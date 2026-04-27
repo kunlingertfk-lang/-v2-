@@ -1,0 +1,81 @@
+#include "CameraParamsDialog.h"
+#include "ui_CameraParamsDialog.h"
+
+#include <QPushButton>
+#include <QToolButton>
+
+#include "OutputDialog.h"
+#include "PlanDialogUtils.h"
+#include "ReferenceImageDialog.h"
+#include "ToolsDialog.h"
+
+
+CameraParamsDialog::CameraParamsDialog(QWidget *parent)
+    : QDialog(parent)
+    , ui(new Ui::CameraParamsDialog)
+    , m_camera(nullptr)
+{
+    ui->setupUi(this);
+    setupUiState();
+    connectNavigation();
+    initCamera();
+    showMaximized();
+}
+
+CameraParamsDialog::~CameraParamsDialog()
+{
+    if (m_camera) {
+        m_camera->stop();
+        delete m_camera;
+    }
+    delete ui;
+}
+
+void CameraParamsDialog::initCamera()
+{
+    // 取第一个相机
+    QList<QCameraInfo> cameras = QCameraInfo::availableCameras();
+    if (cameras.isEmpty()) {
+        qDebug() << "未找到相机";
+        return;
+    }
+    m_camera = new QCamera(cameras[0], this);
+    m_camera->setViewfinder(ui->camera_1);
+    m_camera->start();
+    qDebug() << "✅ 相机已启动，显示在 camera_1";
+}
+
+
+void CameraParamsDialog::setupUiState()
+{
+    PlanDialogUtils::configureDialogWindow(this, tr("方案编辑 - 相机参数"));
+    PlanDialogUtils::connectWindowButtons(this, ui->headerCloseButton, true);
+
+    ui->cameraStepButton->setChecked(true);
+    ui->referenceStepButton->setChecked(false);
+    ui->toolsStepButton->setChecked(false);
+    ui->outputStepButton->setChecked(false);
+}
+
+void CameraParamsDialog::connectNavigation()
+{
+    connect(ui->referenceStepButton, &QToolButton::clicked, this, &CameraParamsDialog::openReferenceImageDialog);
+    connect(ui->toolsStepButton, &QToolButton::clicked, this, &CameraParamsDialog::openToolsDialog);
+    connect(ui->outputStepButton, &QToolButton::clicked, this, &CameraParamsDialog::openOutputDialog);
+    connect(ui->nextButton, &QPushButton::clicked, this, &CameraParamsDialog::openReferenceImageDialog);
+}
+
+void CameraParamsDialog::openReferenceImageDialog()
+{
+    PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
+}
+
+void CameraParamsDialog::openToolsDialog()
+{
+    PlanDialogUtils::replaceDialog(this, new ToolsDialog);
+}
+
+void CameraParamsDialog::openOutputDialog()
+{
+    PlanDialogUtils::replaceDialog(this, new OutputDialog);
+}

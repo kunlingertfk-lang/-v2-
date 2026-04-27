@@ -1,0 +1,2088 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ToolLibraryDialog</class>
+ <widget class="QDialog" name="ToolLibraryDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1180</width>
+    <height>790</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>添加工具</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QDialog {
+      background: #eef1f4;
+      color: #3f4652;
+      font-family: &quot;Microsoft YaHei&quot;, &quot;Noto Sans CJK SC&quot;, sans-serif;
+      font-size: 16px;
+  }
+  QFrame#toolLibraryTitleBar {
+      background: #3f444e;
+      border-top: 2px solid #ff7a00;
+  }
+  QLabel#toolLibraryTitleLabel {
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 500;
+  }
+  QToolButton#closeButton, QToolButton#headerMaximizeButton {
+      color: #ffffff;
+      font-size: 28px;
+      border: 0;
+      background: transparent;
+  }
+  QFrame#toolLibrarySidebar {
+      background: #ffffff;
+      border-right: 1px solid #e2e5e9;
+  }
+  QLineEdit#toolSearchEdit {
+      min-height: 38px;
+      border: 1px solid #c9cdd3;
+      color: #6b747f;
+      padding-left: 12px;
+      font-size: 16px;
+  }
+  QPushButton[navButton=&quot;true&quot;] {
+      border: 0;
+      border-radius: 0;
+      background: #ffffff;
+      color: #3f4652;
+      text-align: left;
+      padding-left: 42px;
+      min-height: 48px;
+      font-size: 17px;
+  }
+  QPushButton[navButton=&quot;true&quot;]:checked {
+      color: #ff7a00;
+      background: #eef1f4;
+      border-right: 2px solid #ff7a00;
+  }
+  QLabel[sidebarGroup=&quot;true&quot;] {
+      color: #3f4652;
+      font-size: 17px;
+      font-weight: 500;
+      padding-left: 18px;
+  }
+  QFrame#toolGridPanel {
+      background: #ffffff;
+      border: 0;
+  }
+  QFrame#toolPreviewPanel {
+      background: #ffffff;
+      border-left: 1px solid #e0e4e8;
+  }
+  QFrame[toolCategory=&quot;true&quot;] {
+      background: #ffffff;
+      border: 0;
+  }
+  QLabel[categoryTitle=&quot;true&quot;] {
+      color: #3f4652;
+      font-size: 17px;
+      font-weight: 600;
+      padding: 8px 0 0 0;
+  }
+  QToolButton[toolCard=&quot;true&quot;] {
+      background: #ffffff;
+      border: 1px solid transparent;
+      border-radius: 2px;
+      color: #4a5360;
+      font-size: 16px;
+      padding: 8px;
+  }
+  QToolButton[toolCard=&quot;true&quot;]:hover, QToolButton[toolCard=&quot;true&quot;]:checked {
+      border: 1px solid #ff7a00;
+      color: #ff7a00;
+      background: #fff7f0;
+  }
+  QFrame#toolPreviewGraphic {
+      background: #ffffff;
+      border: 0;
+  }
+  QLabel#previewIconLabel {
+      color: #d6dde6;
+      font-size: 86px;
+      qproperty-alignment: AlignCenter;
+  }
+  QLabel#previewTitleLabel {
+      color: #3f4652;
+      font-size: 18px;
+      font-weight: 600;
+      qproperty-alignment: AlignCenter;
+  }
+  QLabel#previewDescriptionLabel {
+      color: #9aa3ae;
+      font-size: 15px;
+      qproperty-alignment: AlignCenter;
+  }
+  QFrame#toolLibraryBottomBar {
+      background: #e3e7eb;
+      border-top: 1px solid #d0d5db;
+  }
+  QPushButton#confirmButton {
+      background: #ff7a00;
+      color: #ffffff;
+      border: 1px solid #ef7000;
+      min-width: 104px;
+      min-height: 42px;
+      font-size: 16px;
+  }
+  QPushButton#cancelButton {
+      background: #ffffff;
+      color: #3f4652;
+      border: 1px solid #c9cdd3;
+      min-width: 104px;
+      min-height: 42px;
+      font-size: 16px;
+  }
+  QLabel#toolLibraryTipLabel {
+      color: #ff3b30;
+      font-size: 15px;
+  }
+  QScrollArea { background: transparent; border: 0; }
+  QScrollArea &gt; QWidget &gt; QWidget { background: #ffffff; }
+  </string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_root">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="toolLibraryTitleBar">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>50</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>50</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_titleBar">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <property name="leftMargin">
+       <number>20</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>12</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="toolLibraryTitleLabel">
+        <property name="text">
+         <string>添加工具</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_titleBar">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QToolButton" name="closeButton">
+        <property name="minimumSize">
+         <size>
+          <width>38</width>
+          <height>38</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>×</string>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="toolLibraryBody">
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_body">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QFrame" name="toolLibrarySidebar">
+        <property name="minimumSize">
+         <size>
+          <width>200</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>200</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_sidebar">
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <property name="leftMargin">
+          <number>14</number>
+         </property>
+         <property name="topMargin">
+          <number>16</number>
+         </property>
+         <property name="rightMargin">
+          <number>14</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QLineEdit" name="toolSearchEdit">
+           <property name="minimumSize">
+            <size>
+             <width>170</width>
+             <height>40</height>
+            </size>
+           </property>
+           <property name="placeholderText">
+            <string>搜索工具名</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="generalToolsLabel">
+           <property name="text">
+            <string>通用工具</string>
+           </property>
+           <property name="sidebarGroup" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="allToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>全部工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="measureToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>测量工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="countToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>计数工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="recognitionToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>识别工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="presenceToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>有无工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="logicToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>逻辑工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="locationToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>定位工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="deepLearningToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>深度学习</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="defectToolsButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>48</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>缺陷工具</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="navButton" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer_sidebar">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="toolGridPanel">
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_toolGridPanel">
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QScrollArea" name="toolCategoryScrollArea">
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <property name="widgetResizable">
+            <bool>true</bool>
+           </property>
+           <widget class="QWidget" name="toolCategoryContent">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>642</width>
+              <height>1836</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_toolCategoryContent">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QFrame" name="measurementCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_measurementCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="measurementCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>测量工具</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="pointMeasureButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>点点测量</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="lineMeasureButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>点线测量</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="contrastMeasureButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>对比度测量</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/compare.svg</normaloff>:/icons/compare.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="3">
+                 <widget class="QToolButton" name="grayAreaToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>灰度面积</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QToolButton" name="gapMeasureButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>节距测量</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QToolButton" name="widthMeasureButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>宽度测量</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="2">
+                 <widget class="QToolButton" name="brightnessAverageButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>亮度均值</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="3">
+                 <widget class="QToolButton" name="lineAngleButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>线线角度</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="0">
+                 <widget class="QToolButton" name="colorMeasureButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>颜色测量</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="1">
+                 <widget class="QToolButton" name="colorAreaToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>颜色面积</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="2">
+                 <widget class="QToolButton" name="diameterMeasureButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>直径测量</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="3">
+                 <widget class="QToolButton" name="straightAngleButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>直线角度</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/measure.svg</normaloff>:/icons/measure.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="countCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_countCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="countCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>计数工具</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="counterToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>学习计数</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/tool.svg</normaloff>:/icons/tool.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="areaCounterButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>区域计数</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/tool.svg</normaloff>:/icons/tool.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="edgeCounterButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>边缘计数</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/tool.svg</normaloff>:/icons/tool.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="recognitionCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_recognitionCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="recognitionCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>识别工具</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="ocrToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>字符识别</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/tool-step.svg</normaloff>:/icons/tool-step.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="codeToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>码识别</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/zoom.svg</normaloff>:/icons/zoom.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="categoryToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>种类识别</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/compare.svg</normaloff>:/icons/compare.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="presenceCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_presenceCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="presenceCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>有无工具</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="presenceToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>图案有无</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/eye.svg</normaloff>:/icons/eye.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="edgePresenceButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>边缘有无</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/eye.svg</normaloff>:/icons/eye.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="colorPresenceButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>颜色有无</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/eye.svg</normaloff>:/icons/eye.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="logicCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_logicCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="logicCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>逻辑工具</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="judgeToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>异常判断</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/comm.svg</normaloff>:/icons/comm.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="conditionToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>条件分支</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/comm.svg</normaloff>:/icons/comm.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="variableToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>变量计算</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/comm.svg</normaloff>:/icons/comm.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="3">
+                 <widget class="QToolButton" name="outputLogicButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>结果输出</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/output.svg</normaloff>:/icons/output.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="locationCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_locationCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="locationCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>定位工具</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="templateLocationButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>模板定位</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/fit.svg</normaloff>:/icons/fit.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="edgeLocationButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>边缘定位</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/fit.svg</normaloff>:/icons/fit.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="circleLocationButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>圆定位</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/fit.svg</normaloff>:/icons/fit.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="deepLearningCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_deepLearningCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="deepLearningCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>深度学习</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="dlClassifyButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>深度分类</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/monitor.svg</normaloff>:/icons/monitor.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="dlDetectButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>目标检测</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/monitor.svg</normaloff>:/icons/monitor.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="dlSegmentButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>语义分割</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/monitor.svg</normaloff>:/icons/monitor.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="defectCategoryFrame">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="toolCategory" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_defectCategoryFrame">
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>12</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>12</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>26</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>20</number>
+                </property>
+                <item row="0" column="0" colspan="4">
+                 <widget class="QLabel" name="defectCategoryFrameTitleLabel">
+                  <property name="text">
+                   <string>缺陷工具</string>
+                  </property>
+                  <property name="categoryTitle" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QToolButton" name="scratchDefectButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>划伤检测</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/eye.svg</normaloff>:/icons/eye.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="stainDefectButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>污渍检测</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/eye.svg</normaloff>:/icons/eye.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="missingDefectButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>缺失检测</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/eye.svg</normaloff>:/icons/eye.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_toolCategories">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="toolPreviewPanel">
+        <property name="minimumSize">
+         <size>
+          <width>340</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>340</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_preview">
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QFrame" name="toolPreviewGraphic">
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_previewGraphic">
+            <property name="spacing">
+             <number>20</number>
+            </property>
+            <property name="leftMargin">
+             <number>24</number>
+            </property>
+            <property name="topMargin">
+             <number>120</number>
+            </property>
+            <property name="rightMargin">
+             <number>24</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="previewIconLabel">
+              <property name="text">
+               <string>⌕</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="previewTitleLabel">
+              <property name="text">
+               <string>请选择工具</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="previewDescriptionLabel">
+              <property name="text">
+               <string>请把鼠标悬浮在左侧工具上查看说明</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer_preview">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="toolLibraryBottomBar">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>62</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>62</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_bottom">
+      <property name="spacing">
+       <number>16</number>
+      </property>
+      <property name="leftMargin">
+       <number>18</number>
+      </property>
+      <property name="topMargin">
+       <number>10</number>
+      </property>
+      <property name="rightMargin">
+       <number>14</number>
+      </property>
+      <property name="bottomMargin">
+       <number>10</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="toolLibraryTipLabel">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_bottom">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="confirmButton">
+        <property name="minimumSize">
+         <size>
+          <width>106</width>
+          <height>44</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>确定</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="cancelButton">
+        <property name="minimumSize">
+         <size>
+          <width>106</width>
+          <height>44</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>取消</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="../resources/resources.qrc"/>
+  <include location="../resources/resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>
