@@ -22,3 +22,7 @@ CMakeCache.txt
 cmake_install.cmake
 .DS_Store
 Thumbs.db
+.qmake.stash
+build/
+moc_predefs.h
+/qt_ui_test
