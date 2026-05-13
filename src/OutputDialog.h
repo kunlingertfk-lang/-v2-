@@ -3,6 +3,8 @@
 
 #include <QDialog>
 
+class FrameViewHelper;
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class OutputDialog;
@@ -25,9 +27,12 @@ private slots:
 
 private:
     void setupUiState();
+    void setupOutputScrollArea();
     void connectNavigation();
+    void refreshReferencePreview();
 
     Ui::OutputDialog *ui;
+    FrameViewHelper *m_previewHelper = nullptr;
 };
 
 #endif // OUTPUTDIALOG_H

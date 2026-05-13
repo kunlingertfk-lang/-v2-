@@ -249,15 +249,15 @@
       </property>
       <item>
        <widget class="QFrame" name="setupStepRail">
-        <property name="minimumSize">
-         <size>
-          <width>106</width>
+       <property name="minimumSize">
+        <size>
+          <width>92</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>106</width>
+          <width>96</width>
           <height>16777215</height>
          </size>
         </property>
@@ -432,15 +432,15 @@
       </item>
       <item>
        <widget class="QFrame" name="setupEditorPanel">
-        <property name="minimumSize">
-         <size>
-          <width>610</width>
+       <property name="minimumSize">
+        <size>
+          <width>360</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>610</width>
+          <width>16777215</width>
           <height>16777215</height>
          </size>
         </property>

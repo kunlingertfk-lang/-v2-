@@ -87,15 +87,15 @@ QToolButton#cameraStepButton,
 QToolButton#referenceStepButton,
 QToolButton#toolsStepButton,
 QToolButton#outputStepButton {
-    min-width: 92px;
-    min-height: 86px;
+    min-width: 84px;
+    min-height: 74px;
     border: none;
     border-radius: 0;
     background: transparent;
     color: #6f7787;
     font-size: 15px;
     font-weight: 700;
-    padding: 10px 8px;
+    padding: 8px 6px;
 }
 
 QToolButton#cameraStepButton:hover,
@@ -811,15 +811,15 @@ QWidget[viewerCanvas=&quot;true&quot;] {
       </property>
       <item>
        <widget class="QFrame" name="setupStepRail">
-        <property name="minimumSize">
-         <size>
-          <width>106</width>
+       <property name="minimumSize">
+        <size>
+          <width>92</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>106</width>
+          <width>96</width>
           <height>16777215</height>
          </size>
         </property>
@@ -844,12 +844,12 @@ QWidget[viewerCanvas=&quot;true&quot;] {
          </property>
          <item>
           <widget class="QToolButton" name="cameraStepButton">
-           <property name="minimumSize">
-            <size>
-             <width>108</width>
-             <height>106</height>
-            </size>
-           </property>
+         <property name="minimumSize">
+          <size>
+             <width>84</width>
+             <height>74</height>
+          </size>
+         </property>
            <property name="text">
             <string>相机参数</string>
            </property>
@@ -889,12 +889,12 @@ QWidget[viewerCanvas=&quot;true&quot;] {
          </item>
          <item>
           <widget class="QToolButton" name="referenceStepButton">
-           <property name="minimumSize">
-            <size>
-             <width>108</width>
-             <height>106</height>
-            </size>
-           </property>
+         <property name="minimumSize">
+          <size>
+             <width>84</width>
+             <height>74</height>
+          </size>
+         </property>
            <property name="text">
             <string>基准图</string>
            </property>
@@ -931,12 +931,12 @@ QWidget[viewerCanvas=&quot;true&quot;] {
          </item>
          <item>
           <widget class="QToolButton" name="toolsStepButton">
-           <property name="minimumSize">
-            <size>
-             <width>108</width>
-             <height>106</height>
-            </size>
-           </property>
+         <property name="minimumSize">
+          <size>
+             <width>84</width>
+             <height>74</height>
+          </size>
+         </property>
            <property name="text">
             <string>工具</string>
            </property>
@@ -973,12 +973,12 @@ QWidget[viewerCanvas=&quot;true&quot;] {
          </item>
          <item>
           <widget class="QToolButton" name="outputStepButton">
-           <property name="minimumSize">
-            <size>
-             <width>108</width>
-             <height>106</height>
-            </size>
-           </property>
+         <property name="minimumSize">
+          <size>
+             <width>84</width>
+             <height>74</height>
+          </size>
+         </property>
            <property name="text">
             <string>输出</string>
            </property>
@@ -1018,15 +1018,15 @@ QWidget[viewerCanvas=&quot;true&quot;] {
       </item>
       <item>
        <widget class="QFrame" name="setupEditorPanel">
-        <property name="minimumSize">
-         <size>
-          <width>610</width>
+       <property name="minimumSize">
+        <size>
+          <width>360</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>610</width>
+          <width>16777215</width>
           <height>16777215</height>
          </size>
         </property>
@@ -4324,9 +4324,21 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           </widget>
          </item>
          <item>
-          <widget class="QVideoWidget" name="camera_1" native="true">
+          <widget class="QGraphicsView" name="camera_1">
            <property name="viewerCanvas" stdset="0">
             <bool>true</bool>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <property name="verticalScrollBarPolicy">
+            <enum>Qt::ScrollBarAlwaysOff</enum>
+           </property>
+           <property name="horizontalScrollBarPolicy">
+            <enum>Qt::ScrollBarAlwaysOff</enum>
+           </property>
+           <property name="renderHints">
+            <set>QPainter::Antialiasing|QPainter::SmoothPixmapTransform</set>
            </property>
           </widget>
          </item>
@@ -4407,14 +4419,6 @@ QWidget[viewerCanvas=&quot;true&quot;] {
    </item>
   </layout>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>QVideoWidget</class>
-   <extends>QWidget</extends>
-   <header>CameraParamsDialog.h</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <resources>
   <include location="../resources/resources.qrc"/>
   <include location="../resources/resources.qrc"/>

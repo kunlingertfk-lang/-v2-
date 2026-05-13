@@ -2,6 +2,7 @@
 #include <QFile>
 
 #include "LoginWindow.h"
+#include "frame/CameraFrameProvider.h"
 
 namespace {
 
@@ -22,6 +23,10 @@ int main(int argc, char *argv[])
     app.setOrganizationName(QStringLiteral("汇众智慧"));
 
     loadStyleSheet(app);
+    QObject::connect(&app, &QApplication::aboutToQuit, []() {
+        CameraFrameProvider::instance().stopGrab();
+        CameraFrameProvider::instance().closeCamera();
+    });
 
     LoginWindow loginWindow;
     loginWindow.show();

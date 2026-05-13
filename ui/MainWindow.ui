@@ -19,9 +19,6 @@
   <property name="windowTitle">
    <string>主页面</string>
   </property>
-  <property name="windowState">
-   <set>Qt::WindowMaximized</set>
-  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_root">
     <property name="spacing">
@@ -58,16 +55,16 @@
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_header">
        <property name="spacing">
-        <number>16</number>
+        <number>8</number>
        </property>
        <property name="leftMargin">
-        <number>22</number>
+        <number>12</number>
        </property>
        <property name="topMargin">
         <number>10</number>
        </property>
        <property name="rightMargin">
-        <number>22</number>
+        <number>12</number>
        </property>
        <property name="bottomMargin">
         <number>10</number>
@@ -94,7 +91,7 @@
            <widget class="QLabel" name="headerLogoLabel">
             <property name="minimumSize">
              <size>
-              <width>70</width>
+              <width>48</width>
               <height>48</height>
              </size>
             </property>
@@ -314,7 +311,7 @@
         <widget class="QComboBox" name="headerDeviceComboBox">
          <property name="minimumSize">
           <size>
-           <width>330</width>
+           <width>200</width>
            <height>38</height>
           </size>
          </property>
@@ -866,13 +863,13 @@
         <widget class="QFrame" name="sidebarFrame">
          <property name="minimumSize">
           <size>
-           <width>420</width>
+           <width>320</width>
            <height>0</height>
           </size>
          </property>
          <property name="maximumSize">
           <size>
-           <width>420</width>
+           <width>380</width>
            <height>16777215</height>
           </size>
          </property>
@@ -881,32 +878,32 @@
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_sidebar">
           <property name="spacing">
-           <number>22</number>
+           <number>14</number>
           </property>
           <property name="leftMargin">
-           <number>26</number>
+           <number>16</number>
           </property>
           <property name="topMargin">
-           <number>16</number>
+           <number>12</number>
           </property>
           <property name="rightMargin">
-           <number>16</number>
+           <number>12</number>
           </property>
           <property name="bottomMargin">
-           <number>16</number>
+           <number>12</number>
           </property>
           <item>
            <widget class="QFrame" name="summaryCard">
             <property name="minimumSize">
              <size>
               <width>0</width>
-              <height>186</height>
+              <height>150</height>
              </size>
             </property>
             <property name="maximumSize">
              <size>
               <width>16777215</width>
-              <height>186</height>
+              <height>170</height>
              </size>
             </property>
             <property name="frameShape">

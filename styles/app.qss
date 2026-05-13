@@ -174,6 +174,32 @@ QToolButton#mainNavMonitorButton {
     padding: 4px 6px;
 }
 
+QDialog#LoginWindow QToolButton#navCameraButton,
+QDialog#LoginWindow QToolButton#navPlanButton,
+QDialog#LoginWindow QToolButton#navIoButton,
+QDialog#LoginWindow QToolButton#navCommButton,
+QDialog#LoginWindow QToolButton#navAssistButton,
+QDialog#LoginWindow QToolButton#navMonitorButton {
+    min-width: 68px;
+    min-height: 54px;
+    padding: 2px 4px;
+}
+
+QMainWindow#MainWindow QToolButton#mainNavCameraButton,
+QMainWindow#MainWindow QToolButton#mainNavPlanButton,
+QMainWindow#MainWindow QToolButton#mainNavIoButton,
+QMainWindow#MainWindow QToolButton#mainNavCommButton,
+QMainWindow#MainWindow QToolButton#mainNavAssistButton,
+QMainWindow#MainWindow QToolButton#mainNavMonitorButton {
+    min-width: 68px;
+    min-height: 54px;
+    padding: 2px 4px;
+}
+
+QMainWindow#MainWindow QComboBox#headerDeviceComboBox {
+    min-width: 200px;
+}
+
 QToolButton#navAssistButton,
 QToolButton#mainNavAssistButton {
     color: #ffffff;
@@ -520,6 +546,8 @@ QDialog#CameraParamsDialog,
 QDialog#ReferenceImageDialog,
 QDialog#ToolsDialog,
 QDialog#CharacterRecognitionDialog,
+QDialog#BlobPresenceDialog,
+QDialog#CirclePresenceDialog,
 QDialog#OutputDialog {
     background: #eef1f5;
 }
@@ -594,15 +622,15 @@ QToolButton#cameraStepButton,
 QToolButton#referenceStepButton,
 QToolButton#toolsStepButton,
 QToolButton#outputStepButton {
-    min-width: 92px;
-    min-height: 86px;
+    min-width: 84px;
+    min-height: 74px;
     border: none;
     border-radius: 0;
     background: transparent;
     color: #6f7787;
     font-size: 15px;
     font-weight: 700;
-    padding: 10px 8px;
+    padding: 8px 6px;
 }
 
 QToolButton#cameraStepButton:hover,

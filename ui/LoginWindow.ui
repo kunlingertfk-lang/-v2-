@@ -19,9 +19,6 @@
   <property name="windowTitle">
    <string>登录界面</string>
   </property>
-  <property name="windowState">
-   <set>Qt::WindowMaximized</set>
-  </property>
   <layout class="QVBoxLayout" name="verticalLayout_root">
    <property name="spacing">
     <number>0</number>
@@ -57,16 +54,16 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_header">
       <property name="spacing">
-       <number>16</number>
+       <number>8</number>
       </property>
       <property name="leftMargin">
-       <number>22</number>
+       <number>12</number>
       </property>
       <property name="topMargin">
        <number>10</number>
       </property>
       <property name="rightMargin">
-       <number>22</number>
+       <number>12</number>
       </property>
       <property name="bottomMargin">
        <number>10</number>
@@ -93,7 +90,7 @@
           <widget class="QLabel" name="headerLogoLabel">
            <property name="minimumSize">
             <size>
-             <width>70</width>
+             <width>48</width>
              <height>48</height>
             </size>
            </property>
@@ -335,13 +332,13 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_contentArea">
       <property name="leftMargin">
-       <number>110</number>
+       <number>24</number>
       </property>
       <property name="topMargin">
-       <number>48</number>
+       <number>28</number>
       </property>
       <property name="rightMargin">
-       <number>110</number>
+       <number>24</number>
       </property>
       <property name="bottomMargin">
        <number>20</number>
@@ -363,8 +360,8 @@
        <widget class="QFrame" name="contentCard">
         <property name="minimumSize">
          <size>
-          <width>1120</width>
-          <height>660</height>
+          <width>760</width>
+          <height>520</height>
          </size>
         </property>
         <property name="frameShape">
@@ -390,13 +387,13 @@
           <widget class="QFrame" name="leftPanel">
            <property name="minimumSize">
             <size>
-             <width>470</width>
+             <width>340</width>
              <height>0</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
-             <width>470</width>
+             <width>16777215</width>
              <height>16777215</height>
             </size>
            </property>
@@ -482,7 +479,7 @@
               <property name="minimumSize">
                <size>
                 <width>0</width>
-                <height>330</height>
+                <height>260</height>
                </size>
               </property>
               <property name="verticalScrollBarPolicy">
@@ -501,7 +498,7 @@
               <property name="minimumSize">
                <size>
                 <width>0</width>
-                <height>180</height>
+                <height>150</height>
                </size>
               </property>
               <property name="frameShape">
@@ -627,7 +624,7 @@
           <widget class="QFrame" name="rightPanel">
            <property name="minimumSize">
             <size>
-             <width>70</width>
+             <width>320</width>
              <height>0</height>
             </size>
            </property>
@@ -639,13 +636,13 @@
              <number>20</number>
             </property>
             <property name="leftMargin">
-             <number>76</number>
+             <number>32</number>
             </property>
             <property name="topMargin">
              <number>20</number>
             </property>
             <property name="rightMargin">
-             <number>76</number>
+             <number>32</number>
             </property>
             <property name="bottomMargin">
              <number>5</number>
@@ -657,7 +654,7 @@
                 <property name="minimumSize">
                  <size>
                   <width>0</width>
-                  <height>190</height>
+                  <height>32</height>
                  </size>
                 </property>
                 <property name="orientation">
@@ -715,7 +712,7 @@
                <widget class="QLabel" name="logoMarkLargeLabel">
                 <property name="minimumSize">
                  <size>
-                  <width>100</width>
+                  <width>72</width>
                   <height>72</height>
                  </size>
                 </property>

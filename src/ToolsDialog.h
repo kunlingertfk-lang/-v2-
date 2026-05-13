@@ -2,6 +2,11 @@
 #define TOOLSDIALOG_H
 
 #include <QDialog>
+#include <QVector>
+
+#include "toolcore/ToolConfig.h"
+
+class FrameViewHelper;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -17,6 +22,8 @@ public:
     explicit ToolsDialog(QWidget *parent = nullptr);
     ~ToolsDialog() override;
 
+    const QVector<ToolConfig> &toolConfigs() const;
+
 private slots:
     void openToolLibrary();
     void openCameraParamsDialog();
@@ -26,10 +33,13 @@ private slots:
 private:
     void setupUiState();
     void connectNavigation();
-    void addCharacterRecognitionTool(const QString &summaryText);
+    void addConfiguredTool(const ToolConfig &config);
+    void refreshReferencePreview();
 
     Ui::ToolsDialog *ui;
     int m_toolSerial;
+    QVector<ToolConfig> m_toolConfigs;
+    FrameViewHelper *m_previewHelper = nullptr;
 };
 
 #endif // TOOLSDIALOG_H

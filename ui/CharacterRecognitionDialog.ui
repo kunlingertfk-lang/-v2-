@@ -414,6 +414,28 @@
               <number>0</number>
              </property>
              <item>
+              <widget class="QStackedWidget" name="configStackedWidget">
+               <property name="currentIndex">
+                <number>0</number>
+               </property>
+               <widget class="QWidget" name="basicConfigPage">
+                <layout class="QVBoxLayout" name="verticalLayout_basicConfigPage">
+                 <property name="spacing">
+                  <number>12</number>
+                 </property>
+                 <property name="leftMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>0</number>
+                 </property>
+                 <item>
               <widget class="QFrame" name="detectionAreaCard">
                <property name="frameShape">
                 <enum>QFrame::NoFrame</enum>
@@ -759,7 +781,7 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QSpinBox" name="minCountSpinBox">
+                    <widget class="QSpinBox" name="minCountSpinBox">
                       <property name="minimumSize">
                        <size>
                         <width>110</width>
@@ -839,7 +861,7 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QSpinBox" name="minScoreSpinBox">
+                    <widget class="QSpinBox" name="minScoreSpinBox">
                       <property name="minimumSize">
                        <size>
                         <width>180</width>
@@ -847,13 +869,13 @@
                        </size>
                       </property>
                       <property name="minimum">
-                       <number>1</number>
+                       <number>0</number>
                       </property>
                       <property name="maximum">
                        <number>100</number>
                       </property>
                       <property name="value">
-                       <number>50</number>
+                       <number>70</number>
                       </property>
                      </widget>
                     </item>
@@ -1044,6 +1066,403 @@
                </property>
               </spacer>
              </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="allConfigPage">
+                <layout class="QVBoxLayout" name="verticalLayout_allConfigPage">
+                 <property name="spacing">
+                  <number>12</number>
+                 </property>
+                 <property name="leftMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>0</number>
+                 </property>
+                 <item>
+                  <widget class="QFrame" name="advancedOcrCard">
+                   <property name="frameShape">
+                    <enum>QFrame::NoFrame</enum>
+                   </property>
+                   <property name="panelRole" stdset="0">
+                    <string>configCard</string>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout_advancedOcr">
+                    <property name="spacing">
+                     <number>14</number>
+                    </property>
+                    <property name="leftMargin">
+                     <number>20</number>
+                    </property>
+                    <property name="topMargin">
+                     <number>18</number>
+                    </property>
+                    <property name="rightMargin">
+                     <number>20</number>
+                    </property>
+                    <property name="bottomMargin">
+                     <number>18</number>
+                    </property>
+                    <item>
+                     <widget class="QLabel" name="advancedOcrTitleLabel">
+                      <property name="text">
+                       <string>OCR 高级参数</string>
+                      </property>
+                      <property name="role" stdset="0">
+                       <string>cardTitle</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <layout class="QFormLayout" name="formLayout_advancedOcr">
+                      <property name="horizontalSpacing">
+                       <number>16</number>
+                      </property>
+                      <property name="verticalSpacing">
+                       <number>12</number>
+                      </property>
+                      <property name="labelAlignment">
+                       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                      </property>
+                      <item row="0" column="0">
+                       <widget class="QLabel" name="binaryThresholdLabel">
+                        <property name="text">
+                         <string>二值阈值</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="0" column="1">
+                       <widget class="QSpinBox" name="binaryThresholdSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <number>255</number>
+                        </property>
+                        <property name="value">
+                         <number>128</number>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="1" column="0">
+                       <widget class="QLabel" name="polarityLabel">
+                        <property name="text">
+                         <string>字符极性</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="1" column="1">
+                       <widget class="QComboBox" name="polarityComboBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <item>
+                         <property name="text">
+                          <string>暗目标</string>
+                         </property>
+                        </item>
+                        <item>
+                         <property name="text">
+                          <string>亮目标</string>
+                         </property>
+                        </item>
+                        <item>
+                         <property name="text">
+                          <string>自动</string>
+                         </property>
+                        </item>
+                       </widget>
+                      </item>
+                      <item row="2" column="0">
+                       <widget class="QLabel" name="minCharAreaLabel">
+                        <property name="text">
+                         <string>最小字符面积</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="2" column="1">
+                       <widget class="QDoubleSpinBox" name="minCharAreaSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <double>1000000.000000000000000</double>
+                        </property>
+                        <property name="value">
+                         <double>20.000000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="3" column="0">
+                       <widget class="QLabel" name="maxCharAreaLabel">
+                        <property name="text">
+                         <string>最大字符面积</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="3" column="1">
+                       <widget class="QDoubleSpinBox" name="maxCharAreaSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <double>10000000.000000000000000</double>
+                        </property>
+                        <property name="value">
+                         <double>100000.000000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="4" column="0">
+                       <widget class="QLabel" name="minConfidenceLabel">
+                        <property name="text">
+                         <string>最低得分</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="4" column="1">
+                       <widget class="QSpinBox" name="minConfidenceSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <number>100</number>
+                        </property>
+                        <property name="value">
+                         <number>70</number>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="5" column="0">
+                       <widget class="QLabel" name="minCharWidthLabel">
+                        <property name="text">
+                         <string>最小字符宽度</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="5" column="1">
+                       <widget class="QDoubleSpinBox" name="minCharWidthSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <double>99999.000000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="6" column="0">
+                       <widget class="QLabel" name="minCharHeightLabel">
+                        <property name="text">
+                         <string>最小字符高度</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="6" column="1">
+                       <widget class="QDoubleSpinBox" name="minCharHeightSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <double>99999.000000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="7" column="0">
+                       <widget class="QLabel" name="maxCharWidthLabel">
+                        <property name="text">
+                         <string>最大字符宽度</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="7" column="1">
+                       <widget class="QDoubleSpinBox" name="maxCharWidthSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <double>99999.000000000000000</double>
+                        </property>
+                        <property name="value">
+                         <double>99999.000000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="8" column="0">
+                       <widget class="QLabel" name="maxCharHeightLabel">
+                        <property name="text">
+                         <string>最大字符高度</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="8" column="1">
+                       <widget class="QDoubleSpinBox" name="maxCharHeightSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximum">
+                         <double>99999.000000000000000</double>
+                        </property>
+                        <property name="value">
+                         <double>99999.000000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="9" column="0">
+                       <widget class="QLabel" name="minAspectRatioLabel">
+                        <property name="text">
+                         <string>最小长宽比</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="9" column="1">
+                       <widget class="QDoubleSpinBox" name="minAspectRatioSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="decimals">
+                         <number>2</number>
+                        </property>
+                        <property name="minimum">
+                         <double>0.010000000000000</double>
+                        </property>
+                        <property name="maximum">
+                         <double>100.000000000000000</double>
+                        </property>
+                        <property name="singleStep">
+                         <double>0.100000000000000</double>
+                        </property>
+                        <property name="value">
+                         <double>0.100000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="10" column="0">
+                       <widget class="QLabel" name="maxAspectRatioLabel">
+                        <property name="text">
+                         <string>最大长宽比</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="10" column="1">
+                       <widget class="QDoubleSpinBox" name="maxAspectRatioSpinBox">
+                        <property name="minimumSize">
+                         <size>
+                          <width>220</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="decimals">
+                         <number>2</number>
+                        </property>
+                        <property name="minimum">
+                         <double>0.010000000000000</double>
+                        </property>
+                        <property name="maximum">
+                         <double>100.000000000000000</double>
+                        </property>
+                        <property name="singleStep">
+                         <double>0.100000000000000</double>
+                        </property>
+                        <property name="value">
+                         <double>10.000000000000000</double>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="11" column="0">
+                       <widget class="QLabel" name="modelPathLabel">
+                        <property name="text">
+                         <string>OCR 模型路径</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="11" column="1">
+                       <layout class="QHBoxLayout" name="horizontalLayout_modelPath">
+                        <item>
+                         <widget class="QLineEdit" name="modelPathLineEdit">
+                          <property name="minimumSize">
+                           <size>
+                            <width>0</width>
+                            <height>38</height>
+                           </size>
+                          </property>
+                          <property name="text">
+                           <string>/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/ocr/OCRB_0-9A-Z_NoRej.omc</string>
+                          </property>
+                         </widget>
+                        </item>
+                        <item>
+                         <widget class="QPushButton" name="selectModelButton">
+                          <property name="minimumSize">
+                           <size>
+                            <width>78</width>
+                            <height>38</height>
+                           </size>
+                          </property>
+                          <property name="text">
+                           <string>选择</string>
+                          </property>
+                         </widget>
+                        </item>
+                       </layout>
+                      </item>
+                     </layout>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="verticalSpacer_allConfigPage">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>40</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </widget>
+             </item>
             </layout>
            </widget>
           </widget>
@@ -1061,18 +1480,34 @@
                <height>20</height>
               </size>
              </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QPushButton" name="testRunButton">
-             <property name="minimumSize">
-              <size>
-               <width>120</width>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="referenceTestButton">
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
+              <height>48</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>基准图测试</string>
+            </property>
+            <property name="actionRole" stdset="0">
+             <string>secondary</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="testRunButton">
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
                <height>48</height>
               </size>
              </property>
              <property name="text">
-              <string>测试运行</string>
+              <string>取消</string>
              </property>
              <property name="actionRole" stdset="0">
               <string>secondary</string>

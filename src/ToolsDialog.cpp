@@ -7,15 +7,23 @@
 #include <QPoint>
 #include <QPushButton>
 #include <QSize>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include "CharacterRecognitionDialog.h"
+#include "BlobPresenceDialog.h"
 #include "CameraParamsDialog.h"
+#include "CirclePresenceDialog.h"
+#include "MainWindow.h"
 #include "OutputDialog.h"
+#include "PatternPresenceDialog.h"
 #include "PlanDialogUtils.h"
 #include "ReferenceImageDialog.h"
 #include "ToolLibraryDialog.h"
+#include "WindowUtils.h"
+#include "frame/FrameViewHelper.h"
+#include "frame/ReferenceImageProvider.h"
 #include "ui_ToolsDialog.h"
 
 ToolsDialog::ToolsDialog(QWidget *parent)
@@ -24,9 +32,14 @@ ToolsDialog::ToolsDialog(QWidget *parent)
     , m_toolSerial(0)
 {
     ui->setupUi(this);
+    m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     setupUiState();
     connectNavigation();
-    showMaximized();
+    connect(&ReferenceImageProvider::instance(),
+            &ReferenceImageProvider::referenceFrameChanged,
+            this,
+            [this](const QImage &) { refreshReferencePreview(); });
+    refreshReferencePreview();
 }
 
 ToolsDialog::~ToolsDialog()
@@ -34,10 +47,19 @@ ToolsDialog::~ToolsDialog()
     delete ui;
 }
 
+const QVector<ToolConfig> &ToolsDialog::toolConfigs() const
+{
+    return m_toolConfigs;
+}
+
 void ToolsDialog::setupUiState()
 {
     PlanDialogUtils::configureDialogWindow(this, tr("方案编辑 - 工具"));
-    PlanDialogUtils::connectWindowButtons(this, ui->headerCloseButton, true);
+    if (qobject_cast<MainWindow *>(parentWidget())) {
+        connect(ui->headerCloseButton, &QToolButton::clicked, this, &ToolsDialog::accept);
+    } else {
+        PlanDialogUtils::connectWindowButtons(this, ui->headerCloseButton, true);
+    }
 
 
     ui->cameraStepButton->setChecked(false);
@@ -56,26 +78,135 @@ void ToolsDialog::connectNavigation()
     connect(ui->nextButton, &QPushButton::clicked, this, &ToolsDialog::openOutputDialog);
 }
 
+void ToolsDialog::refreshReferencePreview()
+{
+    if (!m_previewHelper) {
+        return;
+    }
+
+    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    if (image.isNull()) {
+        m_previewHelper->clear();
+        ui->viewerTitleLabel->setText(tr("请先设置基准图"));
+        return;
+    }
+
+    ui->viewerTitleLabel->setText(tr("基准图"));
+    m_previewHelper->setImage(image);
+}
+
 void ToolsDialog::openToolLibrary()
 {
-    ToolLibraryDialog library(this);
-    const QPoint center = frameGeometry().center() - QPoint(library.width() / 2, library.height() / 2);
-    library.move(center);
+    ToolType selectedToolType = ToolType::Unknown;
 
-    if (library.exec() != QDialog::Accepted) {
+    {
+        ToolLibraryDialog library(this);
+        library.setWindowModality(Qt::WindowModal);
+        library.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        WindowUtils::fitDialogToScreen(&library, this, 40);
+        WindowUtils::centerWindowOnScreen(&library, this, 40);
+
+        QTimer::singleShot(0, &library, [&library]() {
+            library.raise();
+            library.activateWindow();
+        });
+
+        if (library.exec() != QDialog::Accepted) {
+            return;
+        }
+
+        selectedToolType = library.selectedToolType();
+    }
+
+    if (selectedToolType == ToolType::Ocr) {
+        CharacterRecognitionDialog configDialog(this);
+        configDialog.setWindowModality(Qt::WindowModal);
+        configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        WindowUtils::applyLargeWindow(&configDialog);
+
+        QTimer::singleShot(0, &configDialog, [&configDialog]() {
+            configDialog.raise();
+            configDialog.activateWindow();
+        });
+        configDialog.raise();
+        configDialog.activateWindow();
+
+        if (configDialog.exec() == QDialog::Accepted) {
+            const ToolConfig config = configDialog.toToolConfig();
+            m_toolConfigs.append(config);
+            addConfiguredTool(config);
+            raise();
+            activateWindow();
+        }
         return;
     }
 
-    if (library.selectedTool() != ToolLibraryDialog::CharacterRecognition) {
+    if (selectedToolType == ToolType::PatternPresence) {
+        PatternPresenceDialog configDialog(this);
+        configDialog.setWindowModality(Qt::WindowModal);
+        configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        WindowUtils::applyLargeWindow(&configDialog);
+
+        QTimer::singleShot(0, &configDialog, [&configDialog]() {
+            configDialog.raise();
+            configDialog.activateWindow();
+        });
+        configDialog.raise();
+        configDialog.activateWindow();
+
+        if (configDialog.exec() == QDialog::Accepted) {
+            const ToolConfig config = configDialog.toToolConfig();
+            m_toolConfigs.append(config);
+            addConfiguredTool(config);
+            raise();
+            activateWindow();
+        }
         return;
     }
 
-    CharacterRecognitionDialog configDialog(this);
+    if (selectedToolType == ToolType::BlobPresence) {
+        BlobPresenceDialog configDialog(this);
+        configDialog.setWindowModality(Qt::WindowModal);
+        configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        WindowUtils::applyLargeWindow(&configDialog);
 
-    if (configDialog.exec() == QDialog::Accepted) {
-        addCharacterRecognitionTool(configDialog.summaryText());
-        raise();
-        activateWindow();
+        QTimer::singleShot(0, &configDialog, [&configDialog]() {
+            configDialog.raise();
+            configDialog.activateWindow();
+        });
+        configDialog.raise();
+        configDialog.activateWindow();
+
+        if (configDialog.exec() == QDialog::Accepted) {
+            const ToolConfig config = configDialog.toToolConfig();
+            m_toolConfigs.append(config);
+            addConfiguredTool(config);
+            raise();
+            activateWindow();
+        }
+        return;
+    }
+
+    if (selectedToolType == ToolType::CirclePresence) {
+        CirclePresenceDialog configDialog(this);
+        configDialog.setWindowModality(Qt::WindowModal);
+        configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        WindowUtils::applyLargeWindow(&configDialog);
+
+        QTimer::singleShot(0, &configDialog, [&configDialog]() {
+            configDialog.raise();
+            configDialog.activateWindow();
+        });
+        configDialog.raise();
+        configDialog.activateWindow();
+
+        if (configDialog.exec() == QDialog::Accepted) {
+            const ToolConfig config = configDialog.toToolConfig();
+            m_toolConfigs.append(config);
+            addConfiguredTool(config);
+            raise();
+            activateWindow();
+        }
     }
 }
 
@@ -94,7 +225,7 @@ void ToolsDialog::openOutputDialog()
     PlanDialogUtils::replaceDialog(this, new OutputDialog);
 }
 
-void ToolsDialog::addCharacterRecognitionTool(const QString &summaryText)
+void ToolsDialog::addConfiguredTool(const ToolConfig &config)
 {
     QFrame *card = new QFrame(ui->scrollAreaWidgetContents);
     card->setObjectName(QStringLiteral("toolSelectedCard"));
@@ -112,11 +243,11 @@ void ToolsDialog::addCharacterRecognitionTool(const QString &summaryText)
     QVBoxLayout *textLayout = new QVBoxLayout;
     textLayout->setSpacing(6);
 
-    QLabel *titleLabel = new QLabel(tr("字符识别_%1").arg(m_toolSerial++), card);
+    QLabel *titleLabel = new QLabel(config.displayName.isEmpty() ? config.toolName : config.displayName, card);
     titleLabel->setObjectName(QStringLiteral("toolTitleLabel"));
     titleLabel->setProperty("role", QStringLiteral("toolTitle"));
 
-    QLabel *summaryLabel = new QLabel(summaryText, card);
+    QLabel *summaryLabel = new QLabel(config.summary, card);
     summaryLabel->setObjectName(QStringLiteral("toolSubTextLabel"));
     summaryLabel->setProperty("role", QStringLiteral("toolSubText"));
     summaryLabel->setWordWrap(true);

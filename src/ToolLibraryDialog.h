@@ -3,6 +3,8 @@
 
 #include <QDialog>
 
+#include "toolcore/ToolTypes.h"
+
 class QButtonGroup;
 
 QT_BEGIN_NAMESPACE
@@ -24,13 +26,16 @@ public:
         Category,
         ColorArea,
         CharacterRecognition,
-        Code
+        Code,
+        BlobPresence,
+        CirclePresence
     };
 
     explicit ToolLibraryDialog(QWidget *parent = nullptr);
     ~ToolLibraryDialog() override;
 
     ToolId selectedTool() const;
+    ToolType selectedToolType() const;
 
 private slots:
     void confirmSelection();
@@ -42,6 +47,7 @@ private:
 
     Ui::ToolLibraryDialog *ui;
     QButtonGroup *m_buttonGroup;
+    ToolType m_selectedToolType = ToolType::Unknown;
 };
 
 #endif // TOOLLIBRARYDIALOG_H

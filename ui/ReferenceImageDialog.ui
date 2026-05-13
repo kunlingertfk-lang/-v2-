@@ -87,15 +87,15 @@ QToolButton#cameraStepButton,
 QToolButton#referenceStepButton,
 QToolButton#toolsStepButton,
 QToolButton#outputStepButton {
-    min-width: 92px;
-    min-height: 86px;
+    min-width: 84px;
+    min-height: 74px;
     border: none;
     border-radius: 0;
     background: transparent;
     color: #6f7787;
     font-size: 15px;
     font-weight: 700;
-    padding: 10px 8px;
+    padding: 8px 6px;
 }
 
 QToolButton#cameraStepButton:hover,
@@ -238,6 +238,7 @@ QPushButton[actionRole=&quot;secondary&quot;]:hover {
 QPushButton[orangeButton=&quot;true&quot;],
 QPushButton#confirmButton,
 QPushButton#currentImageButton,
+QPushButton#captureImageButton,
 QPushButton#highlightActionButton,
 QPushButton[actionRole=&quot;highlight&quot;] {
     min-height: 46px;
@@ -253,6 +254,7 @@ QPushButton[actionRole=&quot;highlight&quot;] {
 QPushButton[orangeButton=&quot;true&quot;]:hover,
 QPushButton#confirmButton:hover,
 QPushButton#currentImageButton:hover,
+QPushButton#captureImageButton:hover,
 QPushButton#highlightActionButton:hover,
 QPushButton[actionRole=&quot;highlight&quot;]:hover {
     background: #ff972f;
@@ -811,15 +813,15 @@ QWidget[viewerCanvas=&quot;true&quot;] {
       </property>
       <item>
        <widget class="QFrame" name="setupStepRail">
-        <property name="minimumSize">
-         <size>
-          <width>106</width>
+       <property name="minimumSize">
+        <size>
+          <width>92</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>106</width>
+          <width>96</width>
           <height>16777215</height>
          </size>
         </property>
@@ -846,8 +848,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="cameraStepButton">
            <property name="minimumSize">
             <size>
-             <width>108</width>
-             <height>106</height>
+             <width>84</width>
+             <height>74</height>
             </size>
            </property>
            <property name="text">
@@ -888,8 +890,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="referenceStepButton">
            <property name="minimumSize">
             <size>
-             <width>108</width>
-             <height>106</height>
+             <width>84</width>
+             <height>74</height>
             </size>
            </property>
            <property name="text">
@@ -933,8 +935,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="toolsStepButton">
            <property name="minimumSize">
             <size>
-             <width>108</width>
-             <height>106</height>
+             <width>84</width>
+             <height>74</height>
             </size>
            </property>
            <property name="text">
@@ -975,8 +977,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="outputStepButton">
            <property name="minimumSize">
             <size>
-             <width>108</width>
-             <height>106</height>
+             <width>84</width>
+             <height>74</height>
             </size>
            </property>
            <property name="text">
@@ -1018,15 +1020,15 @@ QWidget[viewerCanvas=&quot;true&quot;] {
       </item>
       <item>
        <widget class="QFrame" name="setupEditorPanel">
-        <property name="minimumSize">
-         <size>
-          <width>610</width>
+       <property name="minimumSize">
+        <size>
+          <width>360</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>610</width>
+          <width>16777215</width>
           <height>16777215</height>
          </size>
         </property>

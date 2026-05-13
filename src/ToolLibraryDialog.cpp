@@ -1,11 +1,12 @@
 #include "ToolLibraryDialog.h"
 #include "ui_ToolLibraryDialog.h"
-#include "CharacterRecognitionDialog.h"
 
 #include <QButtonGroup>
 #include <QPushButton>
 #include <QToolButton>
 #include <QWidget>
+
+#include "WindowUtils.h"
 
 ToolLibraryDialog::ToolLibraryDialog(QWidget *parent)
     : QDialog(parent)
@@ -27,12 +28,17 @@ ToolLibraryDialog::ToolId ToolLibraryDialog::selectedTool() const
     return static_cast<ToolId>(m_buttonGroup->checkedId());
 }
 
+ToolType ToolLibraryDialog::selectedToolType() const
+{
+    return m_selectedToolType;
+}
+
 void ToolLibraryDialog::setupUiState()
 {
     setWindowTitle(tr("工具库"));
-    setWindowModality(Qt::ApplicationModal);
+    setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
-    resize(1180, 790);
+    WindowUtils::centerWindowOnScreen(this, parentWidget(), 40);
 
     connect(ui->closeButton, &QToolButton::clicked, this, &ToolLibraryDialog::reject);
     connect(ui->cancelButton, &QPushButton::clicked, this, &ToolLibraryDialog::reject);
@@ -131,6 +137,8 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->colorAreaToolButton, ColorArea);
     m_buttonGroup->addButton(ui->ocrToolButton, CharacterRecognition);
     m_buttonGroup->addButton(ui->codeToolButton, Code);
+    m_buttonGroup->addButton(ui->blobPresenceButton, BlobPresence);
+    m_buttonGroup->addButton(ui->circlePresenceButton, CirclePresence);
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     connect(m_buttonGroup, &QButtonGroup::idClicked, this, &ToolLibraryDialog::updatePreview);
@@ -150,25 +158,31 @@ void ToolLibraryDialog::confirmSelection()
         return;
     }
 
-    if (tool != CharacterRecognition) {
-        ui->toolLibraryTipLabel->setText(tr("当前仅支持字符识别工具配置"));
+    if (tool == Presence) {
+        m_selectedToolType = ToolType::PatternPresence;
+        accept();
         return;
     }
-    // 1. 先隐藏自己（ToolLibraryDialog），不立即关闭
-    this->hide();
-    // 2. 隐藏父窗口 ToolsDialog
-    QWidget *toolsDialog = parentWidget();
-    if (toolsDialog) {
-        toolsDialog->hide();
+
+    if (tool == CharacterRecognition) {
+        m_selectedToolType = ToolType::Ocr;
+        accept();
+        return;
     }
-    // 3. 打开字符识别窗口
-    CharacterRecognitionDialog dlg;
-    dlg.exec();
-    // 4. 字符识别关闭后 → 重新显示 ToolsDialog
-    if (toolsDialog) {
-        toolsDialog->show();
+
+    if (tool == BlobPresence) {
+        m_selectedToolType = ToolType::BlobPresence;
+        accept();
+        return;
     }
-    this->close();
+
+    if (tool == CirclePresence) {
+        m_selectedToolType = ToolType::CirclePresence;
+        accept();
+        return;
+    }
+
+    ui->toolLibraryTipLabel->setText(tr("当前仅支持图案有无、斑点有无、圆有无、字符识别工具配置"));
 }
 
 void ToolLibraryDialog::updatePreview(int id)
@@ -177,8 +191,8 @@ void ToolLibraryDialog::updatePreview(int id)
 
     switch (static_cast<ToolId>(id)) {
     case Presence:
-        ui->previewTitleLabel->setText(tr("有无检测"));
-        ui->previewDescriptionLabel->setText(tr("判断检测区域内目标是否存在"));
+        ui->previewTitleLabel->setText(tr("图案有无"));
+        ui->previewDescriptionLabel->setText(tr("判断检测区域内图案是否存在"));
         break;
     case Counter:
         ui->previewTitleLabel->setText(tr("学习计数"));
@@ -199,6 +213,14 @@ void ToolLibraryDialog::updatePreview(int id)
     case Code:
         ui->previewTitleLabel->setText(tr("码识别"));
         ui->previewDescriptionLabel->setText(tr("识别条码和二维码内容"));
+        break;
+    case BlobPresence:
+        ui->previewTitleLabel->setText(tr("斑点有无"));
+        ui->previewDescriptionLabel->setText(tr("判断检测区域内斑点是否存在"));
+        break;
+    case CirclePresence:
+        ui->previewTitleLabel->setText(tr("圆有无"));
+        ui->previewDescriptionLabel->setText(tr("判断检测区域内圆形目标是否存在"));
         break;
     case NoTool:
         ui->previewTitleLabel->setText(tr("请选择工具"));
