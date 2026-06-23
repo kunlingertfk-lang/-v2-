@@ -3,11 +3,15 @@
 
 #include <QDialog>
 #include <QImage>
+#include <QPointF>
 #include <QRectF>
+#include <QVector>
 
+#include "frame/FrameViewHelper.h"
 #include "tooladapters/CirclePresenceAdapter.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolEngine.h"
+#include "toolcore/ToolPreviewSnapshot.h"
 #include "toolcore/ToolResult.h"
 
 #include <opencv2/core.hpp>
@@ -25,6 +29,8 @@ QT_END_NAMESPACE
 struct CirclePresenceConfig
 {
     QString detectRegionType = QStringLiteral("rect");
+    QVector<QPointF> detectPolygonNormalized;
+    CircleRoi detectCircleNormalized;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
     int sensitivity = 60;
@@ -47,6 +53,8 @@ public:
     CirclePresenceConfig configuration() const;
     ToolConfig toToolConfig() const;
     ToolConfig toolConfig() const;
+    ToolPreviewSnapshot referencePreviewSnapshot() const;
+    void loadFromConfig(const ToolConfig &config);
     QString summaryText() const;
 
 protected:
@@ -65,28 +73,45 @@ private:
     void showReferenceImage();
     void showFrameForRoiEditing();
     void startDetectRoiEditing();
+    void startDetectPolygonEditing();
+    void startDetectCircleEditing();
     void showDetectRoiTodo(const QString &message);
     void resetDetectRoi();
     void handleRoiChanged(const QRectF &roi);
+    void handlePolygonChanged(const QVector<QPointF> &points);
+    void handleCircleChanged(const CircleRoi &roi);
+    void handlePolygonSelectionRejected(int pointCount);
+    void handleCircleSelectionRejected();
     void handleRoiSelectionRejected();
+    void refreshDisplayedRoiOverlay();
     void runCirclePresenceOnFrame(const cv::Mat &frame,
                                   const cv::Mat &referenceImage,
                                   const QString &imageTitle,
-                                  const QString &emptyFrameMessage);
+                                  const QString &emptyFrameMessage,
+                                  bool referenceTest = false);
     void displayCirclePresenceResult(const ToolResult &result);
     void displayCirclePresenceError(const QString &status, const QString &message);
     void setViewerStatusText(const QString &displayText, const QString &tooltipText = QString());
     QString detectRoiStatusText() const;
     QRectF effectiveRoiNormalized() const;
+    bool isDetectPolygonMode() const;
+    bool isDetectCircleMode() const;
 
     Ui::CirclePresenceDialog *ui;
     QButtonGroup *m_segmentGroup;
+    QButtonGroup *m_basicDetectionRegionGroup;
+    QButtonGroup *m_detectionRegionGroup;
     QButtonGroup *m_basicResultPresenceGroup;
     QButtonGroup *m_resultPresenceGroup;
     FrameViewHelper *m_previewHelper = nullptr;
     CirclePresenceAdapter m_testCirclePresenceAdapter;
     ToolEngine m_testToolEngine;
+    QString m_toolId;
+    bool m_enabled = true;
+    ToolPreviewSnapshot m_referencePreviewSnapshot;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    QVector<QPointF> m_detectPolygonNormalized;
+    CircleRoi m_detectCircleNormalized;
     bool m_circlePresenceRunning = false;
 };
 

@@ -1,22 +1,129 @@
 #include "PlanDialogUtils.h"
 
+#include <QApplication>
 #include <QByteArray>
 #include <QDebug>
 #include <QDialog>
+#include <QLayout>
 #include <QList>
+#include <QMainWindow>
+#include <QPoint>
 #include <QPointer>
+#include <QRect>
+#include <QScreen>
+#include <QSize>
+#include <QSizePolicy>
 #include <QTimer>
 #include <QToolButton>
 #include <QVariant>
 #include <QWidget>
+#include <QtGlobal>
 
 #include "MainWindow.h"
-#include "WindowUtils.h"
 
 namespace {
 
 constexpr auto kSessionDeviceNameProperty = "sessionDeviceName";
 constexpr auto kSessionUserNameProperty = "sessionUserName";
+
+QScreen *screenFor(QWidget *window, QWidget *parent = nullptr)
+{
+    if (window && window->screen())
+        return window->screen();
+    if (parent && parent->screen())
+        return parent->screen();
+    return QApplication::primaryScreen();
+}
+
+QSize currentWindowSize(QWidget *window)
+{
+    QSize size = window ? window->size() : QSize();
+    if (!size.isValid() || size.isEmpty())
+        size = window ? window->sizeHint() : QSize();
+    if (!size.isValid() || size.isEmpty())
+        size = window ? window->minimumSizeHint() : QSize();
+    return size;
+}
+
+QRect safeAvailableGeometry(QWidget *window, QWidget *parent, int margin)
+{
+    QScreen *screen = screenFor(window, parent);
+    if (!screen) {
+        QSize fallback = currentWindowSize(window);
+        if (!fallback.isValid() || fallback.isEmpty())
+            fallback = QSize(1, 1);
+        return QRect(QPoint(0, 0), fallback);
+    }
+
+    const QRect available = screen->availableGeometry();
+    const int safeMargin = qMax(0, margin);
+    QRect safe = available.adjusted(safeMargin, safeMargin, -safeMargin, -safeMargin);
+    if (safe.width() <= 0 || safe.height() <= 0)
+        safe = available;
+    return safe;
+}
+
+bool isSetupWindow(QWidget *window)
+{
+    if (!window)
+        return false;
+
+    const QString objectName = window->objectName();
+    return objectName == QLatin1String("CameraParamsDialog")
+            || objectName == QLatin1String("ReferenceImageDialog")
+            || objectName == QLatin1String("ToolsDialog")
+            || objectName == QLatin1String("OutputDialog");
+}
+
+bool isLargeSetupWindow(QWidget *window)
+{
+    return qobject_cast<QMainWindow *>(window) != nullptr
+            || (window && (window->objectName() == QLatin1String("LoginWindow")
+                           || isSetupWindow(window)));
+}
+
+void setWidgetWidth(QWidget *root, const char *name, int minimum, int maximum)
+{
+    QWidget *widget = root ? root->findChild<QWidget *>(QLatin1String(name)) : nullptr;
+    if (!widget)
+        return;
+
+    widget->setMinimumWidth(minimum);
+    widget->setMaximumWidth(maximum);
+    widget->setSizePolicy(QSizePolicy::Preferred, widget->sizePolicy().verticalPolicy());
+}
+
+void setToolButtonMinimum(QWidget *root, const char *name, const QSize &minimum, const QSize &iconSize)
+{
+    QToolButton *button = root ? root->findChild<QToolButton *>(QLatin1String(name)) : nullptr;
+    if (!button)
+        return;
+
+    button->setMinimumSize(minimum);
+    button->setIconSize(iconSize);
+}
+
+void applyStandardSetupPageLayout(QWidget *window)
+{
+    if (!isSetupWindow(window))
+        return;
+
+    setWidgetWidth(window, "setupStepRail", 106, 106);
+    setWidgetWidth(window, "setupEditorPanel", 610, 610);
+    setWidgetWidth(window, "setupViewerFrame", 0, QWIDGETSIZE_MAX);
+
+    if (QWidget *viewer = window->findChild<QWidget *>(QLatin1String("setupViewerFrame")))
+        viewer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    if (QWidget *editor = window->findChild<QWidget *>(QLatin1String("setupEditorPanel")))
+        editor->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+
+    const QSize stepMinimum(108, 106);
+    const QSize stepIcon(34, 34);
+    setToolButtonMinimum(window, "cameraStepButton", stepMinimum, stepIcon);
+    setToolButtonMinimum(window, "referenceStepButton", stepMinimum, stepIcon);
+    setToolButtonMinimum(window, "toolsStepButton", stepMinimum, stepIcon);
+    setToolButtonMinimum(window, "outputStepButton", stepMinimum, stepIcon);
+}
 
 void copySessionInfo(QWidget *source, QWidget *target)
 {
@@ -123,7 +230,168 @@ void scheduleSetupDialogSizeLog(QWidget *window)
     });
 }
 
+MainWindow *findParentMainWindow(QWidget *source)
+{
+    QWidget *widget = source;
+    while (widget) {
+        if (MainWindow *mainWindow = qobject_cast<MainWindow *>(widget))
+            return mainWindow;
+        widget = widget->parentWidget();
+    }
+
+    return nullptr;
+}
+
 } // namespace
+
+void PlanDialogUtils::applyLargeWindow(QWidget *window)
+{
+    if (!window)
+        return;
+
+    applyStandardSetupPageLayout(window);
+
+    const QRect safe = safeAvailableGeometry(window, window->parentWidget(), 0);
+    const QSize oldMinimum = window->minimumSize();
+    window->setMinimumSize(qMin(oldMinimum.width(), safe.width()),
+                           qMin(oldMinimum.height(), safe.height()));
+    window->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+    window->setGeometry(safe);
+    window->setWindowState((window->windowState() & ~Qt::WindowMinimized) | Qt::WindowMaximized);
+}
+
+bool PlanDialogUtils::isLargeWindow(QWidget *window)
+{
+    return isLargeSetupWindow(window);
+}
+
+void PlanDialogUtils::fitDialogToScreen(QWidget *dialog, QWidget *parent, int margin)
+{
+    if (!dialog)
+        return;
+
+    if (isLargeSetupWindow(dialog)) {
+        applyLargeWindow(dialog);
+        return;
+    }
+
+    const QRect safe = safeAvailableGeometry(dialog, parent, margin);
+    const QSize maxSize(safe.width(), safe.height());
+
+    const QSize oldMinimum = dialog->minimumSize();
+    dialog->setMinimumSize(qMin(oldMinimum.width(), maxSize.width()),
+                           qMin(oldMinimum.height(), maxSize.height()));
+    dialog->setMaximumSize(maxSize);
+
+    QSize target = currentWindowSize(dialog);
+    if (!target.isValid() || target.isEmpty())
+        target = maxSize;
+
+    target.setWidth(qMin(target.width(), maxSize.width()));
+    target.setHeight(qMin(target.height(), maxSize.height()));
+    target.setWidth(qMax(target.width(), dialog->minimumWidth()));
+    target.setHeight(qMax(target.height(), dialog->minimumHeight()));
+
+    dialog->resize(target);
+    clampWindowToAvailableGeometry(dialog, margin);
+}
+
+void PlanDialogUtils::fitWindowToScreen(QWidget *window, int margin)
+{
+    if (!window)
+        return;
+
+    if (isLargeSetupWindow(window)) {
+        applyLargeWindow(window);
+        return;
+    }
+
+    const QRect safe = safeAvailableGeometry(window, window->parentWidget(), margin);
+    const QSize maxSize(safe.width(), safe.height());
+    const QSize oldMinimum = window->minimumSize();
+    window->setMinimumSize(qMin(oldMinimum.width(), maxSize.width()),
+                           qMin(oldMinimum.height(), maxSize.height()));
+    window->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+
+    QSize target = currentWindowSize(window);
+    if (!target.isValid() || target.isEmpty())
+        target = maxSize;
+
+    target.setWidth(qMin(target.width(), maxSize.width()));
+    target.setHeight(qMin(target.height(), maxSize.height()));
+    target.setWidth(qMax(target.width(), window->minimumWidth()));
+    target.setHeight(qMax(target.height(), window->minimumHeight()));
+
+    window->resize(target);
+    clampWindowToAvailableGeometry(window, margin);
+}
+
+void PlanDialogUtils::centerWindowOnScreen(QWidget *window, QWidget *parent, int margin)
+{
+    if (!window)
+        return;
+
+    if (isLargeSetupWindow(window)) {
+        applyLargeWindow(window);
+        return;
+    }
+
+    fitDialogToScreen(window, parent, margin);
+
+    const QRect safe = safeAvailableGeometry(window, parent, margin);
+    QRect base = safe;
+    if (parent) {
+        QWidget *parentWindow = parent->window();
+        const QRect parentGeometry = parentWindow ? parentWindow->frameGeometry() : parent->frameGeometry();
+        if (parentGeometry.isValid() && safe.intersects(parentGeometry))
+            base = parentGeometry;
+    }
+
+    const QSize size = window->size();
+    const QPoint topLeft(base.center().x() - size.width() / 2,
+                         base.center().y() - size.height() / 2);
+    window->move(topLeft);
+    clampWindowToAvailableGeometry(window, margin);
+}
+
+void PlanDialogUtils::clampWindowToAvailableGeometry(QWidget *window, int margin)
+{
+    if (!window)
+        return;
+
+    if (window->windowState().testFlag(Qt::WindowMaximized))
+        return;
+
+    const QRect safe = safeAvailableGeometry(window, window->parentWidget(), margin);
+    QSize size = window->size();
+    bool resized = false;
+
+    if (size.width() > safe.width()) {
+        size.setWidth(safe.width());
+        resized = true;
+    }
+    if (size.height() > safe.height()) {
+        size.setHeight(safe.height());
+        resized = true;
+    }
+    if (resized)
+        window->resize(size);
+
+    QRect geometry(window->pos(), window->size());
+    int x = geometry.x();
+    int y = geometry.y();
+
+    if (geometry.right() > safe.right())
+        x = safe.right() - geometry.width() + 1;
+    if (geometry.bottom() > safe.bottom())
+        y = safe.bottom() - geometry.height() + 1;
+    if (x < safe.left())
+        x = safe.left();
+    if (y < safe.top())
+        y = safe.top();
+
+    window->move(x, y);
+}
 
 void PlanDialogUtils::applyConfiguredWindowState(QWidget *window)
 {
@@ -131,7 +399,7 @@ void PlanDialogUtils::applyConfiguredWindowState(QWidget *window)
         return;
     }
 
-    WindowUtils::fitWindowToScreen(window, 0);
+    PlanDialogUtils::fitWindowToScreen(window, 0);
     if (window->windowState().testFlag(Qt::WindowMaximized)) {
         window->setWindowState(window->windowState() | Qt::WindowMaximized);
     }
@@ -146,7 +414,7 @@ void PlanDialogUtils::configureDialogWindow(QDialog *dialog, const QString &titl
     dialog->setWindowTitle(title);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowFlag(Qt::Window, true);
-    WindowUtils::applyLargeWindow(dialog);
+    PlanDialogUtils::applyLargeWindow(dialog);
     scheduleSetupDialogSizeLog(dialog);
 
 }
@@ -180,17 +448,17 @@ void PlanDialogUtils::showWindowFromWidget(QWidget *source, QWidget *target)
     }
 
     copySessionInfo(source, target);
-    WindowUtils::fitWindowToScreen(target, 0);
+    PlanDialogUtils::fitWindowToScreen(target, 0);
 
-    if (WindowUtils::isLargeWindow(target)
+    if (PlanDialogUtils::isLargeWindow(target)
             || target->windowState().testFlag(Qt::WindowMaximized)) {
         target->showMaximized();
     } else {
-        WindowUtils::centerWindowOnScreen(target, source, 0);
+        PlanDialogUtils::centerWindowOnScreen(target, source, 0);
         target->show();
     }
 
-    WindowUtils::clampWindowToAvailableGeometry(target, 0);
+    PlanDialogUtils::clampWindowToAvailableGeometry(target, 0);
     target->raise();
     target->activateWindow();
 }
@@ -202,6 +470,11 @@ void PlanDialogUtils::showDialogFromWidget(QWidget *source, QDialog *dialog)
 
 void PlanDialogUtils::replaceDialog(QWidget *current, QDialog *next)
 {
+    if (current && next && !next->parentWidget()) {
+        if (MainWindow *mainWindow = findParentMainWindow(current))
+            next->setParent(mainWindow, next->windowFlags());
+    }
+
     showDialogFromWidget(current, next);
 
     if (current) {
@@ -221,8 +494,13 @@ void PlanDialogUtils::setSessionInfo(QWidget *window, const QString &deviceName,
 
 void PlanDialogUtils::returnToMainWindow(QWidget *source)
 {
-    auto *mainWindow = new MainWindow;
-    mainWindow->setAttribute(Qt::WA_DeleteOnClose);
+    MainWindow *mainWindow = findParentMainWindow(source);
+    if (!mainWindow) {
+        qWarning() << "[SCHEME-RETURN] returnToMainWindow failed: original MainWindow not found"
+                   << "source=" << (source ? source->objectName() : QStringLiteral("<null>"));
+        return;
+    }
+
     copySessionInfo(source, mainWindow);
 
     const QString deviceName = mainWindow->property(kSessionDeviceNameProperty).toString();
@@ -231,9 +509,16 @@ void PlanDialogUtils::returnToMainWindow(QWidget *source)
         mainWindow->setSessionInfo(deviceName, userName);
     }
 
+    qDebug() << "[SCHEME-RETURN] returnToMainWindow"
+             << "source=" << (source ? source->objectName() : QStringLiteral("<null>"))
+             << "mainWindow=" << mainWindow
+             << "reuseExisting=" << true;
+
     showWindowFromWidget(source, mainWindow);
 
     if (source) {
         source->close();
     }
+
+    qDebug() << "[PlanDialogUtils] returnToMainWindow reused existing MainWindow";
 }

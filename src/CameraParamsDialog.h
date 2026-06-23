@@ -25,10 +25,14 @@ private slots:
     void openToolsDialog();
     void openOutputDialog();
     void showLiveImage(const QImage &image);
+    void editCurrentSchemeName();
+    void saveCurrentScheme();
+    void saveCurrentSchemeAs();
 
 private:
     void setupUiState();
     void connectNavigation();
+    void refreshSchemeHeader();
     void setupCameraUI();
     void setupCameraErrorUI();
     void ensureCameraRunning();

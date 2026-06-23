@@ -28,7 +28,12 @@ public:
         CharacterRecognition,
         Code,
         BlobPresence,
-        CirclePresence
+        CirclePresence,
+        EdgePresence,
+        LinePresence,
+        ContourPresence,
+        ObjectDetection,
+        Classification
     };
 
     explicit ToolLibraryDialog(QWidget *parent = nullptr);

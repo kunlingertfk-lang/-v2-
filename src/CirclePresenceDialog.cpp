@@ -1,13 +1,18 @@
 #include "CirclePresenceDialog.h"
 #include "ui_CirclePresenceDialog.h"
 
+#include "PlanDialogUtils.h"
+
 #include <QButtonGroup>
+#include <QComboBox>
 #include <QDebug>
 #include <QFontMetrics>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QSize>
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -16,9 +21,9 @@
 
 #include <opencv2/imgproc.hpp>
 
-#include "WindowUtils.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
+#include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
 
@@ -26,41 +31,7 @@ namespace {
 
 QImage imageFromFrame(const cv::Mat &frame)
 {
-    if (frame.empty())
-        return QImage();
-
-    if (frame.type() == CV_8UC1) {
-        QImage image(frame.data,
-                     frame.cols,
-                     frame.rows,
-                     static_cast<int>(frame.step),
-                     QImage::Format_Grayscale8);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC3) {
-        cv::Mat rgb;
-        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
-        QImage image(rgb.data,
-                     rgb.cols,
-                     rgb.rows,
-                     static_cast<int>(rgb.step),
-                     QImage::Format_RGB888);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC4) {
-        cv::Mat rgba;
-        cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-        QImage image(rgba.data,
-                     rgba.cols,
-                     rgba.rows,
-                     static_cast<int>(rgba.step),
-                     QImage::Format_RGBA8888);
-        return image.copy();
-    }
-
-    return QImage();
+    return MatImageConverter::matToDisplayImage(frame);
 }
 
 int labelDisplayWidth(const QLabel *label)
@@ -135,16 +106,142 @@ QString makeCirclePresenceErrorTooltipText(const QString &status, const QString 
             .arg(status, message);
 }
 
+QJsonObject rectToJson(const QRectF &rect)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("x"), rect.x());
+    json.insert(QStringLiteral("y"), rect.y());
+    json.insert(QStringLiteral("width"), rect.width());
+    json.insert(QStringLiteral("height"), rect.height());
+    return json;
+}
+
+QRectF rectFromJson(const QJsonObject &json, const QRectF &fallback)
+{
+    if (json.isEmpty())
+        return fallback;
+
+    const QRectF rect(json.value(QStringLiteral("x")).toDouble(fallback.x()),
+                      json.value(QStringLiteral("y")).toDouble(fallback.y()),
+                      json.value(QStringLiteral("width")).toDouble(fallback.width()),
+                      json.value(QStringLiteral("height")).toDouble(fallback.height()));
+    return rect.width() > 0.0 && rect.height() > 0.0 ? rect : fallback;
+}
+
+QJsonObject pointToJson(const QPointF &point)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("x"), point.x());
+    json.insert(QStringLiteral("y"), point.y());
+    return json;
+}
+
+QJsonArray pointsToJson(const QVector<QPointF> &points)
+{
+    QJsonArray array;
+    for (const QPointF &point : points)
+        array.append(pointToJson(point));
+    return array;
+}
+
+QVector<QPointF> pointsFromJson(const QJsonArray &array)
+{
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &value : array) {
+        const QJsonObject json = value.toObject();
+        points.append(QPointF(json.value(QStringLiteral("x")).toDouble(),
+                              json.value(QStringLiteral("y")).toDouble()));
+    }
+    return points;
+}
+
+QRectF boundingRectForPoints(const QVector<QPointF> &points)
+{
+    if (points.isEmpty())
+        return QRectF();
+
+    double left = points.first().x();
+    double top = points.first().y();
+    double right = left;
+    double bottom = top;
+    for (const QPointF &point : points) {
+        left = qMin(left, point.x());
+        top = qMin(top, point.y());
+        right = qMax(right, point.x());
+        bottom = qMax(bottom, point.y());
+    }
+
+    return QRectF(QPointF(qBound(0.0, left, 1.0), qBound(0.0, top, 1.0)),
+                  QPointF(qBound(0.0, right, 1.0), qBound(0.0, bottom, 1.0))).normalized();
+}
+
+QJsonObject circleToJson(const CircleRoi &roi)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("center"), pointToJson(roi.centerNormalized));
+    json.insert(QStringLiteral("radius"), roi.radiusNormalized);
+    json.insert(QStringLiteral("boundingRect"), rectToJson(roi.boundingRectNormalized));
+    json.insert(QStringLiteral("valid"), roi.valid);
+    return json;
+}
+
+CircleRoi circleFromJson(const QJsonObject &json)
+{
+    CircleRoi roi;
+    if (json.isEmpty())
+        return roi;
+
+    const QJsonObject center = json.value(QStringLiteral("center")).toObject();
+    roi.centerNormalized = QPointF(center.value(QStringLiteral("x")).toDouble(),
+                                   center.value(QStringLiteral("y")).toDouble());
+    roi.radiusNormalized = json.value(QStringLiteral("radius")).toDouble();
+    roi.boundingRectNormalized = rectFromJson(json.value(QStringLiteral("boundingRect")).toObject(),
+                                              QRectF());
+    roi.valid = roi.radiusNormalized > 0.0 &&
+            roi.boundingRectNormalized.width() > 0.0 &&
+            roi.boundingRectNormalized.height() > 0.0;
+    return roi;
+}
+
+void setComboBoxValue(QComboBox *comboBox, const QString &value)
+{
+    if (!comboBox || value.isEmpty())
+        return;
+
+    const int index = comboBox->findText(value);
+    if (index >= 0)
+        comboBox->setCurrentIndex(index);
+}
+
+void configureRoiToolButton(QToolButton *button,
+                            const QString &text,
+                            const QString &tooltip)
+{
+    if (!button)
+        return;
+
+    button->setText(text);
+    button->setToolTip(tooltip);
+    button->setMinimumSize(QSize(52, 38));
+    button->setMaximumSize(QSize(52, 38));
+    button->setProperty("actionRole", QStringLiteral("toolbarIcon"));
+}
+
 } // namespace
 
 CirclePresenceDialog::CirclePresenceDialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::CirclePresenceDialog)
     , m_segmentGroup(new QButtonGroup(this))
+    , m_basicDetectionRegionGroup(new QButtonGroup(this))
+    , m_detectionRegionGroup(new QButtonGroup(this))
     , m_basicResultPresenceGroup(new QButtonGroup(this))
     , m_resultPresenceGroup(new QButtonGroup(this))
 {
     ui->setupUi(this);
+    m_toolId = QStringLiteral("circle_presence_%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     m_testToolEngine.registerAdapter(&m_testCirclePresenceAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     setupUiState();
@@ -160,9 +257,19 @@ CirclePresenceDialog::~CirclePresenceDialog()
 CirclePresenceConfig CirclePresenceDialog::configuration() const
 {
     const bool basicMode = ui->circleParamsStackedWidget->currentWidget() == ui->basicParamsPage;
+    const bool polygonMode = basicMode
+            ? ui->basicDetectionPolygonButton->isChecked()
+            : ui->detectionPolygonButton->isChecked();
+    const bool circleMode = basicMode
+            ? ui->basicDetectionCircleButton->isChecked()
+            : ui->detectionCircleButton->isChecked();
 
     CirclePresenceConfig config;
-    config.detectRegionType = QStringLiteral("rect");
+    config.detectRegionType = polygonMode
+            ? QStringLiteral("polygon")
+            : (circleMode ? QStringLiteral("circle") : QStringLiteral("rect"));
+    config.detectPolygonNormalized = m_detectPolygonNormalized;
+    config.detectCircleNormalized = m_detectCircleNormalized;
     config.enablePositionCorrection = basicMode
             ? ui->basicPositionCorrectionSwitch->isChecked()
             : ui->positionCorrectionSwitch->isChecked();
@@ -189,11 +296,14 @@ CirclePresenceConfig CirclePresenceDialog::configuration() const
 ToolConfig CirclePresenceDialog::toToolConfig() const
 {
     const CirclePresenceConfig circleConfig = configuration();
-    const QString toolId = QStringLiteral("circle_presence_%1")
-            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    const QString toolId = m_toolId;
 
     QJsonObject params;
     params.insert(QStringLiteral("detectRegionType"), circleConfig.detectRegionType);
+    params.insert(QStringLiteral("detectPolygonNormalized"),
+                  pointsToJson(circleConfig.detectPolygonNormalized));
+    params.insert(QStringLiteral("detectCircleNormalized"),
+                  circleToJson(circleConfig.detectCircleNormalized));
     params.insert(QStringLiteral("enablePositionCorrection"), circleConfig.enablePositionCorrection);
     params.insert(QStringLiteral("positionCorrectionSource"), circleConfig.positionCorrectionSource);
     params.insert(QStringLiteral("sensitivity"), circleConfig.sensitivity);
@@ -213,7 +323,7 @@ ToolConfig CirclePresenceDialog::toToolConfig() const
     config.toolName = tr("圆有无");
     config.toolType = ToolType::CirclePresence;
     config.category = ToolCategory::Presence;
-    config.enabled = true;
+    config.enabled = m_enabled;
     config.roiNormalized = effectiveRoiNormalized();
     config.params = params;
     config.judgeRule = judgeRule;
@@ -225,6 +335,70 @@ ToolConfig CirclePresenceDialog::toToolConfig() const
 ToolConfig CirclePresenceDialog::toolConfig() const
 {
     return toToolConfig();
+}
+
+ToolPreviewSnapshot CirclePresenceDialog::referencePreviewSnapshot() const
+{
+    return m_referencePreviewSnapshot;
+}
+
+void CirclePresenceDialog::loadFromConfig(const ToolConfig &config)
+{
+    if (!config.toolId.trimmed().isEmpty())
+        m_toolId = config.toolId;
+    m_enabled = config.enabled;
+    if (config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0)
+        m_roiNormalized = config.roiNormalized;
+
+    const QJsonObject params = config.params;
+    const bool allMode = params.contains(QStringLiteral("roundness"))
+            || params.value(QStringLiteral("edgePolarity")).toString() != QStringLiteral("any")
+            || params.value(QStringLiteral("edgeType")).toString() != QStringLiteral("strongest");
+    ui->basicSegmentButton->setChecked(!allMode);
+    ui->allSegmentButton->setChecked(allMode);
+    ui->circleParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
+
+    const bool positionCorrection = params.value(QStringLiteral("enablePositionCorrection")).toBool(ui->basicPositionCorrectionSwitch->isChecked());
+    ui->basicPositionCorrectionSwitch->setChecked(positionCorrection);
+    ui->positionCorrectionSwitch->setChecked(positionCorrection);
+    setComboBoxValue(ui->basicPositionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    const int sensitivity = params.value(QStringLiteral("sensitivity")).toInt(ui->circleBasicSensitivitySpinBox->value());
+    ui->circleBasicSensitivitySpinBox->setValue(sensitivity);
+    ui->circleSensitivitySpinBox->setValue(sensitivity);
+    ui->roundnessSpinBox->setValue(params.value(QStringLiteral("roundness")).toInt(ui->roundnessSpinBox->value()));
+    setComboBoxValue(ui->edgePolarityComboBox, edgePolarityDisplayText(params.value(QStringLiteral("edgePolarity")).toString()));
+    setComboBoxValue(ui->edgeTypeComboBox, edgeTypeDisplayText(params.value(QStringLiteral("edgeType")).toString()));
+
+    m_detectPolygonNormalized = pointsFromJson(params.value(QStringLiteral("detectPolygonNormalized")).toArray());
+    m_detectCircleNormalized = circleFromJson(params.value(QStringLiteral("detectCircleNormalized")).toObject());
+    const QString detectRegionType = params.value(QStringLiteral("detectRegionType")).toString().trimmed().toLower();
+    const bool polygonMode = detectRegionType == QStringLiteral("polygon") &&
+            m_detectPolygonNormalized.size() >= 3;
+    const bool circleMode = detectRegionType == QStringLiteral("circle") &&
+            m_detectCircleNormalized.valid;
+    if (polygonMode)
+        m_roiNormalized = boundingRectForPoints(m_detectPolygonNormalized);
+    else if (circleMode)
+        m_roiNormalized = m_detectCircleNormalized.boundingRectNormalized;
+
+    ui->basicDetectionRectButton->setChecked(!polygonMode && !circleMode);
+    ui->detectionRectButton->setChecked(!polygonMode && !circleMode);
+    ui->basicDetectionPolygonButton->setChecked(polygonMode);
+    ui->detectionPolygonButton->setChecked(polygonMode);
+    ui->basicDetectionCircleButton->setChecked(circleMode);
+    ui->detectionCircleButton->setChecked(circleMode);
+
+    const bool existOk = params.value(QStringLiteral("existOk")).toBool(true);
+    ui->basicPresentOkButton->setChecked(existOk);
+    ui->basicAbsentOkButton->setChecked(!existOk);
+    ui->presentOkButton->setChecked(existOk);
+    ui->absentOkButton->setChecked(!existOk);
+
+    m_referencePreviewSnapshot = ToolPreviewSnapshot();
+    refreshDisplayedRoiOverlay();
+    const QString roiText = detectRoiStatusText();
+    setViewerStatusText(roiText, roiText);
 }
 
 QString CirclePresenceDialog::summaryText() const
@@ -267,6 +441,20 @@ void CirclePresenceDialog::setupUiState()
     ui->positionCorrectionSwitch->setChecked(false);
     ui->basicPresentOkButton->setChecked(true);
     ui->presentOkButton->setChecked(true);
+    ui->basicDetectionRectButton->setChecked(true);
+    ui->detectionRectButton->setChecked(true);
+    ui->basicDetectionCircleButton->setChecked(false);
+    ui->detectionCircleButton->setChecked(false);
+    ui->basicDetectionPolygonButton->setChecked(false);
+    ui->detectionPolygonButton->setChecked(false);
+    configureRoiToolButton(ui->basicDetectionRectButton, QStringLiteral("□"), tr("矩形检测 ROI"));
+    configureRoiToolButton(ui->detectionRectButton, QStringLiteral("□"), tr("矩形检测 ROI"));
+    configureRoiToolButton(ui->basicDetectionCircleButton, QStringLiteral("○"), tr("圆形检测 ROI"));
+    configureRoiToolButton(ui->detectionCircleButton, QStringLiteral("○"), tr("圆形检测 ROI"));
+    configureRoiToolButton(ui->basicDetectionPolygonButton, QStringLiteral("⬡"), tr("多边形检测 ROI"));
+    configureRoiToolButton(ui->detectionPolygonButton, QStringLiteral("⬡"), tr("多边形检测 ROI"));
+    configureRoiToolButton(ui->basicDetectionResetButton, QStringLiteral("⟳"), tr("恢复全图检测"));
+    configureRoiToolButton(ui->detectionResetButton, QStringLiteral("⟳"), tr("恢复全图检测"));
 
     ui->viewerStatusBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     ui->viewerStatusBar->setMinimumHeight(42);
@@ -301,8 +489,21 @@ void CirclePresenceDialog::connectControls()
         ui->circleParamsStackedWidget->setCurrentWidget(ui->allParamsPage);
     });
 
+    m_basicDetectionRegionGroup->setExclusive(true);
+    m_basicDetectionRegionGroup->addButton(ui->basicDetectionRectButton, 0);
+    m_basicDetectionRegionGroup->addButton(ui->basicDetectionCircleButton, 1);
+    m_basicDetectionRegionGroup->addButton(ui->basicDetectionPolygonButton, 2);
+    m_detectionRegionGroup->setExclusive(true);
+    m_detectionRegionGroup->addButton(ui->detectionRectButton, 0);
+    m_detectionRegionGroup->addButton(ui->detectionCircleButton, 1);
+    m_detectionRegionGroup->addButton(ui->detectionPolygonButton, 2);
+
     connect(ui->basicDetectionRectButton, &QToolButton::clicked, this, &CirclePresenceDialog::startDetectRoiEditing);
     connect(ui->detectionRectButton, &QToolButton::clicked, this, &CirclePresenceDialog::startDetectRoiEditing);
+    connect(ui->basicDetectionCircleButton, &QToolButton::clicked, this, &CirclePresenceDialog::startDetectCircleEditing);
+    connect(ui->detectionCircleButton, &QToolButton::clicked, this, &CirclePresenceDialog::startDetectCircleEditing);
+    connect(ui->basicDetectionPolygonButton, &QToolButton::clicked, this, &CirclePresenceDialog::startDetectPolygonEditing);
+    connect(ui->detectionPolygonButton, &QToolButton::clicked, this, &CirclePresenceDialog::startDetectPolygonEditing);
     connect(ui->basicDetectionResetButton, &QToolButton::clicked, this, &CirclePresenceDialog::resetDetectRoi);
     connect(ui->detectionResetButton, &QToolButton::clicked, this, &CirclePresenceDialog::resetDetectRoi);
     connect(ui->basicDetectionMaskEditButton, &QPushButton::clicked, this, [this]() {
@@ -330,6 +531,22 @@ void CirclePresenceDialog::connectControls()
                 [this](const QRectF &) {
                     handleRoiSelectionRejected();
                 });
+        connect(m_previewHelper,
+                &FrameViewHelper::polygonChanged,
+                this,
+                &CirclePresenceDialog::handlePolygonChanged);
+        connect(m_previewHelper,
+                &FrameViewHelper::polygonSelectionRejected,
+                this,
+                &CirclePresenceDialog::handlePolygonSelectionRejected);
+        connect(m_previewHelper,
+                &FrameViewHelper::circleChanged,
+                this,
+                &CirclePresenceDialog::handleCircleChanged);
+        connect(m_previewHelper,
+                &FrameViewHelper::circleSelectionRejected,
+                this,
+                &CirclePresenceDialog::handleCircleSelectionRejected);
     }
 
     connect(&ReferenceImageProvider::instance(),
@@ -342,6 +559,23 @@ void CirclePresenceDialog::connectControls()
 
 void CirclePresenceDialog::finishConfiguration()
 {
+    if (isDetectPolygonMode() &&
+        m_previewHelper &&
+        m_previewHelper->isPolygonDrawingEnabled() &&
+        !m_previewHelper->finishPolygonDrawing()) {
+        handlePolygonSelectionRejected(m_detectPolygonNormalized.size());
+        return;
+    }
+
+    if (isDetectPolygonMode() && m_detectPolygonNormalized.size() < 3) {
+        handlePolygonSelectionRejected(m_detectPolygonNormalized.size());
+        return;
+    }
+    if (isDetectCircleMode() && !m_detectCircleNormalized.valid) {
+        handleCircleSelectionRejected();
+        return;
+    }
+
     accept();
 }
 
@@ -360,13 +594,14 @@ void CirclePresenceDialog::runReferenceTest()
     if (!image.isNull() && m_previewHelper) {
         ui->viewerTitleLabel->setText(tr("基准图"));
         m_previewHelper->setImage(image);
-        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+        refreshDisplayedRoiOverlay();
     }
 
     runCirclePresenceOnFrame(referenceImage.clone(),
                              referenceImage.clone(),
                              tr("基准图"),
-                             tr("基准图为空，无法测试"));
+                             tr("基准图为空，无法测试"),
+                             true);
 }
 
 void CirclePresenceDialog::runCameraTest()
@@ -383,7 +618,7 @@ void CirclePresenceDialog::runCameraTest()
     if (!image.isNull() && m_previewHelper) {
         ui->viewerTitleLabel->setText(tr("测试图像"));
         m_previewHelper->setImage(image);
-        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+        refreshDisplayedRoiOverlay();
     }
 
     runCirclePresenceOnFrame(snapshot,
@@ -394,7 +629,7 @@ void CirclePresenceDialog::runCameraTest()
 
 void CirclePresenceDialog::applyAdaptiveWindowSize()
 {
-    WindowUtils::applyLargeWindow(this);
+    PlanDialogUtils::applyLargeWindow(this);
 }
 
 void CirclePresenceDialog::fitPreview()
@@ -417,7 +652,7 @@ void CirclePresenceDialog::showReferenceImage()
 
     ui->viewerTitleLabel->setText(tr("基准图"));
     m_previewHelper->setImage(image);
-    m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+    refreshDisplayedRoiOverlay();
 }
 
 void CirclePresenceDialog::showFrameForRoiEditing()
@@ -444,7 +679,7 @@ void CirclePresenceDialog::showFrameForRoiEditing()
     ui->viewerTitleLabel->setText(title);
     m_previewHelper->setImage(image);
     m_previewHelper->clearToolOverlays();
-    m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+    refreshDisplayedRoiOverlay();
 }
 
 void CirclePresenceDialog::startDetectRoiEditing()
@@ -458,8 +693,81 @@ void CirclePresenceDialog::startDetectRoiEditing()
 
     ui->basicDetectionRectButton->setChecked(true);
     ui->detectionRectButton->setChecked(true);
+    ui->basicDetectionPolygonButton->setChecked(false);
+    ui->detectionPolygonButton->setChecked(false);
+    ui->basicDetectionCircleButton->setChecked(false);
+    ui->detectionCircleButton->setChecked(false);
+    m_detectPolygonNormalized.clear();
+    m_detectCircleNormalized = CircleRoi();
+    m_previewHelper->clearPolygonRoi();
+    m_previewHelper->clearCircleRoi();
+    m_previewHelper->setPolygonDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
+    m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
     m_previewHelper->setRoiDrawingEnabled(true);
     const QString text = tr("请框选圆检测区域");
+    setViewerStatusText(text, text);
+}
+
+void CirclePresenceDialog::startDetectPolygonEditing()
+{
+    if (!m_previewHelper)
+        return;
+
+    showFrameForRoiEditing();
+    if (m_previewHelper->imageSize().isEmpty())
+        return;
+
+    ui->basicDetectionRectButton->setChecked(false);
+    ui->detectionRectButton->setChecked(false);
+    ui->basicDetectionCircleButton->setChecked(false);
+    ui->detectionCircleButton->setChecked(false);
+    ui->basicDetectionPolygonButton->setChecked(true);
+    ui->detectionPolygonButton->setChecked(true);
+    m_detectCircleNormalized = CircleRoi();
+    m_previewHelper->clearToolOverlays();
+    m_previewHelper->clearRoi();
+    m_previewHelper->clearCircleRoi();
+    m_previewHelper->setRoiDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
+    if (m_detectPolygonNormalized.size() >= 3)
+        m_previewHelper->setPolygonRoiNormalized(m_detectPolygonNormalized);
+    else
+        m_previewHelper->clearPolygonRoi();
+    m_previewHelper->setPolygonDrawingEnabled(true);
+
+    const QString text = tr("当前编辑：多边形 ROI。左键添加点，靠近首点点击自动闭合，右键撤销，Esc 取消。");
+    setViewerStatusText(text, text);
+}
+
+void CirclePresenceDialog::startDetectCircleEditing()
+{
+    if (!m_previewHelper)
+        return;
+
+    showFrameForRoiEditing();
+    if (m_previewHelper->imageSize().isEmpty())
+        return;
+
+    ui->basicDetectionRectButton->setChecked(false);
+    ui->detectionRectButton->setChecked(false);
+    ui->basicDetectionPolygonButton->setChecked(false);
+    ui->detectionPolygonButton->setChecked(false);
+    ui->basicDetectionCircleButton->setChecked(true);
+    ui->detectionCircleButton->setChecked(true);
+    m_detectPolygonNormalized.clear();
+    m_previewHelper->clearToolOverlays();
+    m_previewHelper->clearRoi();
+    m_previewHelper->clearPolygonRoi();
+    m_previewHelper->setRoiDrawingEnabled(false);
+    m_previewHelper->setPolygonDrawingEnabled(false);
+    if (m_detectCircleNormalized.valid)
+        m_previewHelper->setCircleRoiNormalized(m_detectCircleNormalized);
+    else
+        m_previewHelper->clearCircleRoi();
+    m_previewHelper->setCircleDrawingEnabled(true);
+
+    const QString text = tr("当前编辑：圆形 ROI。按住左键从圆心拖拽半径，Esc 取消。");
     setViewerStatusText(text, text);
 }
 
@@ -469,7 +777,9 @@ void CirclePresenceDialog::showDetectRoiTodo(const QString &message)
     ui->detectionRectButton->setChecked(true);
     if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
-        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+        m_previewHelper->setPolygonDrawingEnabled(false);
+        m_previewHelper->setCircleDrawingEnabled(false);
+        refreshDisplayedRoiOverlay();
     }
     setViewerStatusText(message, message);
 }
@@ -477,11 +787,21 @@ void CirclePresenceDialog::showDetectRoiTodo(const QString &message)
 void CirclePresenceDialog::resetDetectRoi()
 {
     m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    m_detectPolygonNormalized.clear();
+    m_detectCircleNormalized = CircleRoi();
     ui->basicDetectionRectButton->setChecked(true);
     ui->detectionRectButton->setChecked(true);
+    ui->basicDetectionPolygonButton->setChecked(false);
+    ui->detectionPolygonButton->setChecked(false);
+    ui->basicDetectionCircleButton->setChecked(false);
+    ui->detectionCircleButton->setChecked(false);
     if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
+        m_previewHelper->setPolygonDrawingEnabled(false);
+        m_previewHelper->setCircleDrawingEnabled(false);
         m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearPolygonRoi();
+        m_previewHelper->clearCircleRoi();
         m_previewHelper->setRoiRectNormalized(m_roiNormalized);
     }
     const QString text = detectRoiStatusText();
@@ -491,8 +811,18 @@ void CirclePresenceDialog::resetDetectRoi()
 void CirclePresenceDialog::handleRoiChanged(const QRectF &roi)
 {
     m_roiNormalized = roi;
+    m_detectPolygonNormalized.clear();
+    m_detectCircleNormalized = CircleRoi();
+    ui->basicDetectionRectButton->setChecked(true);
+    ui->detectionRectButton->setChecked(true);
+    ui->basicDetectionPolygonButton->setChecked(false);
+    ui->detectionPolygonButton->setChecked(false);
+    ui->basicDetectionCircleButton->setChecked(false);
+    ui->detectionCircleButton->setChecked(false);
     if (m_previewHelper) {
         m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearPolygonRoi();
+        m_previewHelper->clearCircleRoi();
         m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
     }
     const QString roiText = detectRoiStatusText();
@@ -500,18 +830,110 @@ void CirclePresenceDialog::handleRoiChanged(const QRectF &roi)
     qDebug() << "[CirclePresenceDialog] ROI normalized:" << m_roiNormalized;
 }
 
+void CirclePresenceDialog::handlePolygonChanged(const QVector<QPointF> &points)
+{
+    if (points.size() < 3)
+        return;
+
+    m_detectPolygonNormalized = points;
+    m_detectCircleNormalized = CircleRoi();
+    m_roiNormalized = boundingRectForPoints(m_detectPolygonNormalized);
+    ui->basicDetectionRectButton->setChecked(false);
+    ui->detectionRectButton->setChecked(false);
+    ui->basicDetectionCircleButton->setChecked(false);
+    ui->detectionCircleButton->setChecked(false);
+    ui->basicDetectionPolygonButton->setChecked(true);
+    ui->detectionPolygonButton->setChecked(true);
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearRoi();
+        m_previewHelper->clearCircleRoi();
+        m_previewHelper->setPolygonRoiNormalized(m_detectPolygonNormalized);
+    }
+
+    const QString text = detectRoiStatusText();
+    setViewerStatusText(text, text);
+    qDebug() << "[CirclePresenceDialog] Polygon ROI points:" << m_detectPolygonNormalized.size()
+             << "bounding:" << m_roiNormalized;
+}
+
+void CirclePresenceDialog::handleCircleChanged(const CircleRoi &roi)
+{
+    if (!roi.valid)
+        return;
+
+    m_detectCircleNormalized = roi;
+    m_detectPolygonNormalized.clear();
+    m_roiNormalized = roi.boundingRectNormalized;
+    ui->basicDetectionRectButton->setChecked(false);
+    ui->detectionRectButton->setChecked(false);
+    ui->basicDetectionPolygonButton->setChecked(false);
+    ui->detectionPolygonButton->setChecked(false);
+    ui->basicDetectionCircleButton->setChecked(true);
+    ui->detectionCircleButton->setChecked(true);
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearRoi();
+        m_previewHelper->clearPolygonRoi();
+        m_previewHelper->setCircleRoiNormalized(m_detectCircleNormalized);
+    }
+
+    const QString text = detectRoiStatusText();
+    setViewerStatusText(text, text);
+    qDebug() << "[CirclePresenceDialog] Circle ROI center:" << m_detectCircleNormalized.centerNormalized
+             << "radius:" << m_detectCircleNormalized.radiusNormalized
+             << "bounding:" << m_roiNormalized;
+}
+
+void CirclePresenceDialog::handlePolygonSelectionRejected(int pointCount)
+{
+    Q_UNUSED(pointCount)
+    const QString text = tr("多边形至少需要 3 个点。");
+    setViewerStatusText(text, text);
+    refreshDisplayedRoiOverlay();
+}
+
+void CirclePresenceDialog::handleCircleSelectionRejected()
+{
+    const QString text = tr("圆形 ROI 无效，请拖拽出半径至少 2 像素的圆。");
+    setViewerStatusText(text, text);
+    refreshDisplayedRoiOverlay();
+}
+
 void CirclePresenceDialog::handleRoiSelectionRejected()
 {
     const QString text = tr("ROI 无效，请拖拽宽高至少 2 像素的矩形");
     setViewerStatusText(text, text);
-    if (m_previewHelper)
-        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+    refreshDisplayedRoiOverlay();
+}
+
+void CirclePresenceDialog::refreshDisplayedRoiOverlay()
+{
+    if (!m_previewHelper)
+        return;
+
+    m_previewHelper->clearPolygonRoi();
+    m_previewHelper->clearCircleRoi();
+    m_previewHelper->clearRoi();
+
+    if (isDetectPolygonMode() && m_detectPolygonNormalized.size() >= 3) {
+        m_previewHelper->setPolygonRoiNormalized(m_detectPolygonNormalized);
+        return;
+    }
+
+    if (isDetectCircleMode() && m_detectCircleNormalized.valid) {
+        m_previewHelper->setCircleRoiNormalized(m_detectCircleNormalized);
+        return;
+    }
+
+    m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
 }
 
 void CirclePresenceDialog::runCirclePresenceOnFrame(const cv::Mat &frame,
                                                     const cv::Mat &referenceImage,
                                                     const QString &imageTitle,
-                                                    const QString &emptyFrameMessage)
+                                                    const QString &emptyFrameMessage,
+                                                    bool referenceTest)
 {
     if (m_circlePresenceRunning)
         return;
@@ -535,6 +957,8 @@ void CirclePresenceDialog::runCirclePresenceOnFrame(const cv::Mat &frame,
     if (!imageTitle.isEmpty())
         ui->viewerTitleLabel->setText(imageTitle);
     displayCirclePresenceResult(result);
+    if (referenceTest)
+        m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(config, result, effectiveRoiNormalized());
 
     m_circlePresenceRunning = false;
 }
@@ -548,14 +972,16 @@ void CirclePresenceDialog::displayCirclePresenceResult(const ToolResult &result)
              << "count=" << result.count
              << "ok=" << result.ok;
 
-    const QString displayText = tr("%1 | count:%2 | %3")
-            .arg(result.status,
-                 QString::number(result.count),
-                 result.ok ? QStringLiteral("OK") : QStringLiteral("NG"));
+    const QString displayText = result.success
+            ? tr("%1 | count:%2 | %3")
+              .arg(result.status,
+                   QString::number(result.count),
+                   result.ok ? QStringLiteral("OK") : QStringLiteral("NG"))
+            : tr("%1 | %2").arg(result.status, result.message);
     setViewerStatusText(displayText, makeCirclePresenceStatusTooltipText(result));
 
     if (m_previewHelper) {
-        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+        refreshDisplayedRoiOverlay();
         m_previewHelper->setToolOverlays(result.overlays);
     }
 }
@@ -573,7 +999,7 @@ void CirclePresenceDialog::displayCirclePresenceError(const QString &status, con
     setViewerStatusText(displayText, makeCirclePresenceErrorTooltipText(status, message));
     if (m_previewHelper) {
         m_previewHelper->clearToolOverlays();
-        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+        refreshDisplayedRoiOverlay();
     }
 }
 
@@ -593,7 +1019,11 @@ void CirclePresenceDialog::setViewerStatusText(const QString &displayText, const
 QString CirclePresenceDialog::detectRoiStatusText() const
 {
     const QRectF roi = effectiveRoiNormalized();
-    return tr("检测 ROI x=%1 y=%2 w=%3 h=%4")
+    const QString shape = isDetectPolygonMode()
+            ? tr("多边形")
+            : (isDetectCircleMode() ? tr("圆形") : tr("矩形"));
+    return tr("%1检测 ROI x=%2 y=%3 w=%4 h=%5")
+            .arg(shape)
             .arg(roi.x(), 0, 'f', 3)
             .arg(roi.y(), 0, 'f', 3)
             .arg(roi.width(), 0, 'f', 3)
@@ -602,6 +1032,19 @@ QString CirclePresenceDialog::detectRoiStatusText() const
 
 QRectF CirclePresenceDialog::effectiveRoiNormalized() const
 {
+    if (isDetectPolygonMode() && m_detectPolygonNormalized.size() >= 3) {
+        const QRectF polygonRect = boundingRectForPoints(m_detectPolygonNormalized);
+        if (polygonRect.width() > 0.0 && polygonRect.height() > 0.0)
+            return polygonRect;
+    }
+
+    if (isDetectCircleMode() && m_detectCircleNormalized.valid &&
+        m_detectCircleNormalized.boundingRectNormalized.width() > 0.0 &&
+        m_detectCircleNormalized.boundingRectNormalized.height() > 0.0) {
+        return m_detectCircleNormalized.boundingRectNormalized.normalized()
+                .intersected(QRectF(0.0, 0.0, 1.0, 1.0));
+    }
+
     if (m_roiNormalized.width() <= 0.0 || m_roiNormalized.height() <= 0.0)
         return QRectF(0.0, 0.0, 1.0, 1.0);
 
@@ -610,4 +1053,18 @@ QRectF CirclePresenceDialog::effectiveRoiNormalized() const
         return QRectF(0.0, 0.0, 1.0, 1.0);
 
     return roi;
+}
+
+bool CirclePresenceDialog::isDetectPolygonMode() const
+{
+    const bool basicMode = ui->circleParamsStackedWidget->currentWidget() == ui->basicParamsPage;
+    return basicMode ? ui->basicDetectionPolygonButton->isChecked()
+                     : ui->detectionPolygonButton->isChecked();
+}
+
+bool CirclePresenceDialog::isDetectCircleMode() const
+{
+    const bool basicMode = ui->circleParamsStackedWidget->currentWidget() == ui->basicParamsPage;
+    return basicMode ? ui->basicDetectionCircleButton->isChecked()
+                     : ui->detectionCircleButton->isChecked();
 }

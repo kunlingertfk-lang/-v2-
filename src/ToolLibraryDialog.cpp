@@ -1,12 +1,13 @@
 #include "ToolLibraryDialog.h"
 #include "ui_ToolLibraryDialog.h"
 
+#include "PlanDialogUtils.h"
+
 #include <QButtonGroup>
 #include <QPushButton>
 #include <QToolButton>
 #include <QWidget>
 
-#include "WindowUtils.h"
 
 ToolLibraryDialog::ToolLibraryDialog(QWidget *parent)
     : QDialog(parent)
@@ -38,7 +39,7 @@ void ToolLibraryDialog::setupUiState()
     setWindowTitle(tr("工具库"));
     setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
-    WindowUtils::centerWindowOnScreen(this, parentWidget(), 40);
+    PlanDialogUtils::centerWindowOnScreen(this, parentWidget(), 40);
 
     connect(ui->closeButton, &QToolButton::clicked, this, &ToolLibraryDialog::reject);
     connect(ui->cancelButton, &QPushButton::clicked, this, &ToolLibraryDialog::reject);
@@ -139,6 +140,13 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->codeToolButton, Code);
     m_buttonGroup->addButton(ui->blobPresenceButton, BlobPresence);
     m_buttonGroup->addButton(ui->circlePresenceButton, CirclePresence);
+    m_buttonGroup->addButton(ui->edgePresenceButton, EdgePresence);
+    m_buttonGroup->addButton(ui->linePresenceButton, LinePresence);
+    m_buttonGroup->addButton(ui->contourPresenceButton, ContourPresence);
+    ui->dlDetectButton->setCheckable(true);
+    m_buttonGroup->addButton(ui->dlDetectButton, ObjectDetection);
+    ui->ClassifyButton->setCheckable(true);
+    m_buttonGroup->addButton(ui->ClassifyButton, Classification);
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     connect(m_buttonGroup, &QButtonGroup::idClicked, this, &ToolLibraryDialog::updatePreview);
@@ -182,7 +190,37 @@ void ToolLibraryDialog::confirmSelection()
         return;
     }
 
-    ui->toolLibraryTipLabel->setText(tr("当前仅支持图案有无、斑点有无、圆有无、字符识别工具配置"));
+    if (tool == EdgePresence) {
+        m_selectedToolType = ToolType::EdgePresence;
+        accept();
+        return;
+    }
+
+    if (tool == LinePresence) {
+        m_selectedToolType = ToolType::LinePresence;
+        accept();
+        return;
+    }
+
+    if (tool == ContourPresence) {
+        m_selectedToolType = ToolType::ContourPresence;
+        accept();
+        return;
+    }
+
+    if (tool == ObjectDetection) {
+        m_selectedToolType = ToolType::AiDetection;
+        accept();
+        return;
+    }
+
+    if (tool == Classification) {
+        m_selectedToolType = ToolType::AiClassification;
+        accept();
+        return;
+    }
+
+    ui->toolLibraryTipLabel->setText(tr("当前仅支持图案有无、斑点有无、圆有无、边缘有无、直线有无、轮廓有无、字符识别、目标检测、分类工具配置"));
 }
 
 void ToolLibraryDialog::updatePreview(int id)
@@ -221,6 +259,26 @@ void ToolLibraryDialog::updatePreview(int id)
     case CirclePresence:
         ui->previewTitleLabel->setText(tr("圆有无"));
         ui->previewDescriptionLabel->setText(tr("判断检测区域内圆形目标是否存在"));
+        break;
+    case EdgePresence:
+        ui->previewTitleLabel->setText(tr("边缘有无"));
+        ui->previewDescriptionLabel->setText(tr("判断检测区域内边缘是否存在"));
+        break;
+    case LinePresence:
+        ui->previewTitleLabel->setText(tr("直线有无"));
+        ui->previewDescriptionLabel->setText(tr("判断检测区域内直线是否存在"));
+        break;
+    case ContourPresence:
+        ui->previewTitleLabel->setText(tr("轮廓有无"));
+        ui->previewDescriptionLabel->setText(tr("判断检测区域内轮廓是否存在"));
+        break;
+    case ObjectDetection:
+        ui->previewTitleLabel->setText(tr("目标检测"));
+        ui->previewDescriptionLabel->setText(tr("配置深度学习目标检测参数"));
+        break;
+    case Classification:
+        ui->previewTitleLabel->setText(tr("分类"));
+        ui->previewDescriptionLabel->setText(tr("配置深度学习分类模型与结果判断参数"));
         break;
     case NoTool:
         ui->previewTitleLabel->setText(tr("请选择工具"));

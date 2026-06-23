@@ -17,6 +17,12 @@ enum class Page {
     Output
 };
 
+void applyLargeWindow(QWidget *window);
+bool isLargeWindow(QWidget *window);
+void fitDialogToScreen(QWidget *dialog, QWidget *parent = nullptr, int margin = 40);
+void fitWindowToScreen(QWidget *window, int margin = 40);
+void centerWindowOnScreen(QWidget *window, QWidget *parent = nullptr, int margin = 40);
+void clampWindowToAvailableGeometry(QWidget *window, int margin = 40);
 void applyConfiguredWindowState(QWidget *window);
 void configureDialogWindow(QDialog *dialog, const QString &title);
 void connectWindowButtons(QWidget *window,

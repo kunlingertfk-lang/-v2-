@@ -2,6 +2,9 @@
 #include "ui_CameraParamsDialog.h"
 
 #include <QDebug>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTimer>
 #include <QToolButton>
@@ -9,6 +12,7 @@
 #include "OutputDialog.h"
 #include "PlanDialogUtils.h"
 #include "ReferenceImageDialog.h"
+#include "SchemeStore.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -21,6 +25,10 @@ CameraParamsDialog::CameraParamsDialog(QWidget *parent)
     setupUiState();
     connectNavigation();
     setupCameraUI();
+    QString schemeError;
+    if (!SchemeStore::instance().ensureLoaded(&schemeError))
+        qWarning() << "[CameraParamsDialog] 方案加载失败:" << schemeError;
+    refreshSchemeHeader();
 
     connect(&CameraFrameProvider::instance(),
             &CameraFrameProvider::frameUpdated,
@@ -111,6 +119,7 @@ void CameraParamsDialog::setupUiState()
     ui->referenceStepButton->setChecked(false);
     ui->toolsStepButton->setChecked(false);
     ui->outputStepButton->setChecked(false);
+    refreshSchemeHeader();
 
     const auto applyParamMode = [this](bool allMode) {
         ui->basicModeButton->setChecked(!allMode);
@@ -133,19 +142,85 @@ void CameraParamsDialog::connectNavigation()
     connect(ui->toolsStepButton, &QToolButton::clicked, this, &CameraParamsDialog::openToolsDialog);
     connect(ui->outputStepButton, &QToolButton::clicked, this, &CameraParamsDialog::openOutputDialog);
     connect(ui->nextButton, &QPushButton::clicked, this, &CameraParamsDialog::openReferenceImageDialog);
+    connect(ui->setupExternalEditButton, &QToolButton::clicked, this, &CameraParamsDialog::editCurrentSchemeName);
+    connect(ui->setupSaveButton, &QToolButton::clicked, this, &CameraParamsDialog::saveCurrentScheme);
+    connect(ui->setupSaveAsButton, &QToolButton::clicked, this, &CameraParamsDialog::saveCurrentSchemeAs);
+}
+
+void CameraParamsDialog::refreshSchemeHeader()
+{
+    ui->setupPageCodeLabel->setText(SchemeStore::instance().currentSchemeName());
+}
+
+void CameraParamsDialog::editCurrentSchemeName()
+{
+    SchemeStore &store = SchemeStore::instance();
+    QString error;
+    if (!store.ensureLoaded(&error)) {
+        QMessageBox::warning(this, tr("方案名称"), tr("方案加载失败：%1").arg(error));
+        return;
+    }
+
+    bool ok = false;
+    const QString name = QInputDialog::getText(this,
+                                               tr("编辑方案名"),
+                                               tr("方案名"),
+                                               QLineEdit::Normal,
+                                               store.currentSchemeName(),
+                                               &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+
+    store.setSchemeName(name);
+    saveCurrentScheme();
+}
+
+void CameraParamsDialog::saveCurrentScheme()
+{
+    QString error;
+    if (!SchemeStore::instance().saveCurrentScheme(&error)) {
+        qWarning() << "[CameraParamsDialog] 方案保存失败:" << error;
+        QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
+        return;
+    }
+    refreshSchemeHeader();
+}
+
+void CameraParamsDialog::saveCurrentSchemeAs()
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this,
+                                               tr("另存为"),
+                                               tr("新方案名"),
+                                               QLineEdit::Normal,
+                                               SchemeStore::instance().currentSchemeName() + tr("_副本"),
+                                               &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+
+    QString error;
+    if (!SchemeStore::instance().saveCurrentSchemeAs(name, &error)) {
+        qWarning() << "[CameraParamsDialog] 方案另存为失败:" << error;
+        QMessageBox::warning(this, tr("另存为失败"), tr("方案另存为失败：%1").arg(error));
+        return;
+    }
+    refreshSchemeHeader();
 }
 
 void CameraParamsDialog::openReferenceImageDialog()
 {
+    saveCurrentScheme();
     PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
 }
 
 void CameraParamsDialog::openToolsDialog()
 {
+    saveCurrentScheme();
     PlanDialogUtils::replaceDialog(this, new ToolsDialog);
 }
 
 void CameraParamsDialog::openOutputDialog()
 {
+    saveCurrentScheme();
     PlanDialogUtils::replaceDialog(this, new OutputDialog);
 }

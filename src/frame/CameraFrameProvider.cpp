@@ -1,11 +1,15 @@
 #include "frame/CameraFrameProvider.h"
 
+#include "frame/MatImageConverter.h"
+
 #include <QDebug>
 #include <QElapsedTimer>
 #include <QMutexLocker>
 #include <QStringList>
 
 #include <cstring>
+
+#include <opencv2/imgproc.hpp>
 
 CameraFrameProvider::CameraFrameProvider(QObject *parent)
     : QObject(parent)
@@ -15,7 +19,7 @@ CameraFrameProvider::CameraFrameProvider(QObject *parent)
 
 CameraFrameProvider::~CameraFrameProvider()
 {
-    closeCamera();
+    closeCamera(QStringLiteral("provider destructor"));
 }
 
 CameraFrameProvider &CameraFrameProvider::instance()
@@ -74,7 +78,7 @@ bool CameraFrameProvider::openCamera(const QString &devicePath)
     return false;
 }
 
-void CameraFrameProvider::closeCamera()
+void CameraFrameProvider::closeCamera(const QString &reason)
 {
     stopGrab();
 
@@ -82,6 +86,8 @@ void CameraFrameProvider::closeCamera()
         QMutexLocker locker(&m_cameraMutex);
         if (m_capture.isOpened()) {
             m_capture.release();
+            qDebug() << "[CAMERA-LIFECYCLE] closeCamera reason="
+                     << (reason.isEmpty() ? QStringLiteral("unspecified") : reason);
             qDebug() << "[CameraFrameProvider] camera closed";
         }
         m_useNv12Path = false;
@@ -157,19 +163,36 @@ void CameraFrameProvider::setCurrentFrame(const cv::Mat &frame)
         return;
     }
 
+    qint64 frameIndex = 0;
     {
         QMutexLocker locker(&m_frameMutex);
         m_currentFrame = normalized.clone();
+        frameIndex = ++m_frameIndex;
     }
 
     emit frameUpdated(matToImage(normalized));
     emit frameUpdatedMat();
+    emit frameIndexChanged(frameIndex);
 }
 
 cv::Mat CameraFrameProvider::currentFrame() const
 {
     QMutexLocker locker(&m_frameMutex);
     return m_currentFrame.clone();
+}
+
+cv::Mat CameraFrameProvider::currentFrame(qint64 *frameIndex) const
+{
+    QMutexLocker locker(&m_frameMutex);
+    if (frameIndex)
+        *frameIndex = m_frameIndex;
+    return m_currentFrame.clone();
+}
+
+qint64 CameraFrameProvider::currentFrameIndex() const
+{
+    QMutexLocker locker(&m_frameMutex);
+    return m_frameIndex;
 }
 
 QImage CameraFrameProvider::currentImage() const
@@ -191,13 +214,16 @@ bool CameraFrameProvider::hasFrame() const
 
 void CameraFrameProvider::clearFrame()
 {
+    qint64 frameIndex = 0;
     {
         QMutexLocker locker(&m_frameMutex);
         m_currentFrame.release();
+        frameIndex = ++m_frameIndex;
     }
 
     emit frameUpdated(QImage());
     emit frameUpdatedMat();
+    emit frameIndexChanged(frameIndex);
 }
 
 bool CameraFrameProvider::tryOpenV4L2Device(const QString &devicePath)
@@ -282,28 +308,49 @@ bool CameraFrameProvider::initCameraWithGStreamer(const QString &devicePath)
 
 bool CameraFrameProvider::initCameraWithV4L2(const QString &devicePath)
 {
-    QMutexLocker locker(&m_cameraMutex);
-    if (m_capture.isOpened()) {
+    struct FormatCandidate
+    {
+        const char *name;
+        int fourcc;
+    };
+
+    const FormatCandidate candidates[] = {
+        {"MJPG", cv::VideoWriter::fourcc('M', 'J', 'P', 'G')},
+        {"YUYV", cv::VideoWriter::fourcc('Y', 'U', 'Y', 'V')},
+        {"UYVY", cv::VideoWriter::fourcc('U', 'Y', 'V', 'Y')}
+    };
+
+    for (const FormatCandidate &candidate : candidates) {
+        QMutexLocker locker(&m_cameraMutex);
+        if (m_capture.isOpened()) {
+            m_capture.release();
+        }
+
+        qDebug() << "[CameraFrameProvider] try requested V4L2 device:" << devicePath
+                 << "format=" << candidate.name;
+        if (!m_capture.open(devicePath.toStdString(), cv::CAP_V4L2)) {
+            continue;
+        }
+
+        m_capture.set(cv::CAP_PROP_FOURCC, candidate.fourcc);
+        m_capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+        m_capture.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+        m_capture.set(cv::CAP_PROP_FPS, 30);
+
+        if (testCameraRead()) {
+            m_devicePath = devicePath;
+            m_useNv12Path = false;
+            qDebug() << "[CameraFrameProvider] opened requested V4L2 device:" << devicePath
+                     << "format=" << candidate.name
+                     << QString("%1x%2")
+                            .arg(static_cast<int>(m_capture.get(cv::CAP_PROP_FRAME_WIDTH)))
+                            .arg(static_cast<int>(m_capture.get(cv::CAP_PROP_FRAME_HEIGHT)));
+            return true;
+        }
+
         m_capture.release();
     }
 
-    qDebug() << "[CameraFrameProvider] try requested V4L2 device:" << devicePath;
-    if (!m_capture.open(devicePath.toStdString(), cv::CAP_V4L2)) {
-        return false;
-    }
-
-    m_capture.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('U', 'Y', 'V', 'Y'));
-    m_capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-    m_capture.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-    m_capture.set(cv::CAP_PROP_FPS, 30);
-
-    if (testCameraRead()) {
-        m_devicePath = devicePath;
-        m_useNv12Path = false;
-        return true;
-    }
-
-    m_capture.release();
     return false;
 }
 
@@ -315,12 +362,23 @@ bool CameraFrameProvider::testCameraRead()
 
     cv::Mat testFrame;
     try {
-        if (m_capture.read(testFrame) && !testFrame.empty()) {
+        int validFrameCount = 0;
+        for (int attempt = 0; attempt < 6; ++attempt) {
+            cv::Mat frame;
+            if (m_capture.read(frame) && !frame.empty()) {
+                testFrame = frame;
+                ++validFrameCount;
+            }
+            QThread::msleep(30);
+        }
+
+        if (!testFrame.empty()) {
             qDebug() << QString("[CameraFrameProvider] test frame: %1x%2 channels=%3 type=%4")
                             .arg(testFrame.cols)
                             .arg(testFrame.rows)
                             .arg(testFrame.channels())
-                            .arg(testFrame.type());
+                            .arg(testFrame.type())
+                     << "warmupFrames=" << validFrameCount;
             return true;
         }
     } catch (const cv::Exception &e) {
@@ -427,41 +485,7 @@ void CameraFrameProvider::workerLoop()
 
 QImage CameraFrameProvider::matToImage(const cv::Mat &frame)
 {
-    if (frame.empty())
-        return QImage();
-
-    if (frame.type() == CV_8UC1) {
-        QImage image(frame.data,
-                     frame.cols,
-                     frame.rows,
-                     static_cast<int>(frame.step),
-                     QImage::Format_Grayscale8);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC3) {
-        cv::Mat rgb;
-        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
-        QImage image(rgb.data,
-                     rgb.cols,
-                     rgb.rows,
-                     static_cast<int>(rgb.step),
-                     QImage::Format_RGB888);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC4) {
-        cv::Mat rgba;
-        cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-        QImage image(rgba.data,
-                     rgba.cols,
-                     rgba.rows,
-                     static_cast<int>(rgba.step),
-                     QImage::Format_RGBA8888);
-        return image.copy();
-    }
-
-    return QImage();
+    return MatImageConverter::matToDisplayImage(frame, QStringLiteral("CameraFrameProvider"));
 }
 
 cv::Mat CameraFrameProvider::normalizeFrame(const cv::Mat &frame)

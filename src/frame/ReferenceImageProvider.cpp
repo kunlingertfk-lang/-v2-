@@ -1,5 +1,7 @@
 #include "frame/ReferenceImageProvider.h"
 
+#include "frame/MatImageConverter.h"
+
 #include <QMutexLocker>
 
 #include <opencv2/imgproc.hpp>
@@ -71,41 +73,7 @@ void ReferenceImageProvider::clearReferenceFrame()
 
 QImage ReferenceImageProvider::matToImage(const cv::Mat &frame)
 {
-    if (frame.empty())
-        return QImage();
-
-    if (frame.type() == CV_8UC1) {
-        QImage image(frame.data,
-                     frame.cols,
-                     frame.rows,
-                     static_cast<int>(frame.step),
-                     QImage::Format_Grayscale8);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC3) {
-        cv::Mat rgb;
-        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
-        QImage image(rgb.data,
-                     rgb.cols,
-                     rgb.rows,
-                     static_cast<int>(rgb.step),
-                     QImage::Format_RGB888);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC4) {
-        cv::Mat rgba;
-        cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-        QImage image(rgba.data,
-                     rgba.cols,
-                     rgba.rows,
-                     static_cast<int>(rgba.step),
-                     QImage::Format_RGBA8888);
-        return image.copy();
-    }
-
-    return QImage();
+    return MatImageConverter::matToDisplayImage(frame, QStringLiteral("ReferenceImageProvider"));
 }
 
 cv::Mat ReferenceImageProvider::normalizeFrame(const cv::Mat &frame)

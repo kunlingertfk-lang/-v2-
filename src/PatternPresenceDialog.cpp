@@ -1,14 +1,18 @@
 #include "PatternPresenceDialog.h"
 #include "ui_PatternPresenceDialog.h"
 
+#include "PlanDialogUtils.h"
+
 #include <QButtonGroup>
 #include <QComboBox>
 #include <QDebug>
 #include <QFontMetrics>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QSize>
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -17,11 +21,13 @@
 #include <QtGlobal>
 #include <QUuid>
 
+#include <exception>
+
 #include <opencv2/imgproc.hpp>
 
-#include "WindowUtils.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
+#include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
 
@@ -29,41 +35,7 @@ namespace {
 
 QImage imageFromFrame(const cv::Mat &frame)
 {
-    if (frame.empty())
-        return QImage();
-
-    if (frame.type() == CV_8UC1) {
-        QImage image(frame.data,
-                     frame.cols,
-                     frame.rows,
-                     static_cast<int>(frame.step),
-                     QImage::Format_Grayscale8);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC3) {
-        cv::Mat rgb;
-        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
-        QImage image(rgb.data,
-                     rgb.cols,
-                     rgb.rows,
-                     static_cast<int>(rgb.step),
-                     QImage::Format_RGB888);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC4) {
-        cv::Mat rgba;
-        cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-        QImage image(rgba.data,
-                     rgba.cols,
-                     rgba.rows,
-                     static_cast<int>(rgba.step),
-                     QImage::Format_RGBA8888);
-        return image.copy();
-    }
-
-    return QImage();
+    return MatImageConverter::matToDisplayImage(frame, QStringLiteral("PatternPresenceDialog"));
 }
 
 int labelDisplayWidth(const QLabel *label)
@@ -89,13 +61,11 @@ QString detectRegionTypeFromButtons(const bool drawChecked,
                                     const bool rectChecked,
                                     const bool circleChecked)
 {
+    Q_UNUSED(drawChecked)
+    Q_UNUSED(rectChecked)
     if (circleChecked)
         return QStringLiteral("circle");
-    if (rectChecked)
-        return QStringLiteral("rectangle");
-    if (drawChecked)
-        return QStringLiteral("free");
-    return QStringLiteral("free");
+    return QStringLiteral("rectangle");
 }
 
 QString sensitivityModeFromButtons(const bool manualChecked)
@@ -122,6 +92,14 @@ QString makePresenceStatusTooltipText(const ToolResult &result)
                  boolDisplayText(result.ok));
 }
 
+bool shapeModelContoursTooSparse(const ToolResult &result)
+{
+    return result.payload.value(QStringLiteral("showContourPointsRequested")).toBool(false) &&
+           !result.payload.value(QStringLiteral("showContourPointsApplied")).toBool(false) &&
+           result.payload.value(QStringLiteral("contourSource")).toString() ==
+           QStringLiteral("shape_model_contours_too_sparse");
+}
+
 QString makePresenceErrorTooltipText(const QString &status, const QString &message)
 {
     return QStringLiteral("status: %1\nmessage: %2\nscore: 0.000000\ncount: 0\nok: false")
@@ -136,6 +114,92 @@ QJsonObject rectToJson(const QRectF &rect)
     json.insert(QStringLiteral("width"), rect.width());
     json.insert(QStringLiteral("height"), rect.height());
     return json;
+}
+
+QRectF rectFromJson(const QJsonObject &json, const QRectF &fallback)
+{
+    if (json.isEmpty())
+        return fallback;
+
+    const QRectF rect(json.value(QStringLiteral("x")).toDouble(fallback.x()),
+                      json.value(QStringLiteral("y")).toDouble(fallback.y()),
+                      json.value(QStringLiteral("width")).toDouble(fallback.width()),
+                      json.value(QStringLiteral("height")).toDouble(fallback.height()));
+    return rect.width() > 0.0 && rect.height() > 0.0 ? rect : fallback;
+}
+
+QJsonObject pointToJson(const QPointF &point)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("x"), point.x());
+    json.insert(QStringLiteral("y"), point.y());
+    return json;
+}
+
+QJsonArray pointsToJson(const QVector<QPointF> &points)
+{
+    QJsonArray array;
+    for (const QPointF &point : points)
+        array.append(pointToJson(point));
+    return array;
+}
+
+QVector<QPointF> pointsFromJson(const QJsonArray &array)
+{
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &value : array) {
+        const QJsonObject json = value.toObject();
+        points.append(QPointF(json.value(QStringLiteral("x")).toDouble(),
+                              json.value(QStringLiteral("y")).toDouble()));
+    }
+    return points;
+}
+
+QRectF boundingRectForPoints(const QVector<QPointF> &points)
+{
+    if (points.isEmpty())
+        return QRectF();
+
+    double left = points.first().x();
+    double top = points.first().y();
+    double right = left;
+    double bottom = top;
+    for (const QPointF &point : points) {
+        left = qMin(left, point.x());
+        top = qMin(top, point.y());
+        right = qMax(right, point.x());
+        bottom = qMax(bottom, point.y());
+    }
+
+    const QRectF rect(QPointF(qBound(0.0, left, 1.0), qBound(0.0, top, 1.0)),
+                      QPointF(qBound(0.0, right, 1.0), qBound(0.0, bottom, 1.0)));
+    return rect.normalized();
+}
+
+void setComboBoxValue(QComboBox *comboBox, const QString &value)
+{
+    if (!comboBox || value.isEmpty())
+        return;
+
+    const int index = comboBox->findText(value);
+    if (index >= 0)
+        comboBox->setCurrentIndex(index);
+}
+
+void configureRoiToolButton(QToolButton *button,
+                            const QString &text,
+                            const QString &tooltip)
+{
+    if (!button)
+        return;
+
+    if (!text.isNull())
+        button->setText(text);
+    button->setToolTip(tooltip);
+    button->setMinimumSize(QSize(52, 38));
+    button->setMaximumSize(QSize(52, 38));
+    button->setProperty("actionRole", QStringLiteral("toolbarIcon"));
 }
 
 } // namespace
@@ -155,6 +219,8 @@ PatternPresenceDialog::PatternPresenceDialog(QWidget *parent)
                               .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)))
 {
     ui->setupUi(this);
+    m_toolId = QStringLiteral("pattern_presence_%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     m_testToolEngine.registerAdapter(&m_testPatternPresenceAdapter);
     m_continuousTimer = new QTimer(this);
     m_continuousTimer->setInterval(500);
@@ -178,15 +244,21 @@ PatternPresenceConfig PatternPresenceDialog::configuration() const
             : ui->resultBasisComboBox->currentText();
     const int angleMin = ui->minAngleSpinBox->value();
     const int angleMax = ui->maxAngleSpinBox->value();
+    const bool templatePolygonMode = basicMode
+            ? ui->basicTemplatePolygonButton->isChecked()
+            : ui->templatePolygonButton->isChecked();
 
     PatternPresenceConfig config;
-    config.templateRoiNormalized = m_templateRoiNormalized;
+    config.templateRoiNormalized = templatePolygonMode && m_templatePolygonNormalized.size() >= 3
+            ? boundingRectForPoints(m_templatePolygonNormalized)
+            : m_templateRoiNormalized;
     config.templateSource = QStringLiteral("referenceImage");
     config.modelAutoCreate = true;
     config.modelCacheKey = m_modelCacheKey;
-    config.templateShapeType = basicMode
-            ? shapeTypeFromButtons(ui->basicTemplateRectButton->isChecked())
-            : shapeTypeFromButtons(ui->templateRectButton->isChecked());
+    config.templateShapeType = templatePolygonMode
+            ? QStringLiteral("polygon")
+            : shapeTypeFromButtons(true);
+    config.templatePolygonNormalized = m_templatePolygonNormalized;
     config.templateSensitivityMode = basicMode
             ? QStringLiteral("auto")
             : sensitivityModeFromButtons(ui->templateManualButton->isChecked());
@@ -235,8 +307,7 @@ ToolConfig PatternPresenceDialog::toToolConfig() const
             ? ui->basicResultBasisComboBox->currentText()
             : ui->resultBasisComboBox->currentText();
 
-    const QString toolId = QStringLiteral("pattern_presence_%1")
-            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    const QString toolId = m_toolId;
 
     QJsonObject params;
     params.insert(QStringLiteral("templateRoiNormalized"),
@@ -250,6 +321,8 @@ ToolConfig PatternPresenceDialog::toToolConfig() const
                           ? QStringLiteral("%1_shape_model").arg(toolId)
                           : presenceConfig.modelCacheKey);
     params.insert(QStringLiteral("templateShapeType"), presenceConfig.templateShapeType);
+    params.insert(QStringLiteral("templatePolygonNormalized"),
+                  pointsToJson(presenceConfig.templatePolygonNormalized));
     params.insert(QStringLiteral("templateSensitivityMode"), presenceConfig.templateSensitivityMode);
     params.insert(QStringLiteral("templateSensitivity"), presenceConfig.templateSensitivity);
     params.insert(QStringLiteral("detectRegionType"), presenceConfig.detectRegionType);
@@ -264,6 +337,7 @@ ToolConfig PatternPresenceDialog::toToolConfig() const
     params.insert(QStringLiteral("angleEnd"), presenceConfig.angleStart + presenceConfig.angleExtent);
     params.insert(QStringLiteral("timeoutMs"), presenceConfig.timeoutMs);
     params.insert(QStringLiteral("showContourPoints"), presenceConfig.showContourPoints);
+    params.insert(QStringLiteral("debugPatternPolygonLog"), false);
     params.insert(QStringLiteral("sortMode"), presenceConfig.sortMode);
     params.insert(QStringLiteral("judgeBasis"), presenceConfig.judgeBasis);
     params.insert(QStringLiteral("judgeBasisText"), judgeBasisText);
@@ -280,7 +354,7 @@ ToolConfig PatternPresenceDialog::toToolConfig() const
     config.toolName = tr("图案有无");
     config.toolType = ToolType::PatternPresence;
     config.category = ToolCategory::Presence;
-    config.enabled = true;
+    config.enabled = m_enabled;
     config.roiNormalized = m_roiNormalized;
     config.params = params;
     config.judgeRule = judgeRule;
@@ -292,6 +366,93 @@ ToolConfig PatternPresenceDialog::toToolConfig() const
 ToolConfig PatternPresenceDialog::toolConfig() const
 {
     return toToolConfig();
+}
+
+ToolPreviewSnapshot PatternPresenceDialog::referencePreviewSnapshot() const
+{
+    return m_referencePreviewSnapshot;
+}
+
+void PatternPresenceDialog::loadFromConfig(const ToolConfig &config)
+{
+    if (!config.toolId.trimmed().isEmpty())
+        m_toolId = config.toolId;
+    m_enabled = config.enabled;
+    if (config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0)
+        m_roiNormalized = config.roiNormalized;
+
+    const QJsonObject params = config.params;
+    m_templateRoiNormalized = rectFromJson(params.value(QStringLiteral("templateRoiNormalized")).toObject(),
+                                           m_templateRoiNormalized);
+    m_templatePolygonNormalized = pointsFromJson(params.value(QStringLiteral("templatePolygonNormalized")).toArray());
+    if (m_templatePolygonNormalized.size() >= 3)
+        m_templateRoiNormalized = boundingRectForPoints(m_templatePolygonNormalized);
+    const QString modelCacheKey = params.value(QStringLiteral("modelCacheKey")).toString();
+    if (!modelCacheKey.trimmed().isEmpty())
+        m_modelCacheKey = modelCacheKey;
+
+    const bool allMode = params.value(QStringLiteral("templateSensitivityMode")).toString() == QStringLiteral("manual")
+            || params.contains(QStringLiteral("scaleMin"))
+            || params.contains(QStringLiteral("timeoutMs"));
+    ui->basicSegmentButton->setChecked(!allMode);
+    ui->allSegmentButton->setChecked(allMode);
+    ui->patternParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
+
+    const bool positionCorrection = params.value(QStringLiteral("enablePositionCorrection")).toBool(ui->basicPositionCorrectionSwitch->isChecked());
+    ui->basicPositionCorrectionSwitch->setChecked(positionCorrection);
+    ui->positionCorrectionSwitch->setChecked(positionCorrection);
+    setComboBoxValue(ui->basicPositionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    const int sensitivity = params.value(QStringLiteral("templateSensitivity")).toInt(ui->basicSensitivitySpinBox->value());
+    ui->basicSensitivitySpinBox->setValue(sensitivity);
+    ui->sensitivitySpinBox->setValue(sensitivity);
+    ui->templateManualButton->setChecked(params.value(QStringLiteral("templateSensitivityMode")).toString() == QStringLiteral("manual"));
+    ui->templateAutoButton->setChecked(!ui->templateManualButton->isChecked());
+    const bool polygonTemplate = params.value(QStringLiteral("templateShapeType")).toString()
+            == QStringLiteral("polygon") && m_templatePolygonNormalized.size() >= 3;
+    ui->basicTemplateRectButton->setChecked(!polygonTemplate);
+    ui->templateRectButton->setChecked(!polygonTemplate);
+    ui->basicTemplatePolygonButton->setChecked(polygonTemplate);
+    ui->templatePolygonButton->setChecked(polygonTemplate);
+    ui->basicDetectionRectButton->setChecked(true);
+    ui->detectionRectButton->setChecked(true);
+    ui->minScoreSpinBox->setValue(params.value(QStringLiteral("minScore")).toInt(ui->minScoreSpinBox->value()));
+    setComboBoxValue(ui->matchPolarityComboBox, params.value(QStringLiteral("polarity")).toString());
+    ui->minScaleSpinBox->setValue(params.value(QStringLiteral("scaleMin")).toInt(ui->minScaleSpinBox->value()));
+    ui->maxScaleSpinBox->setValue(params.value(QStringLiteral("scaleMax")).toInt(ui->maxScaleSpinBox->value()));
+    const int angleStart = params.value(QStringLiteral("angleStart")).toInt(ui->minAngleSpinBox->value());
+    const int angleEnd = params.contains(QStringLiteral("angleEnd"))
+            ? params.value(QStringLiteral("angleEnd")).toInt()
+            : angleStart + params.value(QStringLiteral("angleExtent")).toInt(ui->maxAngleSpinBox->value() - angleStart);
+    ui->minAngleSpinBox->setValue(angleStart);
+    ui->maxAngleSpinBox->setValue(angleEnd);
+    ui->timeoutSpinBox->setValue(params.value(QStringLiteral("timeoutMs")).toInt(ui->timeoutSpinBox->value()));
+    const bool showContour = params.value(QStringLiteral("showContourPoints")).toBool(ui->basicShowContourSwitch->isChecked());
+    ui->basicShowContourSwitch->setChecked(showContour);
+    ui->showContourSwitch->setChecked(showContour);
+    setComboBoxValue(ui->sortModeComboBox, params.value(QStringLiteral("sortMode")).toString());
+
+    const QString judgeBasis = params.value(QStringLiteral("judgeBasis")).toString();
+    const int resultIndex = judgeBasis == QStringLiteral("score") ? 1 : 0;
+    ui->basicResultBasisComboBox->setCurrentIndex(resultIndex);
+    ui->resultBasisComboBox->setCurrentIndex(resultIndex);
+    ui->basicResultBasisStackedWidget->setCurrentIndex(ui->basicResultBasisComboBox->currentIndex());
+    ui->resultBasisStackedWidget->setCurrentIndex(ui->resultBasisComboBox->currentIndex());
+    const bool existOk = params.value(QStringLiteral("existOk")).toBool(true);
+    ui->basicPresentOkButton->setChecked(existOk);
+    ui->basicAbsentOkButton->setChecked(!existOk);
+    ui->presentOkButton->setChecked(existOk);
+    ui->absentOkButton->setChecked(!existOk);
+    const int scoreThreshold = params.value(QStringLiteral("scoreThreshold")).toInt(ui->basicResultMinScoreSpinBox->value());
+    ui->basicResultMinScoreSpinBox->setValue(scoreThreshold);
+    ui->resultMinScoreSpinBox->setValue(scoreThreshold);
+
+    m_referencePreviewSnapshot = ToolPreviewSnapshot();
+    m_roiEditTarget = RoiEditTarget::DetectRoi;
+    if (m_previewHelper)
+        m_previewHelper->setRoiRectNormalized(m_roiNormalized);
+    const QString roiText = detectRoiStatusText();
+    setViewerStatusText(roiText, roiText);
 }
 
 QString PatternPresenceDialog::summaryText() const
@@ -342,6 +503,16 @@ void PatternPresenceDialog::setupUiState()
     ui->resultBasisStackedWidget->setCurrentIndex(ui->resultBasisComboBox->currentIndex());
     ui->matchPolarityComboBox->setCurrentIndex(1);
     ui->sortModeComboBox->setCurrentIndex(4);
+    configureRoiToolButton(ui->basicTemplateRectButton, QStringLiteral("□"), tr("模板矩形 ROI"));
+    configureRoiToolButton(ui->templateRectButton, QStringLiteral("□"), tr("模板矩形 ROI"));
+    configureRoiToolButton(ui->basicTemplatePolygonButton, QStringLiteral("⬡"), tr("模板多边形 ROI"));
+    configureRoiToolButton(ui->templatePolygonButton, QStringLiteral("⬡"), tr("模板多边形 ROI"));
+    configureRoiToolButton(ui->basicDetectionDrawButton, QStringLiteral("✎"), tr("自由绘制检测 ROI 暂未实现"));
+    configureRoiToolButton(ui->detectionDrawButton, QStringLiteral("✎"), tr("自由绘制检测 ROI 暂未实现"));
+    configureRoiToolButton(ui->basicDetectionRectButton, QStringLiteral("□"), tr("矩形检测 ROI"));
+    configureRoiToolButton(ui->detectionRectButton, QStringLiteral("□"), tr("矩形检测 ROI"));
+    configureRoiToolButton(ui->basicDetectionCircleButton, QStringLiteral("○"), tr("圆形检测 ROI 暂未实现"));
+    configureRoiToolButton(ui->detectionCircleButton, QStringLiteral("○"), tr("圆形检测 ROI 暂未实现"));
 
     ui->viewerStatusBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     ui->viewerStatusBar->setMinimumHeight(42);
@@ -397,14 +568,8 @@ void PatternPresenceDialog::connectControls()
     connect(ui->templateRectButton, &QToolButton::clicked, this, &PatternPresenceDialog::startTemplateRoiEditing);
     connect(ui->basicTemplateFinishButton, &QPushButton::clicked, this, &PatternPresenceDialog::finishTemplateRoiEditing);
     connect(ui->templateFinishButton, &QPushButton::clicked, this, &PatternPresenceDialog::finishTemplateRoiEditing);
-    connect(ui->basicTemplatePolygonButton, &QToolButton::clicked, this, [this]() {
-        ui->basicTemplateRectButton->setChecked(true);
-        showTemplateRoiTodo(tr("多边形模板 ROI 暂未实现，请使用矩形模板区域"));
-    });
-    connect(ui->templatePolygonButton, &QToolButton::clicked, this, [this]() {
-        ui->templateRectButton->setChecked(true);
-        showTemplateRoiTodo(tr("多边形模板 ROI 暂未实现，请使用矩形模板区域"));
-    });
+    connect(ui->basicTemplatePolygonButton, &QToolButton::clicked, this, &PatternPresenceDialog::startTemplatePolygonEditing);
+    connect(ui->templatePolygonButton, &QToolButton::clicked, this, &PatternPresenceDialog::startTemplatePolygonEditing);
 
     m_basicDetectionRegionGroup->setExclusive(true);
     m_basicDetectionRegionGroup->addButton(ui->basicDetectionDrawButton, 0);
@@ -416,7 +581,17 @@ void PatternPresenceDialog::connectControls()
     m_detectionRegionGroup->addButton(ui->detectionCircleButton, 2);
 
     connect(ui->basicDetectionDrawButton, &QToolButton::clicked, this, [this]() {
-        startDetectRoiEditing(tr("绘制检测区域"));
+        ui->basicDetectionRectButton->setChecked(true);
+        ui->detectionRectButton->setChecked(true);
+        m_editingTemplateRoi = false;
+        m_roiEditTarget = RoiEditTarget::DetectRoi;
+        if (m_previewHelper) {
+            m_previewHelper->setRoiDrawingEnabled(false);
+            m_previewHelper->setPolygonDrawingEnabled(false);
+            m_previewHelper->setRoiRectNormalized(m_roiNormalized);
+        }
+        const QString text = tr("自由绘制检测 ROI 暂未实现，请使用矩形检测区域");
+        setViewerStatusText(text, text);
     });
     connect(ui->basicDetectionRectButton, &QToolButton::clicked, this, [this]() {
         startDetectRoiEditing(tr("绘制矩形检测区域"));
@@ -433,7 +608,17 @@ void PatternPresenceDialog::connectControls()
         setViewerStatusText(text, text);
     });
     connect(ui->detectionDrawButton, &QToolButton::clicked, this, [this]() {
-        startDetectRoiEditing(tr("绘制检测区域"));
+        ui->basicDetectionRectButton->setChecked(true);
+        ui->detectionRectButton->setChecked(true);
+        m_editingTemplateRoi = false;
+        m_roiEditTarget = RoiEditTarget::DetectRoi;
+        if (m_previewHelper) {
+            m_previewHelper->setRoiDrawingEnabled(false);
+            m_previewHelper->setPolygonDrawingEnabled(false);
+            m_previewHelper->setRoiRectNormalized(m_roiNormalized);
+        }
+        const QString text = tr("自由绘制检测 ROI 暂未实现，请使用矩形检测区域");
+        setViewerStatusText(text, text);
     });
     connect(ui->detectionRectButton, &QToolButton::clicked, this, [this]() {
         startDetectRoiEditing(tr("绘制矩形检测区域"));
@@ -501,6 +686,14 @@ void PatternPresenceDialog::connectControls()
                 [this](const QRectF &) {
                     handleRoiSelectionRejected();
                 });
+        connect(m_previewHelper,
+                &FrameViewHelper::polygonChanged,
+                this,
+                &PatternPresenceDialog::handleTemplatePolygonChanged);
+        connect(m_previewHelper,
+                &FrameViewHelper::polygonSelectionRejected,
+                this,
+                &PatternPresenceDialog::handlePolygonSelectionRejected);
     }
 
     connect(&ReferenceImageProvider::instance(),
@@ -514,6 +707,20 @@ void PatternPresenceDialog::connectControls()
 
 void PatternPresenceDialog::finishConfiguration()
 {
+    if (isTemplatePolygonMode() &&
+        m_roiEditTarget == RoiEditTarget::TemplateRoi &&
+        m_previewHelper &&
+        m_previewHelper->isPolygonDrawingEnabled() &&
+        !m_previewHelper->finishPolygonDrawing()) {
+        handlePolygonSelectionRejected(m_templatePolygonNormalized.size());
+        return;
+    }
+
+    if (isTemplatePolygonMode() && m_templatePolygonNormalized.size() < 3) {
+        handlePolygonSelectionRejected(m_templatePolygonNormalized.size());
+        return;
+    }
+
     accept();
 }
 
@@ -525,10 +732,14 @@ void PatternPresenceDialog::showProviderImage(const QImage &image)
 void PatternPresenceDialog::handleTestRunButton()
 {
     if (m_uiMode == PresenceUiMode::Edit) {
+        if (!ensureTemplatePolygonReadyForTest())
+            return;
         enterTestMode();
         return;
     }
 
+    if (!ensureTemplatePolygonReadyForTest())
+        return;
     startContinuousRun();
 }
 
@@ -561,7 +772,7 @@ void PatternPresenceDialog::runOnceInTestMode()
 
 void PatternPresenceDialog::applyAdaptiveWindowSize()
 {
-    WindowUtils::applyLargeWindow(this);
+    PlanDialogUtils::applyLargeWindow(this);
 }
 
 void PatternPresenceDialog::setUiMode(PresenceUiMode mode)
@@ -575,8 +786,10 @@ void PatternPresenceDialog::setUiMode(PresenceUiMode mode)
     if (m_uiMode != PresenceUiMode::Edit) {
         m_editingTemplateRoi = false;
         m_roiEditTarget = RoiEditTarget::None;
-        if (m_previewHelper)
+        if (m_previewHelper) {
             m_previewHelper->setRoiDrawingEnabled(false);
+            m_previewHelper->setPolygonDrawingEnabled(false);
+        }
     }
 
     switch (m_uiMode) {
@@ -622,10 +835,16 @@ void PatternPresenceDialog::startTemplateRoiEditing()
 
     m_roiEditTarget = RoiEditTarget::TemplateRoi;
     m_editingTemplateRoi = true;
+    ui->basicTemplateRectButton->setChecked(true);
+    ui->templateRectButton->setChecked(true);
+    ui->basicTemplatePolygonButton->setChecked(false);
+    ui->templatePolygonButton->setChecked(false);
     ui->viewerTitleLabel->setText(tr("模板区域"));
     showReferenceImage();
     ui->viewerTitleLabel->setText(tr("模板区域"));
     m_previewHelper->clearToolOverlays();
+    m_previewHelper->clearPolygonRoi();
+    m_previewHelper->setPolygonDrawingEnabled(false);
     m_previewHelper->setRoiRectNormalized(m_templateRoiNormalized);
     m_previewHelper->setRoiDrawingEnabled(true);
 
@@ -633,12 +852,78 @@ void PatternPresenceDialog::startTemplateRoiEditing()
     setViewerStatusText(text, text);
 }
 
+void PatternPresenceDialog::startTemplatePolygonEditing()
+{
+    if (!m_previewHelper)
+        return;
+
+    if (m_uiMode != PresenceUiMode::Edit)
+        setUiMode(PresenceUiMode::Edit);
+
+    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    if (image.isNull()) {
+        m_previewHelper->setPolygonDrawingEnabled(false);
+        ui->viewerTitleLabel->setText(tr("请先设置基准图"));
+        const QString text = tr("请先设置基准图后再选择模板区域");
+        setViewerStatusText(text, text);
+        return;
+    }
+
+    m_roiEditTarget = RoiEditTarget::TemplateRoi;
+    m_editingTemplateRoi = true;
+    ui->basicTemplateRectButton->setChecked(false);
+    ui->templateRectButton->setChecked(false);
+    ui->basicTemplatePolygonButton->setChecked(true);
+    ui->templatePolygonButton->setChecked(true);
+    ui->viewerTitleLabel->setText(tr("模板多边形区域"));
+    showReferenceImage();
+    ui->viewerTitleLabel->setText(tr("模板多边形区域"));
+    m_previewHelper->clearToolOverlays();
+    m_previewHelper->clearRoi();
+    if (m_templatePolygonNormalized.size() >= 3)
+        m_previewHelper->setPolygonRoiNormalized(m_templatePolygonNormalized);
+    else
+        m_previewHelper->clearPolygonRoi();
+    m_previewHelper->setPolygonDrawingEnabled(true);
+
+    const QString text = tr("当前编辑：多边形 ROI。左键添加点，靠近首点点击自动闭合，右键撤销，Esc 取消。");
+    setViewerStatusText(text, text);
+}
+
 void PatternPresenceDialog::finishTemplateRoiEditing()
 {
+    if (isTemplatePolygonMode()) {
+        if (m_previewHelper && !m_previewHelper->finishPolygonDrawing()) {
+            handlePolygonSelectionRejected(m_templatePolygonNormalized.size());
+            return;
+        }
+
+        if (m_templatePolygonNormalized.size() < 3) {
+            handlePolygonSelectionRejected(m_templatePolygonNormalized.size());
+            return;
+        }
+
+        m_templateRoiNormalized = boundingRectForPoints(m_templatePolygonNormalized);
+        m_editingTemplateRoi = false;
+        m_roiEditTarget = RoiEditTarget::TemplateRoi;
+        if (m_previewHelper) {
+            if (m_previewHelper->isPolygonDrawingEnabled())
+                m_previewHelper->setPolygonDrawingEnabled(false);
+            m_previewHelper->setRoiDrawingEnabled(false);
+            showReferenceImage();
+            ui->viewerTitleLabel->setText(tr("模板多边形区域"));
+        }
+
+        const QString text = templateRoiStatusText();
+        setViewerStatusText(text, text);
+        return;
+    }
+
     m_editingTemplateRoi = false;
     m_roiEditTarget = RoiEditTarget::TemplateRoi;
     if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
+        m_previewHelper->setPolygonDrawingEnabled(false);
         showReferenceImage();
         ui->viewerTitleLabel->setText(tr("模板区域"));
     }
@@ -670,6 +955,8 @@ void PatternPresenceDialog::startDetectRoiEditing(const QString &title)
     showReferenceImage();
     ui->viewerTitleLabel->setText(title);
     m_previewHelper->clearToolOverlays();
+    m_previewHelper->clearPolygonRoi();
+    m_previewHelper->setPolygonDrawingEnabled(false);
     m_previewHelper->setRoiRectNormalized(m_roiNormalized);
     m_previewHelper->setRoiDrawingEnabled(true);
 
@@ -683,6 +970,7 @@ void PatternPresenceDialog::showTemplateRoiTodo(const QString &message)
     m_roiEditTarget = RoiEditTarget::TemplateRoi;
     if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
+        m_previewHelper->setPolygonDrawingEnabled(false);
         showReferenceImage();
         ui->viewerTitleLabel->setText(tr("模板区域"));
     }
@@ -696,7 +984,9 @@ void PatternPresenceDialog::handleRoiChanged(const QRectF &roi)
 
     if (m_roiEditTarget == RoiEditTarget::TemplateRoi) {
         m_templateRoiNormalized = roi;
+        m_templatePolygonNormalized.clear();
         m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearPolygonRoi();
         m_previewHelper->setRoiRectNormalized(m_templateRoiNormalized);
         const QString text = templateRoiStatusText();
         setViewerStatusText(text, text);
@@ -710,6 +1000,33 @@ void PatternPresenceDialog::handleRoiChanged(const QRectF &roi)
     const QString roiText = detectRoiStatusText();
     setViewerStatusText(roiText, roiText);
     qDebug() << "[PatternPresenceDialog] ROI normalized:" << m_roiNormalized;
+}
+
+void PatternPresenceDialog::handleTemplatePolygonChanged(const QVector<QPointF> &points)
+{
+    if (points.size() < 3)
+        return;
+
+    m_templatePolygonNormalized = points;
+    m_templateRoiNormalized = boundingRectForPoints(m_templatePolygonNormalized);
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearRoi();
+        m_previewHelper->setPolygonRoiNormalized(m_templatePolygonNormalized);
+    }
+
+    const QString text = templateRoiStatusText();
+    setViewerStatusText(text, text);
+    qDebug() << "[PatternPresenceDialog] Template polygon normalized points:" << m_templatePolygonNormalized.size()
+             << "bounding:" << m_templateRoiNormalized;
+}
+
+void PatternPresenceDialog::handlePolygonSelectionRejected(int pointCount)
+{
+    Q_UNUSED(pointCount)
+    const QString text = tr("多边形至少需要 3 个点");
+    setViewerStatusText(text, text);
+    refreshDisplayedRoiOverlay();
 }
 
 void PatternPresenceDialog::handleRoiSelectionRejected()
@@ -727,15 +1044,42 @@ void PatternPresenceDialog::refreshDisplayedRoiOverlay()
         return;
 
     if (m_roiEditTarget == RoiEditTarget::DetectRoi) {
+        m_previewHelper->clearPolygonRoi();
         m_previewHelper->setRoiRectNormalized(m_roiNormalized);
         return;
     }
 
+    if (isTemplatePolygonMode() && m_templatePolygonNormalized.size() >= 3) {
+        m_previewHelper->clearRoi();
+        m_previewHelper->setPolygonRoiNormalized(m_templatePolygonNormalized);
+        return;
+    }
+
+    m_previewHelper->clearPolygonRoi();
     m_previewHelper->setRoiRectNormalized(m_templateRoiNormalized);
+}
+
+bool PatternPresenceDialog::isTemplatePolygonMode() const
+{
+    const bool basicMode = ui->patternParamsStackedWidget->currentWidget() == ui->basicParamsPage;
+    return basicMode ? ui->basicTemplatePolygonButton->isChecked()
+                     : ui->templatePolygonButton->isChecked();
 }
 
 QString PatternPresenceDialog::templateRoiStatusText() const
 {
+    if (isTemplatePolygonMode()) {
+        if (m_templatePolygonNormalized.size() < 3)
+            return tr("模板多边形 ROI 未完成：多边形至少需要 3 个点");
+
+        return tr("模板多边形 ROI 点数=%1，外接矩形 x=%2 y=%3 w=%4 h=%5；算法优先使用多边形域")
+                .arg(m_templatePolygonNormalized.size())
+                .arg(m_templateRoiNormalized.x(), 0, 'f', 3)
+                .arg(m_templateRoiNormalized.y(), 0, 'f', 3)
+                .arg(m_templateRoiNormalized.width(), 0, 'f', 3)
+                .arg(m_templateRoiNormalized.height(), 0, 'f', 3);
+    }
+
     if (qFuzzyIsNull(m_templateRoiNormalized.x()) &&
         qFuzzyIsNull(m_templateRoiNormalized.y()) &&
         qAbs(m_templateRoiNormalized.width() - 1.0) < 0.000001 &&
@@ -857,6 +1201,9 @@ void PatternPresenceDialog::runReferenceTest()
     if (m_presenceRunning)
         return;
 
+    if (!ensureTemplatePolygonReadyForTest())
+        return;
+
     const cv::Mat referenceImage = ReferenceImageProvider::instance().referenceFrame();
     if (referenceImage.empty()) {
         displayPatternPresenceError(QStringLiteral("no_reference_image"),
@@ -882,38 +1229,75 @@ void PatternPresenceDialog::runReferenceTest()
 
     ToolConfig config = toToolConfig();
     config.roiNormalized = m_roiNormalized;
+    config.params.insert(QStringLiteral("debugPatternPolygonLog"), true);
 
     ToolRequest request;
     request.config = config;
     request.image = referenceImage.clone();
     request.referenceImage = referenceImage.clone();
 
-    const ToolResult result = m_testToolEngine.runTool(request);
+    ToolResult result;
+    try {
+        result = m_testToolEngine.runTool(request);
+    } catch (const std::exception &error) {
+        m_presenceRunning = false;
+        displayPatternPresenceError(QStringLiteral("PatternPresence HALCON error"),
+                                    QString::fromLocal8Bit(error.what()));
+        return;
+    } catch (...) {
+        m_presenceRunning = false;
+        displayPatternPresenceError(QStringLiteral("PatternPresence HALCON error"),
+                                    tr("未知图案检测异常"));
+        return;
+    }
     ui->viewerTitleLabel->setText(tr("基准图"));
     displayPatternPresenceResult(result);
+    m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(config, result, m_roiNormalized);
 
     m_presenceRunning = false;
 }
 
-void PatternPresenceDialog::runPatternPresenceOnFrame(const cv::Mat &frame, const QString &imageTitle)
+void PatternPresenceDialog::runPatternPresenceOnFrame(const cv::Mat &frame,
+                                                      const QString &imageTitle,
+                                                      bool referenceTest)
 {
     if (m_presenceRunning)
+        return;
+
+    if (!ensureTemplatePolygonReadyForTest())
         return;
 
     m_presenceRunning = true;
 
     ToolConfig config = toToolConfig();
     config.roiNormalized = m_roiNormalized;
+    config.params.insert(QStringLiteral("debugPatternPolygonLog"),
+                         m_uiMode != PresenceUiMode::Continuous);
 
     ToolRequest request;
     request.config = config;
     request.image = frame;
     request.referenceImage = ReferenceImageProvider::instance().referenceFrame();
 
-    const ToolResult result = m_testToolEngine.runTool(request);
+    ToolResult result;
+    try {
+        result = m_testToolEngine.runTool(request);
+    } catch (const std::exception &error) {
+        m_presenceRunning = false;
+        displayPatternPresenceError(QStringLiteral("PatternPresence HALCON error"),
+                                    QString::fromLocal8Bit(error.what()));
+        return;
+    } catch (...) {
+        m_presenceRunning = false;
+        displayPatternPresenceError(QStringLiteral("PatternPresence HALCON error"),
+                                    tr("未知图案检测异常"));
+        return;
+    }
     if (!imageTitle.isEmpty())
         ui->viewerTitleLabel->setText(imageTitle);
     displayPatternPresenceResult(result);
+    if (referenceTest)
+        m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(config, result, m_roiNormalized);
 
     m_presenceRunning = false;
 }
@@ -927,11 +1311,15 @@ void PatternPresenceDialog::displayPatternPresenceResult(const ToolResult &resul
              << "count=" << result.count
              << "ok=" << result.ok;
 
-    const QString displayText = tr("PatternPresence: %1 | score:%2 | count:%3 | %4")
-            .arg(result.status,
-                 QString::number(result.score, 'f', 3),
-                 QString::number(result.count),
-                 result.ok ? QStringLiteral("OK") : QStringLiteral("NG"));
+    QString displayText = result.success
+            ? tr("PatternPresence: %1 | score:%2 | count:%3 | %4")
+              .arg(result.status,
+                   QString::number(result.score, 'f', 3),
+                   QString::number(result.count),
+                   result.ok ? QStringLiteral("OK") : QStringLiteral("NG"))
+            : tr("PatternPresence: %1 | %2").arg(result.status, result.message);
+    if (shapeModelContoursTooSparse(result))
+        displayText = tr("模型有效轮廓过少，请调整灵敏度或模板区域。");
     setViewerStatusText(displayText, makePresenceStatusTooltipText(result));
 
     if (m_previewHelper) {
@@ -968,6 +1356,26 @@ void PatternPresenceDialog::setViewerStatusText(const QString &displayText, cons
                                                                labelDisplayWidth(label));
     label->setText(elidedText);
     label->setToolTip(tooltipText.isEmpty() ? displayText : tooltipText);
+}
+
+bool PatternPresenceDialog::ensureTemplatePolygonReadyForTest()
+{
+    if (!isTemplatePolygonMode())
+        return true;
+
+    if (m_previewHelper && m_previewHelper->isPolygonDrawingEnabled()) {
+        displayPatternPresenceError(QStringLiteral("invalid_template_polygon"),
+                                    tr("模板多边形 ROI 未完成：请先点击完成闭合多边形"));
+        return false;
+    }
+
+    if (m_templatePolygonNormalized.size() < 3) {
+        displayPatternPresenceError(QStringLiteral("invalid_template_polygon"),
+                                    tr("多边形至少需要 3 个点"));
+        return false;
+    }
+
+    return true;
 }
 
 void PatternPresenceDialog::updateBottomButtons()

@@ -246,7 +246,11 @@ OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig
 {
     OcrHalconResult result;
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
+    result.payload.insert(QStringLiteral("halconSoPathCandidates"),
+                          config.halconSoPathCandidates.join(QStringLiteral("; ")));
     result.payload.insert(QStringLiteral("ocrModelPath"), config.ocrModelPath);
+    result.payload.insert(QStringLiteral("ocrModelPathCandidates"),
+                          config.ocrModelPathCandidates.join(QStringLiteral("; ")));
     result.payload.insert(QStringLiteral("roi"), rectToJson(config.roiNormalized));
     result.payload.insert(QStringLiteral("roiNormalized"), rectToJson(config.roiNormalized));
     result.payload.insert(QStringLiteral("expectedText"), config.expectedText);
@@ -271,14 +275,22 @@ OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig
     }
 
     if (config.halconSoPath.trimmed().isEmpty() || !QFileInfo::exists(config.halconSoPath)) {
+        const QString triedPaths = config.halconSoPathCandidates.isEmpty()
+                ? config.halconSoPath
+                : config.halconSoPathCandidates.join(QStringLiteral("; "));
         result.status = QStringLiteral("halcon_so_not_found");
-        result.message = QStringLiteral("HALCON runtime file not found: %1").arg(config.halconSoPath);
+        result.message = QStringLiteral("HALCON runtime file not found: %1. Tried: %2")
+                .arg(config.halconSoPath, triedPaths);
         return result;
     }
 
     if (config.ocrModelPath.trimmed().isEmpty() || !QFileInfo::exists(config.ocrModelPath)) {
+        const QString triedPaths = config.ocrModelPathCandidates.isEmpty()
+                ? config.ocrModelPath
+                : config.ocrModelPathCandidates.join(QStringLiteral("; "));
         result.status = QStringLiteral("model_not_found");
-        result.message = QStringLiteral("OCR model file not found: %1").arg(config.ocrModelPath);
+        result.message = QStringLiteral("OCR model file not found: %1. Tried: %2")
+                .arg(config.ocrModelPath, triedPaths);
         return result;
     }
 

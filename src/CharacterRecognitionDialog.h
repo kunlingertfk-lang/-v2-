@@ -9,6 +9,7 @@
 
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolEngine.h"
+#include "toolcore/ToolPreviewSnapshot.h"
 #include "toolcore/ToolResult.h"
 #include "tooladapters/OcrAdapter.h"
 
@@ -49,6 +50,8 @@ public:
     CharacterRecognitionConfig configuration() const;
     ToolConfig toToolConfig() const;
     ToolConfig toolConfig() const;
+    ToolPreviewSnapshot referencePreviewSnapshot() const;
+    void loadFromConfig(const ToolConfig &config);
     QString summaryText() const;
 
 protected:
@@ -84,7 +87,7 @@ private:
     void stopContinuousRun();
     void runContinuousTick();
     void runReferenceTest();
-    void runOcrOnFrame(const cv::Mat &frame, const QString &imageTitle);
+    void runOcrOnFrame(const cv::Mat &frame, const QString &imageTitle, bool referenceTest = false);
     void displayOcrResult(const ToolResult &result);
     void displayOcrError(const QString &status, const QString &message);
     void setViewerStatusText(const QString &displayText, const QString &tooltipText = QString());
@@ -99,6 +102,9 @@ private:
     OcrAdapter m_testOcrAdapter;
     ToolEngine m_testToolEngine;
     QMetaObject::Connection m_frameUpdatedConnection;
+    QString m_toolId;
+    bool m_enabled = true;
+    ToolPreviewSnapshot m_referencePreviewSnapshot;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     OcrUiMode m_uiMode = OcrUiMode::Edit;
     bool m_ocrRunning = false;

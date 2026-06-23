@@ -1,7 +1,7 @@
 QWidget {
     color: #f3f5f7;
     background: #2f323b;
-    font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    font-family: "Alimama ShuHeiTi", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
     font-size: 14px;
 }
 
@@ -54,7 +54,6 @@ QScrollArea#basicParamsScrollArea{
     background: #eef2f6;
 }
 
-
 QFrame#imagingAdjustCardHeaderFrame,
 QFrame#triggerConfigCardHeaderFrame,
 QLabel#imagingAdjustCardTitleLabel,
@@ -65,16 +64,35 @@ QLabel#brightnessCardTitleLabel,
 QLabel#autoAdjustLabel,
 QLabel#focusCardTitleLabel,
 QLabel#focusRegionLabel,
-QLabel#autoFocusLabel
+QLabel#autoFocusLabel,
+QLabel#speedScaleLabel,
+QLabel#featureScaleLabel,
+QLabel#grayThresholdLabel,
+QLabel#minChainLengthLabel
 {
     background: #ffffff;
 }
+
+QLabel#basicHorizontalLayout_grayThresholdDashLabel,
+QLabel#horizontalLayout_grayThresholdDashLabel,
+QLabel#horizontalLayout_areaRangeDashLabel,
+QLabel#scaleDashLabel,
+QLabel#angleDashLabel
+{
+    background: #ffffff;
+    color: #000000;
+}
+
 
 QLabel#headerTitleLabel,
 QLabel#logoTitleLabel {
     font-weight: 700;
     color: #ffffff;
 }
+
+
+
+
 
 
 QLabel#headerTitleLabel {
@@ -172,32 +190,6 @@ QToolButton#mainNavMonitorButton {
     color: #9da2ae;
     font-size: 13px;
     padding: 4px 6px;
-}
-
-QDialog#LoginWindow QToolButton#navCameraButton,
-QDialog#LoginWindow QToolButton#navPlanButton,
-QDialog#LoginWindow QToolButton#navIoButton,
-QDialog#LoginWindow QToolButton#navCommButton,
-QDialog#LoginWindow QToolButton#navAssistButton,
-QDialog#LoginWindow QToolButton#navMonitorButton {
-    min-width: 68px;
-    min-height: 54px;
-    padding: 2px 4px;
-}
-
-QMainWindow#MainWindow QToolButton#mainNavCameraButton,
-QMainWindow#MainWindow QToolButton#mainNavPlanButton,
-QMainWindow#MainWindow QToolButton#mainNavIoButton,
-QMainWindow#MainWindow QToolButton#mainNavCommButton,
-QMainWindow#MainWindow QToolButton#mainNavAssistButton,
-QMainWindow#MainWindow QToolButton#mainNavMonitorButton {
-    min-width: 68px;
-    min-height: 54px;
-    padding: 2px 4px;
-}
-
-QMainWindow#MainWindow QComboBox#headerDeviceComboBox {
-    min-width: 200px;
 }
 
 QToolButton#navAssistButton,
@@ -546,8 +538,11 @@ QDialog#CameraParamsDialog,
 QDialog#ReferenceImageDialog,
 QDialog#ToolsDialog,
 QDialog#CharacterRecognitionDialog,
-QDialog#BlobPresenceDialog,
+QDialog#PatternPresenceDialog,
 QDialog#CirclePresenceDialog,
+QDialog#SpotPresenceDialog,
+QDialog#ClassificationDialog,
+QDialog#ObjectDetectionDialog,
 QDialog#OutputDialog {
     background: #eef1f5;
 }
@@ -622,15 +617,15 @@ QToolButton#cameraStepButton,
 QToolButton#referenceStepButton,
 QToolButton#toolsStepButton,
 QToolButton#outputStepButton {
-    min-width: 84px;
-    min-height: 74px;
+    min-width: 92px;
+    min-height: 86px;
     border: none;
     border-radius: 0;
     background: transparent;
     color: #6f7787;
     font-size: 15px;
     font-weight: 700;
-    padding: 8px 6px;
+    padding: 10px 8px;
 }
 
 QToolButton#cameraStepButton:hover,
@@ -657,7 +652,48 @@ QLabel[role="stepDivider"] {
     font-size: 18px;
 }
 
-QFrame#setupEditorPanel {
+QFrame#setupEditorPanel,
+QScrollArea#basicParamsScrollArea,
+QScrollArea#patternConfigScrollArea,
+QScrollArea#circleBasicParamsScrollArea,
+QScrollArea#circleAllParamsScrollArea,
+QScrollArea#edgeBasicParamsScrollArea,
+QScrollArea#edgeAllParamsScrollArea,
+QScrollArea#spotBasicParamsScrollArea,
+QScrollArea#spotAllParamsScrollArea,
+QScrollArea#classificationBasicScrollArea,
+QScrollArea#classificationAllScrollArea,
+QScrollArea#objectDetectionBasicScrollArea,
+QScrollArea#objectDetectionAllScrollArea,
+QScrollArea#allOcrConfigScrollArea,
+QScrollArea#lineBasicParamsScrollArea,
+QScrollArea#lineAllParamsScrollArea,
+QScrollArea#basicParamsScrollArea,
+QScrollArea#contourConfigScrollArea,
+QStackedWidget#ocrParamsStackedWidget,
+QStackedWidget#classificationParamsStackedWidget,
+QStackedWidget#objectDetectionParamsStackedWidget,
+QStackedWidget#circleParamsStackedWidget,
+QStackedWidget#spotParamsStackedWidget,
+QWidget#allParamsPage,
+QWidget#basicParamsPage,
+QWidget#basicParamsContents,
+QWidget#circleBasicParamsContents,
+QWidget#circleAllParamsContents,
+QWidget#spotBasicParamsContents,
+QWidget#spotAllParamsContents,
+QWidget#allOcrConfigContents,
+QWidget#classificationBasicContents,
+QWidget#classificationAllContents,
+QWidget#objectDetectionBasicContents,
+QWidget#objectDetectionAllContents,
+QWidget#edgeAllParamsContents,
+QWidget#edgeBasicParamsContents,
+QWidget#lineBasicParamsContents,
+QWidget#lineAllParamsContents,
+QWidget#basicParamsContents,
+QWidget#contourConfigContents
+{
     background: #eef2f6;
 }
 
@@ -719,6 +755,12 @@ QFrame[panelRole="toolSelected"] {
     border: 2px solid #ff830f;
 }
 
+QFrame#toolItemCard[selected="true"],
+QFrame[panelRole="toolItem"][selected="true"] {
+    background: #fff7ef;
+    border: 2px solid #ff830f;
+}
+
 QLabel#cardTitleLabel,
 QLabel[role="cardTitle"] {
     background: transparent;
@@ -769,7 +811,8 @@ QToolButton[actionRole="toolbarIcon"]:hover {
 QPushButton#secondaryActionButton,
 QPushButton[actionRole="secondary"],
 QPushButton#grayActionButton,
-QPushButton[actionRole="gray"] {
+QPushButton[actionRole="gray"],
+QToolButton[actionRole="gray"] {
     min-height: 42px;
     border-radius: 4px;
     border: 1px solid #c9d1db;
@@ -827,6 +870,52 @@ QLabel[role="toolStatusBadge"] {
     font-size: 14px;
     font-weight: 800;
     qproperty-alignment: 'AlignCenter';
+}
+
+QLabel#toolIndexBadge,
+QLabel[role="toolIndexBadge"] {
+    min-width: 42px;
+    max-width: 42px;
+    min-height: 30px;
+    max-height: 30px;
+    border-radius: 4px;
+    background: #eef2f6;
+    color: #536274;
+    font-size: 14px;
+    font-weight: 800;
+    qproperty-alignment: 'AlignCenter';
+}
+
+QLabel#toolResultBadge,
+QLabel[role="toolResultBadge"] {
+    min-width: 64px;
+    max-width: 64px;
+    min-height: 30px;
+    max-height: 30px;
+    border-radius: 4px;
+    background: #e8edf4;
+    color: #657184;
+    font-size: 13px;
+    font-weight: 700;
+    qproperty-alignment: 'AlignCenter';
+}
+
+QLabel#toolResultBadge[testState="ok"],
+QLabel[role="toolResultBadge"][testState="ok"] {
+    background: #30ca3f;
+    color: #ffffff;
+}
+
+QLabel#toolResultBadge[testState="ng"],
+QLabel[role="toolResultBadge"][testState="ng"] {
+    background: #e45252;
+    color: #ffffff;
+}
+
+QLabel#toolResultBadge[testState="untested"],
+QLabel[role="toolResultBadge"][testState="untested"] {
+    background: #e8edf4;
+    color: #657184;
 }
 
 QFrame#setupViewerFrame {
@@ -1011,7 +1100,7 @@ QLabel#allToolsLabel {
 QLabel#toolLibraryTipLabel {
     color: #ff830f;
     font-size: 14px;
-    background: #f8f9fb;
+    background: #e3e6eb;
 }
 
 QFrame#toolGridPanel,
@@ -1138,18 +1227,100 @@ QPushButton#cancelButton {
 }
 
 QScrollArea#ocrConfigScrollArea,
+QScrollArea#allOcrConfigScrollArea,
+QScrollArea#patternConfigScrollArea,
+QScrollArea#classificationBasicScrollArea,
+QScrollArea#classificationAllScrollArea,
+QScrollArea#objectDetectionBasicScrollArea,
+QScrollArea#objectDetectionAllScrollArea,
+QScrollArea#patternConfigScrollArea > QWidget > QWidget,
+QScrollArea#circleBasicParamsScrollArea > QWidget > QWidget,
+QScrollArea#circleAllParamsScrollArea > QWidget > QWidget,
+QScrollArea#spotBasicParamsScrollArea > QWidget > QWidget,
+QScrollArea#spotAllParamsScrollArea > QWidget > QWidget,
+QScrollArea#contourConfigScrollArea > QWidget > QWidget,
+QScrollArea#classificationBasicScrollArea > QWidget > QWidget,
+QScrollArea#classificationAllScrollArea > QWidget > QWidget,
+QScrollArea#objectDetectionBasicScrollArea > QWidget > QWidget,
+QScrollArea#objectDetectionAllScrollArea > QWidget > QWidget,
+QScrollArea#allOcrConfigScrollArea > QWidget > QWidget,
 QScrollArea#ocrConfigScrollArea > QWidget > QWidget {
     border: none;
     background: transparent;
 }
 
+
+QSpinBox#runIntervalspinBox,
+QSpinBox#brightnessStandardspinBox,
+QSpinBox#exposureTimespinBox,
+QSpinBox#focusStepspinBox,
+QSpinBox#focusPositionspinBox,
+QSpinBox#contrastspinBox,
+QSpinBox#sharpenspinBox,
+QSpinBox#encodeQualityspinBox,
+QSpinBox#basicSensitivitySpinBox,
+QSpinBox#circleBasicSensitivitySpinBox,
+QSpinBox#circleSensitivitySpinBox,
+QSpinBox#edgeSensitivitySpinBox,
+QSpinBox#edgeBasicSensitivitySpinBox,
+QSpinBox#lineBasicSensitivitySpinBox,
+QSpinBox#lineSensitivitySpinBox,
+QSpinBox#lineDegreeSpinBox,
+QSpinBox#roundnessSpinBox,
+QSpinBox#basicMinGraySpinBox,
+QSpinBox#basicMaxGraySpinBox,
+QComboBox#basicPositionCorrectionComboBox,
+QComboBox#basicResultBasisComboBox,
 QComboBox#positionCorrectionComboBox,
 QComboBox#resultBasisComboBox,
+QComboBox#edgePolarityComboBox,
+QComboBox#edgeTypeComboBox,
 QComboBox#modelComboBox,
+QComboBox#allPositionCorrectionComboBox,
+QComboBox#allResultBasisComboBox,
+QComboBox#allJudgeTypeComboBox,
+QComboBox#allModelComboBox,
+QComboBox#matchPolarityComboBox,
+QComboBox#thresholdTypeComboBox,
+QComboBox#sortModeComboBox,
+QSpinBox#speedScaleSpinBox,
+QSpinBox#featureScaleSpinBox,
+QSpinBox#grayThresholdSpinBox,
+QSpinBox#minChainLengthSpinBox,
+QSpinBox#sensitivitySpinBox,
+QSpinBox#minGraySpinBox,
+QSpinBox#maxGraySpinBox,
+QSpinBox#minAreaSpinBox,
+QSpinBox#maxAreaSpinBox,
+QSpinBox#minScoreSpinBox,
+QSpinBox#minScaleSpinBox,
+QSpinBox#maxScaleSpinBox,
+QSpinBox#minAngleSpinBox,
+QSpinBox#maxAngleSpinBox,
+QSpinBox#timeoutSpinBox,
+QSpinBox#resultMinScoreSpinBox,
+QSpinBox#basicResultMinScoreSpinBox,
 QSpinBox#minCountSpinBox,
 QSpinBox#maxCountSpinBox,
 QSpinBox#minScoreSpinBox,
-QLineEdit#baselineTextLineEdit {
+QSpinBox#minRotationScoreSpinBox,
+QSpinBox#allMinCountSpinBox,
+QSpinBox#allMaxCountSpinBox,
+QSpinBox#allMinScoreSpinBox,
+QSpinBox#maxFindCountSpinBox,
+QSpinBox#detectMinScoreSpinBox,
+QSpinBox#maxOverlapSpinBox,
+QSpinBox#minWidthSpinBox,
+QSpinBox#maxWidthSpinBox,
+QSpinBox#minHeightSpinBox,
+QSpinBox#maxHeightSpinBox,
+QSpinBox#overlapRatioSpinBox,
+QComboBox#sortTypeComboBox,
+QLineEdit#baselineTextLineEdit,
+QLineEdit#allBaselineTextLineEdit,
+QLineEdit#categoryLineEdit,
+QLineEdit#allCategoryLineEdit,
+QLineEdit#classFilterLineEdit {
     min-height: 38px;
     border: 1px solid #c8cdd5;
     background: #ffffff;
@@ -1158,13 +1329,104 @@ QLineEdit#baselineTextLineEdit {
     font-size: 16px;
 }
 
+QComboBox#edgePolarityComboBox:on,
+QComboBox#edgeTypeComboBox:on,
+QComboBox#basicResultBasisComboBox:on,
+QComboBox#resultBasisComboBox:on,
+QComboBox#allResultBasisComboBox:on,
+QComboBox#allJudgeTypeComboBox:on,
+QComboBox#matchPolarityComboBox:on,
+QComboBox#thresholdTypeComboBox:on,
+QComboBox#sortModeComboBox:on,
+QComboBox#edgePolarityComboBox:focus,
+QComboBox#edgeTypeComboBox:focus,
+QComboBox#basicResultBasisComboBox:focus,
+QComboBox#resultBasisComboBox:focus,
+QComboBox#allResultBasisComboBox:focus,
+QComboBox#allJudgeTypeComboBox:focus,
+QComboBox#matchPolarityComboBox:focus,
+QComboBox#thresholdTypeComboBox:focus,
+QComboBox#sortModeComboBox:focus {
+    border: 1px solid #ff830f;
+}
+
+QComboBox#edgePolarityComboBox QAbstractItemView,
+QComboBox#edgeTypeComboBox QAbstractItemView,
+QComboBox#basicResultBasisComboBox QAbstractItemView,
+QComboBox#resultBasisComboBox QAbstractItemView,
+QComboBox#allResultBasisComboBox QAbstractItemView,
+QComboBox#allJudgeTypeComboBox QAbstractItemView,
+QComboBox#matchPolarityComboBox QAbstractItemView,
+QComboBox#thresholdTypeComboBox QAbstractItemView,
+QComboBox#sortModeComboBox QAbstractItemView {
+    background: #ffffff;
+    border: 1px solid #8f939a;
+    color: #314968;
+    font-size: 16px;
+    selection-background-color: #f0eeee;
+    selection-color: #ff830f;
+}
+
+
+QLabel#basicResultPresenceLabel,
+QFrame#basicResultPresenceFrame,
+QWidget#basicResultScorePage,
+QWidget#basicResultPresencePage,
+QLabel#scaleDashLabel,
+QLabel#angleDashLabel
+{
+background: #ffffff;
+}
+
 QStackedWidget#resultBasisStackedWidget,
-QStackedWidget#resultBasisStackedWidget QWidget{
+QStackedWidget#allResultBasisStackedWidget,
+QStackedWidget#resultBasisStackedWidget QWidget,
+QStackedWidget#allResultBasisStackedWidget QWidget{
     background: transparent;
 }
 
+QFrame[panelRole="optionGroup"] {
+    background: #f2f4f7;
+    border: 1px solid #d5d9e1;
+    border-radius: 2px;
+}
+
+QFrame[panelRole="optionGroup"] QPushButton {
+    min-height: 36px;
+    border: none;
+    border-right: 1px solid #d5d9e1;
+    background: transparent;
+    color: #536274;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QFrame[panelRole="optionGroup"] QPushButton:checked {
+    background: #ffffff;
+    color: #ff830f;
+}
+
+QFrame#allRegionButtonsFrame QToolButton {
+    min-width: 128px;
+    min-height: 36px;
+}
+
 QToolButton#regionDrawButton,
-QToolButton#regionRectButton {
+QToolButton#regionRectButton,
+QToolButton#allRegionDrawButton,
+QToolButton#allRegionRectButton,
+QToolButton#templateRectButton,
+QToolButton#templatePolygonButton,
+QToolButton#basicDetectionDrawButton,
+QToolButton#basicDetectionRectButton,
+QToolButton#basicDetectionCircleButton,
+QToolButton#basicDetectionPolygonButton,
+QToolButton#basicDetectionResetButton,
+QToolButton#detectionDrawButton,
+QToolButton#detectionRectButton,
+QToolButton#detectionCircleButton,
+QToolButton#detectionPolygonButton,
+QToolButton#detectionResetButton {
     border: 1px solid #d5d9e1;
     background: #f2f4f7;
     color: #8b93a0;
@@ -1172,13 +1434,38 @@ QToolButton#regionRectButton {
 }
 
 QToolButton#regionDrawButton:checked,
-QToolButton#regionRectButton:checked {
+QToolButton#regionRectButton:checked,
+QToolButton#allRegionDrawButton:checked,
+QToolButton#allRegionRectButton:checked,
+QToolButton#templateRectButton:checked,
+QToolButton#templatePolygonButton:checked,
+QToolButton#basicDetectionDrawButton:checked,
+QToolButton#basicDetectionRectButton:checked,
+QToolButton#basicDetectionCircleButton:checked,
+QToolButton#basicDetectionPolygonButton:checked,
+QToolButton#basicDetectionResetButton:checked,
+QToolButton#detectionDrawButton:checked,
+QToolButton#detectionRectButton:checked,
+QToolButton#detectionCircleButton:checked,
+QToolButton#detectionPolygonButton:checked,
+QToolButton#detectionResetButton:checked {
     border: 2px solid #ff830f;
     background: #ffffff;
     color: #ff830f;
 }
 
-QCheckBox#positionCorrectionSwitch::indicator {
+QCheckBox#basicPositionCorrectionSwitch::indicator,
+QCheckBox#positionCorrectionSwitch::indicator,
+QCheckBox#invertRangeSwitch::indicator,
+QCheckBox#maskOutputSwitch::indicator,
+QCheckBox#allLocationFrameSwitch::indicator,
+QCheckBox#allPositionCorrectionSwitch::indicator,
+QCheckBox#showContourSwitch::indicator,
+QCheckBox#angleEnableSwitch::indicator,
+QCheckBox#widthEnableSwitch::indicator,
+QCheckBox#heightEnableSwitch::indicator,
+QCheckBox#boundaryEnableSwitch::indicator,
+QCheckBox#classFilterSwitch::indicator {
     width: 48px;
     height: 24px;
     border-radius: 12px;
@@ -1186,12 +1473,24 @@ QCheckBox#positionCorrectionSwitch::indicator {
     background: #d5dae2;
 }
 
-QCheckBox#positionCorrectionSwitch::indicator:checked {
+QCheckBox#basicPositionCorrectionSwitch::indicator:checked,
+QCheckBox#positionCorrectionSwitch::indicator:checked,
+QCheckBox#invertRangeSwitch::indicator:checked,
+QCheckBox#maskOutputSwitch::indicator:checked,
+QCheckBox#allLocationFrameSwitch::indicator:checked,
+QCheckBox#allPositionCorrectionSwitch::indicator:checked,
+QCheckBox#showContourSwitch::indicator:checked,
+QCheckBox#angleEnableSwitch::indicator:checked,
+QCheckBox#widthEnableSwitch::indicator:checked,
+QCheckBox#heightEnableSwitch::indicator:checked,
+QCheckBox#boundaryEnableSwitch::indicator:checked,
+QCheckBox#classFilterSwitch::indicator:checked {
     background: #ff830f;
     border-color: #ff830f;
 }
 
-QPushButton#importModelButton {
+QPushButton#importModelButton,
+QPushButton#allImportModelButton {
     min-height: 38px;
     border: 1px solid #bfc6d0;
     background: #eef2f6;

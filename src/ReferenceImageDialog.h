@@ -28,11 +28,15 @@ private slots:
     void captureReferenceImage();
     void showReferenceImageMode();
     void importReferenceImageFromPc();
+    void editCurrentSchemeName();
+    void saveCurrentScheme();
+    void saveCurrentSchemeAs();
 
 private:
     void setupUiState();
     void connectNavigation();
     void setupReferenceImageControls();
+    void refreshSchemeHeader();
     void ensureCameraRunning();
     void updateReferenceImageControls();
     void refreshCurrentImage();

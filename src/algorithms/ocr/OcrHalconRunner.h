@@ -6,13 +6,16 @@
 #include <QJsonObject>
 #include <QRectF>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <opencv2/core.hpp>
 
 struct OcrHalconConfig
 {
     QString halconSoPath;
+    QStringList halconSoPathCandidates;
     QString ocrModelPath;
+    QStringList ocrModelPathCandidates;
 
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
 
