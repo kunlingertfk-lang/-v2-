@@ -1,6 +1,10 @@
 #include "CharacterRecognitionDialog.h"
 #include "ui_CharacterRecognitionDialog.h"
 
+#include "PlanDialogUtils.h"
+
+#include "algorithms/halcon/HalconRuntimePaths.h"
+
 #include <QButtonGroup>
 #include <QDebug>
 #include <QDoubleSpinBox>
@@ -24,15 +28,23 @@
 
 #include <opencv2/imgproc.hpp>
 
-#include "WindowUtils.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
+#include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
 
 namespace {
-const QString kDefaultHalconOcrModelPath =
-        QStringLiteral("/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/ocr/OCRB_0-9A-Z_NoRej.omc");
+
+QString defaultHalconOcrModelPath()
+{
+    QStringList triedPaths;
+    const QString resolvedPath = HalconRuntimePaths::resolveOcrModelPath(QString(), &triedPaths);
+    if (!resolvedPath.isEmpty())
+        return resolvedPath;
+
+    return triedPaths.isEmpty() ? QString() : triedPaths.first();
+}
 
 QString judgeModeFromResultBasis(const QString &resultBasis)
 {
@@ -47,41 +59,7 @@ QString judgeModeFromResultBasis(const QString &resultBasis)
 
 QImage imageFromFrame(const cv::Mat &frame)
 {
-    if (frame.empty())
-        return QImage();
-
-    if (frame.type() == CV_8UC1) {
-        QImage image(frame.data,
-                     frame.cols,
-                     frame.rows,
-                     static_cast<int>(frame.step),
-                     QImage::Format_Grayscale8);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC3) {
-        cv::Mat rgb;
-        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
-        QImage image(rgb.data,
-                     rgb.cols,
-                     rgb.rows,
-                     static_cast<int>(rgb.step),
-                     QImage::Format_RGB888);
-        return image.copy();
-    }
-
-    if (frame.type() == CV_8UC4) {
-        cv::Mat rgba;
-        cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-        QImage image(rgba.data,
-                     rgba.cols,
-                     rgba.rows,
-                     static_cast<int>(rgba.step),
-                     QImage::Format_RGBA8888);
-        return image.copy();
-    }
-
-    return QImage();
+    return MatImageConverter::matToDisplayImage(frame);
 }
 
 int textPixelWidth(const QFontMetrics &metrics, const QString &text)
@@ -153,6 +131,16 @@ QString makeOcrErrorTooltipText(const QString &status, const QString &message)
     return QStringLiteral("status: %1\nmessage: %2\ntext: \nscore: 0.000000\ncount: 0\nok: false")
             .arg(status, message);
 }
+
+void setComboBoxValue(QComboBox *comboBox, const QString &value)
+{
+    if (!comboBox || value.isEmpty())
+        return;
+
+    const int index = comboBox->findText(value);
+    if (index >= 0)
+        comboBox->setCurrentIndex(index);
+}
 }
 
 CharacterRecognitionDialog::CharacterRecognitionDialog(QWidget *parent)
@@ -163,6 +151,8 @@ CharacterRecognitionDialog::CharacterRecognitionDialog(QWidget *parent)
     , m_previewHelper(nullptr)
 {
     ui->setupUi(this);
+    m_toolId = QStringLiteral("ocr_%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     m_testToolEngine.registerAdapter(&m_testOcrAdapter);
     m_continuousTimer = new QTimer(this);
     m_continuousTimer->setInterval(500);
@@ -198,7 +188,7 @@ ToolConfig CharacterRecognitionDialog::toToolConfig() const
     const QString judgeMode = judgeModeFromResultBasis(ocrConfig.resultBasis);
     QString modelPath = ui->modelPathLineEdit->text().trimmed();
     if (modelPath.isEmpty())
-        modelPath = kDefaultHalconOcrModelPath;
+        modelPath = defaultHalconOcrModelPath();
 
     QJsonObject params;
     params.insert(QStringLiteral("modelName"), ocrConfig.modelName);
@@ -238,12 +228,11 @@ ToolConfig CharacterRecognitionDialog::toToolConfig() const
     }
 
     ToolConfig config;
-    config.toolId = QStringLiteral("ocr_%1")
-            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    config.toolId = m_toolId;
     config.toolName = tr("字符识别");
     config.toolType = ToolType::Ocr;
     config.category = ToolCategory::Recognition;
-    config.enabled = true;
+    config.enabled = m_enabled;
     config.roiNormalized = m_roiNormalized;
     config.params = params;
     config.judgeRule = judgeRule;
@@ -255,6 +244,56 @@ ToolConfig CharacterRecognitionDialog::toToolConfig() const
 ToolConfig CharacterRecognitionDialog::toolConfig() const
 {
     return toToolConfig();
+}
+
+ToolPreviewSnapshot CharacterRecognitionDialog::referencePreviewSnapshot() const
+{
+    return m_referencePreviewSnapshot;
+}
+
+void CharacterRecognitionDialog::loadFromConfig(const ToolConfig &config)
+{
+    if (!config.toolId.trimmed().isEmpty())
+        m_toolId = config.toolId;
+    m_enabled = config.enabled;
+    if (config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0)
+        m_roiNormalized = config.roiNormalized;
+
+    const QJsonObject params = config.params;
+    setComboBoxValue(ui->modelComboBox, params.value(QStringLiteral("modelName")).toString());
+    const QString modelPath = params.value(QStringLiteral("modelPath")).toString(
+                params.value(QStringLiteral("ocrModelPath")).toString());
+    if (!modelPath.trimmed().isEmpty())
+        ui->modelPathLineEdit->setText(modelPath);
+    setComboBoxValue(ui->resultBasisComboBox, params.value(QStringLiteral("resultBasis")).toString());
+    ui->resultBasisStackedWidget->setCurrentIndex(ui->resultBasisComboBox->currentIndex());
+    ui->minCountSpinBox->setValue(params.value(QStringLiteral("minCount")).toInt(ui->minCountSpinBox->value()));
+    ui->maxCountSpinBox->setValue(params.value(QStringLiteral("maxCount")).toInt(ui->maxCountSpinBox->value()));
+    ui->minScoreSpinBox->setValue(params.value(QStringLiteral("minScore")).toInt(ui->minScoreSpinBox->value()));
+    ui->minConfidenceSpinBox->setValue(params.value(QStringLiteral("minConfidence")).toInt(ui->minConfidenceSpinBox->value()));
+    ui->baselineTextLineEdit->setText(params.value(QStringLiteral("baselineText")).toString(ui->baselineTextLineEdit->text()));
+    setComboBoxValue(ui->polarityComboBox, params.value(QStringLiteral("polarity")).toString());
+    ui->binaryThresholdSpinBox->setValue(params.value(QStringLiteral("binaryThreshold")).toInt(ui->binaryThresholdSpinBox->value()));
+    ui->minCharAreaSpinBox->setValue(params.value(QStringLiteral("minCharArea")).toInt(ui->minCharAreaSpinBox->value()));
+    ui->maxCharAreaSpinBox->setValue(params.value(QStringLiteral("maxCharArea")).toInt(ui->maxCharAreaSpinBox->value()));
+    ui->minCharWidthSpinBox->setValue(params.value(QStringLiteral("minCharWidth")).toInt(ui->minCharWidthSpinBox->value()));
+    ui->minCharHeightSpinBox->setValue(params.value(QStringLiteral("minCharHeight")).toInt(ui->minCharHeightSpinBox->value()));
+    ui->maxCharWidthSpinBox->setValue(params.value(QStringLiteral("maxCharWidth")).toInt(ui->maxCharWidthSpinBox->value()));
+    ui->maxCharHeightSpinBox->setValue(params.value(QStringLiteral("maxCharHeight")).toInt(ui->maxCharHeightSpinBox->value()));
+    ui->minAspectRatioSpinBox->setValue(params.value(QStringLiteral("minAspectRatio")).toDouble(ui->minAspectRatioSpinBox->value()));
+    ui->maxAspectRatioSpinBox->setValue(params.value(QStringLiteral("maxAspectRatio")).toDouble(ui->maxAspectRatioSpinBox->value()));
+    ui->positionCorrectionSwitch->setChecked(params.value(QStringLiteral("independentPositionCorrection")).toBool(ui->positionCorrectionSwitch->isChecked()));
+    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrection")).toString());
+
+    m_referencePreviewSnapshot = ToolPreviewSnapshot();
+    if (m_previewHelper)
+        m_previewHelper->setRoiRectNormalized(m_roiNormalized);
+    const QString roiText = tr("ROI: x=%1 y=%2 w=%3 h=%4")
+            .arg(m_roiNormalized.x(), 0, 'f', 3)
+            .arg(m_roiNormalized.y(), 0, 'f', 3)
+            .arg(m_roiNormalized.width(), 0, 'f', 3)
+            .arg(m_roiNormalized.height(), 0, 'f', 3);
+    setViewerStatusText(roiText, roiText);
 }
 
 QString CharacterRecognitionDialog::summaryText() const
@@ -309,7 +348,7 @@ void CharacterRecognitionDialog::setupUiState()
     ui->minScoreSpinBox->setValue(70);
     ui->minConfidenceSpinBox->setValue(ui->minScoreSpinBox->value());
     if (ui->modelPathLineEdit->text().trimmed().isEmpty())
-        ui->modelPathLineEdit->setText(kDefaultHalconOcrModelPath);
+        ui->modelPathLineEdit->setText(defaultHalconOcrModelPath());
 
     ui->viewerStatusBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     ui->viewerStatusBar->setMinimumHeight(42);
@@ -364,7 +403,7 @@ void CharacterRecognitionDialog::connectControls()
     connect(ui->selectModelButton, &QPushButton::clicked, this, [this]() {
         const QString currentPath = ui->modelPathLineEdit->text().trimmed();
         const QString startDir = currentPath.isEmpty()
-                ? QFileInfo(kDefaultHalconOcrModelPath).absolutePath()
+                ? QFileInfo(defaultHalconOcrModelPath()).absolutePath()
                 : QFileInfo(currentPath).absolutePath();
         const QString path = QFileDialog::getOpenFileName(this,
                                                           tr("选择 OCR 模型"),
@@ -483,7 +522,7 @@ void CharacterRecognitionDialog::runOnceInTestMode()
 
 void CharacterRecognitionDialog::applyAdaptiveWindowSize()
 {
-    WindowUtils::applyLargeWindow(this);
+    PlanDialogUtils::applyLargeWindow(this);
 }
 
 void CharacterRecognitionDialog::setUiMode(OcrUiMode mode)
@@ -629,10 +668,12 @@ void CharacterRecognitionDialog::runReferenceTest()
         m_previewHelper->setRoiRectNormalized(m_roiNormalized);
     }
 
-    runOcrOnFrame(frame, tr("基准图"));
+    runOcrOnFrame(frame, tr("基准图"), true);
 }
 
-void CharacterRecognitionDialog::runOcrOnFrame(const cv::Mat &frame, const QString &imageTitle)
+void CharacterRecognitionDialog::runOcrOnFrame(const cv::Mat &frame,
+                                               const QString &imageTitle,
+                                               bool referenceTest)
 {
     if (m_ocrRunning)
         return;
@@ -655,6 +696,8 @@ void CharacterRecognitionDialog::runOcrOnFrame(const cv::Mat &frame, const QStri
     if (!imageTitle.isEmpty())
         ui->viewerTitleLabel->setText(imageTitle);
     displayOcrResult(result);
+    if (referenceTest)
+        m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(config, result, m_roiNormalized);
 
     m_ocrRunning = false;
 }

@@ -383,7 +383,7 @@
          <item>
           <widget class="QStackedWidget" name="spotParamsStackedWidget">
            <property name="currentIndex">
-            <number>1</number>
+            <number>0</number>
            </property>
            <widget class="QWidget" name="basicParamsPage">
             <layout class="QVBoxLayout" name="verticalLayout_basicParamsPage">
@@ -878,7 +878,7 @@
                        </widget>
                       </item>
                       <item>
-                       <spacer name="basicHorizontalLayout_grayThresholdSpacer">
+                       <spacer name="horizontalSpacer_3">
                         <property name="orientation">
                          <enum>Qt::Horizontal</enum>
                         </property>
@@ -893,12 +893,18 @@
                       <item>
                        <widget class="QSpinBox" name="basicMinGraySpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -928,12 +934,18 @@
                       <item>
                        <widget class="QSpinBox" name="basicMaxGraySpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -1640,7 +1652,7 @@
                        </widget>
                       </item>
                       <item>
-                       <spacer name="horizontalLayout_grayThresholdSpacer">
+                       <spacer name="horizontalSpacer">
                         <property name="orientation">
                          <enum>Qt::Horizontal</enum>
                         </property>
@@ -1655,12 +1667,18 @@
                       <item>
                        <widget class="QSpinBox" name="minGraySpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -1690,12 +1708,18 @@
                       <item>
                        <widget class="QSpinBox" name="maxGraySpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -1797,7 +1821,7 @@
                        </widget>
                       </item>
                       <item>
-                       <spacer name="horizontalLayout_areaRangeSpacer">
+                       <spacer name="horizontalSpacer_2">
                         <property name="orientation">
                          <enum>Qt::Horizontal</enum>
                         </property>
@@ -1812,12 +1836,18 @@
                       <item>
                        <widget class="QSpinBox" name="minAreaSpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -1847,12 +1877,18 @@
                       <item>
                        <widget class="QSpinBox" name="maxAreaSpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -2088,26 +2124,26 @@
                <height>20</height>
               </size>
              </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QPushButton" name="referenceTestButton">
-            <property name="minimumSize">
-             <size>
-              <width>120</width>
-              <height>48</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>基准图测试</string>
-            </property>
-            <property name="actionRole" stdset="0">
-             <string>secondary</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="testRunButton">
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="referenceTestButton">
+             <property name="minimumSize">
+              <size>
+               <width>120</width>
+               <height>48</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>基准图测试</string>
+             </property>
+             <property name="actionRole" stdset="0">
+              <string>secondary</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="testRunButton">
              <property name="minimumSize">
               <size>
                <width>120</width>

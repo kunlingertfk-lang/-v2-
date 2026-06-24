@@ -14,7 +14,6 @@
 
 #include "MainWindow.h"
 #include "PlanDialogUtils.h"
-#include "WindowUtils.h"
 #include "ui_LoginWindow.h"
 
 LoginWindow::LoginWindow(QWidget *parent)
@@ -49,7 +48,7 @@ void LoginWindow::setupUiState()
     setWindowFlag(Qt::Dialog, false);
     setWindowFlag(Qt::Window, true);
     setWindowState(Qt::WindowNoState);
-    WindowUtils::applyLargeWindow(this);
+    PlanDialogUtils::applyLargeWindow(this);
 
     ui->passwordLineEdit->setEchoMode(QLineEdit::Password);
     ui->passwordLineEdit->setText(QStringLiteral("123456"));

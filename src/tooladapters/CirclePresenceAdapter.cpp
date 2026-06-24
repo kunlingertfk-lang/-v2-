@@ -1,7 +1,11 @@
 #include "tooladapters/CirclePresenceAdapter.h"
 
+#include "algorithms/halcon/HalconRuntimePaths.h"
+
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QPointF>
 #include <QtGlobal>
 
 #include <cmath>
@@ -51,20 +55,59 @@ bool isFiniteRoi(const QRectF &rect)
            rect.height() > 0.0;
 }
 
+QRectF rectParam(const QJsonObject &params, const QString &key, const QRectF &defaultValue)
+{
+    const QJsonObject json = params.value(key).toObject();
+    if (json.isEmpty())
+        return defaultValue;
+
+    return QRectF(json.value(QStringLiteral("x")).toDouble(defaultValue.x()),
+                  json.value(QStringLiteral("y")).toDouble(defaultValue.y()),
+                  json.value(QStringLiteral("width")).toDouble(defaultValue.width()),
+                  json.value(QStringLiteral("height")).toDouble(defaultValue.height()));
+}
+
+QVector<QPointF> pointsParam(const QJsonObject &params, const QString &key)
+{
+    const QJsonArray array = params.value(key).toArray();
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &value : array) {
+        const QJsonObject json = value.toObject();
+        points.append(QPointF(json.value(QStringLiteral("x")).toDouble(),
+                              json.value(QStringLiteral("y")).toDouble()));
+    }
+    return points;
+}
+
 CirclePresenceHalconConfig toHalconConfig(const ToolConfig &config)
 {
     const QJsonObject params = config.params;
     const QJsonObject judgeRule = config.judgeRule;
 
     CirclePresenceHalconConfig halconConfig;
-    halconConfig.halconSoPath = stringParam(params,
-                                            QStringLiteral("halconSoPath"),
-                                            halconConfig.halconSoPath);
+    const QString requestedHalconSoPath = stringParam(params, QStringLiteral("halconSoPath"));
+    halconConfig.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                requestedHalconSoPath,
+                &halconConfig.halconSoPathCandidates);
     if (isFiniteRoi(config.roiNormalized))
         halconConfig.roiNormalized = config.roiNormalized;
     halconConfig.detectRegionType = stringParam(params,
                                                 QStringLiteral("detectRegionType"),
                                                 halconConfig.detectRegionType);
+    halconConfig.detectPolygonNormalized = pointsParam(params,
+                                                       QStringLiteral("detectPolygonNormalized"));
+    const QJsonObject circleJson = params.value(QStringLiteral("detectCircleNormalized")).toObject();
+    const QJsonObject circleCenterJson = circleJson.value(QStringLiteral("center")).toObject();
+    halconConfig.detectCircleCenterNormalized = QPointF(
+                circleCenterJson.value(QStringLiteral("x")).toDouble(),
+                circleCenterJson.value(QStringLiteral("y")).toDouble());
+    halconConfig.detectCircleRadiusNormalized =
+            circleJson.value(QStringLiteral("radius")).toDouble();
+    halconConfig.detectCircleBoundingRectNormalized =
+            rectParam(circleJson,
+                      QStringLiteral("boundingRect"),
+                      halconConfig.detectCircleBoundingRectNormalized);
     halconConfig.sensitivity = qBound(0,
                                       intParam(params,
                                                QStringLiteral("sensitivity"),

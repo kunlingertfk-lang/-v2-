@@ -420,7 +420,7 @@
                 <property name="geometry">
                  <rect>
                   <x>0</x>
-                  <y>-22</y>
+                  <y>0</y>
                   <width>540</width>
                   <height>714</height>
                  </rect>
@@ -1367,7 +1367,7 @@
                 <property name="geometry">
                  <rect>
                   <x>0</x>
-                  <y>0</y>
+                  <y>-526</y>
                   <width>540</width>
                   <height>1218</height>
                  </rect>
@@ -2285,12 +2285,18 @@
                       <item>
                        <widget class="QSpinBox" name="minScaleSpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -2317,12 +2323,18 @@
                       <item>
                        <widget class="QSpinBox" name="maxScaleSpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -2384,12 +2396,18 @@
                       <item>
                        <widget class="QSpinBox" name="minAngleSpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -2419,12 +2437,18 @@
                       <item>
                        <widget class="QSpinBox" name="maxAngleSpinBox">
                         <property name="sizePolicy">
-                         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
                         <property name="minimumSize">
+                         <size>
+                          <width>121</width>
+                          <height>38</height>
+                         </size>
+                        </property>
+                        <property name="maximumSize">
                          <size>
                           <width>121</width>
                           <height>38</height>
@@ -2935,28 +2959,28 @@
                <height>20</height>
               </size>
              </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QPushButton" name="referenceTestButton">
-            <property name="minimumSize">
-             <size>
-              <width>120</width>
-              <height>48</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>基准图测试</string>
-            </property>
-            <property name="actionRole" stdset="0">
-             <string>secondary</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="testRunButton">
-            <property name="minimumSize">
-             <size>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="referenceTestButton">
+             <property name="minimumSize">
+              <size>
+               <width>120</width>
+               <height>48</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>基准图测试</string>
+             </property>
+             <property name="actionRole" stdset="0">
+              <string>secondary</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="testRunButton">
+             <property name="minimumSize">
+              <size>
                <width>120</width>
                <height>48</height>
               </size>
@@ -3222,5 +3246,38 @@
   <include location="../resources/resources.qrc"/>
   <include location="../resources/resources.qrc"/>
  </resources>
- <connections/>
+ <connections>
+  <connection>
+   <sender>basicResultBasisComboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>resultBasisComboBox</receiver>
+   <slot>setCurrentIndex(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>0</x>
+     <y>0</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>0</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>resultBasisComboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>basicResultBasisComboBox</receiver>
+   <slot>setCurrentIndex(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>0</x>
+     <y>0</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>0</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

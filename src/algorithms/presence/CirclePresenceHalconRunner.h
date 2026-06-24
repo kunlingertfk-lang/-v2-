@@ -4,8 +4,10 @@
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
+#include <QPointF>
 #include <QRectF>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <QtGlobal>
 
@@ -13,9 +15,14 @@
 
 struct CirclePresenceHalconConfig
 {
-    QString halconSoPath = QStringLiteral("/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2");
+    QString halconSoPath;
+    QStringList halconSoPathCandidates;
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QString detectRegionType = QStringLiteral("rect");
+    QVector<QPointF> detectPolygonNormalized;
+    QPointF detectCircleCenterNormalized;
+    double detectCircleRadiusNormalized = 0.0;
+    QRectF detectCircleBoundingRectNormalized;
     int sensitivity = 60;
     int roundness = 25;
     QString edgePolarity = QStringLiteral("any");

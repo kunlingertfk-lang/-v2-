@@ -510,7 +510,7 @@
                       <item>
                        <widget class="QToolButton" name="basicDetectionRectButton">
                         <property name="text">
-                         <string>矩形</string>
+                         <string>□</string>
                         </property>
                         <property name="checkable">
                          <bool>true</bool>
@@ -524,9 +524,35 @@
                        </widget>
                       </item>
                       <item>
+                       <widget class="QToolButton" name="basicDetectionCircleButton">
+                        <property name="text">
+                         <string>○</string>
+                        </property>
+                        <property name="checkable">
+                         <bool>true</bool>
+                        </property>
+                        <property name="actionRole" stdset="0">
+                         <string>toolbarIcon</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QToolButton" name="basicDetectionPolygonButton">
+                        <property name="text">
+                         <string>⬡</string>
+                        </property>
+                        <property name="checkable">
+                         <bool>true</bool>
+                        </property>
+                        <property name="actionRole" stdset="0">
+                         <string>toolbarIcon</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
                        <widget class="QToolButton" name="basicDetectionResetButton">
                         <property name="text">
-                         <string>全图</string>
+                         <string>⟳</string>
                         </property>
                         <property name="actionRole" stdset="0">
                          <string>toolbarIcon</string>
@@ -901,7 +927,7 @@
                       <item>
                        <widget class="QToolButton" name="detectionRectButton">
                         <property name="text">
-                         <string>矩形</string>
+                         <string>□</string>
                         </property>
                         <property name="checkable">
                          <bool>true</bool>
@@ -915,9 +941,35 @@
                        </widget>
                       </item>
                       <item>
+                       <widget class="QToolButton" name="detectionCircleButton">
+                        <property name="text">
+                         <string>○</string>
+                        </property>
+                        <property name="checkable">
+                         <bool>true</bool>
+                        </property>
+                        <property name="actionRole" stdset="0">
+                         <string>toolbarIcon</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <widget class="QToolButton" name="detectionPolygonButton">
+                        <property name="text">
+                         <string>⬡</string>
+                        </property>
+                        <property name="checkable">
+                         <bool>true</bool>
+                        </property>
+                        <property name="actionRole" stdset="0">
+                         <string>toolbarIcon</string>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
                        <widget class="QToolButton" name="detectionResetButton">
                         <property name="text">
-                         <string>全图</string>
+                         <string>⟳</string>
                         </property>
                         <property name="actionRole" stdset="0">
                          <string>toolbarIcon</string>

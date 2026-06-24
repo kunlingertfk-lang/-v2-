@@ -1,7 +1,8 @@
 #include "tooladapters/OcrAdapter.h"
 
+#include "algorithms/halcon/HalconRuntimePaths.h"
+
 #include <QDebug>
-#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -11,11 +12,6 @@
 #include <limits>
 
 namespace {
-
-const QString kDefaultHalconSoPath =
-        QStringLiteral("/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2");
-const QString kDefaultOcrModelPath =
-        QStringLiteral("/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/ocr/OCRB_0-9A-Z_NoRej.omc");
 
 QString firstString(const QJsonObject &json, const QStringList &keys, const QString &defaultValue = QString())
 {
@@ -119,6 +115,25 @@ ToolResult makeOcrError(const ToolConfig &config, const QString &status, const Q
     return result;
 }
 
+QJsonArray stringListToJson(const QStringList &values)
+{
+    QJsonArray array;
+    for (const QString &value : values)
+        array.append(value);
+    return array;
+}
+
+ToolResult makePathError(const ToolConfig &config,
+                         const QString &status,
+                         const QString &message,
+                         const QString &payloadKey,
+                         const QStringList &triedPaths)
+{
+    ToolResult result = makeOcrError(config, status, message);
+    result.payload.insert(payloadKey, stringListToJson(triedPaths));
+    return result;
+}
+
 struct OcrJudgeDecision
 {
     QString mode;
@@ -136,15 +151,19 @@ OcrHalconConfig toHalconConfig(const ToolConfig &config)
     const QJsonObject judgeRule = config.judgeRule;
 
     OcrHalconConfig halconConfig;
-    halconConfig.halconSoPath = firstString(params,
-                                            {QStringLiteral("halconSoPath"),
-                                             QStringLiteral("so_path")},
-                                            kDefaultHalconSoPath);
-    halconConfig.ocrModelPath = firstString(params,
-                                            {QStringLiteral("ocrModelPath"),
-                                             QStringLiteral("ocr_model_path"),
-                                             QStringLiteral("modelPath")},
-                                            kDefaultOcrModelPath);
+    const QString requestedHalconSoPath = firstString(params,
+                                                      {QStringLiteral("halconSoPath"),
+                                                       QStringLiteral("so_path")});
+    halconConfig.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                requestedHalconSoPath,
+                &halconConfig.halconSoPathCandidates);
+    const QString requestedOcrModelPath = firstString(params,
+                                                     {QStringLiteral("ocrModelPath"),
+                                                      QStringLiteral("ocr_model_path"),
+                                                      QStringLiteral("modelPath")});
+    halconConfig.ocrModelPath = HalconRuntimePaths::resolveOcrModelPath(
+                requestedOcrModelPath,
+                &halconConfig.ocrModelPathCandidates);
 
     halconConfig.roiNormalized = config.roiNormalized;
     if (halconConfig.roiNormalized.width() <= 0.0 || halconConfig.roiNormalized.height() <= 0.0)
@@ -334,15 +353,21 @@ ToolResult OcrAdapter::run(const ToolRequest &request)
                             QStringLiteral("OCR input image is empty."));
 
     const OcrHalconConfig halconConfig = toHalconConfig(config);
-    if (!QFileInfo::exists(halconConfig.halconSoPath))
-        return makeOcrError(config,
-                            QStringLiteral("halcon_so_not_found"),
-                            QStringLiteral("HALCON runtime file not found: %1").arg(halconConfig.halconSoPath));
+    if (halconConfig.halconSoPath.isEmpty())
+        return makePathError(config,
+                             QStringLiteral("halcon_so_not_found"),
+                             QStringLiteral("HALCON runtime file not found. Tried: %1")
+                             .arg(HalconRuntimePaths::formatTriedPaths(halconConfig.halconSoPathCandidates)),
+                             QStringLiteral("halconSoPathCandidates"),
+                             halconConfig.halconSoPathCandidates);
 
-    if (!QFileInfo::exists(halconConfig.ocrModelPath))
-        return makeOcrError(config,
-                            QStringLiteral("model_not_found"),
-                            QStringLiteral("OCR model file not found: %1").arg(halconConfig.ocrModelPath));
+    if (halconConfig.ocrModelPath.isEmpty())
+        return makePathError(config,
+                             QStringLiteral("model_not_found"),
+                             QStringLiteral("OCR model file not found. Tried: %1")
+                             .arg(HalconRuntimePaths::formatTriedPaths(halconConfig.ocrModelPathCandidates)),
+                             QStringLiteral("ocrModelPathCandidates"),
+                             halconConfig.ocrModelPathCandidates);
 
     const OcrHalconResult ocrResult = m_runner.run(request.image, halconConfig);
 

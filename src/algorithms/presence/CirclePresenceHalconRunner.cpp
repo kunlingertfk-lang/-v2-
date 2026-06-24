@@ -15,6 +15,7 @@
 #include <cmath>
 #include <dlfcn.h>
 #include <exception>
+#include <limits>
 #include <opencv2/core.hpp>
 
 namespace {
@@ -42,11 +43,29 @@ QJsonObject rectToJson(const QRectF &rect)
     return json;
 }
 
+QJsonObject pointToJson(const QPointF &point)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("x"), point.x());
+    json.insert(QStringLiteral("y"), point.y());
+    return json;
+}
+
+QJsonArray pointsToJson(const QVector<QPointF> &points)
+{
+    QJsonArray array;
+    for (const QPointF &point : points)
+        array.append(pointToJson(point));
+    return array;
+}
+
 QJsonObject circleToJson(const QPointF &center,
                          const double radius,
                          const double area,
                          const double circularity,
-                         const QString &polarity)
+                         const QString &polarity,
+                         const double strength,
+                         const double contrastScore)
 {
     QJsonObject json;
     json.insert(QStringLiteral("centerX"), center.x());
@@ -55,6 +74,8 @@ QJsonObject circleToJson(const QPointF &center,
     json.insert(QStringLiteral("area"), area);
     json.insert(QStringLiteral("circularity"), circularity);
     json.insert(QStringLiteral("polarity"), polarity);
+    json.insert(QStringLiteral("strength"), strength);
+    json.insert(QStringLiteral("contrastScore"), contrastScore);
     return json;
 }
 
@@ -71,13 +92,72 @@ bool isValidNormalizedRoi(const QRectF &rect)
     return isFiniteRect(rect) && rect.width() > 0.0 && rect.height() > 0.0;
 }
 
+bool isFinitePoint(const QPointF &point)
+{
+    return std::isfinite(point.x()) && std::isfinite(point.y());
+}
+
 bool isSupportedDetectRegionType(const QString &regionType)
 {
     const QString key = regionType.trimmed().toLower();
     return key.isEmpty() ||
            key == QStringLiteral("rect") ||
            key == QStringLiteral("rectangle") ||
-           key.contains(QStringLiteral("矩形"));
+           key == QStringLiteral("polygon") ||
+           key == QStringLiteral("poly") ||
+           key == QStringLiteral("circle") ||
+           key.contains(QStringLiteral("矩形")) ||
+           key.contains(QStringLiteral("多边形")) ||
+           key.contains(QStringLiteral("圆"));
+}
+
+bool isPolygonRegionType(const QString &regionType)
+{
+    const QString key = regionType.trimmed().toLower();
+    return key == QStringLiteral("polygon") ||
+           key == QStringLiteral("poly") ||
+           key.contains(QStringLiteral("多边形"));
+}
+
+bool isCircleRegionType(const QString &regionType)
+{
+    const QString key = regionType.trimmed().toLower();
+    return key == QStringLiteral("circle") ||
+           key.contains(QStringLiteral("圆"));
+}
+
+QVector<QPointF> normalizedPolygonToPixels(const QVector<QPointF> &points,
+                                           const int width,
+                                           const int height)
+{
+    QVector<QPointF> pixelPoints;
+    if (width <= 0 || height <= 0)
+        return pixelPoints;
+
+    pixelPoints.reserve(points.size());
+    for (const QPointF &point : points) {
+        if (!isFinitePoint(point))
+            continue;
+        pixelPoints.append(QPointF(qBound(0.0, point.x(), 1.0) * width,
+                                   qBound(0.0, point.y(), 1.0) * height));
+    }
+    return pixelPoints;
+}
+
+double normalizedCircleRadiusToPixels(const CirclePresenceHalconConfig &config,
+                                      const int width,
+                                      const int height)
+{
+    const double maxDimension = static_cast<double>(qMax(width, height));
+    return qBound(0.0, config.detectCircleRadiusNormalized, 1.0) * maxDimension;
+}
+
+QPointF normalizedCircleCenterToPixels(const CirclePresenceHalconConfig &config,
+                                       const int width,
+                                       const int height)
+{
+    return QPointF(qBound(0.0, config.detectCircleCenterNormalized.x(), 1.0) * width,
+                   qBound(0.0, config.detectCircleCenterNormalized.y(), 1.0) * height);
 }
 
 QString normalizedEdgePolarity(const QString &polarity)
@@ -88,6 +168,18 @@ QString normalizedEdgePolarity(const QString &polarity)
     if (key == QStringLiteral("white_to_black") || key.contains(QStringLiteral("白到黑")))
         return QStringLiteral("white_to_black");
     return QStringLiteral("any");
+}
+
+QString normalizedEdgeType(const QString &edgeType)
+{
+    const QString key = edgeType.trimmed().toLower();
+    if (key == QStringLiteral("maximum") || key.contains(QStringLiteral("最大")))
+        return QStringLiteral("maximum");
+    if (key == QStringLiteral("minimum") || key.contains(QStringLiteral("最小")))
+        return QStringLiteral("minimum");
+    if (key == QStringLiteral("manual") || key.contains(QStringLiteral("手动")))
+        return QStringLiteral("manual");
+    return QStringLiteral("strongest");
 }
 
 QRect normalizedRoiToPixels(const QRectF &sourceRoi,
@@ -131,6 +223,16 @@ ToolOverlay rectOverlay(const QRectF &rect, const QString &label, const double s
     ToolOverlay overlay;
     overlay.type = ToolOverlayType::Rect;
     overlay.rect = rect;
+    overlay.label = label;
+    overlay.score = score;
+    return overlay;
+}
+
+ToolOverlay polygonOverlay(const QVector<QPointF> &points, const QString &label, const double score = 0.0)
+{
+    ToolOverlay overlay;
+    overlay.type = ToolOverlayType::Polygon;
+    overlay.points = points;
     overlay.label = label;
     overlay.score = score;
     return overlay;
@@ -185,6 +287,11 @@ double circularityMinFor(const int roundness, const int sensitivity)
     return qBound(0.20, relaxed, 0.98);
 }
 
+double circularityRelaxFromSensitivityFor(const int sensitivity)
+{
+    return qBound(0.0, static_cast<double>(sensitivity) / 100.0, 1.0) * 0.20;
+}
+
 int thresholdMarginFor(const int sensitivity)
 {
     return qBound(2, 28 - qRound(static_cast<double>(sensitivity) * 0.22), 28);
@@ -209,27 +316,47 @@ void fillPayload(CirclePresenceHalconResult &result,
                  const CirclePresenceHalconConfig &config)
 {
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
+    result.payload.insert(QStringLiteral("halconSoPathCandidates"),
+                          config.halconSoPathCandidates.join(QStringLiteral("; ")));
     result.payload.insert(QStringLiteral("hasImage"), !image.empty());
     result.payload.insert(QStringLiteral("imageWidth"), image.empty() ? 0 : image.cols);
     result.payload.insert(QStringLiteral("imageHeight"), image.empty() ? 0 : image.rows);
     result.payload.insert(QStringLiteral("roiNormalized"), rectToJson(config.roiNormalized));
     result.payload.insert(QStringLiteral("detectRegionType"), config.detectRegionType);
+    result.payload.insert(QStringLiteral("detectPolygonNormalized"),
+                          pointsToJson(config.detectPolygonNormalized));
+    result.payload.insert(QStringLiteral("detectCircleCenterNormalized"),
+                          pointToJson(config.detectCircleCenterNormalized));
+    result.payload.insert(QStringLiteral("detectCircleRadiusNormalized"),
+                          config.detectCircleRadiusNormalized);
+    result.payload.insert(QStringLiteral("detectCircleBoundingRectNormalized"),
+                          rectToJson(config.detectCircleBoundingRectNormalized));
     result.payload.insert(QStringLiteral("sensitivity"), qBound(0, config.sensitivity, 100));
     result.payload.insert(QStringLiteral("roundness"), qBound(0, config.roundness, 100));
     result.payload.insert(QStringLiteral("edgePolarity"), normalizedEdgePolarity(config.edgePolarity));
-    result.payload.insert(QStringLiteral("edgeType"), config.edgeType);
+    result.payload.insert(QStringLiteral("edgeType"), normalizedEdgeType(config.edgeType));
     result.payload.insert(QStringLiteral("judgeBasis"), QStringLiteral("presence"));
     result.payload.insert(QStringLiteral("existOk"), config.existOk);
     result.payload.insert(QStringLiteral("timeoutMs"), config.timeoutMs);
     result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
     result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-    result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_region_circularity"));
+    result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("circle_region"));
+    result.payload.insert(QStringLiteral("mode"), QStringLiteral("region"));
     result.payload.insert(QStringLiteral("edgePolarityApplied"), true);
     result.payload.insert(QStringLiteral("edgeTypeApplied"), false);
     result.payload.insert(QStringLiteral("roundnessApplied"), true);
+    result.payload.insert(QStringLiteral("caliperModeAvailable"), false);
+    result.payload.insert(QStringLiteral("caliperModeApplied"), false);
+    result.payload.insert(QStringLiteral("countMinUsed"), 1);
+    result.payload.insert(QStringLiteral("countMaxUsed"), std::numeric_limits<int>::max());
+    result.payload.insert(QStringLiteral("countRangeSource"), QStringLiteral("internal_default"));
     result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("maskApplied"), false);
     result.payload.insert(QStringLiteral("detectMaskApplied"), false);
+    result.payload.insert(QStringLiteral("polygonDetectRoiApplied"), false);
+    result.payload.insert(QStringLiteral("circleDetectRoiApplied"), false);
+    result.payload.insert(QStringLiteral("maskReason"), QStringLiteral("not implemented"));
 }
 
 CirclePresenceHalconResult makeParameterError(const QString &status,
@@ -245,6 +372,7 @@ CirclePresenceHalconResult makeParameterError(const QString &status,
     result.text = QStringLiteral("error");
     result.payload.insert(QStringLiteral("error"), error);
     fillPayload(result, image, config);
+    result.payload.insert(QStringLiteral("okNgReason"), error);
     return result;
 }
 
@@ -252,6 +380,8 @@ struct HalconCApi
 {
     using SetUtf8Fn = void (*)(int);
     using GetErrorTextFn = Herror (*)(Hlong, char *);
+    using CreateTupleFn = void (*)(Htuple *, Hlong);
+    using SetDoubleFn = void (*)(Htuple *, double, Hlong);
     using DestroyTupleFn = void (*)(Htuple *);
     using GetDoubleFn = double (*)(const Htuple *, Hlong);
     using GenImage1Fn = Herror (*)(Hobject *, const char *, Hlong, Hlong, Hlong);
@@ -260,6 +390,9 @@ struct HalconCApi
     using Rgb1ToGrayFn = Herror (*)(const Hobject, Hobject *);
     using BinaryThresholdFn = Herror (*)(const Hobject, Hobject *, const char *, const char *, Hlong *);
     using ThresholdFn = Herror (*)(const Hobject, Hobject *, double, double);
+    using GenRegionPolygonFn = Herror (*)(Hobject *, const Htuple, const Htuple);
+    using GenCircleFn = Herror (*)(Hobject *, double, double, double);
+    using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using ConnectionFn = Herror (*)(const Hobject, Hobject *);
     using SelectShapeFn = Herror (*)(const Hobject, Hobject *, const char *, const char *, double, double);
     using CountObjFn = Herror (*)(const Hobject, Hlong *);
@@ -270,6 +403,8 @@ struct HalconCApi
 
     SetUtf8Fn setUtf8 = nullptr;
     GetErrorTextFn getErrorText = nullptr;
+    CreateTupleFn createTuple = nullptr;
+    SetDoubleFn setDouble = nullptr;
     DestroyTupleFn destroyTuple = nullptr;
     GetDoubleFn getDouble = nullptr;
     GenImage1Fn genImage1 = nullptr;
@@ -277,6 +412,9 @@ struct HalconCApi
     Rgb1ToGrayFn rgb1ToGray = nullptr;
     BinaryThresholdFn binaryThreshold = nullptr;
     ThresholdFn threshold = nullptr;
+    GenRegionPolygonFn genRegionPolygon = nullptr;
+    GenCircleFn genCircle = nullptr;
+    ReduceDomainFn reduceDomain = nullptr;
     ConnectionFn connection = nullptr;
     SelectShapeFn selectShape = nullptr;
     CountObjFn countObj = nullptr;
@@ -335,6 +473,13 @@ public:
         }
 
         resolveOptional(m_handle, api.setUtf8, "SetHcInterfaceStringEncodingIsUtf8");
+        resolveOptional(m_handle, api.createTuple, "F_create_tuple");
+        resolveOptional(m_handle, api.setDouble, "F_set_d");
+        resolveOptional(m_handle, api.genRegionPolygon, "T_gen_region_polygon");
+        if (!api.genRegionPolygon)
+            resolveOptional(m_handle, api.genRegionPolygon, "gen_region_polygon");
+        resolveOptional(m_handle, api.genCircle, "gen_circle");
+        resolveOptional(m_handle, api.reduceDomain, "reduce_domain");
 
         if (!resolveRequired(m_handle, api.getErrorText, "get_error_text", errorMessage) ||
             !resolveRequired(m_handle, api.destroyTuple, "F_destroy_tuple", errorMessage) ||
@@ -389,7 +534,10 @@ struct DetectedCircle
     double radius = 0.0;
     double area = 0.0;
     double circularity = 0.0;
+    double contrastScore = 0.0;
+    double strength = 0.0;
     QString polarity;
+    int rawIndex = -1;
 };
 
 bool isDuplicateCircle(const QVector<DetectedCircle> &circles,
@@ -450,6 +598,29 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
         return result;
     }
 
+    if (isPolygonRegionType(config.detectRegionType) &&
+        config.detectPolygonNormalized.size() < 3) {
+        CirclePresenceHalconResult result = makeParameterError(QStringLiteral("invalid_detect_polygon"),
+                                                               QStringLiteral("polygon detect ROI requires at least 3 points"),
+                                                               image,
+                                                               config);
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
+        return result;
+    }
+
+    if (isCircleRegionType(config.detectRegionType) &&
+        (!isFinitePoint(config.detectCircleCenterNormalized) ||
+         config.detectCircleRadiusNormalized <= 0.0)) {
+        CirclePresenceHalconResult result = makeParameterError(QStringLiteral("invalid_detect_circle"),
+                                                               QStringLiteral("circle detect ROI is invalid"),
+                                                               image,
+                                                               config);
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
+        return result;
+    }
+
     if (image.depth() != CV_8U ||
         (image.channels() != 1 && image.channels() != 3 && image.channels() != 4)) {
         CirclePresenceHalconResult result = makeParameterError(QStringLiteral("unsupported_image_type"),
@@ -462,8 +633,12 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
     }
 
     if (config.halconSoPath.trimmed().isEmpty() || !QFileInfo::exists(config.halconSoPath)) {
+        const QString triedPaths = config.halconSoPathCandidates.isEmpty()
+                ? config.halconSoPath
+                : config.halconSoPathCandidates.join(QStringLiteral("; "));
         CirclePresenceHalconResult result = makeParameterError(QStringLiteral("halcon_so_not_found"),
-                                                               QStringLiteral("HALCON runtime file not found: %1").arg(config.halconSoPath),
+                                                               QStringLiteral("HALCON runtime file not found: %1. Tried: %2")
+                                                               .arg(config.halconSoPath, triedPaths),
                                                                image,
                                                                config);
         result.elapsedMs = timer.elapsed();
@@ -495,15 +670,22 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
 
     const int sensitivityUsed = qBound(0, config.sensitivity, 100);
     const int roundnessUsed = qBound(0, config.roundness, 100);
+    const double circularityRequested = qBound(0.0, static_cast<double>(roundnessUsed) / 100.0, 1.0);
+    const double circularityRelaxFromSensitivity = circularityRelaxFromSensitivityFor(sensitivityUsed);
     const int thresholdMarginUsed = thresholdMarginFor(sensitivityUsed);
     const double circularityMinUsed = circularityMinFor(roundnessUsed, sensitivityUsed);
     const double edgeThresholdUsed = edgeThresholdForPayload(sensitivityUsed);
+    const QString edgeTypeRequested = normalizedEdgeType(config.edgeType);
+    const bool manualEdgeTypeUnsupported = edgeTypeRequested == QStringLiteral("manual");
+    const QString edgeTypeUsed = manualEdgeTypeUnsupported ? QStringLiteral("strongest") : edgeTypeRequested;
     const double radiusMinUsed = 3.0;
     const double radiusMaxUsed = qMax(radiusMinUsed,
                                       static_cast<double>(qMin(detectRoiPixels.width(),
                                                                detectRoiPixels.height())) / 2.0);
     const double areaMinUsed = kPi * radiusMinUsed * radiusMinUsed;
     const double areaMaxUsed = kPi * radiusMaxUsed * radiusMaxUsed;
+    const int countMinUsed = 1;
+    const int countMaxUsed = std::numeric_limits<int>::max();
 
     result.payload.insert(QStringLiteral("detectRoi"), rectToJson(QRectF(detectRoiPixels)));
     result.payload.insert(QStringLiteral("detectRoiPixels"), rectToJson(QRectF(detectRoiPixels)));
@@ -511,19 +693,55 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
     result.payload.insert(QStringLiteral("detectRoiPixelY"), detectRoiPixels.y());
     result.payload.insert(QStringLiteral("detectRoiPixelW"), detectRoiPixels.width());
     result.payload.insert(QStringLiteral("detectRoiPixelH"), detectRoiPixels.height());
-    result.payload.insert(QStringLiteral("roiMode"), QStringLiteral("rectangle"));
+    const bool polygonDetectRoi = isPolygonRegionType(config.detectRegionType);
+    const bool circleDetectRoi = isCircleRegionType(config.detectRegionType);
+    const QVector<QPointF> detectPolygonPixels = polygonDetectRoi
+            ? normalizedPolygonToPixels(config.detectPolygonNormalized, image.cols, image.rows)
+            : QVector<QPointF>();
+    const QPointF detectCircleCenterPixels = circleDetectRoi
+            ? normalizedCircleCenterToPixels(config, image.cols, image.rows)
+            : QPointF();
+    const double detectCircleRadiusPixels = circleDetectRoi
+            ? normalizedCircleRadiusToPixels(config, image.cols, image.rows)
+            : 0.0;
+    result.payload.insert(QStringLiteral("roiMode"),
+                          polygonDetectRoi ? QStringLiteral("polygon")
+                                           : (circleDetectRoi ? QStringLiteral("circle")
+                                                              : QStringLiteral("rectangle")));
+    result.payload.insert(QStringLiteral("detectPolygonPixels"), pointsToJson(detectPolygonPixels));
+    result.payload.insert(QStringLiteral("detectCircleCenterPixels"), pointToJson(detectCircleCenterPixels));
+    result.payload.insert(QStringLiteral("detectCircleRadiusPixels"), detectCircleRadiusPixels);
     result.payload.insert(QStringLiteral("sensitivityUsed"), sensitivityUsed);
     result.payload.insert(QStringLiteral("thresholdMarginUsed"), thresholdMarginUsed);
     result.payload.insert(QStringLiteral("edgeThresholdUsed"), edgeThresholdUsed);
+    result.payload.insert(QStringLiteral("roundnessCircularityRequested"), circularityRequested);
+    result.payload.insert(QStringLiteral("circularityRelaxFromSensitivity"), circularityRelaxFromSensitivity);
     result.payload.insert(QStringLiteral("radiusMinUsed"), radiusMinUsed);
     result.payload.insert(QStringLiteral("radiusMaxUsed"), radiusMaxUsed);
+    result.payload.insert(QStringLiteral("radiusSource"), QStringLiteral("internal_default"));
     result.payload.insert(QStringLiteral("areaMinUsed"), areaMinUsed);
     result.payload.insert(QStringLiteral("areaMaxUsed"), areaMaxUsed);
     result.payload.insert(QStringLiteral("circularityMinUsed"), circularityMinUsed);
-    result.payload.insert(QStringLiteral("minCount"), 1);
-    result.payload.insert(QStringLiteral("maxCount"), -1);
+    result.payload.insert(QStringLiteral("countMinUsed"), countMinUsed);
+    result.payload.insert(QStringLiteral("countMaxUsed"), countMaxUsed);
+    result.payload.insert(QStringLiteral("countRangeSource"), QStringLiteral("internal_default"));
+    result.payload.insert(QStringLiteral("mode"), QStringLiteral("region"));
+    result.payload.insert(QStringLiteral("caliperModeAvailable"), false);
+    result.payload.insert(QStringLiteral("caliperModeApplied"), false);
+    result.payload.insert(QStringLiteral("countRule"), QStringLiteral("presence_only"));
     result.payload.insert(QStringLiteral("scoreThresholdApplied"), false);
-    result.overlays.append(rectOverlay(QRectF(detectRoiPixels), QStringLiteral("ROI")));
+    result.payload.insert(QStringLiteral("edgeTypeRequested"), edgeTypeRequested);
+    result.payload.insert(QStringLiteral("edgeTypeUsed"), edgeTypeUsed);
+    result.payload.insert(QStringLiteral("edgeTypeApplied"), true);
+    result.payload.insert(QStringLiteral("manualUnsupported"), manualEdgeTypeUnsupported);
+    if (polygonDetectRoi && detectPolygonPixels.size() >= 3)
+        result.overlays.append(polygonOverlay(detectPolygonPixels, QStringLiteral("detect_roi")));
+    else if (circleDetectRoi && detectCircleRadiusPixels > 0.0)
+        result.overlays.append(circleOverlay(detectCircleCenterPixels,
+                                             detectCircleRadiusPixels,
+                                             QStringLiteral("detect_roi")));
+    else
+        result.overlays.append(rectOverlay(QRectF(detectRoiPixels), QStringLiteral("detect_roi")));
 
     cv::Mat detectMat = image(cv::Rect(detectRoiPixels.x(),
                                        detectRoiPixels.y(),
@@ -560,6 +778,10 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
 
     HalconCApi *api = &library.api;
     GrayHalconImage detectImage;
+    Hobject detectRoiRegion = NO_OBJECTS;
+    Hobject detectReducedImage = NO_OBJECTS;
+    Htuple polygonRowsTuple = HTUPLE_INITIALIZER;
+    Htuple polygonColumnsTuple = HTUPLE_INITIALIZER;
 
     auto halconErrorText = [&](const Herror status) {
         char buffer[1024] = {0};
@@ -584,6 +806,10 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
     };
 
     auto cleanup = [&]() {
+        destroyTuple(polygonColumnsTuple);
+        destroyTuple(polygonRowsTuple);
+        clearObject(detectReducedImage);
+        clearObject(detectRoiRegion);
         clearObject(detectImage.grayImage);
         clearObject(detectImage.inputImage);
     };
@@ -629,6 +855,18 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
         halconImage.graySource = halconImage.grayImage;
     };
 
+    auto createDoubleArrayTuple = [&](Htuple &tuple, const QVector<double> &values) {
+        if (!api->createTuple || !api->setDouble) {
+            throw std::pair<QString, QString>(
+                    QStringLiteral("CirclePresence HALCON error"),
+                    QStringLiteral("HALCON tuple API is unavailable for polygon ROI"));
+        }
+
+        api->createTuple(&tuple, static_cast<Hlong>(values.size()));
+        for (int index = 0; index < values.size(); ++index)
+            api->setDouble(&tuple, values.at(index), static_cast<Hlong>(index));
+    };
+
     const QString edgePolarityUsed = normalizedEdgePolarity(config.edgePolarity);
     QVector<ThresholdPass> passes;
     if (edgePolarityUsed == QStringLiteral("white_to_black")) {
@@ -644,6 +882,7 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
     QJsonArray thresholdPassesJson;
     double thresholdLowUsed = 255.0;
     double thresholdHighUsed = 0.0;
+    Hobject thresholdSource = NO_OBJECTS;
 
     auto runThresholdPass = [&](const ThresholdPass &pass) {
         Hobject binaryRegion = NO_OBJECTS;
@@ -676,7 +915,7 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
 
         try {
             Hlong binaryThresholdUsed = 0;
-            checkStatus(api->binaryThreshold(detectImage.graySource,
+            checkStatus(api->binaryThreshold(thresholdSource,
                                              &binaryRegion,
                                              "max_separability",
                                              pass.lightDark,
@@ -689,7 +928,7 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
                     : 0.0;
             const double high = pass.bright
                     ? 255.0
-                    : qBound(0.0, static_cast<double>(thresholdCenter - thresholdMarginUsed), 255.0);
+                    : qBound(0.0, static_cast<double>(thresholdCenter + thresholdMarginUsed), 255.0);
 
             thresholdLowUsed = qMin(thresholdLowUsed, low);
             thresholdHighUsed = qMax(thresholdHighUsed, high);
@@ -701,7 +940,7 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
             passJson.insert(QStringLiteral("thresholdLowUsed"), low);
             passJson.insert(QStringLiteral("thresholdHighUsed"), high);
 
-            checkStatus(api->threshold(detectImage.graySource,
+            checkStatus(api->threshold(thresholdSource,
                                        &thresholdRegion,
                                        low,
                                        high),
@@ -715,6 +954,10 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
                                          areaMinUsed,
                                          areaMaxUsed),
                         QStringLiteral("select_shape.area.%1").arg(pass.polarity));
+            Hlong areaCandidateCount = 0;
+            checkStatus(api->countObj(areaRegions, &areaCandidateCount),
+                        QStringLiteral("count_obj.area.%1").arg(pass.polarity));
+            passJson.insert(QStringLiteral("areaCandidateCount"), static_cast<int>(areaCandidateCount));
             checkStatus(api->selectShape(areaRegions,
                                          &selectedRegions,
                                          "circularity",
@@ -727,6 +970,8 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
             checkStatus(api->countObj(selectedRegions, &objectCount),
                         QStringLiteral("count_obj.%1").arg(pass.polarity));
             passJson.insert(QStringLiteral("selectedCount"), static_cast<int>(objectCount));
+            passJson.insert(QStringLiteral("circularityRejectedCount"),
+                            qMax(0, static_cast<int>(areaCandidateCount - objectCount)));
 
             if (objectCount > 0) {
                 checkStatus(api->smallestCircle(selectedRegions,
@@ -764,7 +1009,19 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
                     circle.circularity = index < circularityTuple.num
                             ? api->getDouble(&circularityTuple, index)
                             : 0.0;
+                    const double areaScore = qBound(0.0,
+                                                    circle.area / qMax(1.0, areaMaxUsed),
+                                                    1.0);
+                    circle.contrastScore = qBound(0.0,
+                                                   std::abs(static_cast<double>(binaryThresholdUsed) - 127.5) / 127.5,
+                                                   1.0);
+                    circle.strength = qBound(0.0,
+                                             circle.circularity * 0.60 +
+                                             areaScore * 0.25 +
+                                             circle.contrastScore * 0.15,
+                                             1.0);
                     circle.polarity = pass.polarity;
+                    circle.rawIndex = detectedCircles.size();
                     detectedCircles.append(circle);
                 }
             }
@@ -780,6 +1037,75 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
 
     try {
         generateGrayImage(detectMat, detectImage, QStringLiteral("detect"));
+        thresholdSource = detectImage.graySource;
+
+        if (polygonDetectRoi) {
+            if (detectPolygonPixels.size() < 3)
+                throw std::pair<QString, QString>(
+                        QStringLiteral("CirclePresence HALCON error"),
+                        QStringLiteral("polygon detect ROI requires at least 3 points"));
+            if (!api->genRegionPolygon || !api->reduceDomain)
+                throw std::pair<QString, QString>(
+                        QStringLiteral("CirclePresence HALCON error"),
+                        QStringLiteral("HALCON polygon ROI symbols are unavailable"));
+
+            QVector<double> rows;
+            QVector<double> columns;
+            rows.reserve(detectPolygonPixels.size());
+            columns.reserve(detectPolygonPixels.size());
+            for (const QPointF &point : detectPolygonPixels) {
+                rows.append(qBound(0.0,
+                                   point.y() - static_cast<double>(detectRoiPixels.y()),
+                                   static_cast<double>(detectMat.rows - 1)));
+                columns.append(qBound(0.0,
+                                      point.x() - static_cast<double>(detectRoiPixels.x()),
+                                      static_cast<double>(detectMat.cols - 1)));
+            }
+
+            createDoubleArrayTuple(polygonRowsTuple, rows);
+            createDoubleArrayTuple(polygonColumnsTuple, columns);
+            checkStatus(api->genRegionPolygon(&detectRoiRegion,
+                                              polygonRowsTuple,
+                                              polygonColumnsTuple),
+                        QStringLiteral("gen_region_polygon.detect_roi"));
+            checkStatus(api->reduceDomain(detectImage.graySource,
+                                          detectRoiRegion,
+                                          &detectReducedImage),
+                        QStringLiteral("reduce_domain.detect_polygon_roi"));
+            thresholdSource = detectReducedImage;
+            result.payload.insert(QStringLiteral("polygonDetectRoiApplied"), true);
+            result.payload.insert(QStringLiteral("detectMaskApplied"), true);
+            result.payload.insert(QStringLiteral("detectRoiRegionApplied"), true);
+            result.payload.insert(QStringLiteral("maskApplied"), false);
+            result.payload.insert(QStringLiteral("maskReason"), QStringLiteral("not implemented"));
+        } else if (circleDetectRoi) {
+            if (detectCircleRadiusPixels <= 0.0)
+                throw std::pair<QString, QString>(
+                        QStringLiteral("CirclePresence HALCON error"),
+                        QStringLiteral("circle detect ROI is invalid"));
+            if (!api->genCircle || !api->reduceDomain)
+                throw std::pair<QString, QString>(
+                        QStringLiteral("CirclePresence HALCON error"),
+                        QStringLiteral("HALCON circle ROI symbols are unavailable"));
+
+            const double localRow = detectCircleCenterPixels.y() - static_cast<double>(detectRoiPixels.y());
+            const double localColumn = detectCircleCenterPixels.x() - static_cast<double>(detectRoiPixels.x());
+            checkStatus(api->genCircle(&detectRoiRegion,
+                                       localRow,
+                                       localColumn,
+                                       detectCircleRadiusPixels),
+                        QStringLiteral("gen_circle.detect_roi"));
+            checkStatus(api->reduceDomain(detectImage.graySource,
+                                          detectRoiRegion,
+                                          &detectReducedImage),
+                        QStringLiteral("reduce_domain.detect_circle_roi"));
+            thresholdSource = detectReducedImage;
+            result.payload.insert(QStringLiteral("circleDetectRoiApplied"), true);
+            result.payload.insert(QStringLiteral("detectMaskApplied"), true);
+            result.payload.insert(QStringLiteral("detectRoiRegionApplied"), true);
+            result.payload.insert(QStringLiteral("maskApplied"), false);
+            result.payload.insert(QStringLiteral("maskReason"), QStringLiteral("not implemented"));
+        }
 
         for (const ThresholdPass &pass : passes)
             runThresholdPass(pass);
@@ -789,60 +1115,174 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
             thresholdHighUsed = 0.0;
         }
 
-        QJsonArray circlesArray;
+        QJsonArray rawCirclesArray;
         for (const DetectedCircle &circle : detectedCircles) {
+            rawCirclesArray.append(circleToJson(circle.center,
+                                                circle.radius,
+                                                circle.area,
+                                                circle.circularity,
+                                                circle.polarity,
+                                                circle.strength,
+                                                circle.contrastScore));
+        }
+
+        QVector<DetectedCircle> finalCircles = detectedCircles;
+        QString edgeTypeSelectionMetric = QStringLiteral("strength");
+        if (edgeTypeUsed == QStringLiteral("maximum")) {
+            edgeTypeSelectionMetric = QStringLiteral("radius_max");
+            std::sort(finalCircles.begin(), finalCircles.end(), [](const DetectedCircle &a, const DetectedCircle &b) {
+                return a.radius > b.radius;
+            });
+            if (finalCircles.size() > 1)
+                finalCircles.resize(1);
+        } else if (edgeTypeUsed == QStringLiteral("minimum")) {
+            edgeTypeSelectionMetric = QStringLiteral("radius_min");
+            std::sort(finalCircles.begin(), finalCircles.end(), [](const DetectedCircle &a, const DetectedCircle &b) {
+                return a.radius < b.radius;
+            });
+            if (finalCircles.size() > 1)
+                finalCircles.resize(1);
+        } else {
+            std::sort(finalCircles.begin(), finalCircles.end(), [](const DetectedCircle &a, const DetectedCircle &b) {
+                if (!qFuzzyCompare(a.strength, b.strength))
+                    return a.strength > b.strength;
+                if (!qFuzzyCompare(a.circularity, b.circularity))
+                    return a.circularity > b.circularity;
+                return a.radius > b.radius;
+            });
+            if (finalCircles.size() > 1)
+                finalCircles.resize(1);
+        }
+
+        QJsonArray circlesArray;
+        for (const DetectedCircle &circle : finalCircles) {
             circlesArray.append(circleToJson(circle.center,
                                              circle.radius,
                                              circle.area,
                                              circle.circularity,
-                                             circle.polarity));
+                                             circle.polarity,
+                                             circle.strength,
+                                             circle.contrastScore));
 
             result.overlays.append(circleOverlay(circle.center,
                                                  circle.radius,
                                                  QStringLiteral("circle"),
-                                                 1.0));
+                                                 circle.strength));
 
             const double crossRadius = qBound(4.0, circle.radius * 0.25, 16.0);
             result.overlays.append(lineOverlay(QPointF(circle.center.x() - crossRadius, circle.center.y()),
                                                QPointF(circle.center.x() + crossRadius, circle.center.y()),
                                                QStringLiteral("circle_center"),
-                                               1.0));
+                                               circle.strength));
             result.overlays.append(lineOverlay(QPointF(circle.center.x(), circle.center.y() - crossRadius),
                                                QPointF(circle.center.x(), circle.center.y() + crossRadius),
                                                QStringLiteral("circle_center"),
-                                               1.0));
+                                               circle.strength));
+            result.overlays.append(textOverlay(QPointF(circle.center.x() + crossRadius + 2.0,
+                                                       circle.center.y() - crossRadius),
+                                               QStringLiteral("r=%1").arg(circle.radius, 0, 'f', 1),
+                                               QStringLiteral("circle_radius_text"),
+                                               circle.strength));
+            result.overlays.append(textOverlay(QPointF(circle.center.x() + crossRadius + 2.0,
+                                                       circle.center.y() + 2.0),
+                                               QStringLiteral("circ=%1").arg(circle.circularity, 0, 'f', 2),
+                                               QStringLiteral("circularity_text"),
+                                               circle.strength));
         }
 
-        const int circleCount = detectedCircles.size();
-        const bool found = circleCount > 0;
+        const int rawCircleCount = detectedCircles.size();
+        const int circleCount = finalCircles.size();
+        const bool found = circleCount >= countMinUsed && circleCount <= countMaxUsed;
         const bool ok = config.existOk ? found : !found;
+        const DetectedCircle *bestCircle = finalCircles.isEmpty() ? nullptr : &finalCircles.first();
+        const int finalSelectedIndex = bestCircle ? bestCircle->rawIndex : -1;
+        const QJsonObject bestCircleJson = bestCircle
+                ? circleToJson(bestCircle->center,
+                               bestCircle->radius,
+                               bestCircle->area,
+                               bestCircle->circularity,
+                               bestCircle->polarity,
+                               bestCircle->strength,
+                               bestCircle->contrastScore)
+                : QJsonObject();
+        QJsonArray rejectedCandidates;
+        for (const QJsonValue &value : thresholdPassesJson) {
+            const QJsonObject passJson = value.toObject();
+            QJsonObject rejected;
+            rejected.insert(QStringLiteral("polarity"), passJson.value(QStringLiteral("polarity")));
+            rejected.insert(QStringLiteral("reason"), QStringLiteral("area_or_circularity_filter"));
+            rejected.insert(QStringLiteral("areaCandidateCount"), passJson.value(QStringLiteral("areaCandidateCount")));
+            rejected.insert(QStringLiteral("selectedCount"), passJson.value(QStringLiteral("selectedCount")));
+            rejected.insert(QStringLiteral("circularityRejectedCount"),
+                            passJson.value(QStringLiteral("circularityRejectedCount")));
+            rejectedCandidates.append(rejected);
+        }
+        QString okNgReason;
+        if (found) {
+            okNgReason = config.existOk
+                    ? QStringLiteral("found target, existOk=true")
+                    : QStringLiteral("found target, existOk=false");
+        } else if (circleCount <= 0) {
+            okNgReason = config.existOk
+                    ? QStringLiteral("not found target, existOk=true")
+                    : QStringLiteral("not found target, existOk=false");
+        } else {
+            okNgReason = QStringLiteral("circle count out of internal range");
+        }
 
         result.success = true;
         result.ok = ok;
-        result.score = found ? 1.0 : 0.0;
+        result.score = bestCircle ? qBound(0.0, bestCircle->strength, 1.0) : 0.0;
         result.count = circleCount;
         result.text = found ? QStringLiteral("found") : QStringLiteral("missing");
-        result.status = QStringLiteral("CirclePresence: %1 count=%2")
-                .arg(result.text, QString::number(circleCount));
+        result.status = QStringLiteral("CirclePresence: %1 count=%2 raw=%3 edgeType=%4 sensitivity=%5 thresholdMargin=%6 circularityMin=%7")
+                .arg(result.text,
+                     QString::number(circleCount),
+                     QString::number(rawCircleCount),
+                     edgeTypeUsed,
+                     QString::number(sensitivityUsed),
+                     QString::number(thresholdMarginUsed),
+                     QString::number(circularityMinUsed, 'f', 3));
         result.message = result.status;
 
         result.payload.insert(QStringLiteral("found"), found);
+        result.payload.insert(QStringLiteral("rawCircleCount"), rawCircleCount);
         result.payload.insert(QStringLiteral("circleCount"), circleCount);
+        result.payload.insert(QStringLiteral("finalCircleCount"), circleCount);
+        result.payload.insert(QStringLiteral("rawCircles"), rawCirclesArray);
         result.payload.insert(QStringLiteral("circles"), circlesArray);
+        result.payload.insert(QStringLiteral("rejectedCandidates"), rejectedCandidates);
+        result.payload.insert(QStringLiteral("bestCircle"), bestCircleJson);
+        result.payload.insert(QStringLiteral("center"), bestCircle ? pointToJson(bestCircle->center) : QJsonObject());
+        result.payload.insert(QStringLiteral("radius"), bestCircle ? bestCircle->radius : 0.0);
+        result.payload.insert(QStringLiteral("circularity"), bestCircle ? bestCircle->circularity : 0.0);
+        result.payload.insert(QStringLiteral("area"), bestCircle ? bestCircle->area : 0.0);
+        result.payload.insert(QStringLiteral("strength"), bestCircle ? bestCircle->strength : 0.0);
+        result.payload.insert(QStringLiteral("finalSelectedIndex"), finalSelectedIndex);
         result.payload.insert(QStringLiteral("thresholdPasses"), thresholdPassesJson);
         result.payload.insert(QStringLiteral("thresholdLowUsed"), thresholdLowUsed);
         result.payload.insert(QStringLiteral("thresholdHighUsed"), thresholdHighUsed);
+        result.payload.insert(QStringLiteral("edgePolarityUsed"), edgePolarityUsed);
         result.payload.insert(QStringLiteral("edgePolarityApplied"), true);
-        result.payload.insert(QStringLiteral("edgeTypeApplied"), false);
+        result.payload.insert(QStringLiteral("edgeTypeApplied"), true);
+        result.payload.insert(QStringLiteral("edgeTypeRequested"), edgeTypeRequested);
+        result.payload.insert(QStringLiteral("edgeTypeUsed"), edgeTypeUsed);
+        result.payload.insert(QStringLiteral("edgeTypeSelectionMetric"), edgeTypeSelectionMetric);
+        result.payload.insert(QStringLiteral("manualUnsupported"), manualEdgeTypeUnsupported);
+        result.payload.insert(QStringLiteral("mode"), QStringLiteral("region"));
+        result.payload.insert(QStringLiteral("caliperModeAvailable"), false);
+        result.payload.insert(QStringLiteral("caliperModeApplied"), false);
         result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+        result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
         result.payload.insert(QStringLiteral("maskApplied"), false);
+        result.payload.insert(QStringLiteral("okNgReason"), okNgReason);
         result.payload.insert(QStringLiteral("text"), result.text);
 
         const QPointF countPosition = countOverlayPosition(detectRoiPixels,
                                                            QSize(image.cols, image.rows));
         result.overlays.append(textOverlay(countPosition,
                                            QStringLiteral("count=%1").arg(circleCount),
-                                           QStringLiteral("circle_count"),
+                                           QStringLiteral("circle_count_text"),
                                            result.score));
 
         result.elapsedMs = timer.elapsed();
@@ -860,6 +1300,7 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
         result.message = errorInfo.second;
         result.text = QStringLiteral("error");
         result.payload.insert(QStringLiteral("error"), errorInfo.second);
+        result.payload.insert(QStringLiteral("okNgReason"), errorInfo.second);
         result.elapsedMs = timer.elapsed();
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
         return result;
@@ -871,6 +1312,7 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
         result.message = QString::fromLocal8Bit(error.what());
         result.text = QStringLiteral("error");
         result.payload.insert(QStringLiteral("error"), result.message);
+        result.payload.insert(QStringLiteral("okNgReason"), result.message);
         result.elapsedMs = timer.elapsed();
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
         return result;

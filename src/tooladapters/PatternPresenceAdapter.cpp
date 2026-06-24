@@ -1,8 +1,14 @@
 #include "tooladapters/PatternPresenceAdapter.h"
 
+#include "algorithms/halcon/HalconRuntimePaths.h"
+
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QPointF>
 #include <QtGlobal>
+
+#include <exception>
 
 namespace {
 
@@ -51,15 +57,30 @@ QRectF rectParam(const QJsonObject &params, const QString &key, const QRectF &de
                   json.value(QStringLiteral("height")).toDouble(defaultValue.height()));
 }
 
+QVector<QPointF> pointsParam(const QJsonObject &params, const QString &key)
+{
+    const QJsonArray array = params.value(key).toArray();
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &value : array) {
+        const QJsonObject json = value.toObject();
+        points.append(QPointF(json.value(QStringLiteral("x")).toDouble(),
+                              json.value(QStringLiteral("y")).toDouble()));
+    }
+    return points;
+}
+
 PatternPresenceHalconConfig toHalconConfig(const ToolConfig &config)
 {
     const QJsonObject params = config.params;
     const QJsonObject judgeRule = config.judgeRule;
 
     PatternPresenceHalconConfig halconConfig;
-    halconConfig.halconSoPath = stringParam(params,
-                                            QStringLiteral("halconSoPath"),
-                                            halconConfig.halconSoPath);
+    halconConfig.toolId = config.toolId;
+    const QString requestedHalconSoPath = stringParam(params, QStringLiteral("halconSoPath"));
+    halconConfig.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                requestedHalconSoPath,
+                &halconConfig.halconSoPathCandidates);
     halconConfig.roiNormalized = config.roiNormalized;
     halconConfig.templateRoiNormalized = rectParam(params,
                                                    QStringLiteral("templateRoiNormalized"),
@@ -76,12 +97,19 @@ PatternPresenceHalconConfig toHalconConfig(const ToolConfig &config)
     halconConfig.modelAutoCreate = boolParam(params,
                                              QStringLiteral("modelAutoCreate"),
                                              halconConfig.modelAutoCreate);
-    halconConfig.modelCacheKey = stringParam(params,
-                                             QStringLiteral("modelCacheKey"),
-                                             halconConfig.modelCacheKey);
+    const QString configuredModelCacheKey = stringParam(params,
+                                                        QStringLiteral("modelCacheKey"),
+                                                        halconConfig.modelCacheKey);
+    halconConfig.modelCacheKey = QStringLiteral("%1|%2")
+            .arg(config.toolId,
+                 configuredModelCacheKey.trimmed().isEmpty()
+                         ? QStringLiteral("%1_shape_model").arg(config.toolId)
+                         : configuredModelCacheKey);
     halconConfig.templateShapeType = stringParam(params,
                                                  QStringLiteral("templateShapeType"),
                                                  halconConfig.templateShapeType);
+    halconConfig.templatePolygonNormalized = pointsParam(params,
+                                                         QStringLiteral("templatePolygonNormalized"));
     halconConfig.templateSensitivityMode = stringParam(params,
                                                        QStringLiteral("templateSensitivityMode"),
                                                        halconConfig.templateSensitivityMode);
@@ -93,6 +121,8 @@ PatternPresenceHalconConfig toHalconConfig(const ToolConfig &config)
     halconConfig.detectRegionType = stringParam(params,
                                                 QStringLiteral("detectRegionType"),
                                                 halconConfig.detectRegionType);
+    halconConfig.detectPolygonNormalized = pointsParam(params,
+                                                       QStringLiteral("detectPolygonNormalized"));
     halconConfig.enablePositionCorrection = boolParam(params,
                                                       QStringLiteral("enablePositionCorrection"),
                                                       halconConfig.enablePositionCorrection);
@@ -103,12 +133,8 @@ PatternPresenceHalconConfig toHalconConfig(const ToolConfig &config)
                                    intParam(params, QStringLiteral("minScore"), halconConfig.minScore),
                                    100);
     halconConfig.polarity = stringParam(params, QStringLiteral("polarity"), halconConfig.polarity);
-    halconConfig.scaleMin = qBound(1,
-                                   intParam(params, QStringLiteral("scaleMin"), halconConfig.scaleMin),
-                                   999);
-    halconConfig.scaleMax = qBound(halconConfig.scaleMin,
-                                   intParam(params, QStringLiteral("scaleMax"), halconConfig.scaleMax),
-                                   999);
+    halconConfig.scaleMin = intParam(params, QStringLiteral("scaleMin"), halconConfig.scaleMin);
+    halconConfig.scaleMax = intParam(params, QStringLiteral("scaleMax"), halconConfig.scaleMax);
     halconConfig.angleStart = qBound(-180,
                                      intParam(params, QStringLiteral("angleStart"), halconConfig.angleStart),
                                      180);
@@ -120,6 +146,9 @@ PatternPresenceHalconConfig toHalconConfig(const ToolConfig &config)
     halconConfig.showContourPoints = boolParam(params,
                                                QStringLiteral("showContourPoints"),
                                                halconConfig.showContourPoints);
+    halconConfig.debugPolygonLog = boolParam(params,
+                                             QStringLiteral("debugPatternPolygonLog"),
+                                             halconConfig.debugPolygonLog);
     halconConfig.sortMode = stringParam(params, QStringLiteral("sortMode"), halconConfig.sortMode);
     halconConfig.judgeBasis = stringParam(params,
                                           QStringLiteral("judgeBasis"),
@@ -191,9 +220,28 @@ ToolResult PatternPresenceAdapter::run(const ToolRequest &request)
                                         QStringLiteral("PatternPresenceAdapter only supports ToolType::PatternPresence."));
 
     const PatternPresenceHalconConfig halconConfig = toHalconConfig(config);
-    const PatternPresenceHalconResult runnerResult = m_runner.run(request.image,
-                                                                  request.referenceImage,
-                                                                  halconConfig);
+    PatternPresenceHalconResult runnerResult;
+    try {
+        runnerResult = m_runner.run(request.image,
+                                    request.referenceImage,
+                                    halconConfig);
+    } catch (const std::exception &error) {
+        runnerResult.success = false;
+        runnerResult.ok = false;
+        runnerResult.status = QStringLiteral("PatternPresence HALCON error");
+        runnerResult.message = QString::fromLocal8Bit(error.what());
+        runnerResult.text = QStringLiteral("error");
+        runnerResult.payload.insert(QStringLiteral("error"), runnerResult.message);
+        runnerResult.payload.insert(QStringLiteral("adapterCaughtException"), true);
+    } catch (...) {
+        runnerResult.success = false;
+        runnerResult.ok = false;
+        runnerResult.status = QStringLiteral("PatternPresence HALCON error");
+        runnerResult.message = QStringLiteral("unknown PatternPresence exception");
+        runnerResult.text = QStringLiteral("error");
+        runnerResult.payload.insert(QStringLiteral("error"), runnerResult.message);
+        runnerResult.payload.insert(QStringLiteral("adapterCaughtException"), true);
+    }
 
     ToolResult result;
     result.toolId = config.toolId;

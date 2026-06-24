@@ -87,15 +87,15 @@ QToolButton#cameraStepButton,
 QToolButton#referenceStepButton,
 QToolButton#toolsStepButton,
 QToolButton#outputStepButton {
-    min-width: 84px;
-    min-height: 74px;
+    min-width: 92px;
+    min-height: 86px;
     border: none;
     border-radius: 0;
     background: transparent;
     color: #6f7787;
     font-size: 15px;
     font-weight: 700;
-    padding: 8px 6px;
+    padding: 10px 8px;
 }
 
 QToolButton#cameraStepButton:hover,
@@ -813,13 +813,13 @@ QWidget[viewerCanvas=&quot;true&quot;] {
        <widget class="QFrame" name="setupStepRail">
        <property name="minimumSize">
         <size>
-          <width>92</width>
+          <width>106</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>96</width>
+          <width>106</width>
           <height>16777215</height>
          </size>
         </property>
@@ -846,8 +846,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="cameraStepButton">
          <property name="minimumSize">
           <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
           </size>
          </property>
            <property name="text">
@@ -891,8 +891,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="referenceStepButton">
          <property name="minimumSize">
           <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
           </size>
          </property>
            <property name="text">
@@ -933,8 +933,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="toolsStepButton">
          <property name="minimumSize">
           <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
           </size>
          </property>
            <property name="text">
@@ -975,8 +975,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="outputStepButton">
          <property name="minimumSize">
           <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
           </size>
          </property>
            <property name="text">
@@ -1020,13 +1020,13 @@ QWidget[viewerCanvas=&quot;true&quot;] {
        <widget class="QFrame" name="setupEditorPanel">
        <property name="minimumSize">
         <size>
-          <width>360</width>
+          <width>610</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>16777215</width>
+          <width>610</width>
           <height>16777215</height>
          </size>
         </property>
@@ -1176,7 +1176,7 @@ QWidget[viewerCanvas=&quot;true&quot;] {
          <item>
           <widget class="QStackedWidget" name="cameraParamsStack">
            <property name="currentIndex">
-            <number>0</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="basicParamsPage">
             <layout class="QVBoxLayout" name="verticalLayout_basicParamsPage">
@@ -1213,7 +1213,7 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                 <property name="geometry">
                  <rect>
                   <x>0</x>
-                  <y>0</y>
+                  <y>-16</y>
                   <width>552</width>
                   <height>613</height>
                  </rect>
@@ -1988,8 +1988,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                 <property name="geometry">
                  <rect>
                   <x>0</x>
-                  <y>0</y>
-                  <width>475</width>
+                  <y>-937</y>
+                  <width>552</width>
                   <height>2413</height>
                  </rect>
                 </property>
@@ -2236,16 +2236,6 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                        <property name="verticalSpacing">
                         <number>12</number>
                        </property>
-                       <item row="0" column="0">
-                        <widget class="QLabel" name="allTriggerModeLabel">
-                         <property name="text">
-                          <string>触发模式 ⓘ</string>
-                         </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
                        <item row="0" column="1">
                         <widget class="QFrame" name="allTriggerSegmentFrame">
                          <property name="minimumSize">
@@ -2330,19 +2320,33 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </property>
                         </widget>
                        </item>
+                       <item row="0" column="0">
+                        <widget class="QLabel" name="allTriggerModeLabel">
+                         <property name="text">
+                          <string>触发模式 ⓘ</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
+                         </property>
+                        </widget>
+                       </item>
                        <item row="1" column="1">
-                        <widget class="QComboBox" name="runIntervalComboBox">
+                        <widget class="QSpinBox" name="runIntervalspinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
+                         </property>
                          <property name="minimumSize">
                           <size>
                            <width>260</width>
                            <height>40</height>
                           </size>
                          </property>
-                         <item>
-                          <property name="text">
-                           <string>17</string>
-                          </property>
-                         </item>
+                         <property name="value">
+                          <number>50</number>
+                         </property>
                         </widget>
                        </item>
                       </layout>
@@ -2462,42 +2466,71 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                        <property name="verticalSpacing">
                         <number>12</number>
                        </property>
-                       <item row="0" column="0">
-                        <widget class="QLabel" name="brightnessStandardLabel">
-                         <property name="text">
-                          <string>亮度标准</string>
+                       <item row="0" column="2">
+                        <widget class="QSpinBox" name="brightnessStandardspinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
                          </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="0" column="1">
-                        <widget class="QComboBox" name="brightnessStandardComboBox">
                          <property name="minimumSize">
                           <size>
                            <width>260</width>
                            <height>40</height>
                           </size>
                          </property>
-                         <item>
-                          <property name="text">
-                           <string>2</string>
-                          </property>
-                         </item>
+                         <property name="value">
+                          <number>1</number>
+                         </property>
                         </widget>
                        </item>
-                       <item row="1" column="0">
-                        <widget class="QLabel" name="allAutoAdjustLabel">
+                       <item row="2" column="0">
+                        <widget class="QLabel" name="exposureTimeLabel">
                          <property name="text">
-                          <string>一键设置</string>
+                          <string>曝光时间(us)</string>
                          </property>
                          <property name="formLabel" stdset="0">
                           <bool>true</bool>
                          </property>
                         </widget>
                        </item>
-                       <item row="1" column="1">
+                       <item row="3" column="2">
+                        <widget class="QLineEdit" name="gainLineEdit">
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <property name="text">
+                          <string>0.00</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="2" column="2">
+                        <widget class="QSpinBox" name="exposureTimespinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
+                         </property>
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <property name="maximum">
+                          <number>5000</number>
+                         </property>
+                         <property name="value">
+                          <number>1620</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="2">
                         <widget class="QPushButton" name="allAutoAdjustButton">
                          <property name="minimumSize">
                           <size>
@@ -2513,29 +2546,14 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </property>
                         </widget>
                        </item>
-                       <item row="2" column="0">
-                        <widget class="QLabel" name="exposureTimeLabel">
+                       <item row="0" column="0">
+                        <widget class="QLabel" name="brightnessStandardLabel">
                          <property name="text">
-                          <string>曝光时间(us)</string>
+                          <string>亮度标准</string>
                          </property>
                          <property name="formLabel" stdset="0">
                           <bool>true</bool>
                          </property>
-                        </widget>
-                       </item>
-                       <item row="2" column="1">
-                        <widget class="QComboBox" name="exposureTimeComboBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>260</width>
-                           <height>40</height>
-                          </size>
-                         </property>
-                         <item>
-                          <property name="text">
-                           <string>799</string>
-                          </property>
-                         </item>
                         </widget>
                        </item>
                        <item row="3" column="0">
@@ -2548,18 +2566,28 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </property>
                         </widget>
                        </item>
-                       <item row="3" column="1">
-                        <widget class="QLineEdit" name="gainLineEdit">
-                         <property name="minimumSize">
-                          <size>
-                           <width>260</width>
-                           <height>40</height>
-                          </size>
-                         </property>
+                       <item row="1" column="0">
+                        <widget class="QLabel" name="allAutoAdjustLabel">
                          <property name="text">
-                          <string>0.00</string>
+                          <string>一键设置</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
                          </property>
                         </widget>
+                       </item>
+                       <item row="0" column="1">
+                        <spacer name="horizontalSpacer">
+                         <property name="orientation">
+                          <enum>Qt::Horizontal</enum>
+                         </property>
+                         <property name="sizeHint" stdset="0">
+                          <size>
+                           <width>40</width>
+                           <height>20</height>
+                          </size>
+                         </property>
+                        </spacer>
                        </item>
                       </layout>
                      </widget>
@@ -2678,85 +2706,20 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                        <property name="verticalSpacing">
                         <number>12</number>
                        </property>
-                       <item row="0" column="0">
-                        <widget class="QLabel" name="focusModeLabel">
+                       <item row="4" column="0">
+                        <widget class="QLabel" name="allAutoFocusLabel">
                          <property name="text">
-                          <string>调焦模式 ⓘ</string>
+                          <string>自动对焦</string>
                          </property>
                          <property name="formLabel" stdset="0">
                           <bool>true</bool>
                          </property>
-                        </widget>
-                       </item>
-                       <item row="0" column="1">
-                        <widget class="QComboBox" name="focusModeComboBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>260</width>
-                           <height>40</height>
-                          </size>
-                         </property>
-                         <item>
-                          <property name="text">
-                           <string>快速调焦模式</string>
-                          </property>
-                         </item>
                         </widget>
                        </item>
                        <item row="1" column="0">
                         <widget class="QLabel" name="focusStepLabel">
                          <property name="text">
                           <string>焦距步进</string>
-                         </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="1" column="1">
-                        <widget class="QComboBox" name="focusStepComboBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>260</width>
-                           <height>40</height>
-                          </size>
-                         </property>
-                         <item>
-                          <property name="text">
-                           <string>100</string>
-                          </property>
-                         </item>
-                        </widget>
-                       </item>
-                       <item row="2" column="0">
-                        <widget class="QLabel" name="focusPositionLabel">
-                         <property name="text">
-                          <string>焦点位置</string>
-                         </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="2" column="1">
-                        <widget class="QComboBox" name="focusPositionComboBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>260</width>
-                           <height>40</height>
-                          </size>
-                         </property>
-                         <item>
-                          <property name="text">
-                           <string>2000</string>
-                          </property>
-                         </item>
-                        </widget>
-                       </item>
-                       <item row="3" column="0">
-                        <widget class="QLabel" name="allFocusRegionLabel">
-                         <property name="text">
-                          <string>焦点区域</string>
                          </property>
                          <property name="formLabel" stdset="0">
                           <bool>true</bool>
@@ -2813,10 +2776,25 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </layout>
                         </widget>
                        </item>
-                       <item row="4" column="0">
-                        <widget class="QLabel" name="allAutoFocusLabel">
+                       <item row="0" column="1">
+                        <widget class="QComboBox" name="focusModeComboBox">
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <item>
+                          <property name="text">
+                           <string>快速调焦模式</string>
+                          </property>
+                         </item>
+                        </widget>
+                       </item>
+                       <item row="2" column="0">
+                        <widget class="QLabel" name="focusPositionLabel">
                          <property name="text">
-                          <string>自动对焦</string>
+                          <string>焦点位置</string>
                          </property>
                          <property name="formLabel" stdset="0">
                           <bool>true</bool>
@@ -2874,6 +2852,70 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                            </widget>
                           </item>
                          </layout>
+                        </widget>
+                       </item>
+                       <item row="3" column="0">
+                        <widget class="QLabel" name="allFocusRegionLabel">
+                         <property name="text">
+                          <string>焦点区域</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="0" column="0">
+                        <widget class="QLabel" name="focusModeLabel">
+                         <property name="text">
+                          <string>调焦模式 ⓘ</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="1">
+                        <widget class="QSpinBox" name="focusStepspinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
+                         </property>
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <property name="maximum">
+                          <number>200</number>
+                         </property>
+                         <property name="value">
+                          <number>100</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="2" column="1">
+                        <widget class="QSpinBox" name="focusPositionspinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
+                         </property>
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <property name="maximum">
+                          <number>5000</number>
+                         </property>
+                         <property name="value">
+                          <number>2300</number>
+                         </property>
                         </widget>
                        </item>
                       </layout>
@@ -3049,8 +3091,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                            <widget class="QLabel" name="lightDeviceIconLabel">
                             <property name="text">
                              <string>●  ●
-                              ◉
-                            ○  ○</string>
+ ◉
+○  ○</string>
                             </property>
                             <property name="devicePreview" stdset="0">
                              <bool>true</bool>
@@ -3247,26 +3289,59 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                        <property name="verticalSpacing">
                         <number>12</number>
                        </property>
-                       <item row="0" column="0">
-                        <widget class="QLabel" name="gammaLabel">
+                       <item row="2" column="0">
+                        <widget class="QLabel" name="sharpenLabel">
                          <property name="text">
-                          <string>伽马值</string>
+                          <string>锐化</string>
                          </property>
                          <property name="formLabel" stdset="0">
                           <bool>true</bool>
                          </property>
                         </widget>
                        </item>
-                       <item row="0" column="1">
-                        <widget class="QLineEdit" name="gammaLineEdit">
+                       <item row="5" column="2">
+                        <widget class="QCheckBox" name="xMirrorCheckBox">
                          <property name="minimumSize">
                           <size>
-                           <width>260</width>
-                           <height>40</height>
+                           <width>58</width>
+                           <height>28</height>
                           </size>
                          </property>
                          <property name="text">
-                          <string>0.70</string>
+                          <string/>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="5" column="0">
+                        <widget class="QLabel" name="xMirrorLabel">
+                         <property name="text">
+                          <string>X镜像</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="6" column="2">
+                        <widget class="QCheckBox" name="yMirrorCheckBox">
+                         <property name="minimumSize">
+                          <size>
+                           <width>58</width>
+                           <height>28</height>
+                          </size>
+                         </property>
+                         <property name="text">
+                          <string/>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="6" column="0">
+                        <widget class="QLabel" name="yMirrorLabel">
+                         <property name="text">
+                          <string>Y镜像</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
                          </property>
                         </widget>
                        </item>
@@ -3280,57 +3355,7 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </property>
                         </widget>
                        </item>
-                       <item row="1" column="1">
-                        <widget class="QComboBox" name="contrastComboBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>260</width>
-                           <height>40</height>
-                          </size>
-                         </property>
-                         <item>
-                          <property name="text">
-                           <string>50</string>
-                          </property>
-                         </item>
-                        </widget>
-                       </item>
-                       <item row="2" column="0">
-                        <widget class="QLabel" name="sharpenLabel">
-                         <property name="text">
-                          <string>锐化</string>
-                         </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="2" column="1">
-                        <widget class="QComboBox" name="sharpenComboBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>260</width>
-                           <height>40</height>
-                          </size>
-                         </property>
-                         <item>
-                          <property name="text">
-                           <string>50</string>
-                          </property>
-                         </item>
-                        </widget>
-                       </item>
-                       <item row="3" column="0">
-                        <widget class="QLabel" name="imageSizeLabel">
-                         <property name="text">
-                          <string>图像大小</string>
-                         </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="3" column="1">
+                       <item row="3" column="2">
                         <widget class="QFrame" name="imageSizeSegmentFrame">
                          <property name="minimumSize">
                           <size>
@@ -3404,6 +3429,67 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </layout>
                         </widget>
                        </item>
+                       <item row="0" column="2">
+                        <widget class="QLineEdit" name="gammaLineEdit">
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <property name="text">
+                          <string>0.70</string>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="2" column="2">
+                        <widget class="QSpinBox" name="sharpenspinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
+                         </property>
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <property name="value">
+                          <number>50</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="1" column="2">
+                        <widget class="QSpinBox" name="contrastspinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
+                         </property>
+                         <property name="minimumSize">
+                          <size>
+                           <width>260</width>
+                           <height>40</height>
+                          </size>
+                         </property>
+                         <property name="value">
+                          <number>50</number>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="0" column="0">
+                        <widget class="QLabel" name="gammaLabel">
+                         <property name="text">
+                          <string>伽马值</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
+                         </property>
+                        </widget>
+                       </item>
                        <item row="4" column="0">
                         <widget class="QLabel" name="grayOutputLabel">
                          <property name="text">
@@ -3414,54 +3500,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </property>
                         </widget>
                        </item>
-                       <item row="4" column="1">
+                       <item row="4" column="2">
                         <widget class="QCheckBox" name="grayOutputCheckBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>58</width>
-                           <height>28</height>
-                          </size>
-                         </property>
-                         <property name="text">
-                          <string/>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="5" column="0">
-                        <widget class="QLabel" name="xMirrorLabel">
-                         <property name="text">
-                          <string>X镜像</string>
-                         </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="5" column="1">
-                        <widget class="QCheckBox" name="xMirrorCheckBox">
-                         <property name="minimumSize">
-                          <size>
-                           <width>58</width>
-                           <height>28</height>
-                          </size>
-                         </property>
-                         <property name="text">
-                          <string/>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="6" column="0">
-                        <widget class="QLabel" name="yMirrorLabel">
-                         <property name="text">
-                          <string>Y镜像</string>
-                         </property>
-                         <property name="formLabel" stdset="0">
-                          <bool>true</bool>
-                         </property>
-                        </widget>
-                       </item>
-                       <item row="6" column="1">
-                        <widget class="QCheckBox" name="yMirrorCheckBox">
                          <property name="minimumSize">
                           <size>
                            <width>58</width>
@@ -3483,19 +3523,46 @@ QWidget[viewerCanvas=&quot;true&quot;] {
                          </property>
                         </widget>
                        </item>
-                       <item row="7" column="1">
-                        <widget class="QComboBox" name="encodeQualityComboBox">
+                       <item row="3" column="0">
+                        <widget class="QLabel" name="imageSizeLabel">
+                         <property name="text">
+                          <string>图像大小</string>
+                         </property>
+                         <property name="formLabel" stdset="0">
+                          <bool>true</bool>
+                         </property>
+                        </widget>
+                       </item>
+                       <item row="0" column="1">
+                        <spacer name="horizontalSpacer_2">
+                         <property name="orientation">
+                          <enum>Qt::Horizontal</enum>
+                         </property>
+                         <property name="sizeHint" stdset="0">
+                          <size>
+                           <width>40</width>
+                           <height>20</height>
+                          </size>
+                         </property>
+                        </spacer>
+                       </item>
+                       <item row="7" column="2">
+                        <widget class="QSpinBox" name="encodeQualityspinBox">
+                         <property name="sizePolicy">
+                          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                           <horstretch>0</horstretch>
+                           <verstretch>0</verstretch>
+                          </sizepolicy>
+                         </property>
                          <property name="minimumSize">
                           <size>
                            <width>260</width>
                            <height>40</height>
                           </size>
                          </property>
-                         <item>
-                          <property name="text">
-                           <string>70</string>
-                          </property>
-                         </item>
+                         <property name="value">
+                          <number>70</number>
+                         </property>
                         </widget>
                        </item>
                       </layout>

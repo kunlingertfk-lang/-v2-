@@ -4,15 +4,19 @@
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
+#include <QPointF>
 #include <QRectF>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <QtGlobal>
 #include <opencv2/core.hpp>
 
 struct PatternPresenceHalconConfig
 {
-    QString halconSoPath = QStringLiteral("/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2");
+    QString toolId;
+    QString halconSoPath;
+    QStringList halconSoPathCandidates;
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QRectF templateRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QString templateSource = QStringLiteral("referenceImage");
@@ -21,9 +25,11 @@ struct PatternPresenceHalconConfig
     bool modelAutoCreate = true;
     QString modelCacheKey;
     QString templateShapeType = QStringLiteral("rectangle");
+    QVector<QPointF> templatePolygonNormalized;
     QString templateSensitivityMode = QStringLiteral("auto");
     int templateSensitivity = 2;
-    QString detectRegionType = QStringLiteral("free");
+    QString detectRegionType = QStringLiteral("rectangle");
+    QVector<QPointF> detectPolygonNormalized;
     bool enablePositionCorrection = true;
     QString positionCorrectionSource;
     int minScore = 50;
@@ -34,6 +40,7 @@ struct PatternPresenceHalconConfig
     int angleExtent = 90;
     int timeoutMs = 2000;
     bool showContourPoints = false;
+    bool debugPolygonLog = false;
     QString sortMode;
     QString judgeBasis = QStringLiteral("presence");
     bool existOk = true;

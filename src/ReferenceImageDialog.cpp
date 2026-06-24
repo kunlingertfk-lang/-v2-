@@ -4,6 +4,8 @@
 #include <QFileDialog>
 #include <QIcon>
 #include <QImage>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSize>
@@ -14,6 +16,7 @@
 #include "CameraParamsDialog.h"
 #include "OutputDialog.h"
 #include "PlanDialogUtils.h"
+#include "SchemeStore.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -48,6 +51,14 @@ ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
                 }
             });
 
+    QString error;
+    if (!SchemeStore::instance().ensureLoaded(&error)) {
+        qWarning() << "[ReferenceImageDialog] 方案加载失败:" << error;
+    } else if (!SchemeStore::instance().loadCurrentReferenceIntoProvider(&error)
+               && !SchemeStore::instance().currentScheme().referenceImagePath.isEmpty()) {
+        qWarning() << "[ReferenceImageDialog]" << error;
+    }
+    refreshSchemeHeader();
     showReferenceImageMode();
 }
 
@@ -65,6 +76,7 @@ void ReferenceImageDialog::setupUiState()
     ui->referenceStepButton->setChecked(true);
     ui->toolsStepButton->setChecked(false);
     ui->outputStepButton->setChecked(false);
+    refreshSchemeHeader();
 }
 
 void ReferenceImageDialog::connectNavigation()
@@ -77,24 +89,90 @@ void ReferenceImageDialog::connectNavigation()
     connect(ui->currentImageButton, &QPushButton::clicked, this, &ReferenceImageDialog::showCurrentImageMode);
     connect(m_captureImageButton, &QPushButton::clicked, this, &ReferenceImageDialog::captureReferenceImage);
     connect(m_exitCaptureButton, &QPushButton::clicked, this, &ReferenceImageDialog::showReferenceImageMode);
+    connect(ui->setupExternalEditButton, &QToolButton::clicked, this, &ReferenceImageDialog::editCurrentSchemeName);
+    connect(ui->setupSaveButton, &QToolButton::clicked, this, &ReferenceImageDialog::saveCurrentScheme);
+    connect(ui->setupSaveAsButton, &QToolButton::clicked, this, &ReferenceImageDialog::saveCurrentSchemeAs);
     connect(ui->historyImageButton, &QPushButton::clicked, this, []() {
         qDebug() << "[ReferenceImageDialog] 历史图像暂未接入。";
     });
     connect(ui->pcImportButton, &QPushButton::clicked, this, &ReferenceImageDialog::importReferenceImageFromPc);
 }
 
+void ReferenceImageDialog::refreshSchemeHeader()
+{
+    ui->setupPageCodeLabel->setText(SchemeStore::instance().currentSchemeName());
+}
+
+void ReferenceImageDialog::editCurrentSchemeName()
+{
+    SchemeStore &store = SchemeStore::instance();
+    QString error;
+    if (!store.ensureLoaded(&error)) {
+        QMessageBox::warning(this, tr("方案名称"), tr("方案加载失败：%1").arg(error));
+        return;
+    }
+
+    bool ok = false;
+    const QString name = QInputDialog::getText(this,
+                                               tr("编辑方案名"),
+                                               tr("方案名"),
+                                               QLineEdit::Normal,
+                                               store.currentSchemeName(),
+                                               &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+
+    store.setSchemeName(name);
+    saveCurrentScheme();
+}
+
+void ReferenceImageDialog::saveCurrentScheme()
+{
+    QString error;
+    if (!SchemeStore::instance().saveCurrentScheme(&error)) {
+        qWarning() << "[ReferenceImageDialog] 方案保存失败:" << error;
+        QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
+        return;
+    }
+    refreshSchemeHeader();
+}
+
+void ReferenceImageDialog::saveCurrentSchemeAs()
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this,
+                                               tr("另存为"),
+                                               tr("新方案名"),
+                                               QLineEdit::Normal,
+                                               SchemeStore::instance().currentSchemeName() + tr("_副本"),
+                                               &ok);
+    if (!ok || name.trimmed().isEmpty())
+        return;
+
+    QString error;
+    if (!SchemeStore::instance().saveCurrentSchemeAs(name, &error)) {
+        qWarning() << "[ReferenceImageDialog] 方案另存为失败:" << error;
+        QMessageBox::warning(this, tr("另存为失败"), tr("方案另存为失败：%1").arg(error));
+        return;
+    }
+    refreshSchemeHeader();
+}
+
 void ReferenceImageDialog::openCameraParamsDialog()
 {
+    saveCurrentScheme();
     PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
 }
 
 void ReferenceImageDialog::openToolsDialog()
 {
+    saveCurrentScheme();
     PlanDialogUtils::replaceDialog(this, new ToolsDialog);
 }
 
 void ReferenceImageDialog::openOutputDialog()
 {
+    saveCurrentScheme();
     PlanDialogUtils::replaceDialog(this, new OutputDialog);
 }
 
@@ -119,7 +197,12 @@ void ReferenceImageDialog::captureReferenceImage()
         return;
     }
 
-    ReferenceImageProvider::instance().setReferenceFrame(frame);
+    QString error;
+    if (!SchemeStore::instance().setReferenceFrame(frame, &error)) {
+        qWarning() << "[ReferenceImageDialog] 基准图保存失败:" << error;
+        QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
+        return;
+    }
     showReferenceImageMode();
     qDebug() << QString("[ReferenceImageDialog] 已抓取静态基准图: %1x%2 type=%3")
                     .arg(frame.cols)
@@ -167,7 +250,12 @@ void ReferenceImageDialog::importReferenceImageFromPc()
         return;
     }
 
-    ReferenceImageProvider::instance().setReferenceFrame(bgrFrame);
+    QString error;
+    if (!SchemeStore::instance().setReferenceFrame(bgrFrame, &error)) {
+        qWarning() << "[ReferenceImageDialog] PC 基准图保存失败:" << error;
+        QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
+        return;
+    }
     showReferenceImageMode();
     qDebug() << QString("[ReferenceImageDialog] 已导入 PC 基准图: %1 size=%2x%3 type=%4")
                     .arg(fileName)

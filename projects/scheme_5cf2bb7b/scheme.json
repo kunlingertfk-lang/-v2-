@@ -1,0 +1,462 @@
+{
+    "output": {
+        "resultOutputEnabled": false,
+        "timedOutputEnabled": false,
+        "timedOutputMs": 100
+    },
+    "previews": {
+        "circle_presence_8f1fa7d9-ffce-4d47-8e84-1a696a4dfbe3": {
+            "count": 1,
+            "ok": true,
+            "payload": {
+                "algorithm": "halcon_region_circularity",
+                "areaMaxUsed": 150673.9252588201,
+                "areaMinUsed": 28.274333882308138,
+                "circleCount": 1,
+                "circles": [
+                    {
+                        "area": 123592,
+                        "centerX": 263.4635462708789,
+                        "centerY": 249.93295491555392,
+                        "circularity": 0.9479803478393954,
+                        "contrastScore": 0.2627450980392157,
+                        "polarity": "black_to_white",
+                        "radius": 204.13233772822656,
+                        "strength": 0.8132653153187117
+                    }
+                ],
+                "circularityMinUsed": 0.48,
+                "circularityRelaxFromSensitivity": 0.12,
+                "countRule": "presence_only",
+                "detectMaskApplied": false,
+                "detectRegionType": "rect",
+                "detectRoi": {
+                    "height": 438,
+                    "width": 447,
+                    "x": 37,
+                    "y": 22
+                },
+                "detectRoiPixelH": 438,
+                "detectRoiPixelW": 447,
+                "detectRoiPixelX": 37,
+                "detectRoiPixelY": 22,
+                "detectRoiPixels": {
+                    "height": 438,
+                    "width": 447,
+                    "x": 37,
+                    "y": 22
+                },
+                "edgePolarity": "any",
+                "edgePolarityApplied": true,
+                "edgeThresholdUsed": 47,
+                "edgeType": "strongest",
+                "edgeTypeApplied": true,
+                "edgeTypeRequested": "strongest",
+                "edgeTypeUsed": "strongest",
+                "elapsedMs": 8,
+                "enablePositionCorrection": false,
+                "existOk": true,
+                "finalCircleCount": 1,
+                "found": true,
+                "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                "hasImage": true,
+                "imageHeight": 480,
+                "imageWidth": 640,
+                "judgeBasis": "presence",
+                "manualUnsupported": false,
+                "maskApplied": false,
+                "maskReason": "not implemented",
+                "positionCorrectionApplied": false,
+                "positionCorrectionReason": "not implemented",
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "radiusMaxUsed": 219,
+                "radiusMinUsed": 3,
+                "radiusSource": "internal_default",
+                "rawCircleCount": 1,
+                "rawCircles": [
+                    {
+                        "area": 123592,
+                        "centerX": 263.4635462708789,
+                        "centerY": 249.93295491555392,
+                        "circularity": 0.9479803478393954,
+                        "contrastScore": 0.2627450980392157,
+                        "polarity": "black_to_white",
+                        "radius": 204.13233772822656,
+                        "strength": 0.8132653153187117
+                    }
+                ],
+                "roiMode": "rectangle",
+                "roiNormalized": {
+                    "height": 0.9117291414752117,
+                    "width": 0.6964933494558647,
+                    "x": 0.05894800483675937,
+                    "y": 0.045949214026602174
+                },
+                "roundness": 60,
+                "roundnessApplied": true,
+                "roundnessCircularityRequested": 0.6,
+                "scoreThresholdApplied": false,
+                "sensitivity": 60,
+                "sensitivityUsed": 60,
+                "text": "found",
+                "thresholdHighUsed": 255,
+                "thresholdLowUsed": 0,
+                "thresholdMarginUsed": 15,
+                "thresholdPasses": [
+                    {
+                        "acceptedTotalAfterPass": 0,
+                        "binaryThresholdUsed": 161,
+                        "lightDark": "light",
+                        "polarity": "white_to_black",
+                        "selectedCount": 0,
+                        "thresholdHighUsed": 255,
+                        "thresholdLowUsed": 176
+                    },
+                    {
+                        "acceptedTotalAfterPass": 1,
+                        "binaryThresholdUsed": 161,
+                        "lightDark": "dark",
+                        "polarity": "black_to_white",
+                        "selectedCount": 1,
+                        "thresholdHighUsed": 146,
+                        "thresholdLowUsed": 0
+                    }
+                ],
+                "timeoutExceeded": false,
+                "timeoutMs": 1000
+            },
+            "result": {
+                "count": 1,
+                "elapsedMs": 8,
+                "message": "CirclePresence: found count=1 raw=1 edgeType=strongest sensitivity=60 thresholdMargin=15 circularityMin=0.480",
+                "ok": true,
+                "overlays": [
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "ROI",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 438,
+                            "width": 447,
+                            "x": 37,
+                            "y": 22
+                        },
+                        "score": 0,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 263.4635462708789,
+                            "y": 249.93295491555392
+                        },
+                        "extra": {
+                        },
+                        "label": "circle",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 204.13233772822656,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0.8132653153187117,
+                        "text": "",
+                        "type": "Circle"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "circle_center",
+                        "p1": {
+                            "x": 247.4635462708789,
+                            "y": 249.93295491555392
+                        },
+                        "p2": {
+                            "x": 279.4635462708789,
+                            "y": 249.93295491555392
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0.8132653153187117,
+                        "text": "",
+                        "type": "Line"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "circle_center",
+                        "p1": {
+                            "x": 263.4635462708789,
+                            "y": 233.93295491555392
+                        },
+                        "p2": {
+                            "x": 263.4635462708789,
+                            "y": 265.9329549155539
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0.8132653153187117,
+                        "text": "",
+                        "type": "Line"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "circle_count",
+                        "p1": {
+                            "x": 41,
+                            "y": 4
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0.8132653153187117,
+                        "text": "count=1",
+                        "type": "Text"
+                    }
+                ],
+                "payload": {
+                    "algorithm": "halcon_region_circularity",
+                    "areaMaxUsed": 150673.9252588201,
+                    "areaMinUsed": 28.274333882308138,
+                    "circleCount": 1,
+                    "circles": [
+                        {
+                            "area": 123592,
+                            "centerX": 263.4635462708789,
+                            "centerY": 249.93295491555392,
+                            "circularity": 0.9479803478393954,
+                            "contrastScore": 0.2627450980392157,
+                            "polarity": "black_to_white",
+                            "radius": 204.13233772822656,
+                            "strength": 0.8132653153187117
+                        }
+                    ],
+                    "circularityMinUsed": 0.48,
+                    "circularityRelaxFromSensitivity": 0.12,
+                    "countRule": "presence_only",
+                    "detectMaskApplied": false,
+                    "detectRegionType": "rect",
+                    "detectRoi": {
+                        "height": 438,
+                        "width": 447,
+                        "x": 37,
+                        "y": 22
+                    },
+                    "detectRoiPixelH": 438,
+                    "detectRoiPixelW": 447,
+                    "detectRoiPixelX": 37,
+                    "detectRoiPixelY": 22,
+                    "detectRoiPixels": {
+                        "height": 438,
+                        "width": 447,
+                        "x": 37,
+                        "y": 22
+                    },
+                    "edgePolarity": "any",
+                    "edgePolarityApplied": true,
+                    "edgeThresholdUsed": 47,
+                    "edgeType": "strongest",
+                    "edgeTypeApplied": true,
+                    "edgeTypeRequested": "strongest",
+                    "edgeTypeUsed": "strongest",
+                    "elapsedMs": 8,
+                    "enablePositionCorrection": false,
+                    "existOk": true,
+                    "finalCircleCount": 1,
+                    "found": true,
+                    "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                    "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                    "hasImage": true,
+                    "imageHeight": 480,
+                    "imageWidth": 640,
+                    "judgeBasis": "presence",
+                    "manualUnsupported": false,
+                    "maskApplied": false,
+                    "maskReason": "not implemented",
+                    "positionCorrectionApplied": false,
+                    "positionCorrectionReason": "not implemented",
+                    "positionCorrectionSource": "1 基准图.位置修正信息",
+                    "radiusMaxUsed": 219,
+                    "radiusMinUsed": 3,
+                    "radiusSource": "internal_default",
+                    "rawCircleCount": 1,
+                    "rawCircles": [
+                        {
+                            "area": 123592,
+                            "centerX": 263.4635462708789,
+                            "centerY": 249.93295491555392,
+                            "circularity": 0.9479803478393954,
+                            "contrastScore": 0.2627450980392157,
+                            "polarity": "black_to_white",
+                            "radius": 204.13233772822656,
+                            "strength": 0.8132653153187117
+                        }
+                    ],
+                    "roiMode": "rectangle",
+                    "roiNormalized": {
+                        "height": 0.9117291414752117,
+                        "width": 0.6964933494558647,
+                        "x": 0.05894800483675937,
+                        "y": 0.045949214026602174
+                    },
+                    "roundness": 60,
+                    "roundnessApplied": true,
+                    "roundnessCircularityRequested": 0.6,
+                    "scoreThresholdApplied": false,
+                    "sensitivity": 60,
+                    "sensitivityUsed": 60,
+                    "text": "found",
+                    "thresholdHighUsed": 255,
+                    "thresholdLowUsed": 0,
+                    "thresholdMarginUsed": 15,
+                    "thresholdPasses": [
+                        {
+                            "acceptedTotalAfterPass": 0,
+                            "binaryThresholdUsed": 161,
+                            "lightDark": "light",
+                            "polarity": "white_to_black",
+                            "selectedCount": 0,
+                            "thresholdHighUsed": 255,
+                            "thresholdLowUsed": 176
+                        },
+                        {
+                            "acceptedTotalAfterPass": 1,
+                            "binaryThresholdUsed": 161,
+                            "lightDark": "dark",
+                            "polarity": "black_to_white",
+                            "selectedCount": 1,
+                            "thresholdHighUsed": 146,
+                            "thresholdLowUsed": 0
+                        }
+                    ],
+                    "timeoutExceeded": false,
+                    "timeoutMs": 1000
+                },
+                "schemaVersion": 1,
+                "score": 0.8132653153187117,
+                "status": "CirclePresence: found count=1 raw=1 edgeType=strongest sensitivity=60 thresholdMargin=15 circularityMin=0.480",
+                "success": true,
+                "text": "found",
+                "toolId": "circle_presence_8f1fa7d9-ffce-4d47-8e84-1a696a4dfbe3",
+                "toolType": "CirclePresence",
+                "value": 1
+            },
+            "roiNormalized": {
+                "height": 0.9117291414752117,
+                "width": 0.6964933494558647,
+                "x": 0.05894800483675937,
+                "y": 0.045949214026602174
+            },
+            "score": 0.8132653153187117,
+            "sourceType": "referenceImage",
+            "statusText": "CirclePresence: found count=1 raw=1 edgeType=strongest sensitivity=60 thresholdMargin=15 circularityMin=0.480 | CirclePresence: found count=1 raw=1 edgeType=strongest sensitivity=60 thresholdMargin=15 circularityMin=0.480",
+            "timestamp": "2026-05-24T18:49:43",
+            "toolId": "circle_presence_8f1fa7d9-ffce-4d47-8e84-1a696a4dfbe3",
+            "toolType": "CirclePresence",
+            "valid": true
+        }
+    },
+    "referenceImage": "reference.png",
+    "schemaVersion": 1,
+    "schemeId": "scheme_5cf2bb7b",
+    "schemeName": "圆",
+    "tools": [
+        {
+            "category": "Presence",
+            "displayName": "圆有无",
+            "enabled": true,
+            "judgeRule": {
+                "existOk": true,
+                "mode": "presence"
+            },
+            "params": {
+                "detectRegionType": "rect",
+                "edgePolarity": "any",
+                "edgeType": "strongest",
+                "enablePositionCorrection": false,
+                "existOk": true,
+                "judgeBasis": "presence",
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "roundness": 60,
+                "sensitivity": 60,
+                "timeoutMs": 1000
+            },
+            "roiNormalized": {
+                "height": 0.9117291414752117,
+                "width": 0.6964933494558647,
+                "x": 0.05894800483675937,
+                "y": 0.045949214026602174
+            },
+            "schemaVersion": 1,
+            "summary": "灵敏度: 60, 圆度: 60, 边缘: 任意/最强, 存在OK",
+            "toolId": "circle_presence_8f1fa7d9-ffce-4d47-8e84-1a696a4dfbe3",
+            "toolName": "圆有无",
+            "toolType": "CirclePresence"
+        }
+    ],
+    "updatedAt": "2026-06-10T14:46:27"
+}

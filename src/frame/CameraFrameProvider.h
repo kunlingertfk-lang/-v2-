@@ -19,7 +19,7 @@ public:
     ~CameraFrameProvider() override;
 
     bool openCamera(const QString &devicePath = QStringLiteral("/dev/video0"));
-    void closeCamera();
+    void closeCamera(const QString &reason = QString());
     bool startGrab();
     void stopGrab();
     bool isOpened() const;
@@ -27,6 +27,8 @@ public:
 
     void setCurrentFrame(const cv::Mat &frame);
     cv::Mat currentFrame() const;
+    cv::Mat currentFrame(qint64 *frameIndex) const;
+    qint64 currentFrameIndex() const;
 
     QImage currentImage() const;
     bool hasFrame() const;
@@ -35,6 +37,7 @@ public:
 signals:
     void frameUpdated(const QImage &image);
     void frameUpdatedMat();
+    void frameIndexChanged(qint64 frameIndex);
     void cameraError(const QString &message);
 
 private:
@@ -53,6 +56,7 @@ private:
     mutable QMutex m_frameMutex;
     mutable QMutex m_cameraMutex;
     cv::Mat m_currentFrame;
+    qint64 m_frameIndex = 0;
     cv::VideoCapture m_capture;
     QString m_devicePath;
     bool m_useNv12Path = false;

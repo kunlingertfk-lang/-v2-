@@ -87,15 +87,15 @@ QToolButton#cameraStepButton,
 QToolButton#referenceStepButton,
 QToolButton#toolsStepButton,
 QToolButton#outputStepButton {
-    min-width: 84px;
-    min-height: 74px;
+    min-width: 92px;
+    min-height: 86px;
     border: none;
     border-radius: 0;
     background: transparent;
     color: #6f7787;
     font-size: 15px;
     font-weight: 700;
-    padding: 8px 6px;
+    padding: 10px 8px;
 }
 
 QToolButton#cameraStepButton:hover,
@@ -238,7 +238,6 @@ QPushButton[actionRole=&quot;secondary&quot;]:hover {
 QPushButton[orangeButton=&quot;true&quot;],
 QPushButton#confirmButton,
 QPushButton#currentImageButton,
-QPushButton#captureImageButton,
 QPushButton#highlightActionButton,
 QPushButton[actionRole=&quot;highlight&quot;] {
     min-height: 46px;
@@ -254,7 +253,6 @@ QPushButton[actionRole=&quot;highlight&quot;] {
 QPushButton[orangeButton=&quot;true&quot;]:hover,
 QPushButton#confirmButton:hover,
 QPushButton#currentImageButton:hover,
-QPushButton#captureImageButton:hover,
 QPushButton#highlightActionButton:hover,
 QPushButton[actionRole=&quot;highlight&quot;]:hover {
     background: #ff972f;
@@ -467,6 +465,9 @@ QWidget[viewerCanvas=&quot;true&quot;] {
 </string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_root">
+   <property name="spacing">
+    <number>0</number>
+   </property>
    <property name="leftMargin">
     <number>0</number>
    </property>
@@ -477,9 +478,6 @@ QWidget[viewerCanvas=&quot;true&quot;] {
     <number>0</number>
    </property>
    <property name="bottomMargin">
-    <number>0</number>
-   </property>
-   <property name="spacing">
     <number>0</number>
    </property>
    <item>
@@ -813,15 +811,15 @@ QWidget[viewerCanvas=&quot;true&quot;] {
       </property>
       <item>
        <widget class="QFrame" name="setupStepRail">
-       <property name="minimumSize">
-        <size>
-          <width>92</width>
+        <property name="minimumSize">
+         <size>
+          <width>106</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>96</width>
+          <width>106</width>
           <height>16777215</height>
          </size>
         </property>
@@ -848,8 +846,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="cameraStepButton">
            <property name="minimumSize">
             <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
             </size>
            </property>
            <property name="text">
@@ -890,8 +888,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="referenceStepButton">
            <property name="minimumSize">
             <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
             </size>
            </property>
            <property name="text">
@@ -935,8 +933,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="toolsStepButton">
            <property name="minimumSize">
             <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
             </size>
            </property>
            <property name="text">
@@ -977,8 +975,8 @@ QWidget[viewerCanvas=&quot;true&quot;] {
           <widget class="QToolButton" name="outputStepButton">
            <property name="minimumSize">
             <size>
-             <width>84</width>
-             <height>74</height>
+             <width>108</width>
+             <height>106</height>
             </size>
            </property>
            <property name="text">
@@ -1020,15 +1018,15 @@ QWidget[viewerCanvas=&quot;true&quot;] {
       </item>
       <item>
        <widget class="QFrame" name="setupEditorPanel">
-       <property name="minimumSize">
-        <size>
-          <width>360</width>
+        <property name="minimumSize">
+         <size>
+          <width>610</width>
           <height>0</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>16777215</width>
+          <width>610</width>
           <height>16777215</height>
          </size>
         </property>
@@ -1180,7 +1178,7 @@ QWidget[viewerCanvas=&quot;true&quot;] {
               <x>0</x>
               <y>0</y>
               <width>592</width>
-              <height>612</height>
+              <height>702</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -1688,16 +1686,16 @@ QWidget[viewerCanvas=&quot;true&quot;] {
             <number>0</number>
            </property>
            <property name="leftMargin">
-            <number>0</number>
+            <number>6</number>
            </property>
            <property name="topMargin">
             <number>14</number>
            </property>
            <property name="rightMargin">
-            <number>0</number>
+            <number>6</number>
            </property>
            <property name="bottomMargin">
-            <number>0</number>
+            <number>9</number>
            </property>
            <item>
             <widget class="QPushButton" name="previousButton">

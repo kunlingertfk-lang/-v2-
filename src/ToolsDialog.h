@@ -2,11 +2,16 @@
 #define TOOLSDIALOG_H
 
 #include <QDialog>
+#include <QMap>
 #include <QVector>
 
 #include "toolcore/ToolConfig.h"
+#include "toolcore/ToolPreviewSnapshot.h"
 
 class FrameViewHelper;
+class QEvent;
+class QFrame;
+class QObject;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -23,23 +28,53 @@ public:
     ~ToolsDialog() override;
 
     const QVector<ToolConfig> &toolConfigs() const;
+    const QMap<QString, ToolPreviewSnapshot> &referencePreviewSnapshots() const;
+    void setInitialToolState(const QVector<ToolConfig> &configs,
+                             const QMap<QString, ToolPreviewSnapshot> &snapshots);
+    bool openedOutputDialog() const;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
     void openToolLibrary();
     void openCameraParamsDialog();
     void openReferenceImageDialog();
     void openOutputDialog();
+    void editCurrentSchemeName();
+    void saveCurrentScheme();
+    void saveCurrentSchemeAs();
 
 private:
     void setupUiState();
     void connectNavigation();
-    void addConfiguredTool(const ToolConfig &config);
+    void refreshSchemeHeader();
+    bool commitToolStateToScheme(bool saveToDisk);
+    void addConfiguredTool(const ToolConfig &config, const ToolPreviewSnapshot &snapshot);
+    bool openToolConfigDialogForAdd(ToolType type);
+    bool openToolConfigDialogForEdit(int index);
+    void storePreviewSnapshot(const ToolConfig &config,
+                              const ToolPreviewSnapshot &snapshot,
+                              bool keepExistingWhenInvalid);
+    void refreshToolList();
+    void clearToolList();
+    QFrame *createToolCard(const ToolConfig &config, int index);
+    void selectTool(int index);
+    void updateToolCardSelection();
     void refreshReferencePreview();
+    void showSelectedToolPreview();
+    QString toolDisplayName(const ToolConfig &config) const;
+    QString toolPreviewStateText(const ToolConfig &config) const;
+    QString toolPreviewStatusLine(const ToolPreviewSnapshot &snapshot) const;
 
     Ui::ToolsDialog *ui;
     int m_toolSerial;
+    int m_selectedToolIndex = -1;
     QVector<ToolConfig> m_toolConfigs;
+    QVector<QFrame *> m_toolCards;
+    QMap<QString, ToolPreviewSnapshot> m_toolPreviewSnapshots;
     FrameViewHelper *m_previewHelper = nullptr;
+    bool m_openedOutputDialog = false;
 };
 
 #endif // TOOLSDIALOG_H
