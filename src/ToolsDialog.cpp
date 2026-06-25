@@ -426,6 +426,12 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     case ToolType::AiClassification:
         accepted = runToolConfigDialog<ClassificationDialog>(this, nullptr, &config, &snapshot);
         break;
+/*============================tfk add=================================*/
+    case ToolType::TemplateLocation:
+        accepted = runToolConfigDialog<TemplateLocationDialog>(this, nullptr, &config, &snapshot);
+        break;
+
+/*============================tfk end=================================*/
     default:
         qDebug() << "[ToolsDialog] Unsupported tool add type:" << toolTypeToString(type);
         break;

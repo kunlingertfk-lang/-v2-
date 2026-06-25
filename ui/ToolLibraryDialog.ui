@@ -531,7 +531,7 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-1310</y>
+              <y>-449</y>
               <width>642</width>
               <height>1974</height>
              </rect>
@@ -1793,8 +1793,8 @@
                   </property>
                  </widget>
                 </item>
-                <item row="1" column="1">
-                 <widget class="QToolButton" name="ClassifyButton">
+                <item row="1" column="2">
+                 <widget class="QToolButton" name="FaultDetectButton">
                   <property name="minimumSize">
                    <size>
                     <width>132</width>
@@ -1802,7 +1802,7 @@
                    </size>
                   </property>
                   <property name="text">
-                   <string>分类</string>
+                   <string>异常检测</string>
                   </property>
                   <property name="icon">
                    <iconset resource="../resources/resources.qrc">
@@ -1822,8 +1822,8 @@
                   </property>
                  </widget>
                 </item>
-                <item row="1" column="2">
-                 <widget class="QToolButton" name="FaultDetectButton">
+                <item row="1" column="1">
+                 <widget class="QToolButton" name="ClassifyButton">
                   <property name="minimumSize">
                    <size>
                     <width>132</width>
@@ -1831,7 +1831,7 @@
                    </size>
                   </property>
                   <property name="text">
-                   <string>异常检测</string>
+                   <string>分类</string>
                   </property>
                   <property name="icon">
                    <iconset resource="../resources/resources.qrc">
@@ -2034,6 +2034,13 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
+         <item>
+          <widget class="QDialogButtonBox" name="buttonBox">
+           <property name="standardButtons">
+            <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+           </property>
+          </widget>
+         </item>
          <item>
           <widget class="QFrame" name="toolPreviewGraphic">
            <property name="frameShape">

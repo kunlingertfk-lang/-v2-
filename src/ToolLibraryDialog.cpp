@@ -136,17 +136,30 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->judgeToolButton, Judge);
     m_buttonGroup->addButton(ui->categoryToolButton, Category);
     m_buttonGroup->addButton(ui->colorAreaToolButton, ColorArea);
-    m_buttonGroup->addButton(ui->ocrToolButton, CharacterRecognition);
+    m_buttonGroup->addButton(ui->ocrToolButton, CharacterRecognition);  //字符识别
     m_buttonGroup->addButton(ui->codeToolButton, Code);
     m_buttonGroup->addButton(ui->blobPresenceButton, BlobPresence);
     m_buttonGroup->addButton(ui->circlePresenceButton, CirclePresence);
     m_buttonGroup->addButton(ui->edgePresenceButton, EdgePresence);
     m_buttonGroup->addButton(ui->linePresenceButton, LinePresence);
     m_buttonGroup->addButton(ui->contourPresenceButton, ContourPresence);
+
+    //定位工具
+    m_buttonGroup->addButton(ui->templateLocationButton, TemplateLocation); //模板定位
+    m_buttonGroup->addButton(ui->edgeLocationButton, EdgeLocationButton);   //边缘定位
+    m_buttonGroup->addButton(ui->circleLocationButton, CircleLocationButton);   //圆定位
+
+    //识别工具
+    // m_buttonGroup->addButton(ui->templateLocationButton, ColorRecognition); //颜色识别
+    // m_buttonGroup->addButton(ui->edgeLocationButton, ColorComparison);      //颜色比较
+    // m_buttonGroup->addButton(ui->circleLocationButton, RegistrationClass);  //注册分类
+    // m_buttonGroup->addButton(ui->circleLocationButton, RegisteredObjectDetection); //注册目标检测
+
+
     ui->dlDetectButton->setCheckable(true);
     m_buttonGroup->addButton(ui->dlDetectButton, ObjectDetection);
     ui->ClassifyButton->setCheckable(true);
-    m_buttonGroup->addButton(ui->ClassifyButton, Classification);
+    m_buttonGroup->addButton(ui->ClassifyButton, Classification); //分类检测
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     connect(m_buttonGroup, &QButtonGroup::idClicked, this, &ToolLibraryDialog::updatePreview);
@@ -220,6 +233,29 @@ void ToolLibraryDialog::confirmSelection()
         return;
     }
 
+/*===========================tfk add===========================*/
+    if (tool == Classification) {
+        m_selectedToolType = ToolType::TemplateLocation;
+        accept();
+        return;
+    }
+
+    if (tool == Classification) {
+        m_selectedToolType = ToolType::EdgeLocation;
+        accept();
+        return;
+    }
+
+    if (tool == Classification) {
+        m_selectedToolType = ToolType::EdgeLocation;
+        accept();
+        return;
+    }
+/*===========================tfk end===========================*/
+
+
+
+
     ui->toolLibraryTipLabel->setText(tr("当前仅支持图案有无、斑点有无、圆有无、边缘有无、直线有无、轮廓有无、字符识别、目标检测、分类工具配置"));
 }
 
@@ -280,6 +316,24 @@ void ToolLibraryDialog::updatePreview(int id)
         ui->previewTitleLabel->setText(tr("分类"));
         ui->previewDescriptionLabel->setText(tr("配置深度学习分类模型与结果判断参数"));
         break;
+
+/*===========================tfk add===========================*/       
+    case TemplateLocation:
+        ui->previewTitleLabel->setText(tr("模板定位"));
+        ui->previewDescriptionLabel->setText(tr("模板定位"));
+        break;
+    case EdgeLocationButton:
+        ui->previewTitleLabel->setText(tr("边缘定位"));
+        ui->previewDescriptionLabel->setText(tr("边缘定位"));
+        break;
+    case CircleLocationButton:
+        ui->previewTitleLabel->setText(tr("圆定位"));
+        ui->previewDescriptionLabel->setText(tr("对圆进行定位"));
+        break;
+/*===========================tfk end===========================*/
+
+
+
     case NoTool:
         ui->previewTitleLabel->setText(tr("请选择工具"));
         ui->previewDescriptionLabel->setText(tr("请点击左侧工具分类查看工具列表"));

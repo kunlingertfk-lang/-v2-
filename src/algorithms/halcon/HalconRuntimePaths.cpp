@@ -5,11 +5,12 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFileInfoList>
+#include <QVector>
 
 namespace {
 
 const QString kLocalHalconRoot =
-        QStringLiteral("/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady");
+        QStringLiteral("/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady");
 const QString kLegacySuperheHalconRoot =
         QStringLiteral("/home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady");
 const QString kLegacySuperheRuntimeRoot =
@@ -18,6 +19,8 @@ const QString kLegacySuperheRuntimeGeneralRoot =
         kLegacySuperheHalconRoot + QStringLiteral("/halcon-24.11.2.0-runtime-general-x64-linux_aarch64-linux_armv7a-linux");
 const QString kLegacySuperheLicenseRoot =
         kLegacySuperheRuntimeGeneralRoot + QStringLiteral("/license");
+const QString kLocalHalconLicenseRoot =
+        kLocalHalconRoot + QStringLiteral("/license");
 const QString kOcrModelRelativePath =
         QStringLiteral("ocr/OCRB_0-9A-Z_NoRej.omc");
 
@@ -80,32 +83,42 @@ QString resolveFirstExisting(const QStringList &candidates)
 
 QString resolveBundledLicense()
 {
-    const QDir licenseDir(kLegacySuperheLicenseRoot);
-    if (!licenseDir.exists())
-        return QString();
-
-    const QString standardLicense =
-            licenseDir.filePath(QStringLiteral("license.dat"));
-    if (QFileInfo(standardLicense).isReadable())
-        return standardLicense;
-
-    const QFileInfoList files = licenseDir.entryInfoList(
-                QStringList() << QStringLiteral("license*.dat"),
-                QDir::Files | QDir::Readable,
-                QDir::Time);
-    const QStringList preferredNames = {
-        QStringLiteral("license_eval_halcon_progress_"),
-        QStringLiteral("license_support_halcon_progress_"),
-        QStringLiteral("license_support_halcon24.11_steady_")
+    const QVector<QString> licenseRoots = {
+        kLocalHalconLicenseRoot,
+        kLegacySuperheLicenseRoot
     };
-    for (const QString &prefix : preferredNames) {
-        for (const QFileInfo &file : files) {
-            if (file.fileName().startsWith(prefix))
-                return file.absoluteFilePath();
+
+    for (const QString &licenseRoot : licenseRoots) {
+        const QDir licenseDir(licenseRoot);
+        if (!licenseDir.exists())
+            continue;
+
+        const QString standardLicense =
+                licenseDir.filePath(QStringLiteral("license.dat"));
+        if (QFileInfo(standardLicense).isReadable())
+            return standardLicense;
+
+        const QFileInfoList files = licenseDir.entryInfoList(
+                    QStringList() << QStringLiteral("license*.dat"),
+                    QDir::Files | QDir::Readable,
+                    QDir::Time);
+        const QStringList preferredNames = {
+            QStringLiteral("license_eval_halcon_progress_"),
+            QStringLiteral("license_support_halcon_progress_"),
+            QStringLiteral("license_support_halcon24.11_steady_")
+        };
+        for (const QString &prefix : preferredNames) {
+            for (const QFileInfo &file : files) {
+                if (file.fileName().startsWith(prefix))
+                    return file.absoluteFilePath();
+            }
         }
+
+        if (!files.isEmpty())
+            return files.first().absoluteFilePath();
     }
 
-    return files.isEmpty() ? QString() : files.first().absoluteFilePath();
+    return QString();
 }
 
 } // namespace

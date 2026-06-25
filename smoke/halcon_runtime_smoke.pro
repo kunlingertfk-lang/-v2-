@@ -8,7 +8,7 @@ INCLUDEPATH += ../src
 INCLUDEPATH += /usr/include/opencv4
 HALCON_ROOT = $$(HALCONROOT)
 !exists($$HALCON_ROOT/include/HalconC.h) {
-    HALCON_ROOT = /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-development_general-x64-linux
+    HALCON_ROOT = /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady
 }
 INCLUDEPATH += $$HALCON_ROOT/include
 

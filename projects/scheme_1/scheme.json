@@ -576,7 +576,65 @@
             "toolId": "ai_detection_3655049e-5dc6-4421-a4a6-0523dd110e63",
             "toolName": "目标检测",
             "toolType": "AiDetection"
+        },
+        {
+            "category": "Presence",
+            "displayName": "轮廓有无",
+            "enabled": true,
+            "judgeRule": {
+                "existOk": true,
+                "mode": "presence",
+                "scoreThreshold": 0.5
+            },
+            "params": {
+                "angleExtent": 90,
+                "angleStart": -45,
+                "chainMode": "auto",
+                "detectPolygonNormalized": [
+                ],
+                "detectRegionType": "rect",
+                "enablePositionCorrection": true,
+                "existOk": true,
+                "featureScale": 1,
+                "grayThreshold": 15,
+                "judgeBasis": "presence",
+                "minChainLength": 4,
+                "minScore": 0.5,
+                "polarity": "考虑极性",
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "scaleMax": 100,
+                "scaleMin": 100,
+                "scaleMode": "auto",
+                "scoreThreshold": 0.5,
+                "showContourPoints": false,
+                "sortMode": "按得分从小到大排序",
+                "speedScale": 5,
+                "templatePolygonNormalized": [
+                ],
+                "templateRoiNormalized": {
+                    "height": 1,
+                    "width": 1,
+                    "x": 0,
+                    "y": 0
+                },
+                "templateShapeType": "rect",
+                "templateSource": "referenceImage",
+                "thresholdMode": "auto",
+                "thresholdType": "自动阈值",
+                "timeoutMs": 2000
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "模板: 矩形, 检测区: 矩形, 判断: 存在OK, 最小得分: 0.50",
+            "toolId": "contour_presence_fa3fe225-f827-4b89-a2a8-e5c0edf9d515",
+            "toolName": "轮廓有无",
+            "toolType": "ContourPresence"
         }
     ],
-    "updatedAt": "2026-06-15T16:26:06"
+    "updatedAt": "2026-06-25T17:52:19"
 }

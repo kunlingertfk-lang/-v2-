@@ -6,29 +6,14 @@ TEMPLATE = app
 TARGET = qt_ui_test
 
 INCLUDEPATH += src
-INCLUDEPATH += /usr/include/opencv4
+OPENCV_ROOT = /home/tt/.local/opencv-4.8.0
+INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
 HALCON_ROOT = $$(HALCONROOT)
 !exists($$HALCON_ROOT/include/HalconC.h) {
-    HALCON_ROOT = /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-development_general-x64-linux
+    HALCON_ROOT = /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady
+    message("Using bundled HALCON root: $$HALCON_ROOT")
 }
 INCLUDEPATH += $$HALCON_ROOT/include
-
-
-https://proxyinfo.net/api/v1/client/subscribe?token=04bbb5952682d8967d1b8baa8f60f6e6
-先不要修改任何文件。
-
-请你阅读当前这个项目，然后用适合新手的方式回答：
-
-1. 这个项目是做什么的？
-2. 它主要解决什么问题？
-3. 项目里最重要的几个目录分别是干什么的？
-4. 源码大概放在哪里？
-5. 测试大概放在哪里？
-6. 文档大概放在哪里？
-
-回答时请尽量引用具体文件路径。
-然后写进 项目分析.md 今后的一些分析和指令文档都存在一个文件夹下
-
 
 
 SOURCES += \
@@ -149,5 +134,7 @@ RESOURCES += \
     resources/resources.qrc
 
 # OpenCV库链接（移植自旧项目 qtt5_project_bak_327_10nrs_260328he/qtt5.pro）
+LIBS += -L$$OPENCV_ROOT/lib
+LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
 LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs
 LIBS += -ldl

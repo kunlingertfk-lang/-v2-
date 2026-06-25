@@ -65,7 +65,7 @@ private slots:
 private:
     struct ToolChainRunOutput;
 
-    void setupUiState();
+    void setupUiState();            
     void setupSchemeSelector();
     void refreshSchemeSelector();
     void showSchemeSelectorPopup();

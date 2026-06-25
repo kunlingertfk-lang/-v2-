@@ -25,15 +25,33 @@ public:
         Judge,
         Category,
         ColorArea,
-        CharacterRecognition,
+        CharacterRecognition,   //字符识别
         Code,
         BlobPresence,
         CirclePresence,
         EdgePresence,
         LinePresence,
         ContourPresence,
-        ObjectDetection,
-        Classification
+        //AI检测 
+        ObjectDetection,        //目标检测
+        Classification,         //分类检测  resnet18
+
+/*===========================tfk add===========================*/
+        //定位工具
+        TemplateLocation,       //模板定位
+        EdgeLocationButton,     //边缘定位
+        CircleLocationButton,   //圆定位
+
+        //识别工具
+        ColorRecognition,       //颜色识别
+        ColorComparison,        //颜色比较
+        RegistrationClass,      //注册分类
+        RegisteredObjectDetection        //注册目标检测
+/*===========================tfk end===========================*/
+
+
+
+
     };
 
     explicit ToolLibraryDialog(QWidget *parent = nullptr);
