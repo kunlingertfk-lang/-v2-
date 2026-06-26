@@ -40,6 +40,7 @@ enum class ToolType {
     Ocr,
     CodeReader,
     CategoryRecognition,
+    ColorRecognition,
 
     // Presence
     PatternPresence,
@@ -156,6 +157,8 @@ inline QString toolTypeToString(ToolType type)
         return QStringLiteral("CodeReader");
     case ToolType::CategoryRecognition:
         return QStringLiteral("CategoryRecognition");
+    case ToolType::ColorRecognition:
+        return QStringLiteral("ColorRecognition");
     case ToolType::PatternPresence:
         return QStringLiteral("PatternPresence");
     case ToolType::BlobPresence:
@@ -239,6 +242,10 @@ inline ToolType toolTypeFromString(const QString &value)
         return ToolType::CodeReader;
     if (key == QStringLiteral("categoryrecognition"))
         return ToolType::CategoryRecognition;
+    if (key == QStringLiteral("colorrecognition") ||
+        key == QStringLiteral("color_recognition") ||
+        key.contains(QStringLiteral("颜色识别")))
+        return ToolType::ColorRecognition;
     if (key == QStringLiteral("patternpresence"))
         return ToolType::PatternPresence;
     if (key == QStringLiteral("blobpresence") ||

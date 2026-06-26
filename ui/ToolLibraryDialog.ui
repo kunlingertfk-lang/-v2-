@@ -1206,6 +1206,38 @@
                   </property>
                  </widget>
                 </item>
+                <item row="1" column="3">
+                 <widget class="QToolButton" name="colorRecognitionToolButton">
+                  <property name="minimumSize">
+                   <size>
+                    <width>132</width>
+                    <height>118</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>颜色识别</string>
+                  </property>
+                  <property name="icon">
+                   <iconset resource="../resources/resources.qrc">
+                    <normaloff>:/icons/compare.svg</normaloff>:/icons/compare.svg</iconset>
+                  </property>
+                  <property name="iconSize">
+                   <size>
+                    <width>46</width>
+                    <height>46</height>
+                   </size>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextUnderIcon</enum>
+                  </property>
+                  <property name="toolCard" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
                </layout>
               </widget>
              </item>

@@ -5,6 +5,167 @@
         "timedOutputMs": 100
     },
     "previews": {
+        "color_recognition_181e4694-051c-4731-ba20-14c26cbb70eb": {
+            "count": 0,
+            "ok": false,
+            "payload": {
+                "algorithm": "opencv_hsv_color_recognition",
+                "blobCount": 0,
+                "blobRects": [
+                ],
+                "coveragePercent": 0,
+                "elapsedMs": 1,
+                "hueTolerance": 10,
+                "matchedPixels": 0,
+                "minCoveragePercent": 10,
+                "roiNormalized": {
+                    "height": 1,
+                    "width": 1,
+                    "x": 0,
+                    "y": 0
+                },
+                "roiPixels": 307200,
+                "roiPixelsRect": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                },
+                "saturationTolerance": 80,
+                "targetColorHex": "#ffffff",
+                "targetColorRgb": {
+                    "b": 255,
+                    "g": 255,
+                    "r": 255
+                },
+                "targetHue": 0,
+                "targetSaturation": 0,
+                "targetValue": 255,
+                "valueTolerance": 80
+            },
+            "result": {
+                "count": 0,
+                "elapsedMs": 1,
+                "message": "coverage=0.00%, threshold=10%, blobs=0",
+                "ok": false,
+                "overlays": [
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "ROI",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 480,
+                            "width": 640,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "NG 0.0%",
+                        "p1": {
+                            "x": 4,
+                            "y": 18
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0,
+                        "text": "NG 0.0%",
+                        "type": "Text"
+                    }
+                ],
+                "payload": {
+                    "algorithm": "opencv_hsv_color_recognition",
+                    "blobCount": 0,
+                    "blobRects": [
+                    ],
+                    "coveragePercent": 0,
+                    "elapsedMs": 1,
+                    "hueTolerance": 10,
+                    "matchedPixels": 0,
+                    "minCoveragePercent": 10,
+                    "roiNormalized": {
+                        "height": 1,
+                        "width": 1,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "roiPixels": 307200,
+                    "roiPixelsRect": {
+                        "height": 480,
+                        "width": 640,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "saturationTolerance": 80,
+                    "targetColorHex": "#ffffff",
+                    "targetColorRgb": {
+                        "b": 255,
+                        "g": 255,
+                        "r": 255
+                    },
+                    "targetHue": 0,
+                    "targetSaturation": 0,
+                    "targetValue": 255,
+                    "valueTolerance": 80
+                },
+                "schemaVersion": 1,
+                "score": 0,
+                "status": "ng",
+                "success": true,
+                "text": "",
+                "toolId": "color_recognition_181e4694-051c-4731-ba20-14c26cbb70eb",
+                "toolType": "ColorRecognition",
+                "value": 0
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "score": 0,
+            "sourceType": "referenceImage",
+            "statusText": "ng | coverage=0.00%, threshold=10%, blobs=0",
+            "timestamp": "2026-06-26T09:06:34",
+            "toolId": "color_recognition_181e4694-051c-4731-ba20-14c26cbb70eb",
+            "toolType": "ColorRecognition",
+            "valid": true
+        },
         "pattern_presence_9286a6f5-7b58-415d-91e4-86cdc99d1d9e": {
             "count": 1,
             "ok": true,
@@ -634,7 +795,46 @@
             "toolId": "contour_presence_fa3fe225-f827-4b89-a2a8-e5c0edf9d515",
             "toolName": "轮廓有无",
             "toolType": "ContourPresence"
+        },
+        {
+            "category": "Recognition",
+            "displayName": "颜色识别",
+            "enabled": true,
+            "judgeRule": {
+                "minCoveragePercent": 10,
+                "mode": "coverage",
+                "okWhenMatched": true,
+                "resultBasis": "最低分数"
+            },
+            "params": {
+                "detectRegionType": "rectangle",
+                "hueTolerance": 10,
+                "minBlobAreaPixels": 20,
+                "morphKernelSize": 3,
+                "paramMode": "basic",
+                "positionCorrectionEnabled": true,
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "saturationTolerance": 80,
+                "targetColorHex": "#ffffff",
+                "targetColorRgb": {
+                    "b": 255,
+                    "g": 255,
+                    "r": 255
+                },
+                "valueTolerance": 80
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "目标色 #ffffff；占比 >= 10%",
+            "toolId": "color_recognition_181e4694-051c-4731-ba20-14c26cbb70eb",
+            "toolName": "颜色识别",
+            "toolType": "ColorRecognition"
         }
     ],
-    "updatedAt": "2026-06-25T17:52:19"
+    "updatedAt": "2026-06-26T13:54:06"
 }

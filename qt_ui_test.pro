@@ -26,6 +26,7 @@ SOURCES += \
     src/ReferenceImageDialog.cpp \
     src/ToolLibraryDialog.cpp \
     src/CharacterRecognitionDialog.cpp \
+    src/ColorRecognitionDialog.cpp \
     src/ClassificationDialog.cpp \
     src/ObjectDetectionDialog.cpp \
     src/PatternPresenceDialog.cpp \
@@ -42,6 +43,7 @@ SOURCES += \
     src/frame/ReferenceImageProvider.cpp \
     src/toolcore/ToolEngine.cpp \
     src/tooladapters/OcrAdapter.cpp \
+    src/tooladapters/ColorRecognitionAdapter.cpp \
     src/tooladapters/PatternPresenceAdapter.cpp \
     src/tooladapters/BlobPresenceAdapter.cpp \
     src/tooladapters/CirclePresenceAdapter.cpp \
@@ -51,6 +53,7 @@ SOURCES += \
     src/tooladapters/AiDetectionAdapter.cpp \
     src/algorithms/halcon/HalconRuntimePaths.cpp \
     src/algorithms/ocr/OcrHalconRunner.cpp \
+    src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
     src/algorithms/ai/AiDetectionRunner.cpp \
     src/algorithms/presence/PatternPresenceHalconApi.cpp \
     src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
@@ -70,6 +73,7 @@ HEADERS += \
     src/ReferenceImageDialog.h \
     src/ToolLibraryDialog.h \
     src/CharacterRecognitionDialog.h \
+    src/ColorRecognitionDialog.h \
     src/ClassificationDialog.h \
     src/ObjectDetectionDialog.h \
     src/PatternPresenceDialog.h \
@@ -93,6 +97,7 @@ HEADERS += \
     src/toolcore/ToolAdapter.h \
     src/toolcore/ToolEngine.h \
     src/tooladapters/OcrAdapter.h \
+    src/tooladapters/ColorRecognitionAdapter.h \
     src/tooladapters/PatternPresenceAdapter.h \
     src/tooladapters/BlobPresenceAdapter.h \
     src/tooladapters/CirclePresenceAdapter.h \
@@ -102,6 +107,7 @@ HEADERS += \
     src/tooladapters/AiDetectionAdapter.h \
     src/algorithms/halcon/HalconRuntimePaths.h \
     src/algorithms/ocr/OcrHalconRunner.h \
+    src/algorithms/recognition/ColorRecognitionHalconRunner.h \
     src/algorithms/ai/AiDetectionRunner.h \
     src/algorithms/presence/PatternPresenceHalconApi.h \
     src/algorithms/presence/PatternPresenceAutoModelDomain.h \
@@ -119,6 +125,7 @@ FORMS += \
     ui/ReferenceImageDialog.ui \
     ui/ToolLibraryDialog.ui \
     ui/CharacterRecognitionDialog.ui \
+    ui/ColorRecognitionDialog.ui \
     ui/ClassificationDialog.ui \
     ui/ObjectDetectionDialog.ui \
     ui/PatternPresenceDialog.ui \

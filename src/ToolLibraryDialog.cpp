@@ -138,6 +138,7 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->colorAreaToolButton, ColorArea);
     m_buttonGroup->addButton(ui->ocrToolButton, CharacterRecognition);  //字符识别
     m_buttonGroup->addButton(ui->codeToolButton, Code);
+    m_buttonGroup->addButton(ui->colorRecognitionToolButton, ColorRecognition); //颜色识别
     m_buttonGroup->addButton(ui->blobPresenceButton, BlobPresence);
     m_buttonGroup->addButton(ui->circlePresenceButton, CirclePresence);
     m_buttonGroup->addButton(ui->edgePresenceButton, EdgePresence);
@@ -187,6 +188,12 @@ void ToolLibraryDialog::confirmSelection()
 
     if (tool == CharacterRecognition) {
         m_selectedToolType = ToolType::Ocr;
+        accept();
+        return;
+    }
+
+    if (tool == ColorRecognition) {
+        m_selectedToolType = ToolType::ColorRecognition;
         accept();
         return;
     }
@@ -287,6 +294,10 @@ void ToolLibraryDialog::updatePreview(int id)
     case Code:
         ui->previewTitleLabel->setText(tr("码识别"));
         ui->previewDescriptionLabel->setText(tr("识别条码和二维码内容"));
+        break;
+    case ColorRecognition:
+        ui->previewTitleLabel->setText(tr("颜色识别"));
+        ui->previewDescriptionLabel->setText(tr("识别检测区域内目标颜色占比"));
         break;
     case BlobPresence:
         ui->previewTitleLabel->setText(tr("斑点有无"));

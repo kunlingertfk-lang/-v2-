@@ -27,6 +27,7 @@
 #include "CharacterRecognitionDialog.h"
 #include "BlobPresenceDialog.h"
 #include "CameraParamsDialog.h"
+#include "ColorRecognitionDialog.h"
 #include "ClassificationDialog.h"
 #include "CirclePresenceDialog.h"
 #include "ContourPresenceDialog.h"
@@ -402,6 +403,9 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     case ToolType::Ocr:
         accepted = runToolConfigDialog<CharacterRecognitionDialog>(this, nullptr, &config, &snapshot);
         break;
+    case ToolType::ColorRecognition:
+        accepted = runToolConfigDialog<ColorRecognitionDialog>(this, nullptr, &config, &snapshot);
+        break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, nullptr, &config, &snapshot);
         break;
@@ -428,7 +432,7 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
         break;
 /*============================tfk add=================================*/
     case ToolType::TemplateLocation:
-        accepted = runToolConfigDialog<TemplateLocationDialog>(this, nullptr, &config, &snapshot);
+        qDebug() << "[ToolsDialog] TemplateLocation dialog is not implemented yet.";
         break;
 
 /*============================tfk end=================================*/
@@ -461,6 +465,9 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
     switch (originalConfig.toolType) {
     case ToolType::Ocr:
         accepted = runToolConfigDialog<CharacterRecognitionDialog>(this, &originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::ColorRecognition:
+        accepted = runToolConfigDialog<ColorRecognitionDialog>(this, &originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, &originalConfig, &editedConfig, &snapshot);
@@ -695,6 +702,8 @@ QString ToolsDialog::toolDisplayName(const ToolConfig &config) const
     switch (config.toolType) {
     case ToolType::Ocr:
         return tr("字符识别");
+    case ToolType::ColorRecognition:
+        return tr("颜色识别");
     case ToolType::PatternPresence:
         return tr("图案有无");
     case ToolType::BlobPresence:
