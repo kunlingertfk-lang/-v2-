@@ -2,6 +2,7 @@
 #define COLORRECOGNITIONDIALOG_H
 
 #include <QDialog>
+#include <QFutureWatcher>
 #include <QRectF>
 #include <QString>
 #include <QVector>
@@ -109,6 +110,9 @@ private:
     bool m_previewUsesReferenceImage = true;
     QTimer *m_testRunTimer = nullptr;
     bool m_liveTestRunning = false;
+    QFutureWatcher<ToolResult> *m_testRunWatcher = nullptr;
+    bool m_testRunBusy = false;
+    int m_testRunGeneration = 0;
 };
 
 #endif // COLORRECOGNITIONDIALOG_H

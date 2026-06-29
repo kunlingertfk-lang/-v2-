@@ -11,6 +11,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDebug>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -219,6 +220,38 @@ void ColorTemplateDialog::resizeEvent(QResizeEvent *event)
     fitPreview();
 }
 
+bool ColorTemplateDialog::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched && watched->property("colorTemplateDragHandle").toBool()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                m_draggingWindow = true;
+                m_dragStartGlobalPos = mouseEvent->globalPos();
+                m_dragStartFramePos = frameGeometry().topLeft();
+                event->accept();
+                return true;
+            }
+        } else if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (m_draggingWindow && (mouseEvent->buttons() & Qt::LeftButton)) {
+                move(m_dragStartFramePos + mouseEvent->globalPos() - m_dragStartGlobalPos);
+                event->accept();
+                return true;
+            }
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton && m_draggingWindow) {
+                m_draggingWindow = false;
+                event->accept();
+                return true;
+            }
+        }
+    }
+
+    return QDialog::eventFilter(watched, event);
+}
+
 void ColorTemplateDialog::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton && event->pos().y() <= 44) {
@@ -309,10 +342,14 @@ void ColorTemplateDialog::buildUi()
 
     QFrame *headerFrame = new QFrame;
     headerFrame->setObjectName(QStringLiteral("headerFrame"));
+    headerFrame->setProperty("colorTemplateDragHandle", true);
+    headerFrame->installEventFilter(this);
     headerFrame->setMinimumHeight(42);
     QHBoxLayout *headerLayout = new QHBoxLayout(headerFrame);
     headerLayout->setContentsMargins(18, 0, 12, 0);
     QLabel *headerTitle = new QLabel(tr("颜色模板创建"));
+    headerTitle->setProperty("colorTemplateDragHandle", true);
+    headerTitle->installEventFilter(this);
     headerTitle->setStyleSheet(QStringLiteral("color:#ffffff; font-size:15px; font-weight:600;"));
     QToolButton *closeButton = new QToolButton;
     closeButton->setText(QStringLiteral("×"));
@@ -381,6 +418,10 @@ void ColorTemplateDialog::buildUi()
 
     QHBoxLayout *sampleCountRow = new QHBoxLayout;
     m_sampleCountLabel = new QLabel(QStringLiteral("0 / 总计 0"));
+    m_sampleCountLabel->setAlignment(Qt::AlignCenter);
+    m_sampleCountLabel->setMinimumHeight(32);
+    m_sampleCountLabel->setStyleSheet(QStringLiteral(
+        "QLabel { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; }"));
     sampleCountRow->addWidget(rowLabel(tr("样本数量")));
     sampleCountRow->addWidget(m_sampleCountLabel, 1);
     labelLayout->addLayout(sampleCountRow);

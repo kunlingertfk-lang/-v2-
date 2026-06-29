@@ -32,6 +32,7 @@
 #include <QTimer>
 #include <QUuid>
 #include <QVBoxLayout>
+#include <QtConcurrent>
 
 #include <algorithm>
 #include <cmath>
@@ -289,6 +290,16 @@ ColorRecognitionDialog::ColorRecognitionDialog(QWidget *parent)
     m_testRunTimer = new QTimer(this);
     m_testRunTimer->setInterval(kLiveTestIntervalMs);
     connect(m_testRunTimer, &QTimer::timeout, this, &ColorRecognitionDialog::performTestRun);
+    m_testRunWatcher = new QFutureWatcher<ToolResult>(this);
+    connect(m_testRunWatcher, &QFutureWatcher<ToolResult>::finished, this, [this]() {
+        m_testRunBusy = false;
+        const ToolResult result = m_testRunWatcher->result();
+        const int generation = result.payload.value(QStringLiteral("_testRunGeneration")).toInt();
+        const bool referenceSource = result.payload.value(QStringLiteral("_referenceSource")).toBool();
+        if (generation != m_testRunGeneration)
+            return;
+        displayResult(result, referenceSource);
+    });
     setupUiState();
     connectControls();
     showPreviewImage();
@@ -296,6 +307,11 @@ ColorRecognitionDialog::ColorRecognitionDialog(QWidget *parent)
 
 ColorRecognitionDialog::~ColorRecognitionDialog()
 {
+    stopLiveTestRun();
+    if (m_testRunWatcher && m_testRunWatcher->isRunning()) {
+        m_testRunWatcher->cancel();
+        m_testRunWatcher->waitForFinished();
+    }
     delete ui;
 }
 
@@ -469,7 +485,12 @@ void ColorRecognitionDialog::runTest()
     }
 
     m_liveTestRunning = true;
+    ++m_testRunGeneration;
+    m_displayedSampleIndex = -1;
     ui->testRunButton->setText(tr("停止测试"));
+    if (m_previewHelper && !m_globalDetection && m_displayedSampleIndex < 0)
+        m_previewHelper->setRoiDrawingEnabled(true);
+    refreshDisplayedRoiOverlay();
     performTestRun();
     if (m_testRunTimer)
         m_testRunTimer->start();
@@ -477,6 +498,9 @@ void ColorRecognitionDialog::runTest()
 
 void ColorRecognitionDialog::performTestRun()
 {
+    if (m_testRunBusy)
+        return;
+
     cv::Mat frame = m_previewUsesReferenceImage
             ? ReferenceImageProvider::instance().referenceFrame()
             : CameraFrameProvider::instance().currentFrame();
@@ -499,17 +523,27 @@ void ColorRecognitionDialog::performTestRun()
     ToolRequest request;
     request.config = toToolConfig();
     request.image = frame.clone();
-    const ToolResult result = m_testAdapter.run(request);
-    displayResult(result, referenceSource);
+    const int generation = m_testRunGeneration;
+    m_testRunBusy = true;
+    m_testRunWatcher->setFuture(QtConcurrent::run([request, referenceSource, generation]() mutable {
+        ColorRecognitionAdapter adapter;
+        ToolResult result = adapter.run(request);
+        result.payload.insert(QStringLiteral("_referenceSource"), referenceSource);
+        result.payload.insert(QStringLiteral("_testRunGeneration"), generation);
+        return result;
+    }));
 }
 
 void ColorRecognitionDialog::stopLiveTestRun()
 {
     if (m_testRunTimer)
         m_testRunTimer->stop();
+    ++m_testRunGeneration;
     m_liveTestRunning = false;
     if (ui && ui->testRunButton)
         ui->testRunButton->setText(tr("测试运行"));
+    if (m_previewHelper && !m_globalDetection && m_displayedSampleIndex < 0)
+        m_previewHelper->setRoiDrawingEnabled(true);
 }
 
 void ColorRecognitionDialog::setupUiState()
@@ -839,12 +873,54 @@ QImage firstTemplateSampleImage(const ColorRecognitionTemplateData &colorTemplat
     return QImage();
 }
 
+QWidget *makeTemplateRoiSampleCard(const QImage &sourceImage,
+                                   const QString &labelText,
+                                   const QString &toolTip,
+                                   QWidget *parent)
+{
+    QFrame *card = new QFrame(parent);
+    card->setFrameShape(QFrame::NoFrame);
+    card->setToolTip(toolTip);
+    card->setStyleSheet(QStringLiteral(
+        "QFrame { background:#ffffff; border:1px solid #cfd6df; border-radius:4px; }"
+        "QLabel { background:#ffffff; border:0; color:#111827; font-size:12px; }"));
+
+    QVBoxLayout *layout = new QVBoxLayout(card);
+    layout->setContentsMargins(8, 6, 8, 6);
+    layout->setSpacing(4);
+
+    QLabel *imageLabel = new QLabel;
+    imageLabel->setFixedSize(96, 62);
+    imageLabel->setAlignment(Qt::AlignCenter);
+    imageLabel->setToolTip(toolTip);
+    imageLabel->setStyleSheet(QStringLiteral(
+        "QLabel { background:#ffffff; border:1px solid #ff7a00; border-radius:2px; }"));
+
+    if (!sourceImage.isNull()) {
+        const QImage scaled = sourceImage.scaled(imageLabel->size(),
+                                                Qt::KeepAspectRatioByExpanding,
+                                                Qt::SmoothTransformation);
+        imageLabel->setPixmap(QPixmap::fromImage(scaled));
+    } else {
+        imageLabel->setText(QStringLiteral("ROI"));
+    }
+
+    QLabel *textLabel = new QLabel(labelText);
+    textLabel->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+    textLabel->setToolTip(toolTip);
+    textLabel->setMinimumHeight(18);
+
+    layout->addWidget(imageLabel, 0, Qt::AlignHCenter);
+    layout->addWidget(textLabel);
+    return card;
+}
+
 void ColorRecognitionDialog::updateTemplateList()
 {
     const QString selectedId = activeTemplateId();
     const QSignalBlocker block(ui->templateListWidget);
     ui->templateListWidget->clear();
-    ui->templateListWidget->setIconSize(QSize(72, 48));
+    ui->templateListWidget->setIconSize(QSize(96, 62));
 
     int selectedRow = -1;
     for (int i = 0; i < m_templates.size(); ++i) {
@@ -888,24 +964,28 @@ void ColorRecognitionDialog::updateTemplateList()
                 if (sample.classId != label.classId)
                     continue;
 
-                QListWidgetItem *sampleItem = new QListWidgetItem(
-                            tr("    ROI %1").arg(labelRoiIndex++));
+                const int displayIndex = labelRoiIndex++;
+                QListWidgetItem *sampleItem = new QListWidgetItem;
+                sampleItem->setText(QString());
+                const QString sampleToolTip = tr("%1 ROI %2").arg(label.name).arg(displayIndex);
+                sampleItem->setToolTip(sampleToolTip);
                 QImage sampleImage;
                 if (!sample.roiImagePngBase64.trimmed().isEmpty()) {
                     sampleImage.loadFromData(QByteArray::fromBase64(sample.roiImagePngBase64.toLatin1()),
                                              "PNG");
                 }
-                if (!sampleImage.isNull()) {
-                    sampleItem->setIcon(QIcon(QPixmap::fromImage(sampleImage.scaled(QSize(72, 48),
-                                                                                  Qt::KeepAspectRatioByExpanding,
-                                                                                  Qt::SmoothTransformation))));
-                    sampleItem->setSizeHint(QSize(260, 58));
-                }
+                sampleItem->setSizeHint(QSize(260, 104));
                 sampleItem->setData(ItemKindRole, kSampleItem);
                 sampleItem->setData(TemplateIdRole, colorTemplate.templateId);
                 sampleItem->setData(ClassIdRole, sample.classId);
                 sampleItem->setData(SampleIndexRole, sampleIndex);
                 ui->templateListWidget->addItem(sampleItem);
+                ui->templateListWidget->setItemWidget(
+                            sampleItem,
+                            makeTemplateRoiSampleCard(sampleImage,
+                                                      label.name,
+                                                      sampleToolTip,
+                                                      ui->templateListWidget));
             }
         }
     }
@@ -1213,9 +1293,15 @@ void ColorRecognitionDialog::refreshDisplayedRoiOverlay()
 void ColorRecognitionDialog::displayResult(const ToolResult &result, bool referenceSource)
 {
     if (m_previewHelper) {
-        m_previewHelper->setRoiDrawingEnabled(false);
+        const bool keepDetectRoiEditable =
+                m_liveTestRunning && !m_globalDetection && m_displayedSampleIndex < 0;
+        m_previewHelper->setRoiDrawingEnabled(keepDetectRoiEditable);
         m_previewHelper->clearToolOverlays();
-        m_previewHelper->setToolOverlays(result.overlays);
+        m_previewHelper->setToolOverlays(keepDetectRoiEditable
+                                         ? colorRecognitionPreviewOverlaysWithoutRoi(result.overlays)
+                                         : result.overlays);
+        if (keepDetectRoiEditable)
+            m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
     }
 
     const QString predictedLabel = result.payload.value(QStringLiteral("predictedLabel")).toString(result.text);
