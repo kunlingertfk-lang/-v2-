@@ -72,6 +72,24 @@ QImage currentReferenceImage()
     return imageFromFrame(ReferenceImageProvider::instance().referenceFrame());
 }
 
+QVector<ToolOverlay> previewOverlaysForToolsPage(const ToolConfig &config,
+                                                 const ToolPreviewSnapshot &snapshot)
+{
+    if (config.toolType != ToolType::ColorRecognition)
+        return snapshot.overlays;
+
+    QVector<ToolOverlay> filtered;
+    filtered.reserve(snapshot.overlays.size());
+    for (const ToolOverlay &overlay : snapshot.overlays) {
+        if (overlay.type == ToolOverlayType::Rect &&
+            overlay.label.compare(QStringLiteral("ROI"), Qt::CaseInsensitive) == 0) {
+            continue;
+        }
+        filtered.append(overlay);
+    }
+    return filtered;
+}
+
 template <typename Dialog>
 bool runToolConfigDialog(QWidget *parent,
                          const ToolConfig *initialConfig,
@@ -671,6 +689,7 @@ void ToolsDialog::showSelectedToolPreview()
         m_previewHelper->setImage(image);
     else
         m_previewHelper->clear();
+    m_previewHelper->clearRoi();
 
     const ToolPreviewSnapshot snapshot = m_toolPreviewSnapshots.value(config.toolId);
     if (!snapshot.valid) {
@@ -688,7 +707,7 @@ void ToolsDialog::showSelectedToolPreview()
         return;
     }
 
-    m_previewHelper->setToolOverlays(snapshot.overlays);
+    m_previewHelper->setToolOverlays(previewOverlaysForToolsPage(config, snapshot));
     ui->viewerStatusLabel->setText(toolPreviewStatusLine(snapshot));
 }
 

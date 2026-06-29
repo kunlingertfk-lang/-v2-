@@ -6,14 +6,17 @@
 #include <QString>
 #include <QVector>
 
-#include "algorithms/recognition/ColorRecognitionHalconRunner.h"
+#include "ColorTemplateDialog.h"
 #include "tooladapters/ColorRecognitionAdapter.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolPreviewSnapshot.h"
 
 class FrameViewHelper;
 class QButtonGroup;
+class QFrame;
+class QListWidgetItem;
 class QResizeEvent;
+class QTimer;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -21,30 +24,10 @@ class ColorRecognitionDialog;
 }
 QT_END_NAMESPACE
 
-struct ColorRecognitionDialogLabel
-{
-    QString name;
-    int classId = 0;
-};
-
-struct ColorRecognitionDialogSample
-{
-    QString label;
-    int classId = 0;
-    QVector<double> feature;
-    QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
-};
-
 struct ColorRecognitionDialogConfig
 {
-    QString modelName = QStringLiteral("颜色模型");
-    QString featureType = QStringLiteral("histogram");
-    QString sensitivity = QStringLiteral("medium");
-    bool brightnessEnabled = true;
-    int knnK = 3;
-    QString knnDistance = QStringLiteral("halcon_l2");
-    QVector<ColorRecognitionDialogLabel> labels;
-    QVector<ColorRecognitionDialogSample> samples;
+    QVector<ColorRecognitionTemplateData> templates;
+    QString activeTemplateId;
     QString judgeMode = QStringLiteral("min_score");
     int minScore = 80;
     QString expectedLabel;
@@ -76,21 +59,27 @@ private:
     void setupUiState();
     void connectControls();
     void setAllParamsMode(bool allMode);
-    void addLabel();
-    void renameCurrentLabel();
-    void deleteCurrentLabel();
-    void addSampleFromCurrentRoi();
+    void addTemplate();
+    void editCurrentTemplate();
+    void importTemplate();
+    void exportCurrentTemplate();
+    void renameCurrentTemplate();
+    void deleteCurrentTemplate();
+    void updateTemplateList();
+    void updateActiveTemplateSummary();
+    void updateExpectedLabelCombo();
     void updateJudgementControls();
-    void updateLabelCombos();
-    void updateSampleCount();
-    void ensureDefaultLabel();
-    int nextClassId() const;
-    int currentClassId() const;
-    QString currentLabelName() const;
-    ColorRecognitionHalconConfig featureExtractionConfig() const;
+    void handleTemplateListItemClicked(QListWidgetItem *item);
+    int currentTemplateIndex() const;
+    ColorRecognitionTemplateData *activeTemplate();
+    const ColorRecognitionTemplateData *activeTemplate() const;
+    QString activeTemplateId() const;
+    void performTestRun();
+    void stopLiveTestRun();
     void fitPreview();
     void showPreviewImage();
     void showFrameForRoiEditing();
+    void startGlobalDetection();
     void startRectangleRoiEditing();
     void showUnsupportedRegionMessage();
     void syncRegionButtons(bool rectangleRegion);
@@ -110,11 +99,16 @@ private:
     QString m_toolId;
     bool m_enabled = true;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
-    QVector<ColorRecognitionDialogLabel> m_labels;
-    QVector<ColorRecognitionDialogSample> m_samples;
+    bool m_globalDetection = false;
+    QVector<ColorRecognitionTemplateData> m_templates;
+    QString m_activeTemplateId;
+    int m_displayedSampleIndex = -1;
     ToolPreviewSnapshot m_referencePreviewSnapshot;
     ColorRecognitionAdapter m_testAdapter;
-    ColorRecognitionHalconRunner m_featureRunner;
+    QFrame *m_maskCard = nullptr;
+    bool m_previewUsesReferenceImage = true;
+    QTimer *m_testRunTimer = nullptr;
+    bool m_liveTestRunning = false;
 };
 
 #endif // COLORRECOGNITIONDIALOG_H

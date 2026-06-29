@@ -27,6 +27,7 @@ SOURCES += \
     src/ToolLibraryDialog.cpp \
     src/CharacterRecognitionDialog.cpp \
     src/ColorRecognitionDialog.cpp \
+    src/ColorTemplateDialog.cpp \
     src/ClassificationDialog.cpp \
     src/ObjectDetectionDialog.cpp \
     src/PatternPresenceDialog.cpp \
@@ -74,6 +75,7 @@ HEADERS += \
     src/ToolLibraryDialog.h \
     src/CharacterRecognitionDialog.h \
     src/ColorRecognitionDialog.h \
+    src/ColorTemplateDialog.h \
     src/ClassificationDialog.h \
     src/ObjectDetectionDialog.h \
     src/PatternPresenceDialog.h \

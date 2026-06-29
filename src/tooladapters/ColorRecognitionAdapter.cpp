@@ -93,11 +93,31 @@ QVector<ColorRecognitionHalconSample> samplesFromJson(const QJsonArray &array)
     return samples;
 }
 
+QJsonObject activeTemplateObject(const QJsonObject &colorModel)
+{
+    const QJsonArray templates = colorModel.value(QStringLiteral("templates")).toArray();
+    if (templates.isEmpty())
+        return QJsonObject();
+
+    const QString activeTemplateId =
+            colorModel.value(QStringLiteral("activeTemplateId")).toString().trimmed();
+    for (const QJsonValue &value : templates) {
+        const QJsonObject candidate = value.toObject();
+        if (!activeTemplateId.isEmpty() &&
+            candidate.value(QStringLiteral("templateId")).toString() == activeTemplateId) {
+            return candidate;
+        }
+    }
+    return templates.first().toObject();
+}
+
 ColorRecognitionHalconConfig toRunnerConfig(const ToolConfig &config)
 {
     const QJsonObject params = config.params;
     const QJsonObject judgeRule = config.judgeRule;
     const QJsonObject colorModel = params.value(QStringLiteral("colorModel")).toObject();
+    const QJsonObject colorTemplate = activeTemplateObject(colorModel);
+    const QJsonObject modelSource = colorTemplate.isEmpty() ? colorModel : colorTemplate;
 
     ColorRecognitionHalconConfig runnerConfig;
     const QString requestedHalconSoPath = stringParam(params, QStringLiteral("halconSoPath"));
@@ -106,21 +126,33 @@ ColorRecognitionHalconConfig toRunnerConfig(const ToolConfig &config)
                 &runnerConfig.halconSoPathCandidates);
     if (config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0)
         runnerConfig.roiNormalized = config.roiNormalized;
-    runnerConfig.featureType = stringParam(params,
+    runnerConfig.featureType = stringParam(modelSource,
                                            QStringLiteral("featureType"),
-                                           runnerConfig.featureType);
-    runnerConfig.sensitivity = stringParam(params,
+                                           stringParam(params,
+                                                       QStringLiteral("featureType"),
+                                                       runnerConfig.featureType));
+    runnerConfig.sensitivity = stringParam(modelSource,
                                            QStringLiteral("sensitivity"),
-                                           runnerConfig.sensitivity);
-    runnerConfig.brightnessEnabled = boolParam(params,
+                                           stringParam(params,
+                                                       QStringLiteral("sensitivity"),
+                                                       runnerConfig.sensitivity));
+    runnerConfig.brightnessEnabled = boolParam(modelSource,
                                                QStringLiteral("brightnessEnabled"),
-                                               runnerConfig.brightnessEnabled);
-    runnerConfig.knnK = qMax(1, intParam(params, QStringLiteral("knnK"), runnerConfig.knnK));
-    runnerConfig.knnDistance = stringParam(params,
+                                               boolParam(params,
+                                                         QStringLiteral("brightnessEnabled"),
+                                                         runnerConfig.brightnessEnabled));
+    runnerConfig.knnK = qMax(1, intParam(modelSource,
+                                         QStringLiteral("knnK"),
+                                         intParam(params,
+                                                  QStringLiteral("knnK"),
+                                                  runnerConfig.knnK)));
+    runnerConfig.knnDistance = stringParam(modelSource,
                                            QStringLiteral("knnDistance"),
-                                           runnerConfig.knnDistance);
-    runnerConfig.labels = labelsFromJson(colorModel.value(QStringLiteral("labels")).toArray());
-    runnerConfig.samples = samplesFromJson(colorModel.value(QStringLiteral("samples")).toArray());
+                                           stringParam(params,
+                                                       QStringLiteral("knnDistance"),
+                                                       runnerConfig.knnDistance));
+    runnerConfig.labels = labelsFromJson(modelSource.value(QStringLiteral("labels")).toArray());
+    runnerConfig.samples = samplesFromJson(modelSource.value(QStringLiteral("samples")).toArray());
     runnerConfig.judgeMode = stringParam(judgeRule, QStringLiteral("mode"), runnerConfig.judgeMode);
     runnerConfig.minScore = qBound(0,
                                    intParam(judgeRule,

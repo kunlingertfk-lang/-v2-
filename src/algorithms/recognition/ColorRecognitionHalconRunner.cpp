@@ -210,8 +210,8 @@ struct HalconCApi
                                       Hobject *, Hobject *, Hobject *, const char *);
     using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
-    using GrayHistoRangeFn = Herror (*)(const Hobject, const Hobject, double, double, Hlong,
-                                        Hlong *, double *);
+    using GrayHistoRangeFn = Herror (*)(const Hobject, const Hobject, const Htuple,
+                                        const Htuple, const Htuple, Htuple *, Htuple *);
     using CreateClassKnnFn = Herror (*)(const Htuple, Htuple *);
     using AddSampleClassKnnFn = Herror (*)(const Htuple, const Htuple, const Htuple);
     using TrainClassKnnFn = Herror (*)(const Htuple, const Htuple, const Htuple);
@@ -305,7 +305,7 @@ public:
             !resolveRequired(m_handle, api.transFromRgb, "trans_from_rgb", errorMessage) ||
             !resolveRequired(m_handle, api.genRectangle1, "gen_rectangle1", errorMessage) ||
             !resolveRequired(m_handle, api.reduceDomain, "reduce_domain", errorMessage) ||
-            !resolveRequired(m_handle, api.grayHistoRange, "gray_histo_range", errorMessage) ||
+            !resolveRequired(m_handle, api.grayHistoRange, "T_gray_histo_range", errorMessage) ||
             !resolveRequired(m_handle, api.createClassKnn, "T_create_class_knn", errorMessage) ||
             !resolveRequired(m_handle, api.addSampleClassKnn, "T_add_sample_class_knn", errorMessage) ||
             !resolveRequired(m_handle, api.trainClassKnn, "T_train_class_knn", errorMessage) ||
@@ -463,18 +463,29 @@ QVector<double> histogramForChannel(HalconCApi *api,
                                     const QString &stage)
 {
     Hobject reducedChannel = NO_OBJECTS;
-    QVector<Hlong> histo(bins);
-    double binSize = 0.0;
+    HalconTuple minValue(api);
+    HalconTuple maxValue(api);
+    HalconTuple binCount(api);
+    HalconTuple histo(api);
+    HalconTuple binSize(api);
+
+    minValue.create(1);
+    minValue.setDouble(0, 0.0);
+    maxValue.create(1);
+    maxValue.setDouble(0, 255.0);
+    binCount.create(1);
+    binCount.setInt(0, bins);
+
     checkStatus(api, api->reduceDomain(channel, roiRegion, &reducedChannel),
                 stage + QStringLiteral(".reduce_domain"));
     try {
         checkStatus(api, api->grayHistoRange(roiRegion,
                                              reducedChannel,
-                                             0.0,
-                                             255.0,
-                                             bins,
-                                             histo.data(),
-                                             &binSize),
+                                             minValue.value(),
+                                             maxValue.value(),
+                                             binCount.value(),
+                                             histo.ptr(),
+                                             binSize.ptr()),
                     stage + QStringLiteral(".gray_histo_range"));
     } catch (...) {
         clearObject(api, reducedChannel);
@@ -483,15 +494,20 @@ QVector<double> histogramForChannel(HalconCApi *api,
     clearObject(api, reducedChannel);
 
     double sum = 0.0;
-    for (const Hlong value : histo)
+    const int histoSize = histo.size();
+    for (int i = 0; i < histoSize; ++i) {
+        const Hlong value = histo.intAt(i);
         sum += static_cast<double>(value);
+    }
     if (sum <= 0.0)
         sum = 1.0;
 
     QVector<double> normalized;
-    normalized.reserve(bins);
-    for (const Hlong value : histo)
+    normalized.reserve(histoSize);
+    for (int i = 0; i < histoSize; ++i) {
+        const Hlong value = histo.intAt(i);
         normalized.append(static_cast<double>(value) / sum);
+    }
     return normalized;
 }
 
@@ -571,64 +587,64 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
     QElapsedTimer timer;
     timer.start();
 
-    if (config.featureType.trimmed().toLower() == QStringLiteral("spectrum")) {
-        return featureError(QStringLiteral("unsupported_feature"),
-                            QStringLiteral("Spectrum feature is reserved but not implemented."),
-                            config,
-                            image,
-                            timer.elapsed());
-    }
-    if (config.featureType.trimmed().toLower() != QStringLiteral("histogram")) {
-        return featureError(QStringLiteral("unsupported_feature"),
-                            QStringLiteral("Only histogram feature is supported in the first version."),
-                            config,
-                            image,
-                            timer.elapsed());
-    }
-
-    const cv::Mat bgr = toBgr8(image);
-    if (bgr.empty()) {
-        return featureError(QStringLiteral("image_empty"),
-                            QStringLiteral("Input image is empty or unsupported."),
-                            config,
-                            image,
-                            timer.elapsed());
-    }
-
-    const QRect roiPixels = normalizedRoiToPixels(config.roiNormalized, bgr.cols, bgr.rows);
-    if (roiPixels.isEmpty()) {
-        return featureError(QStringLiteral("invalid_roi"),
-                            QStringLiteral("Color recognition ROI is invalid."),
-                            config,
-                            image,
-                            timer.elapsed());
-    }
-
-    if (config.halconSoPath.trimmed().isEmpty() || !QFileInfo::exists(config.halconSoPath)) {
-        const QString triedPaths = config.halconSoPathCandidates.isEmpty()
-                ? config.halconSoPath
-                : config.halconSoPathCandidates.join(QStringLiteral("; "));
-        return featureError(QStringLiteral("halcon_so_not_found"),
-                            QStringLiteral("HALCON runtime file not found: %1. Tried: %2")
-                            .arg(config.halconSoPath, triedPaths),
-                            config,
-                            image,
-                            timer.elapsed());
-    }
-
-    HalconLibrary library;
-    QString loadMessage;
-    bool symbolMissing = false;
-    if (!library.load(config.halconSoPath, loadMessage, symbolMissing)) {
-        return featureError(symbolMissing ? QStringLiteral("halcon_symbol_missing")
-                                          : QStringLiteral("halcon_load_failed"),
-                            loadMessage,
-                            config,
-                            image,
-                            timer.elapsed());
-    }
-
     try {
+        if (config.featureType.trimmed().toLower() == QStringLiteral("spectrum")) {
+            return featureError(QStringLiteral("unsupported_feature"),
+                                QStringLiteral("Spectrum feature is reserved but not implemented."),
+                                config,
+                                image,
+                                timer.elapsed());
+        }
+        if (config.featureType.trimmed().toLower() != QStringLiteral("histogram")) {
+            return featureError(QStringLiteral("unsupported_feature"),
+                                QStringLiteral("Only histogram feature is supported in the first version."),
+                                config,
+                                image,
+                                timer.elapsed());
+        }
+
+        const cv::Mat bgr = toBgr8(image);
+        if (bgr.empty()) {
+            return featureError(QStringLiteral("image_empty"),
+                                QStringLiteral("Input image is empty or unsupported."),
+                                config,
+                                image,
+                                timer.elapsed());
+        }
+
+        const QRect roiPixels = normalizedRoiToPixels(config.roiNormalized, bgr.cols, bgr.rows);
+        if (roiPixels.isEmpty()) {
+            return featureError(QStringLiteral("invalid_roi"),
+                                QStringLiteral("Color recognition ROI is invalid."),
+                                config,
+                                image,
+                                timer.elapsed());
+        }
+
+        if (config.halconSoPath.trimmed().isEmpty() || !QFileInfo::exists(config.halconSoPath)) {
+            const QString triedPaths = config.halconSoPathCandidates.isEmpty()
+                    ? config.halconSoPath
+                    : config.halconSoPathCandidates.join(QStringLiteral("; "));
+            return featureError(QStringLiteral("halcon_so_not_found"),
+                                QStringLiteral("HALCON runtime file not found: %1. Tried: %2")
+                                .arg(config.halconSoPath, triedPaths),
+                                config,
+                                image,
+                                timer.elapsed());
+        }
+
+        HalconLibrary library;
+        QString loadMessage;
+        bool symbolMissing = false;
+        if (!library.load(config.halconSoPath, loadMessage, symbolMissing)) {
+            return featureError(symbolMissing ? QStringLiteral("halcon_symbol_missing")
+                                              : QStringLiteral("halcon_load_failed"),
+                                loadMessage,
+                                config,
+                                image,
+                                timer.elapsed());
+        }
+
         ColorRecognitionHalconFeatureResult result;
         result.feature = extractHistogramFeature(bgr, roiPixels, config, &library.api);
         result.success = true;
@@ -648,6 +664,12 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
     } catch (const std::exception &error) {
         return featureError(QStringLiteral("exception"),
                             QString::fromLocal8Bit(error.what()),
+                            config,
+                            image,
+                            timer.elapsed());
+    } catch (...) {
+        return featureError(QStringLiteral("exception"),
+                            QStringLiteral("Unknown exception while extracting color feature."),
                             config,
                             image,
                             timer.elapsed());
@@ -879,6 +901,14 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
             api->clearClassKnn(knnHandle.value());
         return runError(QStringLiteral("exception"),
                         QString::fromLocal8Bit(error.what()),
+                        config,
+                        image,
+                        timer.elapsed());
+    } catch (...) {
+        if (api->clearClassKnn && knnHandle.size() > 0)
+            api->clearClassKnn(knnHandle.value());
+        return runError(QStringLiteral("exception"),
+                        QStringLiteral("Unknown exception while classifying color feature."),
                         config,
                         image,
                         timer.elapsed());

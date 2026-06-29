@@ -2,26 +2,36 @@
 #include "ui_ColorRecognitionDialog.h"
 
 #include "PlanDialogUtils.h"
-#include "algorithms/halcon/HalconRuntimePaths.h"
 
 #include <QButtonGroup>
+#include <QByteArray>
 #include <QComboBox>
 #include <QDebug>
+#include <QFile>
+#include <QFileDialog>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QInputDialog>
+#include <QImage>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidgetItem>
+#include <QListWidget>
 #include <QMessageBox>
+#include <QIcon>
+#include <QPixmap>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QSpinBox>
-#include <QStandardItemModel>
 #include <QToolButton>
+#include <QTimer>
 #include <QUuid>
-#include <QtGlobal>
+#include <QVBoxLayout>
 
 #include <algorithm>
 #include <cmath>
@@ -32,6 +42,18 @@
 #include "toolcore/ToolRequest.h"
 
 namespace {
+
+enum TemplateListRole {
+    ItemKindRole = Qt::UserRole,
+    TemplateIdRole,
+    ClassIdRole,
+    SampleIndexRole
+};
+
+constexpr int kTemplateItem = 1;
+constexpr int kLabelItem = 2;
+constexpr int kSampleItem = 3;
+constexpr int kLiveTestIntervalMs = 500;
 
 bool finiteValue(qreal value)
 {
@@ -107,38 +129,6 @@ QVector<double> featureFromJson(const QJsonArray &array)
     return feature;
 }
 
-QString featureTypeFromUi(const QString &text)
-{
-    return text.contains(QStringLiteral("色谱"))
-            ? QStringLiteral("spectrum")
-            : QStringLiteral("histogram");
-}
-
-QString featureTypeToUi(const QString &value)
-{
-    return value == QStringLiteral("spectrum")
-            ? QStringLiteral("色谱特征")
-            : QStringLiteral("直方图特征");
-}
-
-QString sensitivityFromUi(const QString &text)
-{
-    if (text.contains(QStringLiteral("低")))
-        return QStringLiteral("low");
-    if (text.contains(QStringLiteral("高")))
-        return QStringLiteral("high");
-    return QStringLiteral("medium");
-}
-
-QString sensitivityToUi(const QString &value)
-{
-    if (value == QStringLiteral("low"))
-        return QStringLiteral("低敏感");
-    if (value == QStringLiteral("high"))
-        return QStringLiteral("高敏感");
-    return QStringLiteral("中敏感");
-}
-
 QString judgeModeFromUi(const QString &text)
 {
     return text.contains(QStringLiteral("类别"))
@@ -153,6 +143,13 @@ QString judgeModeToUi(const QString &value)
             : QStringLiteral("最低分数");
 }
 
+QString featureTypeToUi(const QString &value)
+{
+    return value == QStringLiteral("spectrum")
+            ? QStringLiteral("色谱特征")
+            : QStringLiteral("直方图特征");
+}
+
 void setComboBoxText(QComboBox *comboBox, const QString &text)
 {
     if (!comboBox)
@@ -161,6 +158,120 @@ void setComboBoxText(QComboBox *comboBox, const QString &text)
     const int index = comboBox->findText(text);
     if (index >= 0)
         comboBox->setCurrentIndex(index);
+}
+
+QJsonObject labelToJson(const ColorRecognitionLabelData &label)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("name"), label.name);
+    json.insert(QStringLiteral("classId"), label.classId);
+    return json;
+}
+
+ColorRecognitionLabelData labelFromJson(const QJsonObject &json)
+{
+    ColorRecognitionLabelData label;
+    label.name = json.value(QStringLiteral("name")).toString().trimmed();
+    label.classId = json.value(QStringLiteral("classId")).toInt();
+    return label;
+}
+
+QJsonObject sampleToJson(const ColorRecognitionSampleData &sample)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("label"), sample.label);
+    json.insert(QStringLiteral("classId"), sample.classId);
+    json.insert(QStringLiteral("feature"), featureToJson(sample.feature));
+    json.insert(QStringLiteral("roiNormalized"), rectToJson(sample.roiNormalized));
+    json.insert(QStringLiteral("roiImagePngBase64"), sample.roiImagePngBase64);
+    json.insert(QStringLiteral("roiImageWidth"), sample.roiImageWidth);
+    json.insert(QStringLiteral("roiImageHeight"), sample.roiImageHeight);
+    return json;
+}
+
+ColorRecognitionSampleData sampleFromJson(const QJsonObject &json)
+{
+    ColorRecognitionSampleData sample;
+    sample.label = json.value(QStringLiteral("label")).toString().trimmed();
+    sample.classId = json.value(QStringLiteral("classId")).toInt();
+    sample.feature = featureFromJson(json.value(QStringLiteral("feature")).toArray());
+    sample.roiNormalized = normalizedRoiOrDefault(
+                rectFromJson(json.value(QStringLiteral("roiNormalized")).toObject(),
+                             sample.roiNormalized));
+    sample.roiImagePngBase64 = json.value(QStringLiteral("roiImagePngBase64")).toString();
+    sample.roiImageWidth = json.value(QStringLiteral("roiImageWidth")).toInt();
+    sample.roiImageHeight = json.value(QStringLiteral("roiImageHeight")).toInt();
+    return sample;
+}
+
+QJsonObject templateToJson(const ColorRecognitionTemplateData &colorTemplate)
+{
+    QJsonArray labels;
+    for (const ColorRecognitionLabelData &label : colorTemplate.labels)
+        labels.append(labelToJson(label));
+
+    QJsonArray samples;
+    for (const ColorRecognitionSampleData &sample : colorTemplate.samples)
+        samples.append(sampleToJson(sample));
+
+    QJsonObject json;
+    json.insert(QStringLiteral("templateId"), colorTemplate.templateId);
+    json.insert(QStringLiteral("name"), colorTemplate.name);
+    json.insert(QStringLiteral("featureType"), colorTemplate.featureType);
+    json.insert(QStringLiteral("sensitivity"), colorTemplate.sensitivity);
+    json.insert(QStringLiteral("brightnessEnabled"), colorTemplate.brightnessEnabled);
+    json.insert(QStringLiteral("knnK"), colorTemplate.knnK);
+    json.insert(QStringLiteral("knnDistance"), colorTemplate.knnDistance);
+    json.insert(QStringLiteral("labels"), labels);
+    json.insert(QStringLiteral("samples"), samples);
+    return json;
+}
+
+ColorRecognitionTemplateData templateFromJson(const QJsonObject &json)
+{
+    ColorRecognitionTemplateData colorTemplate;
+    colorTemplate.templateId = json.value(QStringLiteral("templateId")).toString().trimmed();
+    colorTemplate.name = json.value(QStringLiteral("name")).toString(QStringLiteral("颜色模板")).trimmed();
+    colorTemplate.featureType = json.value(QStringLiteral("featureType")).toString(QStringLiteral("histogram"));
+    colorTemplate.sensitivity = json.value(QStringLiteral("sensitivity")).toString(QStringLiteral("medium"));
+    colorTemplate.brightnessEnabled = json.value(QStringLiteral("brightnessEnabled")).toBool(true);
+    colorTemplate.knnK = qMax(1, json.value(QStringLiteral("knnK")).toInt(3));
+    colorTemplate.knnDistance = json.value(QStringLiteral("knnDistance")).toString(QStringLiteral("halcon_default"));
+
+    const QJsonArray labels = json.value(QStringLiteral("labels")).toArray();
+    for (const QJsonValue &value : labels) {
+        const ColorRecognitionLabelData label = labelFromJson(value.toObject());
+        if (!label.name.isEmpty() && label.classId > 0)
+            colorTemplate.labels.append(label);
+    }
+
+    const QJsonArray samples = json.value(QStringLiteral("samples")).toArray();
+    for (const QJsonValue &value : samples) {
+        const ColorRecognitionSampleData sample = sampleFromJson(value.toObject());
+        if (!sample.label.isEmpty() && sample.classId > 0 && !sample.feature.isEmpty())
+            colorTemplate.samples.append(sample);
+    }
+
+    return colorTemplate;
+}
+
+int sampleCount(const ColorRecognitionTemplateData &colorTemplate)
+{
+    return colorTemplate.samples.size();
+}
+
+QVector<ToolOverlay> colorRecognitionPreviewOverlaysWithoutRoi(const QVector<ToolOverlay> &overlays)
+{
+    QVector<ToolOverlay> filtered;
+    filtered.reserve(overlays.size());
+    for (const ToolOverlay &overlay : overlays) {
+        if (overlay.type == ToolOverlayType::Rect &&
+            overlay.label.compare(QStringLiteral("ROI"), Qt::CaseInsensitive) == 0) {
+            continue;
+        }
+        filtered.append(overlay);
+    }
+    return filtered;
 }
 
 } // namespace
@@ -175,6 +286,9 @@ ColorRecognitionDialog::ColorRecognitionDialog(QWidget *parent)
 {
     ui->setupUi(this);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_testRunTimer = new QTimer(this);
+    m_testRunTimer->setInterval(kLiveTestIntervalMs);
+    connect(m_testRunTimer, &QTimer::timeout, this, &ColorRecognitionDialog::performTestRun);
     setupUiState();
     connectControls();
     showPreviewImage();
@@ -188,16 +302,8 @@ ColorRecognitionDialog::~ColorRecognitionDialog()
 ColorRecognitionDialogConfig ColorRecognitionDialog::configuration() const
 {
     ColorRecognitionDialogConfig config;
-    config.modelName = ui->modelNameLineEdit->text().trimmed();
-    if (config.modelName.isEmpty())
-        config.modelName = QStringLiteral("颜色模型");
-    config.featureType = featureTypeFromUi(ui->featureTypeComboBox->currentText());
-    config.sensitivity = sensitivityFromUi(ui->sensitivityComboBox->currentText());
-    config.brightnessEnabled = ui->brightnessCheckBox->isChecked();
-    config.knnK = ui->knnKSpinBox->value();
-    config.knnDistance = QStringLiteral("halcon_l2");
-    config.labels = m_labels;
-    config.samples = m_samples;
+    config.templates = m_templates;
+    config.activeTemplateId = activeTemplateId();
     config.judgeMode = judgeModeFromUi(ui->resultBasisComboBox->currentText());
     config.minScore = ui->minScoreSpinBox->value();
     config.expectedLabel = ui->expectedLabelComboBox->currentText().trimmed();
@@ -207,43 +313,31 @@ ColorRecognitionDialogConfig ColorRecognitionDialog::configuration() const
 ToolConfig ColorRecognitionDialog::toToolConfig() const
 {
     const ColorRecognitionDialogConfig colorConfig = configuration();
+    const ColorRecognitionTemplateData *currentTemplate = activeTemplate();
 
-    QJsonArray labelArray;
-    for (const ColorRecognitionDialogLabel &label : colorConfig.labels) {
-        QJsonObject json;
-        json.insert(QStringLiteral("name"), label.name);
-        json.insert(QStringLiteral("classId"), label.classId);
-        labelArray.append(json);
-    }
-
-    QJsonArray sampleArray;
-    for (const ColorRecognitionDialogSample &sample : colorConfig.samples) {
-        QJsonObject json;
-        json.insert(QStringLiteral("label"), sample.label);
-        json.insert(QStringLiteral("classId"), sample.classId);
-        json.insert(QStringLiteral("feature"), featureToJson(sample.feature));
-        json.insert(QStringLiteral("roiNormalized"), rectToJson(sample.roiNormalized));
-        sampleArray.append(json);
-    }
+    QJsonArray templateArray;
+    for (const ColorRecognitionTemplateData &colorTemplate : colorConfig.templates)
+        templateArray.append(templateToJson(colorTemplate));
 
     QJsonObject colorModel;
-    colorModel.insert(QStringLiteral("modelName"), colorConfig.modelName);
-    colorModel.insert(QStringLiteral("labels"), labelArray);
-    colorModel.insert(QStringLiteral("samples"), sampleArray);
+    colorModel.insert(QStringLiteral("activeTemplateId"), colorConfig.activeTemplateId);
+    colorModel.insert(QStringLiteral("templates"), templateArray);
 
     QJsonObject params;
     params.insert(QStringLiteral("paramMode"),
-                  ui->colorParamsStackedWidget->currentWidget() == ui->allParamsPage
+                  ui->allSegmentButton->isChecked()
                   ? QStringLiteral("all")
                   : QStringLiteral("basic"));
-    params.insert(QStringLiteral("featureType"), colorConfig.featureType);
-    params.insert(QStringLiteral("sensitivity"), colorConfig.sensitivity);
-    params.insert(QStringLiteral("brightnessEnabled"), colorConfig.brightnessEnabled);
-    params.insert(QStringLiteral("knnK"), colorConfig.knnK);
-    params.insert(QStringLiteral("knnDistance"), colorConfig.knnDistance);
-    params.insert(QStringLiteral("knnDistanceApplied"), QStringLiteral("halcon_l2_norm"));
     params.insert(QStringLiteral("detectRegionType"), QStringLiteral("rectangle"));
     params.insert(QStringLiteral("colorModel"), colorModel);
+    if (currentTemplate) {
+        params.insert(QStringLiteral("featureType"), currentTemplate->featureType);
+        params.insert(QStringLiteral("sensitivity"), currentTemplate->sensitivity);
+        params.insert(QStringLiteral("brightnessEnabled"), currentTemplate->brightnessEnabled);
+        params.insert(QStringLiteral("knnK"), currentTemplate->knnK);
+        params.insert(QStringLiteral("knnDistance"), currentTemplate->knnDistance);
+        params.insert(QStringLiteral("knnDistanceApplied"), QStringLiteral("halcon_default"));
+    }
 
     QJsonObject judgeRule;
     judgeRule.insert(QStringLiteral("mode"), colorConfig.judgeMode);
@@ -286,52 +380,53 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
     const QJsonObject colorModel = params.value(QStringLiteral("colorModel")).toObject();
     const QJsonObject judgeRule = config.judgeRule;
     setAllParamsMode(params.value(QStringLiteral("paramMode")).toString() == QStringLiteral("all"));
-    ui->modelNameLineEdit->setText(colorModel.value(QStringLiteral("modelName"))
-                                   .toString(ui->modelNameLineEdit->text()));
-    setComboBoxText(ui->featureTypeComboBox,
-                    featureTypeToUi(params.value(QStringLiteral("featureType")).toString(QStringLiteral("histogram"))));
-    if (ui->featureTypeComboBox->currentText().contains(QStringLiteral("色谱")))
-        ui->featureTypeComboBox->setCurrentIndex(0);
-    setComboBoxText(ui->sensitivityComboBox,
-                    sensitivityToUi(params.value(QStringLiteral("sensitivity")).toString(QStringLiteral("medium"))));
-    ui->brightnessCheckBox->setChecked(params.value(QStringLiteral("brightnessEnabled")).toBool(true));
-    ui->knnKSpinBox->setValue(params.value(QStringLiteral("knnK")).toInt(ui->knnKSpinBox->value()));
 
-    m_labels.clear();
-    const QJsonArray labels = colorModel.value(QStringLiteral("labels")).toArray();
-    for (const QJsonValue &value : labels) {
-        const QJsonObject json = value.toObject();
-        ColorRecognitionDialogLabel label;
-        label.name = json.value(QStringLiteral("name")).toString().trimmed();
-        label.classId = json.value(QStringLiteral("classId")).toInt();
-        if (!label.name.isEmpty() && label.classId > 0)
-            m_labels.append(label);
+    m_templates.clear();
+    const QJsonArray templates = colorModel.value(QStringLiteral("templates")).toArray();
+    for (const QJsonValue &value : templates) {
+        ColorRecognitionTemplateData colorTemplate = templateFromJson(value.toObject());
+        if (!colorTemplate.templateId.isEmpty() && !colorTemplate.name.isEmpty())
+            m_templates.append(colorTemplate);
     }
 
-    m_samples.clear();
-    const QJsonArray samples = colorModel.value(QStringLiteral("samples")).toArray();
-    for (const QJsonValue &value : samples) {
-        const QJsonObject json = value.toObject();
-        ColorRecognitionDialogSample sample;
-        sample.label = json.value(QStringLiteral("label")).toString().trimmed();
-        sample.classId = json.value(QStringLiteral("classId")).toInt();
-        sample.feature = featureFromJson(json.value(QStringLiteral("feature")).toArray());
-        sample.roiNormalized = normalizedRoiOrDefault(
-                    rectFromJson(json.value(QStringLiteral("roiNormalized")).toObject(),
-                                 sample.roiNormalized));
-        if (!sample.label.isEmpty() && sample.classId > 0 && !sample.feature.isEmpty())
-            m_samples.append(sample);
+    if (m_templates.isEmpty()) {
+        ColorRecognitionTemplateData legacyTemplate;
+        legacyTemplate.templateId = QStringLiteral("legacy_template");
+        legacyTemplate.name = colorModel.value(QStringLiteral("modelName")).toString(QStringLiteral("颜色模板"));
+        legacyTemplate.featureType = params.value(QStringLiteral("featureType")).toString(QStringLiteral("histogram"));
+        legacyTemplate.sensitivity = params.value(QStringLiteral("sensitivity")).toString(QStringLiteral("medium"));
+        legacyTemplate.brightnessEnabled = params.value(QStringLiteral("brightnessEnabled")).toBool(true);
+        legacyTemplate.knnK = qMax(1, params.value(QStringLiteral("knnK")).toInt(3));
+        legacyTemplate.knnDistance = params.value(QStringLiteral("knnDistance")).toString(QStringLiteral("halcon_default"));
+
+        const QJsonArray labels = colorModel.value(QStringLiteral("labels")).toArray();
+        for (const QJsonValue &value : labels) {
+            const ColorRecognitionLabelData label = labelFromJson(value.toObject());
+            if (!label.name.isEmpty() && label.classId > 0)
+                legacyTemplate.labels.append(label);
+        }
+        const QJsonArray samples = colorModel.value(QStringLiteral("samples")).toArray();
+        for (const QJsonValue &value : samples) {
+            const ColorRecognitionSampleData sample = sampleFromJson(value.toObject());
+            if (!sample.label.isEmpty() && sample.classId > 0 && !sample.feature.isEmpty())
+                legacyTemplate.samples.append(sample);
+        }
+        if (!legacyTemplate.labels.isEmpty() || !legacyTemplate.samples.isEmpty())
+            m_templates.append(legacyTemplate);
     }
 
-    ensureDefaultLabel();
-    updateLabelCombos();
+    m_activeTemplateId = colorModel.value(QStringLiteral("activeTemplateId")).toString();
+    if (m_activeTemplateId.isEmpty() && !m_templates.isEmpty())
+        m_activeTemplateId = m_templates.first().templateId;
+
     setComboBoxText(ui->resultBasisComboBox,
                     judgeModeToUi(judgeRule.value(QStringLiteral("mode")).toString(QStringLiteral("min_score"))));
     ui->minScoreSpinBox->setValue(judgeRule.value(QStringLiteral("minScore")).toInt(ui->minScoreSpinBox->value()));
+    updateTemplateList();
+    updateExpectedLabelCombo();
     setComboBoxText(ui->expectedLabelComboBox,
                     judgeRule.value(QStringLiteral("expectedLabel")).toString());
     updateJudgementControls();
-    updateSampleCount();
 
     syncRegionButtons(true);
     m_referencePreviewSnapshot = ToolPreviewSnapshot();
@@ -341,12 +436,15 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
 
 QString ColorRecognitionDialog::summaryText() const
 {
-    const ColorRecognitionDialogConfig config = configuration();
+    const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
+    if (!colorTemplate)
+        return tr("未选择颜色模板；最低分 %1").arg(ui->minScoreSpinBox->value());
+
     return tr("%1；%2；样本 %3；最低分 %4")
-            .arg(config.modelName,
-                 featureTypeToUi(config.featureType))
-            .arg(config.samples.size())
-            .arg(config.minScore);
+            .arg(colorTemplate->name,
+                 featureTypeToUi(colorTemplate->featureType))
+            .arg(sampleCount(*colorTemplate))
+            .arg(ui->minScoreSpinBox->value());
 }
 
 void ColorRecognitionDialog::resizeEvent(QResizeEvent *event)
@@ -357,6 +455,7 @@ void ColorRecognitionDialog::resizeEvent(QResizeEvent *event)
 
 void ColorRecognitionDialog::finishConfiguration()
 {
+    stopLiveTestRun();
     if (m_previewHelper)
         m_previewHelper->setRoiDrawingEnabled(false);
     accept();
@@ -364,8 +463,28 @@ void ColorRecognitionDialog::finishConfiguration()
 
 void ColorRecognitionDialog::runTest()
 {
-    cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
-    bool referenceSource = !frame.empty();
+    if (m_liveTestRunning) {
+        stopLiveTestRun();
+        return;
+    }
+
+    m_liveTestRunning = true;
+    ui->testRunButton->setText(tr("停止测试"));
+    performTestRun();
+    if (m_testRunTimer)
+        m_testRunTimer->start();
+}
+
+void ColorRecognitionDialog::performTestRun()
+{
+    cv::Mat frame = m_previewUsesReferenceImage
+            ? ReferenceImageProvider::instance().referenceFrame()
+            : CameraFrameProvider::instance().currentFrame();
+    bool referenceSource = m_previewUsesReferenceImage && !frame.empty();
+    if (frame.empty()) {
+        frame = ReferenceImageProvider::instance().referenceFrame();
+        referenceSource = !frame.empty();
+    }
     if (frame.empty()) {
         frame = CameraFrameProvider::instance().currentFrame();
         referenceSource = false;
@@ -373,6 +492,7 @@ void ColorRecognitionDialog::runTest()
 
     if (frame.empty()) {
         displayError(QStringLiteral("image_empty"), tr("当前无基准图或相机图像，无法测试"));
+        stopLiveTestRun();
         return;
     }
 
@@ -381,6 +501,15 @@ void ColorRecognitionDialog::runTest()
     request.image = frame.clone();
     const ToolResult result = m_testAdapter.run(request);
     displayResult(result, referenceSource);
+}
+
+void ColorRecognitionDialog::stopLiveTestRun()
+{
+    if (m_testRunTimer)
+        m_testRunTimer->stop();
+    m_liveTestRunning = false;
+    if (ui && ui->testRunButton)
+        ui->testRunButton->setText(tr("测试运行"));
 }
 
 void ColorRecognitionDialog::setupUiState()
@@ -392,11 +521,6 @@ void ColorRecognitionDialog::setupUiState()
 
     ui->minScoreSpinBox->setRange(0, 100);
     ui->minScoreSpinBox->setValue(80);
-    ui->knnKSpinBox->setRange(1, 99);
-    ui->knnKSpinBox->setValue(3);
-    ui->brightnessCheckBox->setChecked(true);
-    ui->sensitivityComboBox->setCurrentIndex(1);
-    ui->knnDistanceComboBox->setEnabled(false);
     ui->viewerTitleLabel->setText(tr("基准图"));
     ui->viewerStatusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     ui->viewerStatusLabel->setMinimumWidth(0);
@@ -404,17 +528,49 @@ void ColorRecognitionDialog::setupUiState()
     ui->viewerStatusLabel->setTextFormat(Qt::PlainText);
     ui->viewerStatusLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
-    if (QStandardItemModel *model = qobject_cast<QStandardItemModel *>(ui->featureTypeComboBox->model())) {
-        if (QStandardItem *item = model->item(1))
-            item->setEnabled(false);
+    if (!m_maskCard) {
+        m_maskCard = new QFrame(this);
+        m_maskCard->setFrameShape(QFrame::NoFrame);
+        m_maskCard->setProperty("panelRole", QStringLiteral("configCard"));
+
+        QVBoxLayout *maskLayout = new QVBoxLayout(m_maskCard);
+        maskLayout->setContentsMargins(20, 18, 20, 18);
+        maskLayout->setSpacing(14);
+
+        QHBoxLayout *headerLayout = new QHBoxLayout;
+        QLabel *titleLabel = new QLabel(tr("屏蔽区域"));
+        titleLabel->setProperty("role", QStringLiteral("cardTitle"));
+        QToolButton *collapseButton = new QToolButton;
+        collapseButton->setText(QStringLiteral("⌄"));
+        collapseButton->setProperty("role", QStringLiteral("collapseCard"));
+        headerLayout->addWidget(titleLabel);
+        headerLayout->addStretch(1);
+        headerLayout->addWidget(collapseButton);
+        maskLayout->addLayout(headerLayout);
+
+        QHBoxLayout *editLayout = new QHBoxLayout;
+        QLabel *fieldLabel = new QLabel(tr("屏蔽区"));
+        fieldLabel->setMinimumWidth(118);
+        fieldLabel->setProperty("role", QStringLiteral("rowField"));
+        QToolButton *rectButton = new QToolButton;
+        rectButton->setText(QStringLiteral("□"));
+        rectButton->setMinimumSize(74, 36);
+        rectButton->setCheckable(true);
+        rectButton->setEnabled(false);
+        rectButton->setToolTip(tr("屏蔽区域第一版仅按 UI 预留，暂不参与算法"));
+        rectButton->setProperty("actionRole", QStringLiteral("toolbarIcon"));
+        editLayout->addWidget(fieldLabel);
+        editLayout->addStretch(1);
+        editLayout->addWidget(rectButton);
+        maskLayout->addLayout(editLayout);
+
+        ui->basicParamsLayout->insertWidget(2, m_maskCard);
     }
 
-    ensureDefaultLabel();
-    updateLabelCombos();
-    updateJudgementControls();
-    updateSampleCount();
     setAllParamsMode(false);
     syncRegionButtons(true);
+    updateTemplateList();
+    updateJudgementControls();
     setViewerStatusText(roiStatusText(), roiStatusText());
 }
 
@@ -424,14 +580,64 @@ void ColorRecognitionDialog::connectControls()
     connect(ui->headerMaximizeButton, &QToolButton::clicked, this, &ColorRecognitionDialog::showMaximized);
     connect(ui->finishButton, &QPushButton::clicked, this, &ColorRecognitionDialog::finishConfiguration);
     connect(ui->testRunButton, &QPushButton::clicked, this, &ColorRecognitionDialog::runTest);
-    connect(ui->addLabelButton, &QPushButton::clicked, this, &ColorRecognitionDialog::addLabel);
-    connect(ui->renameLabelButton, &QPushButton::clicked, this, &ColorRecognitionDialog::renameCurrentLabel);
-    connect(ui->deleteLabelButton, &QPushButton::clicked, this, &ColorRecognitionDialog::deleteCurrentLabel);
-    connect(ui->addSampleButton, &QPushButton::clicked, this, &ColorRecognitionDialog::addSampleFromCurrentRoi);
-    connect(ui->labelComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &ColorRecognitionDialog::updateSampleCount);
-    connect(ui->resultBasisComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &ColorRecognitionDialog::updateJudgementControls);
+    connect(ui->addTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::addTemplate);
+    connect(ui->editTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::editCurrentTemplate);
+    connect(ui->importTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::importTemplate);
+    connect(ui->exportTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::exportCurrentTemplate);
+    connect(ui->renameTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::renameCurrentTemplate);
+    connect(ui->deleteTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::deleteCurrentTemplate);
+    connect(ui->templateListWidget, &QListWidget::currentRowChanged, this, [this]() {
+        if (const ColorRecognitionTemplateData *colorTemplate = activeTemplate())
+            m_activeTemplateId = colorTemplate->templateId;
+        updateActiveTemplateSummary();
+        updateExpectedLabelCombo();
+    });
+    connect(ui->templateListWidget,
+            &QListWidget::itemClicked,
+            this,
+            &ColorRecognitionDialog::handleTemplateListItemClicked);
+    connect(ui->resultBasisComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &ColorRecognitionDialog::updateJudgementControls);
+
+    auto connectCollapse = [this](QToolButton *button, const QList<QWidget *> &widgets) {
+        if (!button)
+            return;
+        button->setCheckable(true);
+        button->setChecked(false);
+        button->setText(QStringLiteral("⌄"));
+        connect(button, &QToolButton::clicked, this, [this, button, widgets](bool collapsed) {
+            for (QWidget *widget : widgets) {
+                if (widget)
+                    widget->setVisible(!collapsed);
+            }
+            button->setText(collapsed ? QStringLiteral("›") : QStringLiteral("⌄"));
+            if (!collapsed && button == ui->judgeCollapseButton)
+                updateJudgementControls();
+        });
+    };
+    connectCollapse(ui->templateCollapseButton,
+                    {ui->templateListWidget,
+                     ui->activeTemplateSummaryLabel,
+                     ui->addTemplateButton,
+                     ui->editTemplateButton,
+                     ui->renameTemplateButton,
+                     ui->deleteTemplateButton,
+                     ui->importTemplateButton,
+                     ui->exportTemplateButton});
+    connectCollapse(ui->regionCollapseButton,
+                    {ui->regionLabel,
+                     ui->regionDrawButton,
+                     ui->regionRectButton,
+                     ui->regionCircleButton});
+    connectCollapse(ui->judgeCollapseButton,
+                    {ui->resultBasisLabel,
+                     ui->resultBasisComboBox,
+                     ui->minScoreLabel,
+                     ui->minScoreSpinBox,
+                     ui->expectedLabelTitleLabel,
+                     ui->expectedLabelComboBox});
 
     m_segmentGroup->setExclusive(true);
     m_segmentGroup->addButton(ui->basicSegmentButton, 0);
@@ -447,9 +653,9 @@ void ColorRecognitionDialog::connectControls()
     m_regionGroup->addButton(ui->regionDrawButton, 0);
     m_regionGroup->addButton(ui->regionRectButton, 1);
     m_regionGroup->addButton(ui->regionCircleButton, 2);
+    connect(ui->regionDrawButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startGlobalDetection);
     connect(ui->regionRectButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startRectangleRoiEditing);
-    connect(ui->regionDrawButton, &QToolButton::clicked, this, &ColorRecognitionDialog::showUnsupportedRegionMessage);
-    connect(ui->regionCircleButton, &QToolButton::clicked, this, &ColorRecognitionDialog::showUnsupportedRegionMessage);
+    connect(ui->regionCircleButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startRectangleRoiEditing);
 
     if (m_previewHelper) {
         connect(m_previewHelper,
@@ -476,125 +682,286 @@ void ColorRecognitionDialog::setAllParamsMode(bool allMode)
 {
     ui->basicSegmentButton->setChecked(!allMode);
     ui->allSegmentButton->setChecked(allMode);
-    ui->colorParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
+    ui->colorParamsStackedWidget->setCurrentWidget(ui->basicParamsPage);
+    if (m_maskCard)
+        m_maskCard->setVisible(allMode);
 }
 
-void ColorRecognitionDialog::addLabel()
+void ColorRecognitionDialog::addTemplate()
 {
+    ColorRecognitionTemplateData colorTemplate;
+    colorTemplate.templateId = QStringLiteral("color_template_%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    colorTemplate.name = tr("颜色模板%1").arg(m_templates.size() + 1);
+
+    ColorTemplateDialog dialog(this);
+    dialog.setTemplateData(colorTemplate);
+    dialog.setInitialSampleRoi(effectiveRoiNormalized());
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    m_templates.append(dialog.templateData());
+    m_activeTemplateId = m_templates.last().templateId;
+    updateTemplateList();
+}
+
+void ColorRecognitionDialog::editCurrentTemplate()
+{
+    const int index = currentTemplateIndex();
+    if (index < 0 || index >= m_templates.size()) {
+        QMessageBox::information(this, tr("颜色识别"), tr("请先添加模板"));
+        return;
+    }
+
+    ColorTemplateDialog dialog(this);
+    dialog.setTemplateData(m_templates.at(index));
+    dialog.setInitialSampleRoi(effectiveRoiNormalized());
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    m_templates[index] = dialog.templateData();
+    m_activeTemplateId = m_templates.at(index).templateId;
+    updateTemplateList();
+}
+
+void ColorRecognitionDialog::importTemplate()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this,
+                tr("导入颜色模板"),
+                QString(),
+                tr("Color template (*.bin);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, tr("导入颜色模板"), tr("无法打开模板文件"));
+        return;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        QMessageBox::warning(this,
+                             tr("导入颜色模板"),
+                             tr("模板文件格式无效：%1").arg(parseError.errorString()));
+        return;
+    }
+
+    ColorRecognitionTemplateData colorTemplate = templateFromJson(document.object());
+    if (colorTemplate.templateId.trimmed().isEmpty())
+        colorTemplate.templateId = QStringLiteral("color_template_%1")
+                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    if (colorTemplate.name.trimmed().isEmpty())
+        colorTemplate.name = tr("颜色模板%1").arg(m_templates.size() + 1);
+
+    m_templates.append(colorTemplate);
+    m_activeTemplateId = colorTemplate.templateId;
+    updateTemplateList();
+    setViewerStatusText(tr("已导入模板：%1").arg(colorTemplate.name));
+}
+
+void ColorRecognitionDialog::exportCurrentTemplate()
+{
+    const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
+    if (!colorTemplate) {
+        QMessageBox::information(this, tr("导出颜色模板"), tr("请先选择模板"));
+        return;
+    }
+
+    const QString defaultName = colorTemplate->name.trimmed().isEmpty()
+            ? QStringLiteral("color_template.bin")
+            : QStringLiteral("%1.bin").arg(colorTemplate->name);
+    const QString fileName = QFileDialog::getSaveFileName(
+                this,
+                tr("导出颜色模板"),
+                defaultName,
+                tr("Color template (*.bin);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QMessageBox::warning(this, tr("导出颜色模板"), tr("无法写入模板文件"));
+        return;
+    }
+
+    file.write(QJsonDocument(templateToJson(*colorTemplate)).toJson(QJsonDocument::Compact));
+    setViewerStatusText(tr("已导出模板：%1").arg(colorTemplate->name));
+}
+
+void ColorRecognitionDialog::renameCurrentTemplate()
+{
+    ColorRecognitionTemplateData *colorTemplate = activeTemplate();
+    if (!colorTemplate) {
+        QMessageBox::information(this, tr("颜色识别"), tr("请先添加模板"));
+        return;
+    }
+
     bool ok = false;
     const QString name = QInputDialog::getText(this,
-                                               tr("添加标签"),
-                                               tr("标签名"),
+                                               tr("重命名模板"),
+                                               tr("模板名"),
                                                QLineEdit::Normal,
-                                               tr("类别%1").arg(nextClassId()),
+                                               colorTemplate->name,
                                                &ok).trimmed();
     if (!ok || name.isEmpty())
         return;
 
-    for (const ColorRecognitionDialogLabel &label : m_labels) {
-        if (label.name == name) {
-            QMessageBox::warning(this, tr("颜色识别"), tr("标签已存在"));
-            return;
+    colorTemplate->name = name;
+    updateTemplateList();
+}
+
+void ColorRecognitionDialog::deleteCurrentTemplate()
+{
+    const int index = currentTemplateIndex();
+    if (index < 0 || index >= m_templates.size())
+        return;
+
+    m_templates.removeAt(index);
+    m_activeTemplateId = m_templates.isEmpty()
+            ? QString()
+            : m_templates.at(qMin(index, m_templates.size() - 1)).templateId;
+    updateTemplateList();
+}
+
+QImage firstTemplateSampleImage(const ColorRecognitionTemplateData &colorTemplate)
+{
+    for (const ColorRecognitionSampleData &sample : colorTemplate.samples) {
+        if (sample.roiImagePngBase64.trimmed().isEmpty())
+            continue;
+        QImage image;
+        image.loadFromData(QByteArray::fromBase64(sample.roiImagePngBase64.toLatin1()), "PNG");
+        if (!image.isNull())
+            return image;
+    }
+    return QImage();
+}
+
+void ColorRecognitionDialog::updateTemplateList()
+{
+    const QString selectedId = activeTemplateId();
+    const QSignalBlocker block(ui->templateListWidget);
+    ui->templateListWidget->clear();
+    ui->templateListWidget->setIconSize(QSize(72, 48));
+
+    int selectedRow = -1;
+    for (int i = 0; i < m_templates.size(); ++i) {
+        const ColorRecognitionTemplateData &colorTemplate = m_templates.at(i);
+        QListWidgetItem *item = new QListWidgetItem(
+                    tr("%1（%2 样本）").arg(colorTemplate.name).arg(sampleCount(colorTemplate)));
+        const QImage image = firstTemplateSampleImage(colorTemplate);
+        if (!image.isNull()) {
+            item->setIcon(QIcon(QPixmap::fromImage(image.scaled(QSize(72, 48),
+                                                             Qt::KeepAspectRatioByExpanding,
+                                                             Qt::SmoothTransformation))));
+            item->setSizeHint(QSize(260, 58));
+        }
+        item->setData(ItemKindRole, kTemplateItem);
+        item->setData(TemplateIdRole, colorTemplate.templateId);
+        item->setData(SampleIndexRole, -1);
+        QFont templateFont = item->font();
+        templateFont.setBold(true);
+        item->setFont(templateFont);
+        ui->templateListWidget->addItem(item);
+        if (colorTemplate.templateId == selectedId)
+            selectedRow = ui->templateListWidget->count() - 1;
+
+        for (const ColorRecognitionLabelData &label : colorTemplate.labels) {
+            int labelSampleCount = 0;
+            for (const ColorRecognitionSampleData &sample : colorTemplate.samples) {
+                if (sample.classId == label.classId)
+                    ++labelSampleCount;
+            }
+            QListWidgetItem *labelItem = new QListWidgetItem(
+                        tr("  %1（%2）").arg(label.name).arg(labelSampleCount));
+            labelItem->setData(ItemKindRole, kLabelItem);
+            labelItem->setData(TemplateIdRole, colorTemplate.templateId);
+            labelItem->setData(ClassIdRole, label.classId);
+            labelItem->setData(SampleIndexRole, -1);
+            ui->templateListWidget->addItem(labelItem);
+
+            int labelRoiIndex = 1;
+            for (int sampleIndex = 0; sampleIndex < colorTemplate.samples.size(); ++sampleIndex) {
+                const ColorRecognitionSampleData &sample = colorTemplate.samples.at(sampleIndex);
+                if (sample.classId != label.classId)
+                    continue;
+
+                QListWidgetItem *sampleItem = new QListWidgetItem(
+                            tr("    ROI %1").arg(labelRoiIndex++));
+                QImage sampleImage;
+                if (!sample.roiImagePngBase64.trimmed().isEmpty()) {
+                    sampleImage.loadFromData(QByteArray::fromBase64(sample.roiImagePngBase64.toLatin1()),
+                                             "PNG");
+                }
+                if (!sampleImage.isNull()) {
+                    sampleItem->setIcon(QIcon(QPixmap::fromImage(sampleImage.scaled(QSize(72, 48),
+                                                                                  Qt::KeepAspectRatioByExpanding,
+                                                                                  Qt::SmoothTransformation))));
+                    sampleItem->setSizeHint(QSize(260, 58));
+                }
+                sampleItem->setData(ItemKindRole, kSampleItem);
+                sampleItem->setData(TemplateIdRole, colorTemplate.templateId);
+                sampleItem->setData(ClassIdRole, sample.classId);
+                sampleItem->setData(SampleIndexRole, sampleIndex);
+                ui->templateListWidget->addItem(sampleItem);
+            }
         }
     }
 
-    ColorRecognitionDialogLabel label;
-    label.name = name;
-    label.classId = nextClassId();
-    m_labels.append(label);
-    updateLabelCombos();
-    setComboBoxText(ui->labelComboBox, name);
-}
-
-void ColorRecognitionDialog::renameCurrentLabel()
-{
-    const int index = ui->labelComboBox->currentIndex();
-    if (index < 0 || index >= m_labels.size())
-        return;
-
-    bool ok = false;
-    const QString oldName = m_labels.at(index).name;
-    const QString newName = QInputDialog::getText(this,
-                                                  tr("重命名标签"),
-                                                  tr("标签名"),
-                                                  QLineEdit::Normal,
-                                                  oldName,
-                                                  &ok).trimmed();
-    if (!ok || newName.isEmpty() || newName == oldName)
-        return;
-
-    for (int i = 0; i < m_labels.size(); ++i) {
-        if (i != index && m_labels.at(i).name == newName) {
-            QMessageBox::warning(this, tr("颜色识别"), tr("标签已存在"));
-            return;
+    if (selectedRow < 0 && !m_templates.isEmpty())
+        selectedRow = 0;
+    if (selectedRow >= 0) {
+        ui->templateListWidget->setCurrentRow(selectedRow);
+        if (QListWidgetItem *item = ui->templateListWidget->item(selectedRow)) {
+            const QString templateId = item->data(TemplateIdRole).toString().trimmed();
+            if (!templateId.isEmpty())
+                m_activeTemplateId = templateId;
         }
     }
 
-    m_labels[index].name = newName;
-    for (ColorRecognitionDialogSample &sample : m_samples) {
-        if (sample.classId == m_labels.at(index).classId)
-            sample.label = newName;
-    }
-    updateLabelCombos();
-    setComboBoxText(ui->labelComboBox, newName);
+    updateActiveTemplateSummary();
+    updateExpectedLabelCombo();
 }
 
-void ColorRecognitionDialog::deleteCurrentLabel()
+void ColorRecognitionDialog::updateActiveTemplateSummary()
 {
-    const int index = ui->labelComboBox->currentIndex();
-    if (index < 0 || index >= m_labels.size())
-        return;
+    const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
+    const bool hasTemplate = colorTemplate != nullptr;
+    ui->editTemplateButton->setEnabled(hasTemplate);
+    ui->renameTemplateButton->setEnabled(hasTemplate);
+    ui->deleteTemplateButton->setEnabled(hasTemplate);
+    ui->exportTemplateButton->setEnabled(hasTemplate);
 
-    const int classId = m_labels.at(index).classId;
-    m_labels.removeAt(index);
-    m_samples.erase(std::remove_if(m_samples.begin(),
-                                   m_samples.end(),
-                                   [classId](const ColorRecognitionDialogSample &sample) {
-        return sample.classId == classId;
-    }), m_samples.end());
-    ensureDefaultLabel();
-    updateLabelCombos();
-    updateSampleCount();
+    if (!colorTemplate) {
+        ui->activeTemplateSummaryLabel->setText(tr("未添加模板"));
+        ui->allTemplateSummaryLabel->setText(tr("未添加模板"));
+        return;
+    }
+
+    const QString text = tr("%1 | %2 | 标签 %3 | 样本 %4 | K=%5")
+            .arg(colorTemplate->name,
+                 featureTypeToUi(colorTemplate->featureType))
+            .arg(colorTemplate->labels.size())
+            .arg(colorTemplate->samples.size())
+            .arg(colorTemplate->knnK);
+    ui->activeTemplateSummaryLabel->setText(text);
+    ui->allTemplateSummaryLabel->setText(text);
 }
 
-void ColorRecognitionDialog::addSampleFromCurrentRoi()
+void ColorRecognitionDialog::updateExpectedLabelCombo()
 {
-    const QString labelName = currentLabelName();
-    const int classId = currentClassId();
-    if (labelName.isEmpty() || classId <= 0) {
-        QMessageBox::warning(this, tr("颜色识别"), tr("请先创建标签"));
-        return;
+    const QString currentExpected = ui->expectedLabelComboBox->currentText();
+    const QSignalBlocker block(ui->expectedLabelComboBox);
+    ui->expectedLabelComboBox->clear();
+
+    if (const ColorRecognitionTemplateData *colorTemplate = activeTemplate()) {
+        for (const ColorRecognitionLabelData &label : colorTemplate->labels)
+            ui->expectedLabelComboBox->addItem(label.name, label.classId);
     }
 
-    cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
-    if (frame.empty())
-        frame = CameraFrameProvider::instance().currentFrame();
-    if (frame.empty()) {
-        displayError(QStringLiteral("image_empty"), tr("当前无基准图或相机图像，无法添加样本"));
-        return;
-    }
-
-    ColorRecognitionHalconConfig config = featureExtractionConfig();
-    const ColorRecognitionHalconFeatureResult featureResult =
-            m_featureRunner.extractFeature(frame, config);
-    if (!featureResult.success) {
-        displayError(featureResult.status, featureResult.message);
-        QMessageBox::warning(this, tr("颜色识别"), featureResult.message);
-        return;
-    }
-
-    ColorRecognitionDialogSample sample;
-    sample.label = labelName;
-    sample.classId = classId;
-    sample.feature = featureResult.feature;
-    sample.roiNormalized = effectiveRoiNormalized();
-    m_samples.append(sample);
-    updateSampleCount();
-
-    const QString text = tr("已添加样本：%1，特征维度 %2")
-            .arg(labelName)
-            .arg(featureResult.feature.size());
-    setViewerStatusText(text, text);
+    setComboBoxText(ui->expectedLabelComboBox, currentExpected);
 }
 
 void ColorRecognitionDialog::updateJudgementControls()
@@ -606,83 +973,82 @@ void ColorRecognitionDialog::updateJudgementControls()
     ui->expectedLabelComboBox->setVisible(categoryMode);
 }
 
-void ColorRecognitionDialog::updateLabelCombos()
+void ColorRecognitionDialog::handleTemplateListItemClicked(QListWidgetItem *item)
 {
-    const QString currentLabel = ui->labelComboBox->currentText();
-    const QString currentExpected = ui->expectedLabelComboBox->currentText();
-
-    {
-        const QSignalBlocker block(ui->labelComboBox);
-        ui->labelComboBox->clear();
-        for (const ColorRecognitionDialogLabel &label : m_labels)
-            ui->labelComboBox->addItem(label.name, label.classId);
-    }
-
-    {
-        const QSignalBlocker block(ui->expectedLabelComboBox);
-        ui->expectedLabelComboBox->clear();
-        for (const ColorRecognitionDialogLabel &label : m_labels)
-            ui->expectedLabelComboBox->addItem(label.name, label.classId);
-    }
-
-    setComboBoxText(ui->labelComboBox, currentLabel);
-    setComboBoxText(ui->expectedLabelComboBox, currentExpected);
-    updateSampleCount();
-}
-
-void ColorRecognitionDialog::updateSampleCount()
-{
-    const int classId = currentClassId();
-    int labelSamples = 0;
-    for (const ColorRecognitionDialogSample &sample : m_samples) {
-        if (sample.classId == classId)
-            ++labelSamples;
-    }
-
-    ui->sampleCountLabel->setText(tr("%1 / 总计 %2").arg(labelSamples).arg(m_samples.size()));
-}
-
-void ColorRecognitionDialog::ensureDefaultLabel()
-{
-    if (!m_labels.isEmpty())
+    if (!item)
         return;
 
-    ColorRecognitionDialogLabel label;
-    label.name = tr("类别1");
-    label.classId = 1;
-    m_labels.append(label);
+    const QString templateId = item->data(TemplateIdRole).toString().trimmed();
+    if (templateId.isEmpty())
+        return;
+
+    const int clickedSampleIndex = item->data(ItemKindRole).toInt() == kSampleItem
+            ? item->data(SampleIndexRole).toInt()
+            : -1;
+    const bool hideCurrentSample =
+            clickedSampleIndex >= 0 &&
+            templateId == m_activeTemplateId &&
+            clickedSampleIndex == m_displayedSampleIndex;
+
+    m_activeTemplateId = templateId;
+    m_displayedSampleIndex = hideCurrentSample ? -1 : clickedSampleIndex;
+
+    updateActiveTemplateSummary();
+    updateExpectedLabelCombo();
+    refreshDisplayedRoiOverlay();
+
+    if (m_displayedSampleIndex >= 0) {
+        const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
+        if (colorTemplate && m_displayedSampleIndex < colorTemplate->samples.size()) {
+            const QRectF roi = normalizedRoiOrDefault(
+                        colorTemplate->samples.at(m_displayedSampleIndex).roiNormalized);
+            const QString text = tr("已选择样本 ROI x=%1 y=%2 w=%3 h=%4")
+                    .arg(roi.x(), 0, 'f', 3)
+                    .arg(roi.y(), 0, 'f', 3)
+                    .arg(roi.width(), 0, 'f', 3)
+                    .arg(roi.height(), 0, 'f', 3);
+            setViewerStatusText(text, text);
+            return;
+        }
+    }
+
+    setViewerStatusText(roiStatusText(), roiStatusText());
 }
 
-int ColorRecognitionDialog::nextClassId() const
+int ColorRecognitionDialog::currentTemplateIndex() const
 {
-    int maxId = 0;
-    for (const ColorRecognitionDialogLabel &label : m_labels)
-        maxId = qMax(maxId, label.classId);
-    return maxId + 1;
+    QString id;
+    if (ui && ui->templateListWidget) {
+        if (const QListWidgetItem *item = ui->templateListWidget->currentItem())
+            id = item->data(TemplateIdRole).toString().trimmed();
+    }
+    if (id.isEmpty())
+        id = m_activeTemplateId;
+
+    for (int i = 0; i < m_templates.size(); ++i) {
+        if (m_templates.at(i).templateId == id)
+            return i;
+    }
+    return -1;
 }
 
-int ColorRecognitionDialog::currentClassId() const
+ColorRecognitionTemplateData *ColorRecognitionDialog::activeTemplate()
 {
-    return ui->labelComboBox->currentData().toInt();
+    const int index = currentTemplateIndex();
+    return index >= 0 && index < m_templates.size() ? &m_templates[index] : nullptr;
 }
 
-QString ColorRecognitionDialog::currentLabelName() const
+const ColorRecognitionTemplateData *ColorRecognitionDialog::activeTemplate() const
 {
-    return ui->labelComboBox->currentText().trimmed();
+    const int index = currentTemplateIndex();
+    return index >= 0 && index < m_templates.size() ? &m_templates.at(index) : nullptr;
 }
 
-ColorRecognitionHalconConfig ColorRecognitionDialog::featureExtractionConfig() const
+QString ColorRecognitionDialog::activeTemplateId() const
 {
-    ColorRecognitionHalconConfig config;
-    QStringList tried;
-    config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(QString(), &tried);
-    config.halconSoPathCandidates = tried;
-    config.roiNormalized = effectiveRoiNormalized();
-    config.featureType = featureTypeFromUi(ui->featureTypeComboBox->currentText());
-    config.sensitivity = sensitivityFromUi(ui->sensitivityComboBox->currentText());
-    config.brightnessEnabled = ui->brightnessCheckBox->isChecked();
-    config.knnK = ui->knnKSpinBox->value();
-    return config;
+    if (const ColorRecognitionTemplateData *colorTemplate = activeTemplate())
+        return colorTemplate->templateId;
+    return m_activeTemplateId;
 }
 
 void ColorRecognitionDialog::fitPreview()
@@ -698,9 +1064,11 @@ void ColorRecognitionDialog::showPreviewImage()
 
     QImage image = ReferenceImageProvider::instance().referenceImage();
     QString title = tr("基准图");
+    m_previewUsesReferenceImage = !image.isNull();
     if (image.isNull()) {
         image = CameraFrameProvider::instance().currentImage();
         title = tr("当前图像");
+        m_previewUsesReferenceImage = false;
     }
 
     if (image.isNull()) {
@@ -723,9 +1091,11 @@ void ColorRecognitionDialog::showFrameForRoiEditing()
 
     QImage image = ReferenceImageProvider::instance().referenceImage();
     QString title = tr("基准图");
+    m_previewUsesReferenceImage = !image.isNull();
     if (image.isNull()) {
         image = CameraFrameProvider::instance().currentImage();
         title = tr("当前图像");
+        m_previewUsesReferenceImage = false;
     }
 
     if (image.isNull()) {
@@ -743,8 +1113,31 @@ void ColorRecognitionDialog::showFrameForRoiEditing()
     refreshDisplayedRoiOverlay();
 }
 
+void ColorRecognitionDialog::startGlobalDetection()
+{
+    showFrameForRoiEditing();
+    m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    m_globalDetection = true;
+    m_displayedSampleIndex = -1;
+    const QSignalBlocker blockDraw(ui->regionDrawButton);
+    const QSignalBlocker blockRect(ui->regionRectButton);
+    const QSignalBlocker blockCircle(ui->regionCircleButton);
+    ui->regionDrawButton->setChecked(true);
+    ui->regionRectButton->setChecked(false);
+    ui->regionCircleButton->setChecked(false);
+    if (m_previewHelper) {
+        m_previewHelper->setRoiDrawingEnabled(false);
+        m_previewHelper->clearRoi();
+        m_previewHelper->clearToolOverlays();
+    }
+    const QString text = tr("全局检测：测试运行将检测当前整张图像");
+    setViewerStatusText(text, text);
+}
+
 void ColorRecognitionDialog::startRectangleRoiEditing()
 {
+    m_globalDetection = false;
+    m_displayedSampleIndex = -1;
     syncRegionButtons(true);
     showFrameForRoiEditing();
 
@@ -759,13 +1152,7 @@ void ColorRecognitionDialog::startRectangleRoiEditing()
 
 void ColorRecognitionDialog::showUnsupportedRegionMessage()
 {
-    syncRegionButtons(true);
-    if (m_previewHelper) {
-        m_previewHelper->setRoiDrawingEnabled(false);
-        refreshDisplayedRoiOverlay();
-    }
-    const QString text = tr("第一版暂未接入自由/圆形区域，当前支持矩形区域");
-    setViewerStatusText(text, text);
+    startRectangleRoiEditing();
 }
 
 void ColorRecognitionDialog::syncRegionButtons(bool rectangleRegion)
@@ -784,6 +1171,8 @@ void ColorRecognitionDialog::syncRegionButtons(bool rectangleRegion)
 void ColorRecognitionDialog::handleRoiChanged(const QRectF &roi)
 {
     m_roiNormalized = normalizedRoiOrDefault(roi);
+    m_globalDetection = false;
+    m_displayedSampleIndex = -1;
     syncRegionButtons(true);
     if (m_previewHelper) {
         m_previewHelper->clearToolOverlays();
@@ -807,7 +1196,18 @@ void ColorRecognitionDialog::refreshDisplayedRoiOverlay()
         return;
 
     m_previewHelper->clearRoi();
-    m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+    if (m_displayedSampleIndex >= 0) {
+        if (const ColorRecognitionTemplateData *colorTemplate = activeTemplate()) {
+            if (m_displayedSampleIndex < colorTemplate->samples.size()) {
+                m_previewHelper->setRoiRectNormalized(
+                            normalizedRoiOrDefault(colorTemplate->samples.at(m_displayedSampleIndex).roiNormalized));
+            }
+        }
+        return;
+    }
+
+    if (!m_globalDetection)
+        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
 }
 
 void ColorRecognitionDialog::displayResult(const ToolResult &result, bool referenceSource)
@@ -828,8 +1228,13 @@ void ColorRecognitionDialog::displayResult(const ToolResult &result, bool refere
             .arg(result.message);
     setViewerStatusText(displayText, displayText);
 
-    if (referenceSource && result.success)
-        m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(toToolConfig(), result, effectiveRoiNormalized());
+    if (referenceSource && result.success) {
+        ToolResult snapshotResult = result;
+        snapshotResult.overlays = colorRecognitionPreviewOverlaysWithoutRoi(result.overlays);
+        m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(toToolConfig(),
+                                                                      snapshotResult,
+                                                                      effectiveRoiNormalized());
+    }
 }
 
 void ColorRecognitionDialog::displayError(const QString &status, const QString &message)
@@ -861,6 +1266,9 @@ void ColorRecognitionDialog::setViewerStatusText(const QString &displayText,
 
 QString ColorRecognitionDialog::roiStatusText() const
 {
+    if (m_globalDetection)
+        return tr("全局检测：检测当前整张图像");
+
     const QRectF roi = effectiveRoiNormalized();
     return tr("矩形检测 ROI x=%1 y=%2 w=%3 h=%4")
             .arg(roi.x(), 0, 'f', 3)
