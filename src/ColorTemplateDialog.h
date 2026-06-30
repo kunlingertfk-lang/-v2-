@@ -21,7 +21,6 @@ class QListWidget;
 class QPushButton;
 class QResizeEvent;
 class QMouseEvent;
-class QSpinBox;
 class QToolButton;
 
 struct ColorRecognitionLabelData
@@ -47,7 +46,7 @@ struct ColorRecognitionTemplateData
     QString name = QStringLiteral("颜色模板");
     QString featureType = QStringLiteral("histogram");
     QString sensitivity = QStringLiteral("medium");
-    bool brightnessEnabled = true;
+    bool brightnessEnabled = false;
     int knnK = 3;
     QString knnDistance = QStringLiteral("halcon_default");
     QVector<ColorRecognitionLabelData> labels;
@@ -128,8 +127,6 @@ private:
     QComboBox *m_featureTypeComboBox = nullptr;
     QComboBox *m_sensitivityComboBox = nullptr;
     QCheckBox *m_brightnessCheckBox = nullptr;
-    QSpinBox *m_knnKSpinBox = nullptr;
-    QComboBox *m_knnDistanceComboBox = nullptr;
     QToolButton *m_regionRectButton = nullptr;
     QPushButton *m_addCurrentImageButton = nullptr;
     QPushButton *m_addImageButton = nullptr;

@@ -48,6 +48,17 @@ bool isCircleRegionType(const QString &type)
     return type.trimmed().toLower() == QStringLiteral("circle");
 }
 
+// 规范化颜色判别方式，未知旧配置回退到新版默认主颜色占比模式。
+QString normalizedColorDecisionMode(const QString &mode)
+{
+    const QString key = mode.trimmed().toLower();
+    if (key == QStringLiteral("histogram_intersection") || key == QStringLiteral("similarity"))
+        return QStringLiteral("histogram_intersection");
+    if (key == QStringLiteral("halcon_color_segmentation") || key == QStringLiteral("halcon_color_cluster"))
+        return QStringLiteral("halcon_color_segmentation");
+    return QStringLiteral("dominant_ratio");
+}
+
 QRect normalizedRoiToPixels(const QRectF &sourceRoi, const int width, const int height)
 {
     if (width <= 0 || height <= 0 || !isValidNormalizedRoi(sourceRoi))
@@ -88,6 +99,20 @@ QJsonArray vectorToJson(const QVector<double> &values)
     QJsonArray array;
     for (const double value : values)
         array.append(value);
+    return array;
+}
+
+// 将类别占比映射转为 payload 数组，便于 UI、日志和调试读取每个类别的占比。
+QJsonArray ratiosToJson(const QVector<QPair<QString, double>> &ratios)
+{
+    QJsonArray array;
+    for (const QPair<QString, double> &ratio : ratios) {
+        QJsonObject json;
+        json.insert(QStringLiteral("label"), ratio.first);
+        json.insert(QStringLiteral("ratio"), ratio.second);
+        json.insert(QStringLiteral("score"), ratio.second * 100.0);
+        array.append(json);
+    }
     return array;
 }
 
@@ -207,6 +232,8 @@ ColorRecognitionHalconFeatureResult featureError(const QString &status,
     result.elapsedMs = elapsedMs;
     result.payload.insert(QStringLiteral("error"), message);
     result.payload.insert(QStringLiteral("featureType"), config.featureType);
+    result.payload.insert(QStringLiteral("colorDecisionMode"),
+                          normalizedColorDecisionMode(config.colorDecisionMode));
     result.payload.insert(QStringLiteral("hasImage"), !image.empty());
     result.payload.insert(QStringLiteral("imageWidth"), image.empty() ? 0 : image.cols);
     result.payload.insert(QStringLiteral("imageHeight"), image.empty() ? 0 : image.rows);
@@ -244,6 +271,8 @@ ColorRecognitionHalconResult runError(const QString &status,
     result.payload.insert(QStringLiteral("error"), message);
     result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_intersection_color_recognition"));
     result.payload.insert(QStringLiteral("featureType"), config.featureType);
+    result.payload.insert(QStringLiteral("colorDecisionMode"),
+                          normalizedColorDecisionMode(config.colorDecisionMode));
     result.payload.insert(QStringLiteral("hasImage"), !image.empty());
     result.payload.insert(QStringLiteral("imageWidth"), image.empty() ? 0 : image.cols);
     result.payload.insert(QStringLiteral("imageHeight"), image.empty() ? 0 : image.rows);
@@ -305,6 +334,8 @@ ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig 
 
     result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_intersection_color_recognition"));
     result.payload.insert(QStringLiteral("featureType"), config.featureType);
+    result.payload.insert(QStringLiteral("colorDecisionMode"),
+                          normalizedColorDecisionMode(config.colorDecisionMode));
     result.payload.insert(QStringLiteral("detectMaskApplied"), true);
     result.payload.insert(QStringLiteral("detectMaskFullyCoversRoi"), true);
     result.payload.insert(QStringLiteral("detectMaskPolygon"), pointsToJson(config.detectMaskPolygonNormalized));
@@ -656,6 +687,167 @@ double histogramIntersectionSimilarity(HalconCApi *api,
     return qBound(0.0, intersection / denominator, 1.0);
 }
 
+struct ColorDecisionResult
+{
+    QString mode;
+    QString comparisonMethod;
+    QString predictedLabel;
+    int predictedClassId = -1;
+    int matchedSampleIndex = -1;
+    QString matchedSampleLabel;
+    double rating = 0.0;
+    double score = 0.0;
+    QVector<QPair<QString, double>> labelAreaRatios;
+    QVector<QPair<QString, double>> classSimilarities;
+};
+
+// 根据 classId 在 labels 中查找显示名，找不到时回退到样本标签或 classId 文案。
+QString labelNameForClass(const QVector<ColorRecognitionHalconLabel> &labels,
+                          const QVector<ColorRecognitionHalconSample> &samples,
+                          const int classId,
+                          const QString &fallback)
+{
+    for (const ColorRecognitionHalconLabel &label : labels) {
+        if (label.classId == classId && !label.name.trimmed().isEmpty())
+            return label.name;
+    }
+    for (const ColorRecognitionHalconSample &sample : samples) {
+        if (sample.classId == classId && !sample.label.trimmed().isEmpty())
+            return sample.label;
+    }
+    return fallback.trimmed().isEmpty() ? QStringLiteral("#%1").arg(classId) : fallback;
+}
+
+// 保留旧版整体直方图交集判别：逐样本比较，选择相似度最高的样本。
+ColorDecisionResult decideByHistogramIntersection(HalconCApi *api,
+                                                  const ColorRecognitionHalconConfig &config,
+                                                  const QVector<ColorRecognitionHalconSample> &usableSamples,
+                                                  const QVector<double> &queryFeature)
+{
+    ColorDecisionResult decision;
+    decision.mode = QStringLiteral("histogram_intersection");
+    decision.comparisonMethod = QStringLiteral("histogram_intersection");
+
+    double bestSimilarity = -1.0;
+    int bestSampleIndex = -1;
+    for (int sampleIndex = 0; sampleIndex < usableSamples.size(); ++sampleIndex) {
+        const ColorRecognitionHalconSample &sample = usableSamples.at(sampleIndex);
+        const double similarity = histogramIntersectionSimilarity(api, queryFeature, sample.feature);
+        decision.classSimilarities.append(qMakePair(
+                                              labelNameForClass(config.labels, usableSamples, sample.classId, sample.label),
+                                              similarity));
+        if (similarity > bestSimilarity) {
+            bestSimilarity = similarity;
+            bestSampleIndex = sampleIndex;
+        }
+    }
+
+    if (bestSampleIndex < 0 || bestSimilarity < 0.0) {
+        throw std::pair<QString, QString>(
+                QStringLiteral("empty_similarity"),
+                QStringLiteral("Histogram intersection returned no comparable sample."));
+    }
+
+    const ColorRecognitionHalconSample &bestSample = usableSamples.at(bestSampleIndex);
+    decision.predictedClassId = bestSample.classId;
+    decision.predictedLabel = labelNameForClass(config.labels, usableSamples, bestSample.classId, bestSample.label);
+    decision.matchedSampleIndex = bestSampleIndex;
+    decision.matchedSampleLabel = bestSample.label;
+    decision.rating = qBound(0.0, bestSimilarity, 1.0);
+    decision.score = qBound(0.0, decision.rating * 100.0, 100.0);
+    return decision;
+}
+
+// 使用 HALCON 直方图交集覆盖量估算各类别在 ROI 中的主颜色占比。
+ColorDecisionResult decideByDominantRatio(HalconCApi *api,
+                                          const ColorRecognitionHalconConfig &config,
+                                          const QVector<ColorRecognitionHalconSample> &usableSamples,
+                                          const QVector<double> &queryFeature)
+{
+    ColorDecisionResult decision;
+    decision.mode = QStringLiteral("dominant_ratio");
+    decision.comparisonMethod = QStringLiteral("dominant_color_ratio");
+
+    QVector<int> classIds;
+    QVector<double> classCoverage;
+    QVector<int> classBestSampleIndex;
+    QVector<double> classBestSimilarity;
+    for (int sampleIndex = 0; sampleIndex < usableSamples.size(); ++sampleIndex) {
+        const ColorRecognitionHalconSample &sample = usableSamples.at(sampleIndex);
+        const double similarity = histogramIntersectionSimilarity(api, queryFeature, sample.feature);
+        int classIndex = classIds.indexOf(sample.classId);
+        if (classIndex < 0) {
+            classIds.append(sample.classId);
+            classCoverage.append(0.0);
+            classBestSampleIndex.append(sampleIndex);
+            classBestSimilarity.append(similarity);
+            classIndex = classIds.size() - 1;
+        }
+        classCoverage[classIndex] = qMax(classCoverage.at(classIndex), similarity);
+        if (similarity > classBestSimilarity.at(classIndex)) {
+            classBestSimilarity[classIndex] = similarity;
+            classBestSampleIndex[classIndex] = sampleIndex;
+        }
+    }
+
+    double coverageSum = 0.0;
+    for (const double coverage : classCoverage)
+        coverageSum += qMax(0.0, coverage);
+    if (coverageSum <= 0.0) {
+        throw std::pair<QString, QString>(
+                QStringLiteral("empty_similarity"),
+                QStringLiteral("Dominant color ratio returned no comparable class."));
+    }
+
+    int bestClassIndex = -1;
+    double bestRatio = -1.0;
+    for (int i = 0; i < classIds.size(); ++i) {
+        const QString label = labelNameForClass(config.labels, usableSamples, classIds.at(i), QString());
+        const double similarity = qBound(0.0, classCoverage.at(i), 1.0);
+        const double ratio = qBound(0.0, similarity / coverageSum, 1.0);
+        decision.classSimilarities.append(qMakePair(label, similarity));
+        decision.labelAreaRatios.append(qMakePair(label, ratio));
+        if (ratio > bestRatio) {
+            bestRatio = ratio;
+            bestClassIndex = i;
+        }
+    }
+
+    if (bestClassIndex < 0) {
+        throw std::pair<QString, QString>(
+                QStringLiteral("empty_similarity"),
+                QStringLiteral("Dominant color ratio returned no dominant class."));
+    }
+
+    const int bestSampleIndex = classBestSampleIndex.at(bestClassIndex);
+    const ColorRecognitionHalconSample &bestSample = usableSamples.at(bestSampleIndex);
+    decision.predictedClassId = classIds.at(bestClassIndex);
+    decision.predictedLabel = labelNameForClass(config.labels,
+                                                usableSamples,
+                                                decision.predictedClassId,
+                                                bestSample.label);
+    decision.matchedSampleIndex = bestSampleIndex;
+    decision.matchedSampleLabel = bestSample.label;
+    decision.rating = qBound(0.0, bestRatio, 1.0);
+    decision.score = qBound(0.0, decision.rating * 100.0, 100.0);
+    return decision;
+}
+
+// 预留 HALCON 颜色分割/聚类接口，后续可替换当前直方图占比近似实现。
+ColorDecisionResult decideByHalconColorSegmentationReserved(HalconCApi *api,
+                                                            const ColorRecognitionHalconConfig &config,
+                                                            const QVector<ColorRecognitionHalconSample> &usableSamples,
+                                                            const QVector<double> &queryFeature)
+{
+    Q_UNUSED(api)
+    Q_UNUSED(config)
+    Q_UNUSED(usableSamples)
+    Q_UNUSED(queryFeature)
+    throw std::pair<QString, QString>(
+            QStringLiteral("unsupported_feature"),
+            QStringLiteral("HALCON color segmentation/cluster mode is reserved but not implemented."));
+}
+
 void clearObject(HalconCApi *api, Hobject &object)
 {
     if (api && api->clearObj && halconObjectAllocated(object))
@@ -716,6 +908,46 @@ QVector<double> histogramForChannel(HalconCApi *api,
         normalized.append(static_cast<double>(value) / sum);
     }
     return normalized;
+}
+
+bool areHsHsvCompatibleFeatureLengths(const int lhsSize, const int rhsSize)
+{
+    if (lhsSize <= 0 || rhsSize <= 0 || lhsSize == rhsSize)
+        return false;
+
+    const int minSize = qMin(lhsSize, rhsSize);
+    const int maxSize = qMax(lhsSize, rhsSize);
+    return minSize % 2 == 0 && maxSize == (minSize / 2) * 3;
+}
+
+int comparisonFeatureSizeForPair(const int queryFeatureSize, const int sampleFeatureSize)
+{
+    if (queryFeatureSize <= 0 || sampleFeatureSize <= 0)
+        return 0;
+    if (queryFeatureSize == sampleFeatureSize)
+        return queryFeatureSize;
+    if (areHsHsvCompatibleFeatureLengths(queryFeatureSize, sampleFeatureSize))
+        return qMin(queryFeatureSize, sampleFeatureSize);
+    return 0;
+}
+
+// 将亮度开关造成的 H/S 与 H/S/V 特征差异统一对齐到 H/S 前缀，兼容旧模板样本。
+QVector<double> alignedFeatureToComparisonSize(const QVector<double> &feature,
+                                               const int comparisonFeatureSize,
+                                               bool *aligned)
+{
+    if (aligned)
+        *aligned = false;
+    if (feature.size() == comparisonFeatureSize)
+        return feature;
+    if (comparisonFeatureSize > 0 &&
+        comparisonFeatureSize < feature.size() &&
+        areHsHsvCompatibleFeatureLengths(feature.size(), comparisonFeatureSize)) {
+        if (aligned)
+            *aligned = true;
+        return feature.mid(0, comparisonFeatureSize);
+    }
+    return QVector<double>();
 }
 
 struct HistogramExtractionResult
@@ -937,6 +1169,10 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
         result.payload.insert(QStringLiteral("featureLength"), result.feature.size());
         result.payload.insert(QStringLiteral("histogramBins"), histogramBinsForSensitivity(config.sensitivity));
         result.payload.insert(QStringLiteral("brightnessEnabled"), config.brightnessEnabled);
+        result.payload.insert(QStringLiteral("lightingNormalizationMode"),
+                              config.brightnessEnabled
+                              ? QStringLiteral("include_value_channel")
+                              : QStringLiteral("hue_saturation_priority"));
         result.payload.insert(QStringLiteral("roiPixelsRect"), rectToJson(QRectF(roiPixels)));
         result.payload.insert(QStringLiteral("detectRegionType"),
                               isCircleRegionType(config.detectRegionType)
@@ -1010,11 +1246,33 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                         timer.elapsed());
     }
 
+    int comparisonFeatureSize = featureResult.feature.size();
+    for (const ColorRecognitionHalconSample &sample : config.samples) {
+        const int candidateSize =
+                comparisonFeatureSizeForPair(featureResult.feature.size(), sample.feature.size());
+        if (candidateSize > 0)
+            comparisonFeatureSize = qMin(comparisonFeatureSize, candidateSize);
+    }
+
+    QVector<double> comparisonFeature = featureResult.feature;
+    bool featureAlignmentApplied = false;
+    if (comparisonFeatureSize > 0 && comparisonFeatureSize < comparisonFeature.size()) {
+        comparisonFeature = comparisonFeature.mid(0, comparisonFeatureSize);
+        featureAlignmentApplied = true;
+    }
+
     QVector<ColorRecognitionHalconSample> usableSamples;
     usableSamples.reserve(config.samples.size());
     for (const ColorRecognitionHalconSample &sample : config.samples) {
-        if (sample.feature.size() == featureResult.feature.size())
-            usableSamples.append(sample);
+        bool sampleAligned = false;
+        QVector<double> alignedFeature =
+                alignedFeatureToComparisonSize(sample.feature, comparisonFeature.size(), &sampleAligned);
+        if (!alignedFeature.isEmpty()) {
+            ColorRecognitionHalconSample usableSample = sample;
+            usableSample.feature = alignedFeature;
+            usableSamples.append(usableSample);
+            featureAlignmentApplied = featureAlignmentApplied || sampleAligned;
+        }
     }
     if (usableSamples.isEmpty()) {
         return runError(QStringLiteral("invalid_model_samples"),
@@ -1039,36 +1297,13 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
     HalconCApi *api = &library.api;
 
     try {
-        double bestSimilarity = -1.0;
-        int bestSampleIndex = -1;
-        for (int sampleIndex = 0; sampleIndex < usableSamples.size(); ++sampleIndex) {
-            const ColorRecognitionHalconSample &sample = usableSamples.at(sampleIndex);
-            const double similarity = histogramIntersectionSimilarity(api,
-                                                                      featureResult.feature,
-                                                                      sample.feature);
-            if (similarity > bestSimilarity) {
-                bestSimilarity = similarity;
-                bestSampleIndex = sampleIndex;
-            }
-        }
-
-        if (bestSampleIndex < 0 || bestSimilarity < 0.0) {
-            throw std::pair<QString, QString>(
-                    QStringLiteral("empty_similarity"),
-                    QStringLiteral("Histogram intersection returned no comparable sample."));
-        }
-
-        const ColorRecognitionHalconSample &bestSample = usableSamples.at(bestSampleIndex);
-        const int predictedClassId = bestSample.classId;
-        const double rating = qBound(0.0, bestSimilarity, 1.0);
-        const double score = qBound(0.0, rating * 100.0, 100.0);
-        QString predictedLabel = bestSample.label;
-        for (const ColorRecognitionHalconLabel &label : config.labels) {
-            if (label.classId == predictedClassId) {
-                predictedLabel = label.name;
-                break;
-            }
-        }
+        const QString decisionMode = normalizedColorDecisionMode(config.colorDecisionMode);
+        const ColorDecisionResult decision =
+                decisionMode == QStringLiteral("histogram_intersection")
+                ? decideByHistogramIntersection(api, config, usableSamples, comparisonFeature)
+                : decisionMode == QStringLiteral("halcon_color_segmentation")
+                  ? decideByHalconColorSegmentationReserved(api, config, usableSamples, comparisonFeature)
+                : decideByDominantRatio(api, config, usableSamples, comparisonFeature);
 
         bool ok = false;
         QString judgeMode = config.judgeMode.trimmed().toLower();
@@ -1078,27 +1313,27 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                         QStringLiteral("invalid_expected_label"),
                         QStringLiteral("Expected label is empty for category judgement."));
             }
-            ok = predictedLabel == config.expectedLabel;
+            ok = decision.predictedLabel == config.expectedLabel;
         } else {
             judgeMode = QStringLiteral("min_score");
-            ok = score >= static_cast<double>(qBound(0, config.minScore, 100));
+            ok = decision.score >= static_cast<double>(qBound(0, config.minScore, 100));
         }
 
         ColorRecognitionHalconResult result;
         result.success = true;
         result.ok = ok;
         result.status = ok ? QStringLiteral("ok") : QStringLiteral("ng");
-        result.predictedLabel = predictedLabel;
-        result.predictedClassId = predictedClassId;
-        result.score = score;
-        result.rating = rating;
+        result.predictedLabel = decision.predictedLabel;
+        result.predictedClassId = decision.predictedClassId;
+        result.score = decision.score;
+        result.rating = decision.rating;
         result.sampleCount = usableSamples.size();
         result.elapsedMs = timer.elapsed();
         result.message = QStringLiteral("label=%1, score=%2")
-                .arg(predictedLabel.isEmpty()
-                     ? QStringLiteral("#%1").arg(predictedClassId)
-                     : predictedLabel,
-                     QString::number(score, 'f', 2));
+                .arg(decision.predictedLabel.isEmpty()
+                     ? QStringLiteral("#%1").arg(decision.predictedClassId)
+                     : decision.predictedLabel,
+                     QString::number(decision.score, 'f', 2));
 
         const QRect roiPixels = normalizedRoiToPixels(config.roiNormalized,
                                                       image.empty() ? 0 : image.cols,
@@ -1112,16 +1347,16 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                                                          config.detectCircleCenterNormalized.y() * image.rows),
                                                 radiusPixels,
                                                 QStringLiteral("ROI"),
-                                                score));
+                                                decision.score));
         } else {
-            result.overlays.append(rectOverlay(QRectF(roiPixels), QStringLiteral("ROI"), score));
+            result.overlays.append(rectOverlay(QRectF(roiPixels), QStringLiteral("ROI"), decision.score));
         }
         ToolOverlay statusText = textOverlay(QPointF(roiPixels.x(), roiPixels.y()),
                                              QStringLiteral("%1 %2 %3")
                                              .arg(result.ok ? QStringLiteral("OK") : QStringLiteral("NG"),
-                                                  predictedLabel,
-                                                  QString::number(score, 'f', 1)),
-                                             score,
+                                                  decision.predictedLabel,
+                                                  QString::number(decision.score, 'f', 1)),
+                                             decision.score,
                                              QStringLiteral("color_result_text"));
         statusText.extra.insert(QStringLiteral("status"), result.ok ? QStringLiteral("OK") : QStringLiteral("NG"));
         statusText.extra.insert(QStringLiteral("anchorRect"), rectToJsonObject(QRectF(roiPixels)));
@@ -1129,20 +1364,33 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
 
         result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_intersection_color_recognition"));
         result.payload.insert(QStringLiteral("featureType"), QStringLiteral("histogram"));
-        result.payload.insert(QStringLiteral("predictedLabel"), predictedLabel);
-        result.payload.insert(QStringLiteral("predictedClassId"), predictedClassId);
-        result.payload.insert(QStringLiteral("matchedSampleIndex"), bestSampleIndex);
-        result.payload.insert(QStringLiteral("matchedSampleLabel"), bestSample.label);
-        result.payload.insert(QStringLiteral("score"), score);
-        result.payload.insert(QStringLiteral("rating"), rating);
-        result.payload.insert(QStringLiteral("similarity"), rating);
+        result.payload.insert(QStringLiteral("colorDecisionMode"), decision.mode);
+        result.payload.insert(QStringLiteral("predictedLabel"), decision.predictedLabel);
+        result.payload.insert(QStringLiteral("predictedClassId"), decision.predictedClassId);
+        result.payload.insert(QStringLiteral("matchedSampleIndex"), decision.matchedSampleIndex);
+        result.payload.insert(QStringLiteral("matchedSampleLabel"), decision.matchedSampleLabel);
+        result.payload.insert(QStringLiteral("score"), decision.score);
+        result.payload.insert(QStringLiteral("rating"), decision.rating);
+        result.payload.insert(QStringLiteral("similarity"), decision.rating);
+        result.payload.insert(QStringLiteral("dominantColorRatio"),
+                              decision.mode == QStringLiteral("dominant_ratio") ? decision.rating : 0.0);
+        result.payload.insert(QStringLiteral("labelAreaRatios"), ratiosToJson(decision.labelAreaRatios));
+        result.payload.insert(QStringLiteral("classSimilarities"), ratiosToJson(decision.classSimilarities));
         result.payload.insert(QStringLiteral("scoreDirection"), QStringLiteral("higher_is_better"));
-        result.payload.insert(QStringLiteral("scoreFormula"), QStringLiteral("histogram_intersection_similarity_x100"));
-        result.payload.insert(QStringLiteral("ratingMode"), QStringLiteral("histogram_intersection_similarity"));
-        result.payload.insert(QStringLiteral("comparisonMethod"), QStringLiteral("histogram_intersection"));
+        result.payload.insert(QStringLiteral("scoreFormula"),
+                              decision.mode == QStringLiteral("dominant_ratio")
+                              ? QStringLiteral("dominant_color_ratio_x100")
+                              : QStringLiteral("histogram_intersection_similarity_x100"));
+        result.payload.insert(QStringLiteral("ratingMode"),
+                              decision.mode == QStringLiteral("dominant_ratio")
+                              ? QStringLiteral("dominant_color_ratio")
+                              : QStringLiteral("histogram_intersection_similarity"));
+        result.payload.insert(QStringLiteral("comparisonMethod"), decision.comparisonMethod);
         result.payload.insert(QStringLiteral("sampleCount"), result.sampleCount);
         result.payload.insert(QStringLiteral("featureLength"), featureResult.feature.size());
-        result.payload.insert(QStringLiteral("queryFeature"), vectorToJson(featureResult.feature));
+        result.payload.insert(QStringLiteral("comparisonFeatureLength"), comparisonFeature.size());
+        result.payload.insert(QStringLiteral("featureAlignmentApplied"), featureAlignmentApplied);
+        result.payload.insert(QStringLiteral("queryFeature"), vectorToJson(comparisonFeature));
         result.payload.insert(QStringLiteral("roiPixelsRect"), rectToJson(QRectF(roiPixels)));
         result.payload.insert(QStringLiteral("detectRegionType"),
                               featureResult.payload.value(QStringLiteral("detectRegionType")).toString(QStringLiteral("rectangle")));
@@ -1167,6 +1415,8 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         result.payload.insert(QStringLiteral("knnDistanceApplied"), QStringLiteral("not_used_histogram_intersection"));
         result.payload.insert(QStringLiteral("histogramBins"), histogramBinsForSensitivity(config.sensitivity));
         result.payload.insert(QStringLiteral("brightnessEnabled"), config.brightnessEnabled);
+        result.payload.insert(QStringLiteral("lightingNormalizationMode"),
+                              featureResult.payload.value(QStringLiteral("lightingNormalizationMode")).toString());
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
 
         return result;

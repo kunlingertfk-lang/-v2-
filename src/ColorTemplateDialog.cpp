@@ -33,7 +33,6 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSizePolicy>
-#include <QSpinBox>
 #include <QStandardItem>
 #include <QStandardItemModel>
 #include <QToolButton>
@@ -198,7 +197,7 @@ ColorRecognitionTemplateData ColorTemplateDialog::templateData() const
     data.featureType = featureTypeFromUi(m_featureTypeComboBox->currentText());
     data.sensitivity = sensitivityFromUi(m_sensitivityComboBox->currentText());
     data.brightnessEnabled = m_brightnessCheckBox->isChecked();
-    data.knnK = m_knnKSpinBox->value();
+    data.knnK = qMax(1, data.knnK);
     data.knnDistance = QStringLiteral("halcon_default");
     return data;
 }
@@ -214,7 +213,6 @@ void ColorTemplateDialog::setTemplateData(const ColorRecognitionTemplateData &da
         m_featureTypeComboBox->setCurrentIndex(0);
     setComboBoxText(m_sensitivityComboBox, sensitivityToUi(m_template.sensitivity));
     m_brightnessCheckBox->setChecked(m_template.brightnessEnabled);
-    m_knnKSpinBox->setValue(qBound(1, m_template.knnK, 99));
     ensureDefaultLabel();
     updateLabelList();
     updateRoiSampleList();
@@ -341,9 +339,10 @@ void ColorTemplateDialog::buildUi()
         "QComboBox QAbstractItemView, QListWidget::item { background:#ffffff; color:#111827; selection-background-color:#ffffff; selection-color:#111827; outline:0; }"
         "QListWidget#roiSampleListWidget { padding:6px; }"
         "QListWidget#roiSampleListWidget::item { min-width:86px; min-height:74px; margin:4px; border:1px solid #d7dde6; border-radius:4px; }"
+        "QListWidget#roiSampleListWidget::item:selected { background:#ffffff; color:#111827; border:2px solid #ff7a00; }"
         "QCheckBox { color:#111827; background:#ffffff; border:1px solid #cfd6df; border-radius:4px; padding:6px 10px; min-height:20px; }"
         "QCheckBox::indicator { width:16px; height:16px; border:1px solid #9aa6b2; border-radius:3px; background:#ffffff; }"
-        "QCheckBox::indicator:checked { background:#ffffff; border-color:#ff7a00; }"
+        "QCheckBox::indicator:checked { background:#ff7a00; border-color:#ff7a00; }"
         "QPushButton { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; padding:8px 18px; font-size:14px; }"
         "QPushButton[actionRole=\"primary\"], QPushButton[actionRole=\"secondary\"], QPushButton[actionRole=\"plain\"] { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; }"
         "QPushButton:disabled, QToolButton:disabled, QComboBox:disabled, QSpinBox:disabled, QLineEdit:disabled { background:#ffffff; color:#111827; border-color:#d7dde6; }"
@@ -483,20 +482,6 @@ void ColorTemplateDialog::buildUi()
     brightnessRow->addWidget(m_brightnessCheckBox, 1);
     advancedLayout->addLayout(brightnessRow);
 
-    QHBoxLayout *knnRow = new QHBoxLayout;
-    m_knnKSpinBox = new QSpinBox;
-    m_knnKSpinBox->setRange(1, 99);
-    knnRow->addWidget(rowLabel(tr("K 值")));
-    knnRow->addWidget(m_knnKSpinBox, 1);
-    advancedLayout->addLayout(knnRow);
-
-    QHBoxLayout *distanceRow = new QHBoxLayout;
-    m_knnDistanceComboBox = new QComboBox;
-    m_knnDistanceComboBox->addItem(tr("HALCON 默认"));
-    m_knnDistanceComboBox->setEnabled(false);
-    distanceRow->addWidget(rowLabel(tr("KNN 距离")));
-    distanceRow->addWidget(m_knnDistanceComboBox, 1);
-    advancedLayout->addLayout(distanceRow);
     leftLayout->addWidget(advancedCard);
 
     leftLayout->addStretch(1);
@@ -542,9 +527,8 @@ void ColorTemplateDialog::buildUi()
 
 void ColorTemplateDialog::setupUiState()
 {
-    m_brightnessCheckBox->setChecked(true);
+    m_brightnessCheckBox->setChecked(false);
     m_sensitivityComboBox->setCurrentIndex(1);
-    m_knnKSpinBox->setValue(3);
     m_regionRectButton->setChecked(true);
     if (QStandardItemModel *model = qobject_cast<QStandardItemModel *>(m_featureTypeComboBox->model())) {
         if (QStandardItem *item = model->item(1))
@@ -976,7 +960,6 @@ QImage ColorTemplateDialog::roiThumbnailForSample(const ColorRecognitionSampleDa
 
     QPainter painter(&thumbnail);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor(255, 122, 0), 2));
 
     QImage cropped;
     if (!sample.roiImagePngBase64.trimmed().isEmpty()) {
@@ -992,10 +975,8 @@ QImage ColorTemplateDialog::roiThumbnailForSample(const ColorRecognitionSampleDa
     } else {
         painter.setPen(QPen(QColor(203, 213, 225), 1));
         painter.drawText(thumbnail.rect(), Qt::AlignCenter, tr("ROI"));
-        painter.setPen(QPen(QColor(255, 122, 0), 2));
     }
 
-    painter.drawRect(thumbnail.rect().adjusted(1, 1, -2, -2));
     return thumbnail;
 }
 
@@ -1066,7 +1047,6 @@ ColorRecognitionHalconConfig ColorTemplateDialog::featureExtractionConfig() cons
     config.featureType = featureTypeFromUi(m_featureTypeComboBox->currentText());
     config.sensitivity = sensitivityFromUi(m_sensitivityComboBox->currentText());
     config.brightnessEnabled = m_brightnessCheckBox->isChecked();
-    config.knnK = m_knnKSpinBox->value();
     return config;
 }
 

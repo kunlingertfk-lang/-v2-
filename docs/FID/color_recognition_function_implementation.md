@@ -78,7 +78,7 @@
   - `brightnessEnabled=true` 时特征为 H + S + V 三个通道直方图。
   - 每个通道的直方图会按该通道 ROI 内像素总数归一化，减少 ROI 面积变化对比较结果的影响。
 - 识别运行：
-  - `ColorRecognitionAdapter` 从当前激活模板中读取 labels、samples、featureType、sensitivity、brightnessEnabled、knnK 和判断规则。
+  - `ColorRecognitionAdapter` 从当前激活模板中读取 labels、samples、featureType、sensitivity、brightnessEnabled 和判断规则。
   - runner 对当前检测 ROI 提取一条查询特征。
   - runner 只使用与查询特征维度一致的模板样本；若没有可用样本，返回 `invalid_model_samples`。
   - runner 使用 HALCON `tuple_min2` 和 `tuple_sum` 逐样本计算直方图交集相似度。
@@ -109,6 +109,35 @@
   - `comparisonMethod=histogram_intersection`。
   - `sampleCount`、`featureLength`、`roiPixelsRect`、`elapsedMs`。
   - ROI 矩形 overlay 和 OK/NG 文本 overlay。
+
+### 新版优化实现方案：主颜色占比与光照稳定性
+
+- 新增 `params.colorDecisionMode` 判别方式字段：
+  - `dominant_ratio`：主颜色占比模式，作为新版默认模式。
+  - `histogram_intersection`：旧版整体直方图交集相似度模式，作为兼容接口保留。
+- `判别方式` 控件放在主界面 `结果判断` 区：
+  - `主颜色占比` 对应 `dominant_ratio`。
+  - `整体相似度` 对应 `histogram_intersection`。
+- 主颜色占比模式实现原则：
+  - 不改用 OpenCV、自写像素分类或第三方库。
+  - 仍基于 HALCON 已有直方图链路提取有效检测 ROI 的 H/S 或 H/S/V 特征。
+  - 对每个类别聚合可用样本的直方图交集覆盖量。
+  - 将各类别覆盖量归一化为 `labelAreaRatios`，选择占比最大的类别作为 `predictedLabel`。
+  - 输出 `dominantColorRatio`，并令 `rating=dominantColorRatio`、`score=dominantColorRatio*100`。
+  - `最低分数` 判定使用主色占比得分；`类别判断` 仍使用预测类别与目标类别比较。
+- 旧版兼容接口：
+  - 当 `colorDecisionMode=histogram_intersection` 时，保留旧版逐样本相似度最大值逻辑。
+  - payload 继续输出 `comparisonMethod=histogram_intersection`、`scoreFormula=histogram_intersection_similarity_x100`。
+  - 旧版配置缺少 `colorDecisionMode` 时，按新版默认 `dominant_ratio` 读取；如需回退可显式保存为 `histogram_intersection`。
+- 光照稳定性策略：
+  - 新建模板默认 `brightnessEnabled=false`，即直方图特征优先使用 H/S 两个通道。
+  - `brightnessEnabled=false` 时 payload 输出 `lightingNormalizationMode=hue_saturation_priority`。
+  - `brightnessEnabled=true` 时继续使用 H/S/V 三通道，并输出 `lightingNormalizationMode=include_value_channel`。
+  - 已保存模板的亮度配置保持兼容，不强制覆盖。
+- HALCON 颜色分割/聚类预留：
+  - runner 内预留 HALCON 颜色分割/聚类判别函数入口。
+  - 当前第一版该入口返回 `unsupported_feature`，不参与默认流程。
+  - 后续若要从“直方图覆盖量近似”升级为“真实颜色区域分割/聚类面积统计”，可在该入口接入已确认的 HALCON 算子链。
 
 ### UI 方案
 
@@ -184,8 +213,7 @@
 - 已支持高级参数：
   - 敏感度。
   - 亮度是否参与直方图。
-  - K 值。
-  - KNN 距离保留为 HALCON 默认策略。
+- K 值和 KNN 距离不参与新版直方图/主颜色占比计算，模板对话框不再提供对应 UI 控件，只保留历史配置字段兼容旧数据。
 - 已修复 `添加 ROI 样本` 点击导致程序退出的主要问题。
 - 已修复下拉框和输入控件白底黑字可读性问题。
 - 已实现模板创建窗口按父窗口自适应打开，比父窗口小一圈，避免控件堆叠。
@@ -242,8 +270,8 @@
 - `samples[].roiImageHeight`：样本 ROI 图片高度。
 - `sensitivity`：敏感度。
 - `brightnessEnabled`：亮度是否参与。
-- `knnK`：历史 KNN 配置字段，新版直方图交集判定不使用。
-- `knnDistance`：历史 KNN 距离策略字段，新版直方图交集判定不使用，payload 中记录为 `not_used_histogram_intersection`。
+- `knnK`：历史 KNN 配置字段，新版直方图交集和主颜色占比判定不使用，当前无对应 UI 控件。
+- `knnDistance`：历史 KNN 距离策略字段，新版直方图交集和主颜色占比判定不使用，当前无对应 UI 控件，payload 中记录为 `not_used_histogram_intersection`。
 - `judgeRule.mode`：`min_score` 或 `category`。
 - `judgeRule.minScore`：最低分数。
 - `judgeRule.expectedLabel`：目标类别。
@@ -545,4 +573,3 @@
 
 ### 新需求
 - 颜色识别主颜色占比与光照稳定性优化计划
-

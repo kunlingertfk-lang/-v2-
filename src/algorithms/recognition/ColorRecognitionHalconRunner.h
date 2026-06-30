@@ -38,6 +38,7 @@ struct ColorRecognitionHalconConfig
     QPointF detectCircleCenterNormalized;
     double detectCircleRadiusNormalized = 0.0;
     QRectF detectCircleBoundingRectNormalized;
+    QString colorDecisionMode = QStringLiteral("dominant_ratio");
     QString featureType = QStringLiteral("histogram");
     QString sensitivity = QStringLiteral("medium");
     bool brightnessEnabled = true;

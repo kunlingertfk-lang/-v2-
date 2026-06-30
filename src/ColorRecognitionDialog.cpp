@@ -215,6 +215,20 @@ QString judgeModeToUi(const QString &value)
             : QStringLiteral("最低分数");
 }
 
+QString colorDecisionModeFromUi(const QString &text)
+{
+    return text.contains(QStringLiteral("整体"))
+            ? QStringLiteral("histogram_intersection")
+            : QStringLiteral("dominant_ratio");
+}
+
+QString colorDecisionModeToUi(const QString &value)
+{
+    return value == QStringLiteral("histogram_intersection")
+            ? QStringLiteral("整体相似度")
+            : QStringLiteral("主颜色占比");
+}
+
 QString featureTypeToUi(const QString &value)
 {
     return value == QStringLiteral("spectrum")
@@ -436,6 +450,8 @@ ToolConfig ColorRecognitionDialog::toToolConfig() const
                   m_maskPolygonNormalized.size() >= 3
                   ? QStringLiteral("UI configured; HALCON color runner applies mask during detection")
                   : QStringLiteral("not configured"));
+    params.insert(QStringLiteral("colorDecisionMode"),
+                  colorDecisionModeFromUi(ui->colorDecisionModeComboBox->currentText()));
     params.insert(QStringLiteral("colorModel"), colorModel);
     if (currentTemplate) {
         params.insert(QStringLiteral("featureType"), currentTemplate->featureType);
@@ -538,6 +554,9 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
 
     setComboBoxText(ui->resultBasisComboBox,
                     judgeModeToUi(judgeRule.value(QStringLiteral("mode")).toString(QStringLiteral("min_score"))));
+    setComboBoxText(ui->colorDecisionModeComboBox,
+                    colorDecisionModeToUi(params.value(QStringLiteral("colorDecisionMode"))
+                                          .toString(QStringLiteral("dominant_ratio"))));
     ui->minScoreSpinBox->setValue(judgeRule.value(QStringLiteral("minScore")).toInt(ui->minScoreSpinBox->value()));
     updateTemplateList();
     updateExpectedLabelCombo();
@@ -821,6 +840,8 @@ void ColorRecognitionDialog::connectControls()
     connectCollapse(ui->judgeCollapseButton,
                     {ui->resultBasisLabel,
                      ui->resultBasisComboBox,
+                     ui->colorDecisionModeLabel,
+                     ui->colorDecisionModeComboBox,
                      ui->minScoreLabel,
                      ui->minScoreSpinBox,
                      ui->expectedLabelTitleLabel,

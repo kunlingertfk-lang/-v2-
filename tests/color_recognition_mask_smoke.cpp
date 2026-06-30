@@ -2,6 +2,8 @@
 #include "algorithms/halcon/HalconRuntimePaths.h"
 
 #include <QCoreApplication>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QPointF>
 #include <QString>
 #include <iostream>
@@ -33,6 +35,87 @@ int main(int argc, char **argv)
         circleFeature.payload.value(QStringLiteral("circleDetectRoiApplied")).toBool() != true ||
         circleFeature.payload.value(QStringLiteral("effectiveRoiArea")).toDouble() <= 0.0) {
         std::cerr << "circle ROI payload missing or invalid" << std::endl;
+        return 1;
+    }
+
+    if (circleFeature.payload.value(QStringLiteral("lightingNormalizationMode")).toString()
+            != QStringLiteral("include_value_channel")) {
+        std::cerr << "brightness enabled must include value channel" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig hsConfig = circleConfig;
+    hsConfig.brightnessEnabled = false;
+    const ColorRecognitionHalconFeatureResult hsFeature = runner.extractFeature(image, hsConfig);
+    if (!hsFeature.success || hsFeature.feature.size() != 32 ||
+        hsFeature.payload.value(QStringLiteral("lightingNormalizationMode")).toString()
+            != QStringLiteral("hue_saturation_priority")) {
+        std::cerr << "brightness disabled must use H/S priority feature" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig dominantConfig = circleConfig;
+    dominantConfig.brightnessEnabled = false;
+    dominantConfig.colorDecisionMode = QStringLiteral("dominant_ratio");
+    dominantConfig.labels = {
+        {QStringLiteral("warm"), 1},
+        {QStringLiteral("cool"), 2}
+    };
+    dominantConfig.samples = {
+        {QStringLiteral("warm"), 1, hsFeature.feature, dominantConfig.roiNormalized},
+        {QStringLiteral("cool"), 2, QVector<double>(hsFeature.feature.size(), 0.0), dominantConfig.roiNormalized}
+    };
+    const ColorRecognitionHalconResult dominantResult = runner.run(image, dominantConfig);
+    if (!dominantResult.success ||
+        dominantResult.payload.value(QStringLiteral("colorDecisionMode")).toString()
+            != QStringLiteral("dominant_ratio") ||
+        dominantResult.payload.value(QStringLiteral("comparisonMethod")).toString()
+            != QStringLiteral("dominant_color_ratio") ||
+        dominantResult.payload.value(QStringLiteral("dominantColorRatio")).toDouble() <= 0.99 ||
+        dominantResult.predictedLabel != QStringLiteral("warm") ||
+        dominantResult.payload.value(QStringLiteral("labelAreaRatios")).toArray().isEmpty()) {
+        std::cerr << "dominant ratio mode did not select dominant color" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig legacyConfig = dominantConfig;
+    legacyConfig.colorDecisionMode = QStringLiteral("histogram_intersection");
+    const ColorRecognitionHalconResult legacyResult = runner.run(image, legacyConfig);
+    if (!legacyResult.success ||
+        legacyResult.payload.value(QStringLiteral("colorDecisionMode")).toString()
+            != QStringLiteral("histogram_intersection") ||
+        legacyResult.payload.value(QStringLiteral("comparisonMethod")).toString()
+            != QStringLiteral("histogram_intersection")) {
+        std::cerr << "legacy histogram intersection mode must remain available" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig alignedConfig = dominantConfig;
+    alignedConfig.samples = {
+        {QStringLiteral("warm"), 1, circleFeature.feature, dominantConfig.roiNormalized}
+    };
+    const ColorRecognitionHalconResult alignedResult = runner.run(image, alignedConfig);
+    if (!alignedResult.success ||
+        alignedResult.predictedLabel != QStringLiteral("warm") ||
+        alignedResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
+        std::cerr << "brightness-disabled detection must align older H/S/V samples to H/S" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig brightnessOnAlignedConfig = circleConfig;
+    brightnessOnAlignedConfig.colorDecisionMode = QStringLiteral("dominant_ratio");
+    brightnessOnAlignedConfig.labels = {
+        {QStringLiteral("warm"), 1}
+    };
+    brightnessOnAlignedConfig.samples = {
+        {QStringLiteral("warm"), 1, hsFeature.feature, brightnessOnAlignedConfig.roiNormalized}
+    };
+    const ColorRecognitionHalconResult brightnessOnAlignedResult =
+            runner.run(image, brightnessOnAlignedConfig);
+    if (!brightnessOnAlignedResult.success ||
+        brightnessOnAlignedResult.predictedLabel != QStringLiteral("warm") ||
+        brightnessOnAlignedResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
+        std::cerr << "brightness-enabled detection must align older H/S samples to H/S" << std::endl;
         return 1;
     }
 

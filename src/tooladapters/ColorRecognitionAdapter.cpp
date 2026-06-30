@@ -162,6 +162,9 @@ ColorRecognitionHalconConfig toRunnerConfig(const ToolConfig &config)
     runnerConfig.detectCircleBoundingRectNormalized =
             rectFromJson(circleJson.value(QStringLiteral("boundingRect")).toObject(),
                          runnerConfig.roiNormalized);
+    runnerConfig.colorDecisionMode = stringParam(params,
+                                                 QStringLiteral("colorDecisionMode"),
+                                                 runnerConfig.colorDecisionMode);
     runnerConfig.detectMaskPolygonNormalized =
             pointsFromJson(params.value(QStringLiteral("detectMaskPolygon")).toArray());
     if (runnerConfig.detectMaskPolygonNormalized.size() < 3)

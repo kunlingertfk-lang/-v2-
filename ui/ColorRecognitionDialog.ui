@@ -220,6 +220,12 @@ QGraphicsView { border:1px solid #ff7a00; background:#ffffff; color:#111827; }</
                 </layout>
                </item>
                <item>
+                <layout class="QHBoxLayout" name="colorDecisionModeLayout">
+                 <item><widget class="QLabel" name="colorDecisionModeLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>判别方式</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
+                 <item><widget class="QComboBox" name="colorDecisionModeComboBox"><item><property name="text"><string>主颜色占比</string></property></item><item><property name="text"><string>整体相似度</string></property></item></widget></item>
+                </layout>
+               </item>
+               <item>
                 <layout class="QHBoxLayout" name="minScoreLayout">
                  <item><widget class="QLabel" name="minScoreLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>最低得分</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
                  <item><widget class="QSpinBox" name="minScoreSpinBox"><property name="maximum"><number>100</number></property><property name="value"><number>80</number></property></widget></item>
