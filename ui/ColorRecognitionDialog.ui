@@ -14,14 +14,14 @@
    <string>方案编辑 - 颜色识别</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QFrame#headerFrame { background:#3f4652; }
-QFrame#leftPanel { background:#eef1f5; }
-QFrame#previewPanel { background:#20242b; }
-QFrame[panelRole="configCard"] { background:#ffffff; border-radius:6px; }
-QLabel { color:#334155; font-size:14px; }
-QLabel[role="cardTitle"] { color:#1f2937; font-size:17px; font-weight:700; }
-QLabel[role="rowField"] { color:#475569; font-size:14px; }
-QLabel#viewerTitleLabel, QLabel#viewerStatusLabel, QLabel#viewerZoomLabel { color:#f5f7fb; }
+   <string notr="true">QDialog { background:#ffffff; color:#111827; }
+QWidget { background:#ffffff; color:#111827; }
+QFrame#headerFrame, QFrame#leftPanel, QFrame#previewPanel { background:#ffffff; color:#111827; }
+QFrame[panelRole="configCard"] { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:6px; }
+QLabel { background:#ffffff; color:#111827; font-size:14px; }
+QLabel[role="cardTitle"] { background:#ffffff; color:#111827; font-size:17px; font-weight:700; }
+QLabel[role="rowField"] { background:#ffffff; color:#111827; font-size:14px; }
+QLabel#viewerTitleLabel, QLabel#viewerStatusLabel, QLabel#viewerZoomLabel { background:#ffffff; color:#111827; }
 QPushButton { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; padding:8px 18px; font-size:15px; }
 QPushButton#finishButton, QPushButton#testRunButton, QPushButton[actionRole="secondary"], QPushButton[actionRole="plain"] { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; }
 QPushButton[actionRole="plain"] { padding:6px 12px; }
@@ -32,9 +32,9 @@ QToolButton[actionRole="toolbarIcon"], QToolButton#viewerGridButton, QToolButton
 QToolButton[actionRole="toolbarIcon"]:checked { background:#ffffff; border-color:#ff7a00; color:#111827; }
 QListWidget, QComboBox, QSpinBox, QLineEdit { background:#ffffff; border:1px solid #cfd6df; border-radius:4px; min-height:32px; color:#111827; }
 QListWidget#templateListWidget { font-size:14px; }
-QComboBox QAbstractItemView, QListWidget::item { background:#ffffff; color:#111827; selection-background-color:#e5f0fb; selection-color:#111827; outline:0; }
+QComboBox QAbstractItemView, QListWidget::item { background:#ffffff; color:#111827; selection-background-color:#ffffff; selection-color:#111827; outline:0; }
 QPushButton:disabled, QToolButton:disabled, QComboBox:disabled, QSpinBox:disabled, QLineEdit:disabled { background:#ffffff; color:#111827; border-color:#d7dde6; }
-QGraphicsView { border:1px solid #ff7a00; background:#11151b; }</string>
+QGraphicsView { border:1px solid #ff7a00; background:#ffffff; color:#111827; }</string>
   </property>
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing"><number>0</number></property>
@@ -52,7 +52,7 @@ QGraphicsView { border:1px solid #ff7a00; background:#11151b; }</string>
       <property name="rightMargin"><number>12</number></property>
       <item>
        <widget class="QLabel" name="headerTitleLabel">
-        <property name="styleSheet"><string notr="true">color:#ffffff; font-size:15px; font-weight:600;</string></property>
+        <property name="styleSheet"><string notr="true">background:#ffffff; color:#111827; font-size:15px; font-weight:600;</string></property>
         <property name="text"><string>方案编辑</string></property>
        </widget>
       </item>
@@ -64,13 +64,13 @@ QGraphicsView { border:1px solid #ff7a00; background:#11151b; }</string>
       </item>
       <item>
        <widget class="QToolButton" name="headerMaximizeButton">
-        <property name="styleSheet"><string notr="true">color:#ffffff; border:0; font-size:20px;</string></property>
+        <property name="styleSheet"><string notr="true">background:#ffffff; color:#111827; border:0; font-size:20px;</string></property>
         <property name="text"><string>□</string></property>
        </widget>
       </item>
       <item>
        <widget class="QToolButton" name="headerCloseButton">
-        <property name="styleSheet"><string notr="true">color:#ffffff; border:0; font-size:20px;</string></property>
+        <property name="styleSheet"><string notr="true">background:#ffffff; color:#111827; border:0; font-size:20px;</string></property>
         <property name="text"><string>×</string></property>
        </widget>
       </item>

@@ -4,6 +4,7 @@
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
+#include <QPointF>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
@@ -11,12 +12,14 @@
 
 #include <opencv2/core.hpp>
 
+//roi标签及id
 struct ColorRecognitionHalconLabel
 {
     QString name;
     int classId = 0;
 };
 
+//模板roi
 struct ColorRecognitionHalconSample
 {
     QString label;
@@ -25,16 +28,22 @@ struct ColorRecognitionHalconSample
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
 };
 
+//
 struct ColorRecognitionHalconConfig
 {
     QString halconSoPath;
     QStringList halconSoPathCandidates;
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    QString detectRegionType = QStringLiteral("rectangle");
+    QPointF detectCircleCenterNormalized;
+    double detectCircleRadiusNormalized = 0.0;
+    QRectF detectCircleBoundingRectNormalized;
     QString featureType = QStringLiteral("histogram");
     QString sensitivity = QStringLiteral("medium");
     bool brightnessEnabled = true;
     int knnK = 3;
     QString knnDistance = QStringLiteral("halcon_default");
+    QVector<QPointF> detectMaskPolygonNormalized;
     QVector<ColorRecognitionHalconLabel> labels;
     QVector<ColorRecognitionHalconSample> samples;
     QString judgeMode = QStringLiteral("min_score");

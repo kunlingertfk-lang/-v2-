@@ -25,6 +25,7 @@
 #include <QSizePolicy>
 #include <QtGlobal>
 #include <QWidget>
+#include <QFont>
 
 #include <cmath>
 
@@ -80,6 +81,16 @@ QColor overlayColor(const ToolOverlay &overlay)
         label == QStringLiteral("edge_count_text") ||
         label == QStringLiteral("line_result_text"))
         return QColor(255, 255, 255);
+    if (label == QStringLiteral("color_result_text")) {
+        const QString status = overlay.extra.value(QStringLiteral("status")).toString().trimmed().toUpper();
+        if (status == QStringLiteral("OK"))
+            return QColor(0, 210, 120);
+        if (status == QStringLiteral("NG"))
+            return QColor(255, 70, 70);
+        if (status == QStringLiteral("MASKED"))
+            return QColor(150, 90, 35);
+        return QColor(255, 255, 255);
+    }
     if (label == QStringLiteral("match_result") ||
         label == QStringLiteral("match_rect") ||
         label == QStringLiteral("match_bbox") ||
@@ -132,9 +143,22 @@ qreal overlayZValue(const ToolOverlay &overlay)
         return 116.0;
     if (label == QStringLiteral("score_text") ||
         label == QStringLiteral("match_score_text") ||
+        label == QStringLiteral("color_result_text") ||
         overlay.type == ToolOverlayType::Text)
         return 116.0;
     return 110.0;
+}
+
+QRectF rectFromOverlayExtra(const QJsonObject &extra)
+{
+    const QJsonObject json = extra.value(QStringLiteral("anchorRect")).toObject();
+    if (json.isEmpty())
+        return QRectF();
+
+    return QRectF(json.value(QStringLiteral("x")).toDouble(),
+                  json.value(QStringLiteral("y")).toDouble(),
+                  json.value(QStringLiteral("width")).toDouble(),
+                  json.value(QStringLiteral("height")).toDouble()).normalized();
 }
 
 bool finiteValue(const qreal value)
@@ -238,6 +262,7 @@ void FrameViewHelper::clear()
     clearToolOverlays();
     clearDraftRoiItem();
     clearDraftPolygonItem();
+    clearPolygonVertexItems();
     clearDraftCircleItem();
     clearLineBandItems(&m_lineBandDraftItems);
     clearLineBandItems(&m_lineBandItems);
@@ -254,6 +279,7 @@ void FrameViewHelper::clear()
         m_roiItem->hide();
     if (m_polygonItem)
         m_polygonItem->hide();
+    clearPolygonVertexItems();
     if (m_circleItem)
         m_circleItem->hide();
     m_scene->setSceneRect(QRectF());
@@ -441,8 +467,12 @@ void FrameViewHelper::clearPolygonRoi()
 {
     m_hasPolygonRoi = false;
     m_polygonNormalized.clear();
+    m_polygonDragging = false;
+    m_draggingPolygonVertexIndex = -1;
+    m_polygonDragStartNormalized.clear();
     if (m_polygonItem)
         m_polygonItem->hide();
+    clearPolygonVertexItems();
 }
 
 void FrameViewHelper::setCircleDrawingEnabled(bool enabled)
@@ -666,9 +696,33 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
             const QString fullText = overlay.text.isEmpty() ? overlay.label : overlay.text;
             const QString text = overlayTextForDisplay(fullText);
             QGraphicsSimpleTextItem *item = m_scene->addSimpleText(text);
+            if (overlay.label.trimmed().compare(QStringLiteral("color_result_text"), Qt::CaseInsensitive) == 0) {
+                QFont font = item->font();
+                font.setPointSize(18);
+                font.setBold(true);
+                item->setFont(font);
+            }
             item->setBrush(QBrush(color));
             item->setPen(cosmeticPen(QColor(0, 0, 0), 1.0));
-            item->setPos(clampedTextPosition(clampedImagePoint(overlay.p1), item->boundingRect()));
+            QPointF textPosition = clampedImagePoint(overlay.p1);
+            const QRectF anchorRect = rectFromOverlayExtra(overlay.extra).intersected(m_imageRect);
+            if (overlay.label.trimmed().compare(QStringLiteral("color_result_text"), Qt::CaseInsensitive) == 0 &&
+                anchorRect.width() > 0.0 && anchorRect.height() > 0.0) {
+                const QRectF bounds = item->boundingRect();
+                const qreal margin = 8.0;
+                if (anchorRect.width() >= bounds.width() + margin * 2.0 &&
+                    anchorRect.height() >= bounds.height() + margin * 2.0) {
+                    textPosition = QPointF(anchorRect.center().x() - bounds.width() / 2.0,
+                                           anchorRect.center().y() - bounds.height() / 2.0);
+                } else if (anchorRect.top() - bounds.height() - margin >= m_imageRect.top()) {
+                    textPosition = QPointF(anchorRect.left(), anchorRect.top() - bounds.height() - margin);
+                } else if (anchorRect.bottom() + bounds.height() + margin <= m_imageRect.bottom()) {
+                    textPosition = QPointF(anchorRect.left(), anchorRect.bottom() + margin);
+                } else {
+                    textPosition = QPointF(anchorRect.right() + margin, anchorRect.top());
+                }
+            }
+            item->setPos(clampedTextPosition(textPosition, item->boundingRect()));
             item->setToolTip(fullText);
             item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
             addOverlayItem(item, overlayZValue(overlay));
@@ -828,6 +882,71 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
 
                 setCircleRoiNormalized(roi);
                 emit circleChanged(m_circleRoi);
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && !m_roiDrawingEnabled && !m_polygonDrawingEnabled &&
+        !m_circleDrawingEnabled && !m_lineBandDrawingEnabled &&
+        m_hasPolygonRoi && m_polygonNormalized.size() >= 3 && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return false;
+
+                const int vertexIndex = polygonVertexIndexAt(imagePoint);
+                if (vertexIndex >= 0) {
+                    m_draggingPolygonVertexIndex = vertexIndex;
+                    return true;
+                }
+
+                if (polygonContainsImagePoint(imagePoint)) {
+                    m_polygonDragging = true;
+                    m_polygonDragStartImagePoint = imagePoint;
+                    m_polygonDragStartNormalized = m_polygonNormalized;
+                    return true;
+                }
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (m_draggingPolygonVertexIndex >= 0 && (mouseEvent->buttons() & Qt::LeftButton)) {
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return true;
+
+                QVector<QPointF> points = m_polygonNormalized;
+                if (m_draggingPolygonVertexIndex < points.size()) {
+                    points[m_draggingPolygonVertexIndex] = imagePointToNormalized(imagePoint);
+                    setPolygonRoiNormalized(points);
+                    emit polygonChanged(m_polygonNormalized);
+                }
+                return true;
+            }
+
+            if (m_polygonDragging && (mouseEvent->buttons() & Qt::LeftButton)) {
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return true;
+
+                setPolygonRoiNormalized(translatedPolygonNormalized(imagePoint - m_polygonDragStartImagePoint));
+                emit polygonChanged(m_polygonNormalized);
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton &&
+                (m_draggingPolygonVertexIndex >= 0 || m_polygonDragging)) {
+                m_draggingPolygonVertexIndex = -1;
+                m_polygonDragging = false;
+                m_polygonDragStartNormalized.clear();
+                emit polygonChanged(m_polygonNormalized);
                 return true;
             }
         }
@@ -1086,6 +1205,42 @@ double FrameViewHelper::polygonCloseThresholdPixels() const
     return 12.0;
 }
 
+int FrameViewHelper::polygonVertexIndexAt(const QPointF &imagePoint) const
+{
+    if (m_lastImage.isNull() || m_polygonNormalized.isEmpty())
+        return -1;
+
+    const double hitRadius = 9.0;
+    for (int index = 0; index < m_polygonNormalized.size(); ++index) {
+        if (QLineF(imagePoint, normalizedToImagePoint(m_polygonNormalized.at(index))).length() <= hitRadius)
+            return index;
+    }
+    return -1;
+}
+
+bool FrameViewHelper::polygonContainsImagePoint(const QPointF &imagePoint) const
+{
+    if (m_polygonNormalized.size() < 3)
+        return false;
+
+    QPolygonF polygon;
+    for (const QPointF &point : qAsConst(m_polygonNormalized))
+        polygon << normalizedToImagePoint(point);
+    return polygon.containsPoint(imagePoint, Qt::OddEvenFill);
+}
+
+QVector<QPointF> FrameViewHelper::translatedPolygonNormalized(const QPointF &deltaImage) const
+{
+    QVector<QPointF> translated;
+    if (m_lastImage.isNull() || m_polygonDragStartNormalized.isEmpty())
+        return translated;
+
+    translated.reserve(m_polygonDragStartNormalized.size());
+    for (const QPointF &point : qAsConst(m_polygonDragStartNormalized))
+        translated.append(imagePointToNormalized(normalizedToImagePoint(point) + deltaImage));
+    return translated;
+}
+
 bool FrameViewHelper::isValidCircleRoi(const CircleRoi &roi) const
 {
     if (!finitePoint(roi.centerNormalized) || !finiteValue(roi.radiusNormalized))
@@ -1293,6 +1448,7 @@ void FrameViewHelper::updatePolygonItem()
 
     if (!m_hasPolygonRoi || m_lastImage.isNull() || m_polygonNormalized.size() < 3) {
         m_polygonItem->hide();
+        clearPolygonVertexItems();
         return;
     }
 
@@ -1302,6 +1458,43 @@ void FrameViewHelper::updatePolygonItem()
 
     m_polygonItem->setPolygon(polygon);
     m_polygonItem->show();
+    updatePolygonVertexItems();
+}
+
+void FrameViewHelper::updatePolygonVertexItems()
+{
+    clearPolygonVertexItems();
+    if (!m_scene || !m_hasPolygonRoi || m_lastImage.isNull() || m_polygonNormalized.size() < 3)
+        return;
+
+    const double side = 10.0;
+    for (const QPointF &point : qAsConst(m_polygonNormalized)) {
+        const QPointF imagePoint = normalizedToImagePoint(point);
+        QGraphicsRectItem *item = m_scene->addRect(QRectF(imagePoint.x() - side / 2.0,
+                                                          imagePoint.y() - side / 2.0,
+                                                          side,
+                                                          side),
+                                                   cosmeticPen(QColor(0, 210, 255, 160), 1.2),
+                                                   QBrush(QColor(0, 210, 255, 35)));
+        item->setZValue(105.0);
+        m_polygonVertexItems.append(item);
+    }
+}
+
+void FrameViewHelper::clearPolygonVertexItems()
+{
+    if (!m_scene) {
+        m_polygonVertexItems.clear();
+        return;
+    }
+
+    for (QGraphicsItem *item : m_polygonVertexItems) {
+        if (item) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    m_polygonVertexItems.clear();
 }
 
 void FrameViewHelper::updateCircleItem()

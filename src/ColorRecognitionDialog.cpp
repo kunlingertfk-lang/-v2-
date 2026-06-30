@@ -4,7 +4,9 @@
 #include "PlanDialogUtils.h"
 
 #include <QButtonGroup>
+#include <QBrush>
 #include <QByteArray>
+#include <QColor>
 #include <QComboBox>
 #include <QDebug>
 #include <QFile>
@@ -32,6 +34,7 @@
 #include <QTimer>
 #include <QUuid>
 #include <QVBoxLayout>
+#include <QWidget>
 #include <QtConcurrent>
 
 #include <algorithm>
@@ -100,6 +103,74 @@ QJsonObject rectToJson(const QRectF &rect)
     json.insert(QStringLiteral("width"), rect.width());
     json.insert(QStringLiteral("height"), rect.height());
     return json;
+}
+
+QJsonObject pointToJson(const QPointF &point)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("x"), point.x());
+    json.insert(QStringLiteral("y"), point.y());
+    return json;
+}
+
+QPointF pointFromJson(const QJsonObject &json)
+{
+    return QPointF(json.value(QStringLiteral("x")).toDouble(),
+                   json.value(QStringLiteral("y")).toDouble());
+}
+
+QJsonArray pointsToJson(const QVector<QPointF> &points)
+{
+    QJsonArray array;
+    for (const QPointF &point : points)
+        array.append(pointToJson(point));
+    return array;
+}
+
+QVector<QPointF> pointsFromJson(const QJsonArray &array)
+{
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &value : array) {
+        const QPointF point = pointFromJson(value.toObject());
+        if (finiteValue(point.x()) && finiteValue(point.y()))
+            points.append(QPointF(qBound(0.0, point.x(), 1.0),
+                                  qBound(0.0, point.y(), 1.0)));
+    }
+    return points;
+}
+
+QJsonObject circleToJson(const CircleRoi &circle)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("center"), pointToJson(circle.centerNormalized));
+    json.insert(QStringLiteral("radius"), circle.radiusNormalized);
+    json.insert(QStringLiteral("boundingRect"), rectToJson(circle.boundingRectNormalized));
+    json.insert(QStringLiteral("valid"), circle.valid);
+    return json;
+}
+
+CircleRoi circleFromJson(const QJsonObject &json)
+{
+    CircleRoi circle;
+    circle.centerNormalized = pointFromJson(json.value(QStringLiteral("center")).toObject());
+    circle.radiusNormalized = json.value(QStringLiteral("radius")).toDouble();
+    const QRectF fallback(circle.centerNormalized.x() - circle.radiusNormalized,
+                          circle.centerNormalized.y() - circle.radiusNormalized,
+                          circle.radiusNormalized * 2.0,
+                          circle.radiusNormalized * 2.0);
+    const QJsonObject rectJson = json.value(QStringLiteral("boundingRect")).toObject();
+    const QRectF boundingRect(rectJson.value(QStringLiteral("x")).toDouble(fallback.x()),
+                              rectJson.value(QStringLiteral("y")).toDouble(fallback.y()),
+                              rectJson.value(QStringLiteral("width")).toDouble(fallback.width()),
+                              rectJson.value(QStringLiteral("height")).toDouble(fallback.height()));
+    circle.boundingRectNormalized = normalizedRoiOrDefault(boundingRect);
+    circle.valid = json.value(QStringLiteral("valid")).toBool(circle.radiusNormalized > 0.0) &&
+            finiteValue(circle.centerNormalized.x()) &&
+            finiteValue(circle.centerNormalized.y()) &&
+            finiteValue(circle.radiusNormalized) &&
+            circle.radiusNormalized > 0.0;
+    return circle;
 }
 
 QRectF rectFromJson(const QJsonObject &json, const QRectF &fallback)
@@ -270,6 +341,10 @@ QVector<ToolOverlay> colorRecognitionPreviewOverlaysWithoutRoi(const QVector<Too
             overlay.label.compare(QStringLiteral("ROI"), Qt::CaseInsensitive) == 0) {
             continue;
         }
+        if (overlay.type == ToolOverlayType::Circle &&
+            overlay.label.compare(QStringLiteral("ROI"), Qt::CaseInsensitive) == 0) {
+            continue;
+        }
         filtered.append(overlay);
     }
     return filtered;
@@ -344,7 +419,23 @@ ToolConfig ColorRecognitionDialog::toToolConfig() const
                   ui->allSegmentButton->isChecked()
                   ? QStringLiteral("all")
                   : QStringLiteral("basic"));
-    params.insert(QStringLiteral("detectRegionType"), QStringLiteral("rectangle"));
+    params.insert(QStringLiteral("detectRegionType"),
+                  (!m_globalDetection && m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid)
+                  ? QStringLiteral("circle")
+                  : QStringLiteral("rectangle"));
+    params.insert(QStringLiteral("detectCircleNormalized"),
+                  (!m_globalDetection && m_circleRoiNormalized.valid)
+                  ? circleToJson(m_circleRoiNormalized)
+                  : circleToJson(CircleRoi()));
+    params.insert(QStringLiteral("detectMaskType"), m_maskPolygonNormalized.size() >= 3
+                  ? QStringLiteral("polygon")
+                  : QStringLiteral("none"));
+    params.insert(QStringLiteral("detectMaskPolygon"), pointsToJson(m_maskPolygonNormalized));
+    params.insert(QStringLiteral("detectMaskApplied"), false);
+    params.insert(QStringLiteral("detectMaskReason"),
+                  m_maskPolygonNormalized.size() >= 3
+                  ? QStringLiteral("UI configured; HALCON color runner applies mask during detection")
+                  : QStringLiteral("not configured"));
     params.insert(QStringLiteral("colorModel"), colorModel);
     if (currentTemplate) {
         params.insert(QStringLiteral("featureType"), currentTemplate->featureType);
@@ -396,6 +487,16 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
     const QJsonObject colorModel = params.value(QStringLiteral("colorModel")).toObject();
     const QJsonObject judgeRule = config.judgeRule;
     setAllParamsMode(params.value(QStringLiteral("paramMode")).toString() == QStringLiteral("all"));
+    m_detectRegionType = params.value(QStringLiteral("detectRegionType")).toString(QStringLiteral("rectangle")).trimmed().toLower();
+    m_circleRoiNormalized = circleFromJson(params.value(QStringLiteral("detectCircleNormalized")).toObject());
+    if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid)
+        m_roiNormalized = normalizedRoiOrDefault(m_circleRoiNormalized.boundingRectNormalized);
+    else
+        m_detectRegionType = QStringLiteral("rectangle");
+    m_maskPolygonNormalized = pointsFromJson(params.value(QStringLiteral("detectMaskPolygon")).toArray());
+    if (m_maskPolygonNormalized.size() < 3)
+        m_maskPolygonNormalized.clear();
+    m_maskEditing = false;
 
     m_templates.clear();
     const QJsonArray templates = colorModel.value(QStringLiteral("templates")).toArray();
@@ -443,8 +544,18 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
     setComboBoxText(ui->expectedLabelComboBox,
                     judgeRule.value(QStringLiteral("expectedLabel")).toString());
     updateJudgementControls();
+    syncMaskControls();
 
-    syncRegionButtons(true);
+    if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid) {
+        const QSignalBlocker blockDraw(ui->regionDrawButton);
+        const QSignalBlocker blockRect(ui->regionRectButton);
+        const QSignalBlocker blockCircle(ui->regionCircleButton);
+        ui->regionDrawButton->setChecked(false);
+        ui->regionRectButton->setChecked(false);
+        ui->regionCircleButton->setChecked(true);
+    } else {
+        syncRegionButtons(true);
+    }
     m_referencePreviewSnapshot = ToolPreviewSnapshot();
     showPreviewImage();
     setViewerStatusText(roiStatusText(), roiStatusText());
@@ -472,8 +583,10 @@ void ColorRecognitionDialog::resizeEvent(QResizeEvent *event)
 void ColorRecognitionDialog::finishConfiguration()
 {
     stopLiveTestRun();
-    if (m_previewHelper)
+    if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
+        m_previewHelper->setCircleDrawingEnabled(false);
+    }
     accept();
 }
 
@@ -488,8 +601,11 @@ void ColorRecognitionDialog::runTest()
     ++m_testRunGeneration;
     m_displayedSampleIndex = -1;
     ui->testRunButton->setText(tr("停止测试"));
-    if (m_previewHelper && !m_globalDetection && m_displayedSampleIndex < 0)
-        m_previewHelper->setRoiDrawingEnabled(true);
+    if (m_previewHelper && !m_maskEditing && !m_globalDetection && m_displayedSampleIndex < 0) {
+        const bool circleMode = m_detectRegionType == QStringLiteral("circle");
+        m_previewHelper->setRoiDrawingEnabled(!circleMode);
+        m_previewHelper->setCircleDrawingEnabled(circleMode);
+    }
     refreshDisplayedRoiOverlay();
     performTestRun();
     if (m_testRunTimer)
@@ -542,8 +658,11 @@ void ColorRecognitionDialog::stopLiveTestRun()
     m_liveTestRunning = false;
     if (ui && ui->testRunButton)
         ui->testRunButton->setText(tr("测试运行"));
-    if (m_previewHelper && !m_globalDetection && m_displayedSampleIndex < 0)
-        m_previewHelper->setRoiDrawingEnabled(true);
+    if (m_previewHelper && !m_maskEditing && !m_globalDetection && m_displayedSampleIndex < 0) {
+        const bool circleMode = m_detectRegionType == QStringLiteral("circle");
+        m_previewHelper->setRoiDrawingEnabled(!circleMode);
+        m_previewHelper->setCircleDrawingEnabled(circleMode);
+    }
 }
 
 void ColorRecognitionDialog::setupUiState()
@@ -556,6 +675,7 @@ void ColorRecognitionDialog::setupUiState()
     ui->minScoreSpinBox->setRange(0, 100);
     ui->minScoreSpinBox->setValue(80);
     ui->viewerTitleLabel->setText(tr("基准图"));
+    ui->previewGraphicsView->setBackgroundBrush(QBrush(QColor(255, 255, 255)));
     ui->viewerStatusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     ui->viewerStatusLabel->setMinimumWidth(0);
     ui->viewerStatusLabel->setWordWrap(false);
@@ -576,35 +696,62 @@ void ColorRecognitionDialog::setupUiState()
         titleLabel->setProperty("role", QStringLiteral("cardTitle"));
         QToolButton *collapseButton = new QToolButton;
         collapseButton->setText(QStringLiteral("⌄"));
+        collapseButton->setCheckable(true);
         collapseButton->setProperty("role", QStringLiteral("collapseCard"));
         headerLayout->addWidget(titleLabel);
         headerLayout->addStretch(1);
         headerLayout->addWidget(collapseButton);
         maskLayout->addLayout(headerLayout);
 
+        QWidget *maskContent = new QWidget(m_maskCard);
+        QVBoxLayout *maskContentLayout = new QVBoxLayout(maskContent);
+        maskContentLayout->setContentsMargins(0, 0, 0, 0);
+        maskContentLayout->setSpacing(10);
+
         QHBoxLayout *editLayout = new QHBoxLayout;
         QLabel *fieldLabel = new QLabel(tr("屏蔽区"));
         fieldLabel->setMinimumWidth(118);
         fieldLabel->setProperty("role", QStringLiteral("rowField"));
-        QToolButton *rectButton = new QToolButton;
-        rectButton->setText(QStringLiteral("□"));
-        rectButton->setMinimumSize(74, 36);
-        rectButton->setCheckable(true);
-        rectButton->setEnabled(false);
-        rectButton->setToolTip(tr("屏蔽区域第一版仅按 UI 预留，暂不参与算法"));
-        rectButton->setProperty("actionRole", QStringLiteral("toolbarIcon"));
+        m_maskEditButton = new QPushButton(tr("编辑"));
+        m_maskEditButton->setProperty("actionRole", QStringLiteral("plain"));
+        m_maskEditButton->setToolTip(tr("编辑屏蔽区域"));
+        m_maskPolygonButton = new QToolButton;
+        m_maskPolygonButton->setText(QStringLiteral("⬡"));
+        m_maskPolygonButton->setMinimumSize(74, 36);
+        m_maskPolygonButton->setCheckable(true);
+        m_maskPolygonButton->setToolTip(tr("绘制多边形屏蔽区域"));
+        m_maskPolygonButton->setProperty("actionRole", QStringLiteral("toolbarIcon"));
+        m_maskFinishButton = new QPushButton(tr("完成"));
+        m_maskFinishButton->setProperty("actionRole", QStringLiteral("plain"));
         editLayout->addWidget(fieldLabel);
         editLayout->addStretch(1);
-        editLayout->addWidget(rectButton);
-        maskLayout->addLayout(editLayout);
+        editLayout->addWidget(m_maskEditButton);
+        editLayout->addWidget(m_maskPolygonButton);
+        editLayout->addWidget(m_maskFinishButton);
+        maskContentLayout->addLayout(editLayout);
+        maskLayout->addWidget(maskContent);
+        connect(collapseButton, &QToolButton::clicked, this, [collapseButton, maskContent](bool collapsed) {
+            maskContent->setVisible(!collapsed);
+            collapseButton->setText(collapsed ? QStringLiteral("›") : QStringLiteral("⌄"));
+        });
 
         ui->basicParamsLayout->insertWidget(2, m_maskCard);
     }
 
     setAllParamsMode(false);
-    syncRegionButtons(true);
+    if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid) {
+        const QSignalBlocker blockDraw(ui->regionDrawButton);
+        const QSignalBlocker blockRect(ui->regionRectButton);
+        const QSignalBlocker blockCircle(ui->regionCircleButton);
+        ui->regionDrawButton->setChecked(false);
+        ui->regionRectButton->setChecked(false);
+        ui->regionCircleButton->setChecked(true);
+    } else {
+        syncRegionButtons(true);
+    }
     updateTemplateList();
     updateJudgementControls();
+    syncMaskControls();
     setViewerStatusText(roiStatusText(), roiStatusText());
 }
 
@@ -634,6 +781,12 @@ void ColorRecognitionDialog::connectControls()
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &ColorRecognitionDialog::updateJudgementControls);
+    if (m_maskEditButton)
+        connect(m_maskEditButton, &QPushButton::clicked, this, &ColorRecognitionDialog::startMaskEditing);
+    if (m_maskPolygonButton)
+        connect(m_maskPolygonButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startMaskPolygonDrawing);
+    if (m_maskFinishButton)
+        connect(m_maskFinishButton, &QPushButton::clicked, this, &ColorRecognitionDialog::finishMaskEditing);
 
     auto connectCollapse = [this](QToolButton *button, const QList<QWidget *> &widgets) {
         if (!button)
@@ -689,7 +842,7 @@ void ColorRecognitionDialog::connectControls()
     m_regionGroup->addButton(ui->regionCircleButton, 2);
     connect(ui->regionDrawButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startGlobalDetection);
     connect(ui->regionRectButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startRectangleRoiEditing);
-    connect(ui->regionCircleButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startRectangleRoiEditing);
+    connect(ui->regionCircleButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startCircleRoiEditing);
 
     if (m_previewHelper) {
         connect(m_previewHelper,
@@ -702,6 +855,22 @@ void ColorRecognitionDialog::connectControls()
                 [this](const QRectF &) {
             handleRoiSelectionRejected();
         });
+        connect(m_previewHelper,
+                &FrameViewHelper::circleChanged,
+                this,
+                &ColorRecognitionDialog::handleCircleRoiChanged);
+        connect(m_previewHelper,
+                &FrameViewHelper::circleSelectionRejected,
+                this,
+                &ColorRecognitionDialog::handleCircleRoiSelectionRejected);
+        connect(m_previewHelper,
+                &FrameViewHelper::polygonChanged,
+                this,
+                &ColorRecognitionDialog::handleMaskPolygonChanged);
+        connect(m_previewHelper,
+                &FrameViewHelper::polygonSelectionRejected,
+                this,
+                &ColorRecognitionDialog::handleMaskPolygonSelectionRejected);
     }
 
     connect(&ReferenceImageProvider::instance(),
@@ -1197,6 +1366,8 @@ void ColorRecognitionDialog::startGlobalDetection()
 {
     showFrameForRoiEditing();
     m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    m_detectRegionType = QStringLiteral("rectangle");
+    m_circleRoiNormalized = CircleRoi();
     m_globalDetection = true;
     m_displayedSampleIndex = -1;
     const QSignalBlocker blockDraw(ui->regionDrawButton);
@@ -1207,7 +1378,9 @@ void ColorRecognitionDialog::startGlobalDetection()
     ui->regionCircleButton->setChecked(false);
     if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
+        m_previewHelper->setCircleDrawingEnabled(false);
         m_previewHelper->clearRoi();
+        m_previewHelper->clearCircleRoi();
         m_previewHelper->clearToolOverlays();
     }
     const QString text = tr("全局检测：测试运行将检测当前整张图像");
@@ -1217,6 +1390,8 @@ void ColorRecognitionDialog::startGlobalDetection()
 void ColorRecognitionDialog::startRectangleRoiEditing()
 {
     m_globalDetection = false;
+    m_detectRegionType = QStringLiteral("rectangle");
+    m_circleRoiNormalized = CircleRoi();
     m_displayedSampleIndex = -1;
     syncRegionButtons(true);
     showFrameForRoiEditing();
@@ -1225,8 +1400,38 @@ void ColorRecognitionDialog::startRectangleRoiEditing()
         return;
 
     m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+    m_previewHelper->clearCircleRoi();
+    m_previewHelper->setCircleDrawingEnabled(false);
     m_previewHelper->setRoiDrawingEnabled(true);
     const QString text = tr("请框选颜色识别矩形 ROI");
+    setViewerStatusText(text, text);
+}
+
+void ColorRecognitionDialog::startCircleRoiEditing()
+{
+    m_globalDetection = false;
+    m_detectRegionType = QStringLiteral("circle");
+    m_displayedSampleIndex = -1;
+    showFrameForRoiEditing();
+
+    const QSignalBlocker blockDraw(ui->regionDrawButton);
+    const QSignalBlocker blockRect(ui->regionRectButton);
+    const QSignalBlocker blockCircle(ui->regionCircleButton);
+    ui->regionDrawButton->setChecked(false);
+    ui->regionRectButton->setChecked(false);
+    ui->regionCircleButton->setChecked(true);
+
+    if (!m_previewHelper || !m_previewHelper->hasImage())
+        return;
+
+    m_previewHelper->setRoiDrawingEnabled(false);
+    m_previewHelper->clearRoi();
+    if (m_circleRoiNormalized.valid)
+        m_previewHelper->setCircleRoiNormalized(m_circleRoiNormalized);
+    else
+        m_previewHelper->clearCircleRoi();
+    m_previewHelper->setCircleDrawingEnabled(true);
+    const QString text = tr("请框选颜色识别圆形 ROI：按住左键从圆心拖拽半径");
     setViewerStatusText(text, text);
 }
 
@@ -1252,10 +1457,13 @@ void ColorRecognitionDialog::handleRoiChanged(const QRectF &roi)
 {
     m_roiNormalized = normalizedRoiOrDefault(roi);
     m_globalDetection = false;
+    m_detectRegionType = QStringLiteral("rectangle");
+    m_circleRoiNormalized = CircleRoi();
     m_displayedSampleIndex = -1;
     syncRegionButtons(true);
     if (m_previewHelper) {
         m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearCircleRoi();
         m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
     }
     const QString text = roiStatusText();
@@ -1270,12 +1478,152 @@ void ColorRecognitionDialog::handleRoiSelectionRejected()
     refreshDisplayedRoiOverlay();
 }
 
+void ColorRecognitionDialog::handleCircleRoiChanged(const CircleRoi &roi)
+{
+    if (!roi.valid)
+        return;
+
+    m_circleRoiNormalized = roi;
+    m_roiNormalized = normalizedRoiOrDefault(roi.boundingRectNormalized);
+    m_detectRegionType = QStringLiteral("circle");
+    m_globalDetection = false;
+    m_displayedSampleIndex = -1;
+
+    const QSignalBlocker blockDraw(ui->regionDrawButton);
+    const QSignalBlocker blockRect(ui->regionRectButton);
+    const QSignalBlocker blockCircle(ui->regionCircleButton);
+    ui->regionDrawButton->setChecked(false);
+    ui->regionRectButton->setChecked(false);
+    ui->regionCircleButton->setChecked(true);
+
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearRoi();
+        m_previewHelper->setCircleRoiNormalized(m_circleRoiNormalized);
+    }
+
+    const QString text = roiStatusText();
+    setViewerStatusText(text, text);
+    qDebug() << "[ColorRecognitionDialog] Circle ROI center:" << m_circleRoiNormalized.centerNormalized
+             << "radius:" << m_circleRoiNormalized.radiusNormalized
+             << "bounding:" << m_roiNormalized;
+}
+
+void ColorRecognitionDialog::handleCircleRoiSelectionRejected()
+{
+    const QString text = tr("ROI 无效，请从圆心拖拽半径至少 2 像素的圆形");
+    setViewerStatusText(text, text);
+    refreshDisplayedRoiOverlay();
+}
+
+void ColorRecognitionDialog::startMaskEditing()
+{
+    stopLiveTestRun();
+    m_maskEditing = true;
+    m_displayedSampleIndex = -1;
+    showFrameForRoiEditing();
+
+    if (m_previewHelper) {
+        m_previewHelper->setRoiDrawingEnabled(false);
+        m_previewHelper->setCircleDrawingEnabled(false);
+        m_previewHelper->clearRoi();
+        m_previewHelper->clearCircleRoi();
+        m_previewHelper->clearToolOverlays();
+        if (m_maskPolygonNormalized.size() >= 3)
+            m_previewHelper->setPolygonRoiNormalized(m_maskPolygonNormalized);
+        else
+            m_previewHelper->clearPolygonRoi();
+    }
+
+    syncMaskControls();
+    const QString text = tr("屏蔽区域编辑：点击多边形工具后左键添加角点，双击完成");
+    setViewerStatusText(text, text);
+}
+
+void ColorRecognitionDialog::startMaskPolygonDrawing()
+{
+    if (!m_maskEditing)
+        startMaskEditing();
+
+    if (!m_previewHelper || !m_previewHelper->hasImage()) {
+        const QString text = tr("当前无图像，无法绘制屏蔽区域");
+        setViewerStatusText(text, text);
+        syncMaskControls();
+        return;
+    }
+
+    m_previewHelper->setRoiDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
+    m_previewHelper->setPolygonDrawingEnabled(true);
+    if (m_maskPolygonButton)
+        m_maskPolygonButton->setChecked(true);
+    const QString text = tr("绘制屏蔽多边形：左键添加角点，双击完成；完成后可拖动整体或拖动顶点");
+    setViewerStatusText(text, text);
+}
+
+void ColorRecognitionDialog::finishMaskEditing()
+{
+    if (m_previewHelper) {
+        if (m_previewHelper->isPolygonDrawingEnabled())
+            m_previewHelper->finishPolygonDrawing();
+        m_previewHelper->setPolygonDrawingEnabled(false);
+    }
+
+    m_maskEditing = false;
+    syncMaskControls();
+    refreshDisplayedRoiOverlay();
+    const QString text = m_maskPolygonNormalized.size() >= 3
+            ? tr("屏蔽区域已设置：%1 个角点").arg(m_maskPolygonNormalized.size())
+            : tr("屏蔽区域未设置");
+    setViewerStatusText(text, text);
+}
+
+void ColorRecognitionDialog::handleMaskPolygonChanged(const QVector<QPointF> &points)
+{
+    if (!m_maskEditing)
+        return;
+
+    m_maskPolygonNormalized = points.size() >= 3 ? points : QVector<QPointF>();
+    syncMaskControls();
+    const QString text = m_maskPolygonNormalized.size() >= 3
+            ? tr("屏蔽多边形：%1 个角点，可拖动整体或顶点微调").arg(m_maskPolygonNormalized.size())
+            : tr("屏蔽多边形点数不足");
+    setViewerStatusText(text, text);
+}
+
+void ColorRecognitionDialog::handleMaskPolygonSelectionRejected(int pointCount)
+{
+    if (!m_maskEditing)
+        return;
+
+    const QString text = tr("屏蔽多边形无效：至少需要 3 个角点，当前 %1 个").arg(pointCount);
+    setViewerStatusText(text, text);
+    syncMaskControls();
+}
+
+void ColorRecognitionDialog::syncMaskControls()
+{
+    if (m_maskEditButton)
+        m_maskEditButton->setVisible(!m_maskEditing);
+    if (m_maskPolygonButton) {
+        m_maskPolygonButton->setVisible(m_maskEditing);
+        m_maskPolygonButton->setChecked(m_previewHelper && m_previewHelper->isPolygonDrawingEnabled());
+    }
+    if (m_maskFinishButton)
+        m_maskFinishButton->setVisible(m_maskEditing);
+}
+
 void ColorRecognitionDialog::refreshDisplayedRoiOverlay()
 {
     if (!m_previewHelper)
         return;
 
     m_previewHelper->clearRoi();
+    m_previewHelper->clearCircleRoi();
+    if (m_maskEditing && m_maskPolygonNormalized.size() >= 3)
+        m_previewHelper->setPolygonRoiNormalized(m_maskPolygonNormalized);
+    else
+        m_previewHelper->clearPolygonRoi();
     if (m_displayedSampleIndex >= 0) {
         if (const ColorRecognitionTemplateData *colorTemplate = activeTemplate()) {
             if (m_displayedSampleIndex < colorTemplate->samples.size()) {
@@ -1286,8 +1634,12 @@ void ColorRecognitionDialog::refreshDisplayedRoiOverlay()
         return;
     }
 
-    if (!m_globalDetection)
-        m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+    if (!m_globalDetection && !m_maskEditing) {
+        if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid)
+            m_previewHelper->setCircleRoiNormalized(m_circleRoiNormalized);
+        else
+            m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
+    }
 }
 
 void ColorRecognitionDialog::displayResult(const ToolResult &result, bool referenceSource)
@@ -1295,12 +1647,17 @@ void ColorRecognitionDialog::displayResult(const ToolResult &result, bool refere
     if (m_previewHelper) {
         const bool keepDetectRoiEditable =
                 m_liveTestRunning && !m_globalDetection && m_displayedSampleIndex < 0;
-        m_previewHelper->setRoiDrawingEnabled(keepDetectRoiEditable);
+        const bool keepCircleEditable =
+                keepDetectRoiEditable && m_detectRegionType == QStringLiteral("circle");
+        m_previewHelper->setRoiDrawingEnabled(keepDetectRoiEditable && !keepCircleEditable);
+        m_previewHelper->setCircleDrawingEnabled(keepCircleEditable);
         m_previewHelper->clearToolOverlays();
         m_previewHelper->setToolOverlays(keepDetectRoiEditable
                                          ? colorRecognitionPreviewOverlaysWithoutRoi(result.overlays)
                                          : result.overlays);
-        if (keepDetectRoiEditable)
+        if (keepCircleEditable && m_circleRoiNormalized.valid)
+            m_previewHelper->setCircleRoiNormalized(m_circleRoiNormalized);
+        else if (keepDetectRoiEditable)
             m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
     }
 
@@ -1354,6 +1711,13 @@ QString ColorRecognitionDialog::roiStatusText() const
 {
     if (m_globalDetection)
         return tr("全局检测：检测当前整张图像");
+
+    if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid) {
+        return tr("圆形检测 ROI cx=%1 cy=%2 r=%3")
+                .arg(m_circleRoiNormalized.centerNormalized.x(), 0, 'f', 3)
+                .arg(m_circleRoiNormalized.centerNormalized.y(), 0, 'f', 3)
+                .arg(m_circleRoiNormalized.radiusNormalized, 0, 'f', 3);
+    }
 
     const QRectF roi = effectiveRoiNormalized();
     return tr("矩形检测 ROI x=%1 y=%2 w=%3 h=%4")

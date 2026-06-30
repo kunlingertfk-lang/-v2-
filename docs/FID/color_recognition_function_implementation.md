@@ -35,7 +35,7 @@
 - 当前第一阶段只实现 `直方图特征`。
 - `色谱特征` 只保留配置枚举和 UI 入口，运行时返回 `unsupported_feature`，不得崩溃。
 - 图像输入仍可使用 `cv::Mat` 作为工程载体，但进入 runner 后必须桥接为 HALCON 图像。
-- 当前直方图链路包含：HALCON 图像桥接、ROI region/domain、通道拆分、颜色空间转换、直方图提取、KNN 分类流程。
+- 当前直方图链路包含：HALCON 图像桥接、ROI region/domain、通道拆分、颜色空间转换、直方图提取、直方图交集相似度比较流程。
 
 ### HALCON 算子链
 
@@ -50,21 +50,20 @@
   - `reduce_domain`：将 H/S/V 单通道图像限制到 ROI domain。
   - `gray_histo_range`：分别对 H、S 以及可选 V 通道提取固定 bin 数直方图。
   - 直方图结果按通道内像素总数归一化后拼接为特征向量；`brightnessEnabled=false` 时只使用 H/S，开启时使用 H/S/V。
-- KNN 分类链：
-  - `create_class_knn`：按特征维度创建 HALCON KNN 分类器。
-  - `add_sample_class_knn`：将模板样本特征及其 `classId` 加入分类器。
-  - `train_class_knn`：训练分类器，当前训练参数包含 `normalization=true`。
-  - `set_params_class_knn`：设置分类参数，当前使用 `method=classes_frequency`、`k=knnK`、`max_num_classes=1`、`num_checks=0`。
-  - `classify_class_knn`：对当前 ROI 特征进行分类，输出预测 class id 和 rating。
-  - `clear_class_knn` / `clear_obj`：释放 KNN handle 和 HALCON object。
+- 直方图交集相似度链：
+  - `tuple_min2`：对当前 ROI 特征和模板样本特征逐 bin 取最小值。
+  - `tuple_sum`：分别计算交集向量、当前 ROI 特征和模板样本特征的总和。
+  - 相似度公式为 `similarity = sum(min(queryFeature, sampleFeature)) / min(sum(queryFeature), sum(sampleFeature))`。
+  - 遍历当前模板下所有同维度样本，选择 `similarity` 最大的样本作为匹配样本。
+  - 匹配样本的 `classId` 作为预测类别 id，匹配样本或 labels 中的名称作为预测类别。
 - 得分映射：
-  - 当前 `rating` 按 `classes_frequency` 相对频率解释。
-  - 输出 `score = clamp(rating * 100, 0, 100)`。
-  - payload 写入 `scoreDirection=higher_is_better`、`scoreFormula=classes_frequency_rating_x100`、`ratingMode=classes_frequency_relative_frequency`。
+  - 当前 `rating` 即直方图交集相似度，范围按 0-1 归一化。
+  - 输出 `score = clamp(similarity * 100, 0, 100)`。
+  - payload 写入 `scoreDirection=higher_is_better`、`scoreFormula=histogram_intersection_similarity_x100`、`ratingMode=histogram_intersection_similarity`。
 
 ### 算法实现原理
 
-- 颜色识别第一阶段使用“颜色直方图特征 + HALCON KNN 分类”的方式实现。
+- 颜色识别第一阶段使用“颜色直方图特征 + HALCON tuple 交集相似度”的方式实现。
 - 训练样本生成：
   - 用户在 `ColorTemplateDialog` 中选择标签，并在样本图像上框选矩形 ROI。
   - 系统把 ROI 归一化坐标转换为当前图像上的像素矩形。
@@ -82,17 +81,21 @@
   - `ColorRecognitionAdapter` 从当前激活模板中读取 labels、samples、featureType、sensitivity、brightnessEnabled、knnK 和判断规则。
   - runner 对当前检测 ROI 提取一条查询特征。
   - runner 只使用与查询特征维度一致的模板样本；若没有可用样本，返回 `invalid_model_samples`。
-  - runner 临时创建 HALCON KNN 分类器，将模板样本特征和 `classId` 加入分类器并训练。
-  - 当前 KNN 使用 `normalization=true`，分类参数为 `method=classes_frequency`、`k=knnK`、`max_num_classes=1`、`num_checks=0`。
+  - runner 使用 HALCON `tuple_min2` 和 `tuple_sum` 逐样本计算直方图交集相似度。
+  - `knnK` 和 `knnDistance` 字段保留为历史配置字段，新版直方图交集判定不使用 KNN 分类器。
 
 ### 结果比较与判定
 
-- 特征比较不是手写距离公式完成，而是交给 HALCON `classify_class_knn` 完成。
-- HALCON KNN 会把当前 ROI 的查询特征与模板样本特征进行近邻比较，返回最匹配的类别 id 和 `rating`。
-- 当前 `method=classes_frequency`，因此 `rating` 表示 K 个近邻中预测类别的相对频率，可理解为该类别在近邻投票中的占比。
-- runner 将 `rating` 转成界面分数：
-  - `score = clamp(rating * 100, 0, 100)`。
-  - 分数越高表示 KNN 近邻投票越集中到预测类别。
+- 旧版需求：结果与判断基于 HALCON `classify_class_knn` 的预测类别和 `rating`。
+- 新版需求：结果与判断改为基于直方图交集相似度，不再使用 `classify_class_knn` 作为分类判定。
+- 对每个模板样本，runner 计算：
+  - `intersection = sum(min(queryFeature, sampleFeature))`。
+  - `normalizer = min(sum(queryFeature), sum(sampleFeature))`。
+  - `similarity = normalizer > 0 ? intersection / normalizer : 0`。
+- runner 选择 `similarity` 最大的样本作为最佳匹配。
+- runner 将 `similarity` 转成界面分数：
+  - `score = clamp(similarity * 100, 0, 100)`。
+  - 分数越高表示当前 ROI 颜色直方图与最佳模板样本越接近。
 - 类别名称解析：
   - 优先用预测 `classId` 在模板 labels 中查找标签名。
   - 如果 labels 中没有找到，再从可用样本中按 `classId` 回退查找样本标签。
@@ -101,8 +104,9 @@
   - `类别判断`：`predictedLabel == expectedLabel` 判定 OK，否则 NG；此时分数仍输出，但不参与 OK/NG。
 - 结果输出包含：
   - `predictedLabel`、`predictedClassId`。
-  - `rating` 原始值和转换后的 `score`。
+  - `similarity` / `rating` 原始值和转换后的 `score`。
   - `scoreDirection=higher_is_better`。
+  - `comparisonMethod=histogram_intersection`。
   - `sampleCount`、`featureLength`、`roiPixelsRect`、`elapsedMs`。
   - ROI 矩形 overlay 和 OK/NG 文本 overlay。
 
@@ -238,8 +242,8 @@
 - `samples[].roiImageHeight`：样本 ROI 图片高度。
 - `sensitivity`：敏感度。
 - `brightnessEnabled`：亮度是否参与。
-- `knnK`：K 值。
-- `knnDistance`：KNN 距离策略，当前为 HALCON 默认。
+- `knnK`：历史 KNN 配置字段，新版直方图交集判定不使用。
+- `knnDistance`：历史 KNN 距离策略字段，新版直方图交集判定不使用，payload 中记录为 `not_used_histogram_intersection`。
 - `judgeRule.mode`：`min_score` 或 `category`。
 - `judgeRule.minScore`：最低分数。
 - `judgeRule.expectedLabel`：目标类别。
@@ -328,7 +332,7 @@
   - 定义 HALCON 颜色识别配置、标签、样本、特征结果、运行结果。
 - `src/algorithms/recognition/ColorRecognitionHalconRunner.cpp`
   - 实现 HALCON 直方图特征提取。
-  - 实现 KNN 分类识别。
+  - 实现 HALCON `tuple_min2` / `tuple_sum` 直方图交集相似度识别。
   - 实现错误状态和结果输出。
 - `src/ToolsDialog.cpp`
   - 接入颜色识别配置对话框。
@@ -504,6 +508,41 @@
   ## 未实现功能（目前先不用管）
   - `ColorTemplateDialog` 拖动问题已按标题栏 `eventFilter()` 方案修复；仍需在真实 GUI 中手动复验拖动手感。
  
-<!-- 
+### 已实现功能
+- 更改结果比较与判断显示的字体，ok为绿色，NG为红色，字体加大加粗；roi太小就放在roi外面不能被边框边界遮挡。roi能放下字体就处于roi正中心
+- `ColorTemplateDialog`中的折叠也要与父窗口一致，可以折叠和显示参数
+- 亮度参数勾选进行优化，要有边框。
+- 屏蔽区域，改为“编辑”按钮。点击显示 选择“多边形roi图标”和“完成”按钮。当点击一次图标，可以在视图区域进行绘制多边形，点击一下左键增加一个角点，双击完成后能进行拖动，每个角点上增加一个透明小方框可以进行拖动。点击完成按钮，回到 “编辑”按钮。在编辑期间，不能选择检测区域的roi进行绘制。
+
+
+
+### 
+- 更改屏蔽roi区域，如果检测区域与屏蔽区域有交叉，完全包含，与完全被包含。需要进行裁剪，只检测没被屏蔽的区域。如果完全被包含在屏蔽区域中，则显示棕色颜色识别字体，不用进行检测。
+- 屏蔽roi在完成确认后，自动隐藏，当编辑屏蔽roi时，在显示出来
+
+### 2026-06-30 最新需求实现记录
+
+- 屏蔽 ROI 已接入颜色识别 runner：
+  - 主界面保存的 `detectMaskPolygon` 会经 `ColorRecognitionAdapter` 传递到 `ColorRecognitionHalconRunner`。
+  - runner 使用 HALCON `gen_region_polygon_filled` 生成屏蔽多边形 region。
+  - runner 使用 HALCON `difference` 对检测矩形 ROI 与屏蔽 region 做差集，后续直方图只在差集后的有效检测 region 内统计。
+  - runner 使用 HALCON `area_center` 检查有效检测 region 面积。
+- 检测 ROI 与屏蔽 ROI 的关系处理：
+  - 有交叉时，检测区域会扣除屏蔽区域，只检测剩余区域。
+  - 屏蔽区域包含检测区域时，有效检测面积为 0，runner 返回 `masked_roi_empty`，不继续进行颜色直方图比较。
+  - 检测区域包含屏蔽区域时，会裁剪掉内部屏蔽部分，继续检测剩余区域。
+- 完全屏蔽时显示：
+  - 输出 `颜色识别 已屏蔽` 文本 overlay。
+  - overlay 使用 `status=MASKED`，显示层映射为棕色字体。
+  - payload 写入 `detectMaskApplied=true`、`detectMaskFullyCoversRoi=true`。
+- 屏蔽 ROI 显隐：
+  - 点击 `完成` 后，屏蔽 ROI 自动隐藏。
+  - 仅进入屏蔽区域编辑状态时显示屏蔽 ROI，多边形仍可拖动和拖动角点。
+- 验证：
+  - 新增 `tests/color_recognition_mask_smoke.cpp`，覆盖“屏蔽 ROI 完全包含检测 ROI 时不检测并返回 `masked_roi_empty`”。
+  - 已执行该 smoke 测试，通过。
+  - 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j8`，编译链接通过。 
+
 ### 新需求
-- 更改结果比较与判断， -->
+- 颜色识别主颜色占比与光照稳定性优化计划
+

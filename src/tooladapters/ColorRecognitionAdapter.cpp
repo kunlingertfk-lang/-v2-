@@ -5,7 +5,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QPointF>
 #include <QtGlobal>
+
+#include <cmath>
 
 namespace {
 
@@ -49,6 +52,28 @@ QRectF rectFromJson(const QJsonObject &json, const QRectF &fallback)
                   json.value(QStringLiteral("y")).toDouble(fallback.y()),
                   json.value(QStringLiteral("width")).toDouble(fallback.width()),
                   json.value(QStringLiteral("height")).toDouble(fallback.height()));
+}
+
+QPointF pointFromJson(const QJsonObject &json, const QPointF &fallback = QPointF())
+{
+    return QPointF(json.value(QStringLiteral("x")).toDouble(fallback.x()),
+                   json.value(QStringLiteral("y")).toDouble(fallback.y()));
+}
+
+QVector<QPointF> pointsFromJson(const QJsonArray &array)
+{
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &value : array) {
+        const QJsonObject json = value.toObject();
+        const QPointF point(json.value(QStringLiteral("x")).toDouble(),
+                            json.value(QStringLiteral("y")).toDouble());
+        if (std::isfinite(point.x()) && std::isfinite(point.y())) {
+            points.append(QPointF(qBound(0.0, point.x(), 1.0),
+                                  qBound(0.0, point.y(), 1.0)));
+        }
+    }
+    return points;
 }
 
 QVector<double> featureFromJson(const QJsonArray &array)
@@ -126,6 +151,21 @@ ColorRecognitionHalconConfig toRunnerConfig(const ToolConfig &config)
                 &runnerConfig.halconSoPathCandidates);
     if (config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0)
         runnerConfig.roiNormalized = config.roiNormalized;
+    runnerConfig.detectRegionType = stringParam(params,
+                                                QStringLiteral("detectRegionType"),
+                                                runnerConfig.detectRegionType);
+    const QJsonObject circleJson = params.value(QStringLiteral("detectCircleNormalized")).toObject();
+    runnerConfig.detectCircleCenterNormalized =
+            pointFromJson(circleJson.value(QStringLiteral("center")).toObject());
+    runnerConfig.detectCircleRadiusNormalized =
+            circleJson.value(QStringLiteral("radius")).toDouble(0.0);
+    runnerConfig.detectCircleBoundingRectNormalized =
+            rectFromJson(circleJson.value(QStringLiteral("boundingRect")).toObject(),
+                         runnerConfig.roiNormalized);
+    runnerConfig.detectMaskPolygonNormalized =
+            pointsFromJson(params.value(QStringLiteral("detectMaskPolygon")).toArray());
+    if (runnerConfig.detectMaskPolygonNormalized.size() < 3)
+        runnerConfig.detectMaskPolygonNormalized.clear();
     runnerConfig.featureType = stringParam(modelSource,
                                            QStringLiteral("featureType"),
                                            stringParam(params,

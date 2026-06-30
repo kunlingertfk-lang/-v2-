@@ -8,16 +8,18 @@
 #include <QVector>
 
 #include "ColorTemplateDialog.h"
+#include "frame/FrameViewHelper.h"
 #include "tooladapters/ColorRecognitionAdapter.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolPreviewSnapshot.h"
 
-class FrameViewHelper;
 class QButtonGroup;
 class QFrame;
 class QListWidgetItem;
+class QPushButton;
 class QResizeEvent;
 class QTimer;
+class QToolButton;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -82,10 +84,19 @@ private:
     void showFrameForRoiEditing();
     void startGlobalDetection();
     void startRectangleRoiEditing();
+    void startCircleRoiEditing();
     void showUnsupportedRegionMessage();
     void syncRegionButtons(bool rectangleRegion);
     void handleRoiChanged(const QRectF &roi);
     void handleRoiSelectionRejected();
+    void handleCircleRoiChanged(const CircleRoi &roi);
+    void handleCircleRoiSelectionRejected();
+    void startMaskEditing();
+    void startMaskPolygonDrawing();
+    void finishMaskEditing();
+    void handleMaskPolygonChanged(const QVector<QPointF> &points);
+    void handleMaskPolygonSelectionRejected(int pointCount);
+    void syncMaskControls();
     void refreshDisplayedRoiOverlay();
     void displayResult(const ToolResult &result, bool referenceSource);
     void displayError(const QString &status, const QString &message);
@@ -100,6 +111,8 @@ private:
     QString m_toolId;
     bool m_enabled = true;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    QString m_detectRegionType = QStringLiteral("rectangle");
+    CircleRoi m_circleRoiNormalized;
     bool m_globalDetection = false;
     QVector<ColorRecognitionTemplateData> m_templates;
     QString m_activeTemplateId;
@@ -107,6 +120,11 @@ private:
     ToolPreviewSnapshot m_referencePreviewSnapshot;
     ColorRecognitionAdapter m_testAdapter;
     QFrame *m_maskCard = nullptr;
+    QPushButton *m_maskEditButton = nullptr;
+    QToolButton *m_maskPolygonButton = nullptr;
+    QPushButton *m_maskFinishButton = nullptr;
+    QVector<QPointF> m_maskPolygonNormalized;
+    bool m_maskEditing = false;
     bool m_previewUsesReferenceImage = true;
     QTimer *m_testRunTimer = nullptr;
     bool m_liveTestRunning = false;

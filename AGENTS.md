@@ -122,7 +122,7 @@
   - 色彩空间转换：`TransFromRgb`。
   - ROI 区域：`GenRectangle1` + `ReduceDomain`，或等效 HALCON region/domain 操作。
   - 直方图特征：`GrayHistoRange` 提取 H/S/V 或 H/S 通道直方图并归一化。
-  - KNN 分类：`create_class_knn`、`add_sample_class_knn`、`train_class_knn`、`classify_class_knn`。
+  - 直方图交集相似度：`tuple_min2` + `tuple_sum`，用于计算当前 ROI 特征与模板样本特征的交集相似度。
 - HALCON 调用方式：
   - 后续实现优先沿用当前工程已有的 `HalconC.h + dlopen/dlsym` 风格。
   - 不默认引入 `halconcpp` 链接方式；若必须使用 `HClassKnn` C++ wrapper，需先确认链接改动并再次向用户说明。
@@ -132,16 +132,16 @@
   - 基于矩形 ROI 生成 HALCON region 并 `ReduceDomain`。
   - 拆分 RGB 通道后用 `TransFromRgb` 转到适合颜色直方图的 HALCON 色彩空间。
   - 通过 `GrayHistoRange` 提取 H/S/V 或 H/S 直方图特征。
-  - 将标签样本特征加入 HALCON KNN 分类器并训练。
-  - 使用 `classify_class_knn` 输出预测类别和 `Rating`。
+  - 对当前 ROI 特征与每个模板样本特征使用 HALCON `tuple_min2` 逐 bin 取最小值，并用 `tuple_sum` 求交集总和。
+  - 计算 `similarity = sum(min(queryFeature, sampleFeature)) / min(sum(queryFeature), sum(sampleFeature))`，选择相似度最高的样本作为预测类别。
   - 根据判断依据输出 OK/NG。
 - KNN 参数要求：
-  - 实现前必须查 HALCON 24.11 的 KNN 参数名和值域。
-  - `K 值` 必须映射到 HALCON KNN 可用参数后才允许生效。
-  - `KNN 距离` 若不能映射到 HALCON 参数，UI 禁用该选项，并在 payload 中记录 `knnDistanceApplied="halcon_default"`。
+  - `K 值`、`KNN 距离` 保留为历史配置字段，新版直方图交集相似度判定不使用。
+  - payload 中记录 `knnDistanceApplied="not_used_histogram_intersection"`。
 - 得分与 `Rating`：
-  - 实现前必须用两类纯色小样本验证 `classify_class_knn` 的 `Rating` 方向和值域。
-  - 若 `Rating` 不是“越高越好”的百分制分数，必须明确转换到 0-100 的 `score`，并在 payload 中写入原始 `rating`、转换公式标识和 `scoreDirection`。
+  - `rating` 记录 0-1 的直方图交集相似度。
+  - `score = clamp(rating * 100, 0, 100)`，越高表示与最佳模板样本越接近。
+  - payload 必须写入原始 `rating`、`similarity`、转换公式标识和 `scoreDirection`。
 - OK/NG 判断：
   - `最低分数`：`score >= minScore` 为 OK，否则 NG。
   - `类别判断`：`predictedLabel == expectedLabel` 为 OK，否则 NG；得分仍输出但不参与 OK/NG。
@@ -174,13 +174,13 @@
   - 将 `色谱特征` 显示为置灰不可选。
   - 保存和回显新的 `ToolConfig.params` / `judgeRule`。
 - 需要更新 `ColorRecognitionAdapter`：
-- 从 `ToolConfig.params` / `judgeRule` 解析当前激活模板、颜色模型、特征类型、KNN 参数和判断规则。
+- 从 `ToolConfig.params` / `judgeRule` 解析当前激活模板、颜色模型、特征类型、历史 KNN 字段和判断规则。
   - 解析 `halconSoPath` 并通过 `HalconRuntimePaths::resolveHalconLibPath()` 检查 runtime。
   - 映射 HALCON runner 输出到 `ToolResult`。
 - 需要更新颜色识别 runner：
   - 必须新增或重命名为 `ColorRecognitionHalconRunner`。
   - 废弃 OpenCV HSV 覆盖率主路径。
-  - 基于 HALCON 图像、直方图和 KNN 分类接口实现直方图特征模式。
+  - 基于 HALCON 图像、直方图和 `tuple_min2` / `tuple_sum` 交集相似度实现直方图特征模式。
   - 保留 `spectrum` 接口并返回 `unsupported_feature`。
 
 ## 配置字段建议
@@ -228,7 +228,7 @@
 - 能在 `ColorTemplateDialog` 从矩形 ROI 添加样本，并在重新打开配置时回显样本数量。
 - 能选择 `直方图特征`；`色谱特征` 显示但不可选。
 - 能设置 `敏感度`、`亮度`、`K 值`。
-- `classify_class_knn` 的 `Rating` 方向和值域已用两类纯色小样本验证。
+- 直方图交集相似度方向和值域已用样本验证，`score=similarity*100`。
 - `最低分数` 判断能根据得分输出 OK/NG。、
 - `类别判断` 能根据预测类别输出 OK/NG。
 - 单次运行能输出预测类别、得分、OK/NG、ROI overlay、算法耗时和工具耗时。

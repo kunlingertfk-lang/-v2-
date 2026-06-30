@@ -128,6 +128,9 @@ private:
     QVector<QPointF> validNormalizedPolygon(const QVector<QPointF> &points) const;
     bool completeDraftPolygon();
     double polygonCloseThresholdPixels() const;
+    int polygonVertexIndexAt(const QPointF &imagePoint) const;
+    bool polygonContainsImagePoint(const QPointF &imagePoint) const;
+    QVector<QPointF> translatedPolygonNormalized(const QPointF &deltaImage) const;
     bool isValidCircleRoi(const CircleRoi &roi) const;
     CircleRoi validCircleRoi(const CircleRoi &roi) const;
     CircleRoi imageCircleToNormalized(const QPointF &center, double radiusPixels) const;
@@ -142,6 +145,8 @@ private:
     QRectF validNormalizedRect(const QRectF &rect) const;
     void updateRoiItem();
     void updatePolygonItem();
+    void updatePolygonVertexItems();
+    void clearPolygonVertexItems();
     void updateCircleItem();
     void updateLineBandItem();
     void updateDraftRoiItem(const QRectF &imageRect);
@@ -171,8 +176,12 @@ private:
     QVector<QPointF> m_polygonNormalized;
     QVector<QPointF> m_draftPolygonImagePoints;
     QVector<QGraphicsItem *> m_draftPolygonPointItems;
+    QVector<QGraphicsItem *> m_polygonVertexItems;
     QPointF m_polygonHoverPoint;
     bool m_polygonHoverPointValid = false;
+    QPointF m_polygonDragStartImagePoint;
+    QVector<QPointF> m_polygonDragStartNormalized;
+    int m_draggingPolygonVertexIndex = -1;
     CircleRoi m_circleRoi;
     QPointF m_circleDraftCenter;
     double m_circleDraftRadiusPixels = 0.0;
@@ -189,6 +198,7 @@ private:
     bool m_circleDrawingEnabled = false;
     bool m_lineBandDrawingEnabled = false;
     bool m_roiDrawing = false;
+    bool m_polygonDragging = false;
     bool m_circleDrawing = false;
     bool m_lineBandDrawingLine = false;
     bool m_lineBandAdjustingWidth = false;

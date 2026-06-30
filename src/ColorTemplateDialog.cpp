@@ -8,6 +8,7 @@
 
 #include <QButtonGroup>
 #include <QBuffer>
+#include <QBrush>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDebug>
@@ -37,6 +38,7 @@
 #include <QStandardItemModel>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QWidget>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
@@ -143,13 +145,24 @@ QFrame *makeCard(const QString &title, QVBoxLayout **contentLayout)
     titleLabel->setProperty("role", QStringLiteral("cardTitle"));
     QToolButton *collapseButton = new QToolButton;
     collapseButton->setText(QStringLiteral("⌄"));
+    collapseButton->setCheckable(true);
     collapseButton->setProperty("role", QStringLiteral("collapseCard"));
     header->addWidget(titleLabel);
     header->addStretch(1);
     header->addWidget(collapseButton);
     layout->addLayout(header);
 
-    *contentLayout = layout;
+    QWidget *contentWidget = new QWidget(card);
+    QVBoxLayout *content = new QVBoxLayout(contentWidget);
+    content->setContentsMargins(0, 0, 0, 0);
+    content->setSpacing(14);
+    layout->addWidget(contentWidget);
+    QObject::connect(collapseButton, &QToolButton::clicked, card, [collapseButton, contentWidget](bool collapsed) {
+        contentWidget->setVisible(!collapsed);
+        collapseButton->setText(collapsed ? QStringLiteral("›") : QStringLiteral("⌄"));
+    });
+
+    *contentLayout = content;
     return card;
 }
 
@@ -314,27 +327,28 @@ void ColorTemplateDialog::buildUi()
     setWindowModality(Qt::WindowModal);
 
     setStyleSheet(QStringLiteral(
-        "QDialog { background:#eef1f5; }"
-        "QFrame#headerFrame { background:#3f4652; }"
-        "QFrame#leftPanel { background:#eef1f5; }"
-        "QFrame#previewPanel { background:#20242b; }"
-        "QFrame[panelRole=\"configCard\"] { background:#ffffff; border-radius:6px; }"
-        "QLabel { color:#334155; font-size:14px; }"
-        "QLabel[role=\"cardTitle\"] { color:#1f2937; font-size:17px; font-weight:700; }"
-        "QLabel[role=\"rowField\"] { color:#475569; font-size:14px; }"
-        "QToolButton[role=\"collapseCard\"] { border:0; color:#64748b; font-size:18px; }"
+        "QDialog { background:#ffffff; color:#111827; }"
+        "QWidget { background:#ffffff; color:#111827; }"
+        "QFrame#headerFrame, QFrame#leftPanel, QFrame#previewPanel { background:#ffffff; color:#111827; }"
+        "QFrame[panelRole=\"configCard\"] { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:6px; }"
+        "QLabel { background:#ffffff; color:#111827; font-size:14px; }"
+        "QLabel[role=\"cardTitle\"] { background:#ffffff; color:#111827; font-size:17px; font-weight:700; }"
+        "QLabel[role=\"rowField\"] { background:#ffffff; color:#111827; font-size:14px; }"
+        "QToolButton[role=\"collapseCard\"] { background:#ffffff; border:1px solid #cfd6df; color:#111827; font-size:18px; }"
         "QToolButton[actionRole=\"toolbarIcon\"] { background:#ffffff; border:1px solid #cfd6df; border-radius:4px; color:#111827; }"
         "QToolButton[actionRole=\"toolbarIcon\"]:checked { background:#ffffff; border-color:#ff7a00; color:#111827; }"
         "QLineEdit, QComboBox, QSpinBox, QListWidget { background:#ffffff; border:1px solid #cfd6df; border-radius:4px; min-height:32px; color:#111827; }"
-        "QComboBox QAbstractItemView, QListWidget::item { background:#ffffff; color:#111827; selection-background-color:#e5f0fb; selection-color:#111827; outline:0; }"
+        "QComboBox QAbstractItemView, QListWidget::item { background:#ffffff; color:#111827; selection-background-color:#ffffff; selection-color:#111827; outline:0; }"
         "QListWidget#roiSampleListWidget { padding:6px; }"
         "QListWidget#roiSampleListWidget::item { min-width:86px; min-height:74px; margin:4px; border:1px solid #d7dde6; border-radius:4px; }"
-        "QCheckBox { color:#111827; background:#ffffff; }"
+        "QCheckBox { color:#111827; background:#ffffff; border:1px solid #cfd6df; border-radius:4px; padding:6px 10px; min-height:20px; }"
+        "QCheckBox::indicator { width:16px; height:16px; border:1px solid #9aa6b2; border-radius:3px; background:#ffffff; }"
+        "QCheckBox::indicator:checked { background:#ffffff; border-color:#ff7a00; }"
         "QPushButton { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; padding:8px 18px; font-size:14px; }"
         "QPushButton[actionRole=\"primary\"], QPushButton[actionRole=\"secondary\"], QPushButton[actionRole=\"plain\"] { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; }"
         "QPushButton:disabled, QToolButton:disabled, QComboBox:disabled, QSpinBox:disabled, QLineEdit:disabled { background:#ffffff; color:#111827; border-color:#d7dde6; }"
-        "QLabel#viewerTitleLabel, QLabel#statusLabel { color:#f5f7fb; }"
-        "QGraphicsView { border:1px solid #ff7a00; background:#11151b; }"));
+        "QLabel#viewerTitleLabel, QLabel#statusLabel { background:#ffffff; color:#111827; }"
+        "QGraphicsView { border:1px solid #ff7a00; background:#ffffff; color:#111827; }"));
 
     QVBoxLayout *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -350,10 +364,10 @@ void ColorTemplateDialog::buildUi()
     QLabel *headerTitle = new QLabel(tr("颜色模板创建"));
     headerTitle->setProperty("colorTemplateDragHandle", true);
     headerTitle->installEventFilter(this);
-    headerTitle->setStyleSheet(QStringLiteral("color:#ffffff; font-size:15px; font-weight:600;"));
+    headerTitle->setStyleSheet(QStringLiteral("background:#ffffff; color:#111827; font-size:15px; font-weight:600;"));
     QToolButton *closeButton = new QToolButton;
     closeButton->setText(QStringLiteral("×"));
-    closeButton->setStyleSheet(QStringLiteral("color:#ffffff; border:0; font-size:20px;"));
+    closeButton->setStyleSheet(QStringLiteral("background:#ffffff; color:#111827; border:0; font-size:20px;"));
     headerLayout->addWidget(headerTitle);
     headerLayout->addStretch(1);
     headerLayout->addWidget(closeButton);
@@ -523,6 +537,7 @@ void ColorTemplateDialog::buildUi()
     content->addWidget(previewPanel, 1);
 
     m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
+    m_previewGraphicsView->setBackgroundBrush(QBrush(QColor(255, 255, 255)));
 }
 
 void ColorTemplateDialog::setupUiState()
