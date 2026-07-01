@@ -33,6 +33,8 @@
 
 namespace {
 
+constexpr int kActionButtonFlashMs = 120;
+
 bool finiteValue(qreal value)
 {
     return std::isfinite(static_cast<double>(value));
@@ -171,6 +173,21 @@ void refreshButtonStyle(QWidget *button)
     button->style()->unpolish(button);
     button->style()->polish(button);
     button->update();
+}
+
+void installActionButtonFlash(QPushButton *button)
+{
+    if (!button)
+        return;
+
+    QObject::connect(button, &QPushButton::clicked, button, [button]() {
+        button->setProperty("flash", true);
+        refreshButtonStyle(button);
+        QTimer::singleShot(kActionButtonFlashMs, button, [button]() {
+            button->setProperty("flash", false);
+            refreshButtonStyle(button);
+        });
+    });
 }
 
 } // namespace
@@ -449,6 +466,11 @@ void ColorComparisonDialog::buildUi()
     m_testRunButton->setProperty("running", false);
     m_finishButton->setProperty("actionRole", QStringLiteral("testPrimary"));
     m_exitTestButton->setProperty("actionRole", QStringLiteral("testAction"));
+    m_exitTestButton->setObjectName(QStringLiteral("exitTestButton"));
+    installActionButtonFlash(m_referenceTestButton);
+    installActionButtonFlash(m_testRunButton);
+    installActionButtonFlash(m_finishButton);
+    installActionButtonFlash(m_exitTestButton);
     bottomButtons->addStretch(1);
     bottomButtons->addWidget(m_referenceTestButton);
     bottomButtons->addWidget(m_testRunButton);
@@ -477,12 +499,20 @@ void ColorComparisonDialog::buildUi()
     setStyleSheet(styleSheet() + QStringLiteral(
         "QPushButton,QToolButton,QComboBox,QSpinBox{background:#ffffff;color:#111827;border:1px solid #cfd6df;padding:6px;}"
         "QPushButton:checked,QToolButton:checked{background:#fff3e6;color:#ff7a00;border-color:#ff7a00;}"
-        "QPushButton[actionRole=\"testAction\"]{background:#ffffff;color:#1f2937;border:1px solid #cfd6df;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000;border-color:#000;}"
+        "QPushButton[actionRole=\"testPrimary\"]:pressed,QPushButton[actionRole=\"testPrimary\"][flash=\"true\"]{background:#ffffff;color:#111827;border-color:#111827;}"
+        "QPushButton[actionRole=\"testPrimary\"]:disabled{background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;}"
+        "QPushButton[actionRole=\"testAction\"]{background:#ffffff;color:#111827;border:1px solid #9ca3af;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton[actionRole=\"testAction\"]:hover{background:#f9fafb;border-color:#111827;}"
+        "QPushButton[actionRole=\"testAction\"]:pressed,QPushButton[actionRole=\"testAction\"][flash=\"true\"]{background:#111827;color:#ffffff;border-color:#111827;}"
         "QPushButton[actionRole=\"testAction\"][running=\"true\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;}"
-        "QPushButton[actionRole=\"testAction\"]:pressed{background:#ffe1bf;color:#ff7a00;border-color:#ff7a00;}"
-        "QPushButton[actionRole=\"testAction\"][running=\"true\"]:pressed{background:#e66f00;color:#ffffff;border-color:#e66f00;}"
-        "QPushButton[actionRole=\"testPrimary\"]{background:#ff7a00;color:#ffffff;border:1px solid #ff7a00;border-radius:4px;padding:0;font-size:15px;}"
-        "QPushButton[actionRole=\"testPrimary\"]:pressed{background:#e66f00;color:#ffffff;border-color:#e66f00;}"
+        "QPushButton[actionRole=\"testAction\"][running=\"true\"]:hover{background:#e66e00;border-color:#e66e00;}"
+        "QPushButton[actionRole=\"testAction\"]:disabled{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}"
+        "QPushButton#exitTestButton{background:transparent;color:#6b7280;border:1px solid #d1d5db;}"
+        "QPushButton#exitTestButton:hover{background:#fef2f2;color:#dc2626;border-color:#dc2626;}"
+        "QPushButton#exitTestButton:pressed,QPushButton#exitTestButton[flash=\"true\"]{background:#dc2626;color:#ffffff;border-color:#dc2626;}"
+        "QPushButton#exitTestButton:disabled{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}"
         "QToolButton:pressed{background:#ffe1bf;color:#ff7a00;border-color:#ff7a00;}"));
 
     m_basicButton->setChecked(true);
@@ -699,6 +729,8 @@ void ColorComparisonDialog::handleRoiChanged(const QRectF &roi)
     } else if (m_editState == EditState::DetectRect) {
         m_detectRoi = normalizedRoiOrDefault(roi);
         refreshRoiOverlay();
+        if (m_liveTestSource != LiveTestSource::None)
+            rerunLiveComparison();  // 测试态下绘制完成立即以新检测区域重跑比较
     }
 }
 
@@ -710,6 +742,8 @@ void ColorComparisonDialog::handleCircleChanged(const CircleRoi &circle)
     if (circle.valid) {
         m_detectRoi = normalizedRoiOrDefault(circle.boundingRectNormalized);
         refreshRoiOverlay();
+        if (m_liveTestSource != LiveTestSource::None)
+            rerunLiveComparison();  // 测试态下绘制完成立即以新检测区域重跑比较
     }
 }
 
@@ -922,8 +956,9 @@ void ColorComparisonDialog::runTest()
     if (m_testUiMode == TestUiMode::Continuous) {
         stopContinuousRun();
         m_testUiMode = TestUiMode::TestPaused;
+        applyDetectRoiEditState();
         updateBottomButtons();
-        updateStatus(tr("连续运行已停止，视图保留最后一帧"));
+        updateStatus(tr("连续运行已停止，视图保留最后一帧，可继续绘制检测区域即时重测"));
         return;
     }
 
@@ -933,7 +968,9 @@ void ColorComparisonDialog::runTest()
 void ColorComparisonDialog::runReferenceTest()
 {
     stopContinuousRun();
+    m_liveTestSource = LiveTestSource::Reference;
     m_testUiMode = TestUiMode::Edit;
+    applyDetectRoiEditState();
     updateBottomButtons();
 
     const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
@@ -949,6 +986,8 @@ void ColorComparisonDialog::runReferenceTest()
 void ColorComparisonDialog::startContinuousRun()
 {
     m_testUiMode = TestUiMode::Continuous;
+    m_liveTestSource = LiveTestSource::Camera;
+    applyDetectRoiEditState();
     updateBottomButtons();
     if (m_continuousTimer && !m_continuousTimer->isActive())
         m_continuousTimer->start();
@@ -980,22 +1019,70 @@ void ColorComparisonDialog::runSingleShotTest()
 {
     stopContinuousRun();
     m_testUiMode = TestUiMode::TestPaused;
+    m_liveTestSource = LiveTestSource::Camera;
+    m_liveTestFrameSnapshot = CameraFrameProvider::instance().currentFrame();
+    applyDetectRoiEditState();
     updateBottomButtons();
 
-    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
-    if (frame.empty()) {
+    if (m_liveTestFrameSnapshot.empty()) {
         displayError(QStringLiteral("image_empty"), tr("当前帧为空"));
         return;
     }
 
-    showFrameImage(frame, tr("单次测试快照"));
-    runComparisonOnFrame(frame.clone(), tr("单次测试快照"), false);
+    showFrameImage(m_liveTestFrameSnapshot, tr("单次测试快照"));
+    runComparisonOnFrame(m_liveTestFrameSnapshot.clone(), tr("单次测试快照"), false);
+}
+
+void ColorComparisonDialog::rerunLiveComparison()
+{
+    if (m_liveTestSource == LiveTestSource::None)
+        return;
+
+    cv::Mat frame;
+    bool referenceSource = false;
+    QString title;
+    if (m_liveTestSource == LiveTestSource::Reference) {
+        frame = ReferenceImageProvider::instance().referenceFrame();
+        referenceSource = true;
+        title = tr("基准图");
+        if (frame.empty()) {
+            displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
+            return;
+        }
+    } else {
+        if (m_testUiMode == TestUiMode::Continuous) {
+            frame = CameraFrameProvider::instance().currentFrame();
+            title = tr("测试图像");
+        } else {
+            frame = m_liveTestFrameSnapshot;
+            title = tr("单次测试快照");
+        }
+        if (frame.empty()) {
+            displayError(QStringLiteral("image_empty"), tr("当前图像为空"));
+            return;
+        }
+    }
+
+    showFrameImage(frame, title);
+    runComparisonOnFrame(frame.clone(), title, referenceSource);
+}
+
+void ColorComparisonDialog::applyDetectRoiEditState()
+{
+    if (m_detectRegionType == QStringLiteral("circle"))
+        setEditState(EditState::DetectCircle);
+    else if (m_detectRegionType == QStringLiteral("rectangle"))
+        setEditState(EditState::DetectRect);
+    else
+        setEditState(EditState::None);
 }
 
 void ColorComparisonDialog::exitTestMode()
 {
     stopContinuousRun();
+    m_liveTestSource = LiveTestSource::None;
     m_testUiMode = TestUiMode::Edit;
+    setEditState(EditState::None);
     updateBottomButtons();
     showPreviewImage();
     refreshRoiOverlay();
@@ -1035,6 +1122,8 @@ void ColorComparisonDialog::runComparisonOnFrame(const cv::Mat &frame,
     request.image = frame.clone();
     if (!imageTitle.isEmpty() && m_viewerTitleLabel)
         m_viewerTitleLabel->setText(imageTitle);
+    if (!referenceSource)
+        m_liveTestFrameSnapshot = frame;  // 缓存为停止态重测的快照帧
     displayResult(m_testAdapter.run(request), referenceSource);
     m_comparisonRunning = false;
 }
