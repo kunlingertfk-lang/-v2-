@@ -33,6 +33,9 @@ QToolButton[actionRole="toolbarIcon"]:checked { background:#ffffff; border-color
 QListWidget, QComboBox, QSpinBox, QLineEdit { background:#ffffff; border:1px solid #cfd6df; border-radius:4px; min-height:32px; color:#111827; }
 QListWidget#templateListWidget { font-size:14px; }
 QComboBox QAbstractItemView, QListWidget::item { background:#ffffff; color:#111827; selection-background-color:#ffffff; selection-color:#111827; outline:0; }
+QCheckBox { background:#ffffff; color:#111827; border:1px solid #cfd6df; border-radius:4px; padding:6px 10px; min-height:20px; }
+QCheckBox::indicator { width:16px; height:16px; border:1px solid #9aa6b2; border-radius:3px; background:#ffffff; }
+QCheckBox::indicator:checked { background:#ff7a00; border-color:#ff7a00; }
 QPushButton:disabled, QToolButton:disabled, QComboBox:disabled, QSpinBox:disabled, QLineEdit:disabled { background:#ffffff; color:#111827; border-color:#d7dde6; }
 QGraphicsView { border:1px solid #ff7a00; background:#ffffff; color:#111827; }</string>
   </property>
@@ -193,6 +196,25 @@ QGraphicsView { border:1px solid #ff7a00; background:#ffffff; color:#111827; }</
                  <item><widget class="QToolButton" name="regionRectButton"><property name="minimumSize"><size><width>74</width><height>36</height></size></property><property name="text"><string>□</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="actionRole" stdset="0"><string>toolbarIcon</string></property></widget></item>
                  <item><widget class="QToolButton" name="regionCircleButton"><property name="minimumSize"><size><width>74</width><height>36</height></size></property><property name="text"><string>○</string></property><property name="checkable"><bool>true</bool></property><property name="actionRole" stdset="0"><string>toolbarIcon</string></property></widget></item>
                 </layout>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="positionCorrectionEnableLayout">
+                 <item><widget class="QLabel" name="positionCorrectionEnableLabel"><property name="text"><string>独立位置修正使能 ⓘ</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
+                 <item><spacer name="positionCorrectionEnableSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+                 <item><widget class="QCheckBox" name="positionCorrectionSwitch"><property name="text"><string/></property></widget></item>
+                </layout>
+               </item>
+               <item>
+                <widget class="QWidget" name="positionCorrectionSourceRow">
+                 <layout class="QHBoxLayout" name="positionCorrectionSourceLayout">
+                  <property name="leftMargin"><number>0</number></property>
+                  <property name="topMargin"><number>0</number></property>
+                  <property name="rightMargin"><number>0</number></property>
+                  <property name="bottomMargin"><number>0</number></property>
+                  <item><widget class="QLabel" name="positionCorrectionSourceLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>位置修正</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
+                  <item><widget class="QComboBox" name="positionCorrectionSourceComboBox"><item><property name="text"><string>1 基准图.位置修正信息</string></property></item></widget></item>
+                 </layout>
+                </widget>
                </item>
               </layout>
              </widget>

@@ -1,0 +1,58 @@
+#ifndef ALGORITHMS_RECOGNITION_COLORCOMPARISONHALCONRUNNER_H
+#define ALGORITHMS_RECOGNITION_COLORCOMPARISONHALCONRUNNER_H
+
+#include "toolcore/ToolOverlay.h"
+
+#include <QJsonObject>
+#include <QPointF>
+#include <QRectF>
+#include <QString>
+#include <QStringList>
+#include <QVector>
+
+#include <opencv2/core.hpp>
+
+struct ColorComparisonHalconConfig
+{
+    QString halconSoPath;
+    QStringList halconSoPathCandidates;
+    QRectF templateRoiNormalized = QRectF(0.0, 0.0, 0.5, 0.5);
+    QVector<QPointF> templateMaskPolygonNormalized;
+    QVector<double> templateFeature;
+    QRectF detectRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    QString detectRegionType = QStringLiteral("rectangle");
+    QPointF detectCircleCenterNormalized;
+    double detectCircleRadiusNormalized = 0.0;
+    QRectF detectCircleBoundingRectNormalized;
+    QVector<QPointF> detectMaskPolygonNormalized;
+    QString featureType = QStringLiteral("histogram");
+    QString sensitivity = QStringLiteral("medium");
+    bool brightnessEnabled = true;
+    bool enablePositionCorrection = false;
+    QString positionCorrectionSource;
+    int minScore = 52;
+};
+
+struct ColorComparisonHalconResult
+{
+    bool success = false;
+    bool ok = false;
+    QString status;
+    QString message;
+    double score = 0.0;
+    double similarity = 0.0;
+    qint64 elapsedMs = 0;
+    QVector<double> templateFeature;
+    QVector<double> detectFeature;
+    QVector<ToolOverlay> overlays;
+    QJsonObject payload;
+};
+
+class ColorComparisonHalconRunner
+{
+public:
+    ColorComparisonHalconResult run(const cv::Mat &image,
+                                    const ColorComparisonHalconConfig &config) const;
+};
+
+#endif // ALGORITHMS_RECOGNITION_COLORCOMPARISONHALCONRUNNER_H

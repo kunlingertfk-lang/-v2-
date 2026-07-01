@@ -27,6 +27,7 @@ SOURCES += \
     src/ToolLibraryDialog.cpp \
     src/CharacterRecognitionDialog.cpp \
     src/ColorRecognitionDialog.cpp \
+    src/ColorComparisonDialog.cpp \
     src/ColorTemplateDialog.cpp \
     src/ClassificationDialog.cpp \
     src/ObjectDetectionDialog.cpp \
@@ -45,6 +46,7 @@ SOURCES += \
     src/toolcore/ToolEngine.cpp \
     src/tooladapters/OcrAdapter.cpp \
     src/tooladapters/ColorRecognitionAdapter.cpp \
+    src/tooladapters/ColorComparisonAdapter.cpp \
     src/tooladapters/PatternPresenceAdapter.cpp \
     src/tooladapters/BlobPresenceAdapter.cpp \
     src/tooladapters/CirclePresenceAdapter.cpp \
@@ -55,6 +57,7 @@ SOURCES += \
     src/algorithms/halcon/HalconRuntimePaths.cpp \
     src/algorithms/ocr/OcrHalconRunner.cpp \
     src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
+    src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
     src/algorithms/ai/AiDetectionRunner.cpp \
     src/algorithms/presence/PatternPresenceHalconApi.cpp \
     src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
@@ -75,6 +78,7 @@ HEADERS += \
     src/ToolLibraryDialog.h \
     src/CharacterRecognitionDialog.h \
     src/ColorRecognitionDialog.h \
+    src/ColorComparisonDialog.h \
     src/ColorTemplateDialog.h \
     src/ClassificationDialog.h \
     src/ObjectDetectionDialog.h \
@@ -100,6 +104,7 @@ HEADERS += \
     src/toolcore/ToolEngine.h \
     src/tooladapters/OcrAdapter.h \
     src/tooladapters/ColorRecognitionAdapter.h \
+    src/tooladapters/ColorComparisonAdapter.h \
     src/tooladapters/PatternPresenceAdapter.h \
     src/tooladapters/BlobPresenceAdapter.h \
     src/tooladapters/CirclePresenceAdapter.h \
@@ -110,6 +115,7 @@ HEADERS += \
     src/algorithms/halcon/HalconRuntimePaths.h \
     src/algorithms/ocr/OcrHalconRunner.h \
     src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+    src/algorithms/recognition/ColorComparisonHalconRunner.h \
     src/algorithms/ai/AiDetectionRunner.h \
     src/algorithms/presence/PatternPresenceHalconApi.h \
     src/algorithms/presence/PatternPresenceAutoModelDomain.h \
@@ -128,6 +134,7 @@ FORMS += \
     ui/ToolLibraryDialog.ui \
     ui/CharacterRecognitionDialog.ui \
     ui/ColorRecognitionDialog.ui \
+    ui/ColorComparisonDialog.ui \
     ui/ClassificationDialog.ui \
     ui/ObjectDetectionDialog.ui \
     ui/PatternPresenceDialog.ui \

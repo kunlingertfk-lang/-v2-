@@ -14,6 +14,8 @@
 #include "toolcore/ToolPreviewSnapshot.h"
 
 class QButtonGroup;
+class QCheckBox;
+class QComboBox;
 class QFrame;
 class QListWidgetItem;
 class QPushButton;
@@ -57,8 +59,15 @@ protected:
 private slots:
     void finishConfiguration();
     void runTest();
+    void exitTestMode();
 
 private:
+    enum class TestUiMode {
+        Edit,
+        Continuous,
+        TestPaused
+    };
+
     void setupUiState();
     void connectControls();
     void setAllParamsMode(bool allMode);
@@ -78,7 +87,10 @@ private:
     const ColorRecognitionTemplateData *activeTemplate() const;
     QString activeTemplateId() const;
     void performTestRun();
+    void runReferenceTest();
+    void runOnceInTestMode();
     void stopLiveTestRun();
+    void updateBottomButtons();
     void fitPreview();
     void showPreviewImage();
     void showFrameForRoiEditing();
@@ -97,6 +109,7 @@ private:
     void handleMaskPolygonChanged(const QVector<QPointF> &points);
     void handleMaskPolygonSelectionRejected(int pointCount);
     void syncMaskControls();
+    void refreshPositionCorrectionControls();
     void refreshDisplayedRoiOverlay();
     void displayResult(const ToolResult &result, bool referenceSource);
     void displayError(const QString &status, const QString &message);
@@ -127,6 +140,9 @@ private:
     bool m_maskEditing = false;
     bool m_previewUsesReferenceImage = true;
     QTimer *m_testRunTimer = nullptr;
+    QPushButton *m_referenceTestButton = nullptr;
+    QPushButton *m_exitTestButton = nullptr;
+    TestUiMode m_testUiMode = TestUiMode::Edit;
     bool m_liveTestRunning = false;
     QFutureWatcher<ToolResult> *m_testRunWatcher = nullptr;
     bool m_testRunBusy = false;

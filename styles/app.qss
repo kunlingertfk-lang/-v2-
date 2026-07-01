@@ -790,6 +790,13 @@ QLabel[role="toolTitle"] {
     font-weight: 600;
 }
 
+QLabel#toolTypeIconLabel,
+QLabel[role="toolTypeIcon"] {
+    background: #fff7ef;
+    border: 1px solid #ffd4a8;
+    border-radius: 6px;
+}
+
 QToolButton#collapseCardButton,
 QToolButton[role="collapseCard"],
 QToolButton#toolGearButton,

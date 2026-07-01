@@ -24,16 +24,20 @@ ToolLibraryDialog::~ToolLibraryDialog()
     delete ui;
 }
 
+//返回选择工具id
 ToolLibraryDialog::ToolId ToolLibraryDialog::selectedTool() const
 {
     return static_cast<ToolId>(m_buttonGroup->checkedId());
 }
 
+//返回选择工具类型
 ToolType ToolLibraryDialog::selectedToolType() const
 {
     return m_selectedToolType;
 }
 
+
+//初始化各个工具组状态（隐藏显示）
 void ToolLibraryDialog::setupUiState()
 {
     setWindowTitle(tr("工具库"));
@@ -128,6 +132,7 @@ void ToolLibraryDialog::setupUiState()
     updatePreview(NoTool);
 }
 
+//添加以实现的工具到我的按钮组中，只有这些才可以被选择和使用
 void ToolLibraryDialog::setupButtonGroup()
 {
     m_buttonGroup->setExclusive(true);
@@ -138,7 +143,7 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->colorAreaToolButton, ColorArea);
     m_buttonGroup->addButton(ui->ocrToolButton, CharacterRecognition);  //字符识别
     m_buttonGroup->addButton(ui->codeToolButton, Code);
-    m_buttonGroup->addButton(ui->colorRecognitionToolButton, ColorRecognition); //颜色识别
+
     m_buttonGroup->addButton(ui->blobPresenceButton, BlobPresence);
     m_buttonGroup->addButton(ui->circlePresenceButton, CirclePresence);
     m_buttonGroup->addButton(ui->edgePresenceButton, EdgePresence);
@@ -151,8 +156,8 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->circleLocationButton, CircleLocationButton);   //圆定位
 
     //识别工具
-    // m_buttonGroup->addButton(ui->templateLocationButton, ColorRecognition); //颜色识别
-    // m_buttonGroup->addButton(ui->edgeLocationButton, ColorComparison);      //颜色比较
+    m_buttonGroup->addButton(ui->colorRecognitionToolButton, ColorRecognition); //颜色识别
+    m_buttonGroup->addButton(ui->colorComparisonToolButton, ColorComparison); //颜色比较
     // m_buttonGroup->addButton(ui->circleLocationButton, RegistrationClass);  //注册分类
     // m_buttonGroup->addButton(ui->circleLocationButton, RegisteredObjectDetection); //注册目标检测
 
@@ -172,6 +177,7 @@ void ToolLibraryDialog::setupButtonGroup()
 #endif
 }
 
+//确认选择的工具
 void ToolLibraryDialog::confirmSelection()
 {
     const ToolId tool = selectedTool();
@@ -188,12 +194,6 @@ void ToolLibraryDialog::confirmSelection()
 
     if (tool == CharacterRecognition) {
         m_selectedToolType = ToolType::Ocr;
-        accept();
-        return;
-    }
-
-    if (tool == ColorRecognition) {
-        m_selectedToolType = ToolType::ColorRecognition;
         accept();
         return;
     }
@@ -241,20 +241,32 @@ void ToolLibraryDialog::confirmSelection()
     }
 
 /*===========================tfk add===========================*/
-    if (tool == Classification) {
-        m_selectedToolType = ToolType::TemplateLocation;
+    // if (tool == Classification) {
+    //     m_selectedToolType = ToolType::TemplateLocation;
+    //     accept();
+    //     return;
+    // }
+
+    // if (tool == Classification) {
+    //     m_selectedToolType = ToolType::EdgeLocation;
+    //     accept();
+    //     return;
+    // }
+
+    // if (tool == Classification) {//注册分类
+    //     m_selectedToolType = ToolType::EdgeLocation;
+    //     accept();
+    //     return;
+    // }
+
+    if (tool == ColorRecognition) {//颜色识别
+        m_selectedToolType = ToolType::ColorRecognition;
         accept();
         return;
     }
 
-    if (tool == Classification) {
-        m_selectedToolType = ToolType::EdgeLocation;
-        accept();
-        return;
-    }
-
-    if (tool == Classification) {
-        m_selectedToolType = ToolType::EdgeLocation;
+    if (tool == ColorComparison) {//颜色比较
+        m_selectedToolType = ToolType::ColorComparison;
         accept();
         return;
     }
@@ -266,6 +278,7 @@ void ToolLibraryDialog::confirmSelection()
     ui->toolLibraryTipLabel->setText(tr("当前仅支持图案有无、斑点有无、圆有无、边缘有无、直线有无、轮廓有无、字符识别、目标检测、分类工具配置"));
 }
 
+//更新到视图上
 void ToolLibraryDialog::updatePreview(int id)
 {
     ui->toolLibraryTipLabel->clear();
@@ -294,10 +307,6 @@ void ToolLibraryDialog::updatePreview(int id)
     case Code:
         ui->previewTitleLabel->setText(tr("码识别"));
         ui->previewDescriptionLabel->setText(tr("识别条码和二维码内容"));
-        break;
-    case ColorRecognition:
-        ui->previewTitleLabel->setText(tr("颜色识别"));
-        ui->previewDescriptionLabel->setText(tr("识别检测区域内目标颜色占比"));
         break;
     case BlobPresence:
         ui->previewTitleLabel->setText(tr("斑点有无"));
@@ -329,18 +338,28 @@ void ToolLibraryDialog::updatePreview(int id)
         break;
 
 /*===========================tfk add===========================*/       
-    case TemplateLocation:
-        ui->previewTitleLabel->setText(tr("模板定位"));
-        ui->previewDescriptionLabel->setText(tr("模板定位"));
+    // case TemplateLocation:
+    //     ui->previewTitleLabel->setText(tr("模板定位"));
+    //     ui->previewDescriptionLabel->setText(tr("模板定位"));
+    //     break;
+    // case EdgeLocationButton:
+    //     ui->previewTitleLabel->setText(tr("边缘定位"));
+    //     ui->previewDescriptionLabel->setText(tr("边缘定位"));
+    //     break;
+    // case CircleLocationButton:
+    //     ui->previewTitleLabel->setText(tr("圆定位"));
+    //     ui->previewDescriptionLabel->setText(tr("对圆进行定位"));
+    //     break;
+
+    case ColorRecognition:
+        ui->previewTitleLabel->setText(tr("颜色识别"));
+        ui->previewDescriptionLabel->setText(tr("识别检测区域内目标颜色占比"));
         break;
-    case EdgeLocationButton:
-        ui->previewTitleLabel->setText(tr("边缘定位"));
-        ui->previewDescriptionLabel->setText(tr("边缘定位"));
+    case ColorComparison:
+        ui->previewTitleLabel->setText(tr("颜色比较"));
+        ui->previewDescriptionLabel->setText(tr("比较模板区域与检测区域的颜色相似度"));
         break;
-    case CircleLocationButton:
-        ui->previewTitleLabel->setText(tr("圆定位"));
-        ui->previewDescriptionLabel->setText(tr("对圆进行定位"));
-        break;
+
 /*===========================tfk end===========================*/
 
 

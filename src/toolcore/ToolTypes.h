@@ -41,6 +41,7 @@ enum class ToolType {
     CodeReader,
     CategoryRecognition,
     ColorRecognition,
+    ColorComparison,
 
     // Presence
     PatternPresence,
@@ -159,6 +160,8 @@ inline QString toolTypeToString(ToolType type)
         return QStringLiteral("CategoryRecognition");
     case ToolType::ColorRecognition:
         return QStringLiteral("ColorRecognition");
+    case ToolType::ColorComparison:
+        return QStringLiteral("ColorComparison");
     case ToolType::PatternPresence:
         return QStringLiteral("PatternPresence");
     case ToolType::BlobPresence:
@@ -246,6 +249,10 @@ inline ToolType toolTypeFromString(const QString &value)
         key == QStringLiteral("color_recognition") ||
         key.contains(QStringLiteral("颜色识别")))
         return ToolType::ColorRecognition;
+    if (key == QStringLiteral("colorcomparison") ||
+        key == QStringLiteral("color_comparison") ||
+        key.contains(QStringLiteral("颜色比较")))
+        return ToolType::ColorComparison;
     if (key == QStringLiteral("patternpresence"))
         return ToolType::PatternPresence;
     if (key == QStringLiteral("blobpresence") ||

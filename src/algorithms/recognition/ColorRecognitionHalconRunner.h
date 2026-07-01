@@ -42,6 +42,8 @@ struct ColorRecognitionHalconConfig
     QString featureType = QStringLiteral("histogram");
     QString sensitivity = QStringLiteral("medium");
     bool brightnessEnabled = true;
+    bool enablePositionCorrection = false;
+    QString positionCorrectionSource;
     int knnK = 3;
     QString knnDistance = QStringLiteral("halcon_default");
     QVector<QPointF> detectMaskPolygonNormalized;

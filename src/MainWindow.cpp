@@ -43,6 +43,7 @@
 #include "CharacterRecognitionDialog.h"
 #include "ClassificationDialog.h"
 #include "CirclePresenceDialog.h"
+#include "ColorComparisonDialog.h"
 #include "ColorRecognitionDialog.h"
 #include "ContourPresenceDialog.h"
 #include "EdgePresenceDialog.h"
@@ -391,6 +392,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolEngine.registerAdapter(&m_patternPresenceAdapter);
     m_toolEngine.registerAdapter(&m_blobPresenceAdapter);
     m_toolEngine.registerAdapter(&m_circlePresenceAdapter);
+    m_toolEngine.registerAdapter(&m_colorComparisonAdapter);
     m_toolEngine.registerAdapter(&m_colorRecognitionAdapter);
     m_toolEngine.registerAdapter(&m_contourPresenceAdapter);
     m_toolEngine.registerAdapter(&m_edgePresenceAdapter);
@@ -1634,6 +1636,8 @@ QString MainWindow::toolDisplayName(const ToolConfig &config) const
         return tr("字符识别");
     case ToolType::ColorRecognition:
         return tr("颜色识别");
+    case ToolType::ColorComparison:
+        return tr("颜色比较");
     case ToolType::PatternPresence:
         return tr("图案有无");
     case ToolType::BlobPresence:
@@ -1725,6 +1729,9 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         break;
     case ToolType::ColorRecognition:
         accepted = runToolConfigDialog<ColorRecognitionDialog>(this, originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::ColorComparison:
+        accepted = runToolConfigDialog<ColorComparisonDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, originalConfig, &editedConfig, &snapshot);

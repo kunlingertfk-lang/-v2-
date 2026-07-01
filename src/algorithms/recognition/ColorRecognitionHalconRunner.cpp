@@ -84,6 +84,7 @@ QRect normalizedRoiToPixels(const QRectF &sourceRoi, const int width, const int 
     return QRect(x1, y1, roiWidth, roiHeight);
 }
 
+#if 1 //json数据配置
 QJsonObject rectToJson(const QRectF &rect)
 {
     QJsonObject json;
@@ -136,6 +137,8 @@ QJsonObject pointToJsonObject(const QPointF &point)
     return json;
 }
 
+#endif
+
 ToolOverlay rectOverlay(const QRectF &rect, const QString &label, const double score = 0.0)
 {
     ToolOverlay overlay;
@@ -184,6 +187,7 @@ ToolOverlay textOverlay(const QPointF &position,
     return overlay;
 }
 
+//直方图灵敏度 分成不同8,16,32bin
 int histogramBinsForSensitivity(const QString &sensitivity)
 {
     const QString key = sensitivity.trimmed().toLower();
@@ -194,6 +198,7 @@ int histogramBinsForSensitivity(const QString &sensitivity)
     return 16;
 }
 
+//转bgr 8位深
 cv::Mat toBgr8(const cv::Mat &image)
 {
     if (image.empty())
@@ -219,6 +224,7 @@ cv::Mat toBgr8(const cv::Mat &image)
     return bgr;
 }
 
+//错误信息的特征结果合成
 ColorRecognitionHalconFeatureResult featureError(const QString &status,
                                                  const QString &message,
                                                  const ColorRecognitionHalconConfig &config,
@@ -249,6 +255,10 @@ ColorRecognitionHalconFeatureResult featureError(const QString &status,
                           pointsToJson(config.detectMaskPolygonNormalized));
     result.payload.insert(QStringLiteral("detectMaskConfigured"),
                           config.detectMaskPolygonNormalized.size() >= 3);
+    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
     result.payload.insert(QStringLiteral("halconSoPathCandidates"),
                           config.halconSoPathCandidates.join(QStringLiteral("; ")));
@@ -256,6 +266,7 @@ ColorRecognitionHalconFeatureResult featureError(const QString &status,
     return result;
 }
 
+//错误信息的运行结果合成
 ColorRecognitionHalconResult runError(const QString &status,
                                       const QString &message,
                                       const ColorRecognitionHalconConfig &config,
@@ -288,6 +299,10 @@ ColorRecognitionHalconResult runError(const QString &status,
                           pointsToJson(config.detectMaskPolygonNormalized));
     result.payload.insert(QStringLiteral("detectMaskConfigured"),
                           config.detectMaskPolygonNormalized.size() >= 3);
+    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
     result.payload.insert(QStringLiteral("halconSoPathCandidates"),
                           config.halconSoPathCandidates.join(QStringLiteral("; ")));
@@ -295,6 +310,7 @@ ColorRecognitionHalconResult runError(const QString &status,
     return result;
 }
 
+//屏蔽roi结果
 ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig &config,
                                              const cv::Mat &image,
                                              const qint64 elapsedMs)
@@ -349,10 +365,15 @@ ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig 
     result.payload.insert(QStringLiteral("detectCircleBoundingRectNormalized"),
                           rectToJson(config.detectCircleBoundingRectNormalized));
     result.payload.insert(QStringLiteral("roiPixelsRect"), rectToJson(QRectF(roiPixels)));
+    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(elapsedMs));
     return result;
 }
 
+//声明halcon API接口
 struct HalconCApi
 {
     using SetUtf8Fn = void (*)(int);
@@ -1417,6 +1438,10 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         result.payload.insert(QStringLiteral("brightnessEnabled"), config.brightnessEnabled);
         result.payload.insert(QStringLiteral("lightingNormalizationMode"),
                               featureResult.payload.value(QStringLiteral("lightingNormalizationMode")).toString());
+        result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+        result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+        result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+        result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
 
         return result;

@@ -119,6 +119,21 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    ColorRecognitionHalconConfig positionConfig = dominantConfig;
+    positionConfig.enablePositionCorrection = true;
+    positionConfig.positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
+    const ColorRecognitionHalconResult positionResult = runner.run(image, positionConfig);
+    if (!positionResult.success ||
+        positionResult.payload.value(QStringLiteral("enablePositionCorrection")).toBool() != true ||
+        positionResult.payload.value(QStringLiteral("positionCorrectionSource")).toString()
+            != QStringLiteral("1 基准图.位置修正信息") ||
+        positionResult.payload.value(QStringLiteral("positionCorrectionApplied")).toBool() != false ||
+        positionResult.payload.value(QStringLiteral("positionCorrectionReason")).toString()
+            != QStringLiteral("not implemented")) {
+        std::cerr << "position correction payload must expose requested-but-not-applied state" << std::endl;
+        return 1;
+    }
+
     ColorRecognitionHalconConfig config = circleConfig;
     config.detectMaskPolygonNormalized = {
         QPointF(0.0, 0.0),

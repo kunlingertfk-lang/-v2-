@@ -169,6 +169,14 @@ ColorRecognitionHalconConfig toRunnerConfig(const ToolConfig &config)
             pointsFromJson(params.value(QStringLiteral("detectMaskPolygon")).toArray());
     if (runnerConfig.detectMaskPolygonNormalized.size() < 3)
         runnerConfig.detectMaskPolygonNormalized.clear();
+    runnerConfig.enablePositionCorrection =
+            boolParam(params,
+                      QStringLiteral("enablePositionCorrection"),
+                      runnerConfig.enablePositionCorrection);
+    runnerConfig.positionCorrectionSource =
+            stringParam(params,
+                        QStringLiteral("positionCorrectionSource"),
+                        runnerConfig.positionCorrectionSource);
     runnerConfig.featureType = stringParam(modelSource,
                                            QStringLiteral("featureType"),
                                            stringParam(params,

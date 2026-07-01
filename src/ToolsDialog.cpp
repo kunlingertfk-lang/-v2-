@@ -27,6 +27,7 @@
 #include "CharacterRecognitionDialog.h"
 #include "BlobPresenceDialog.h"
 #include "CameraParamsDialog.h"
+#include "ColorComparisonDialog.h"
 #include "ColorRecognitionDialog.h"
 #include "ClassificationDialog.h"
 #include "CirclePresenceDialog.h"
@@ -67,9 +68,33 @@ QImage imageFromFrame(const cv::Mat &frame)
     return MatImageConverter::matToDisplayImage(frame, QStringLiteral("ToolsDialog"));
 }
 
+//当前实时图
 QImage currentReferenceImage()
 {
     return imageFromFrame(ReferenceImageProvider::instance().referenceFrame());
+}
+
+QString toolIconForType(ToolType type)
+{
+    switch (type) {
+    case ToolType::ColorRecognition:
+    case ToolType::ColorComparison:
+        return QStringLiteral(":/icons/compare.svg");
+    case ToolType::Ocr:
+        return QStringLiteral(":/icons/tool.svg");
+    case ToolType::AiDetection:
+    case ToolType::AiClassification:
+        return QStringLiteral(":/icons/monitor.svg");
+    case ToolType::PatternPresence:
+    case ToolType::BlobPresence:
+    case ToolType::CirclePresence:
+    case ToolType::EdgePresence:
+    case ToolType::LinePresence:
+    case ToolType::ContourPresence:
+        return QStringLiteral(":/icons/eye.svg");
+    default:
+        return QStringLiteral(":/icons/tool.svg");
+    }
 }
 
 QVector<ToolOverlay> previewOverlaysForToolsPage(const ToolConfig &config,
@@ -424,6 +449,9 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     case ToolType::ColorRecognition:
         accepted = runToolConfigDialog<ColorRecognitionDialog>(this, nullptr, &config, &snapshot);
         break;
+    case ToolType::ColorComparison:
+        accepted = runToolConfigDialog<ColorComparisonDialog>(this, nullptr, &config, &snapshot);
+        break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, nullptr, &config, &snapshot);
         break;
@@ -486,6 +514,9 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
         break;
     case ToolType::ColorRecognition:
         accepted = runToolConfigDialog<ColorRecognitionDialog>(this, &originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::ColorComparison:
+        accepted = runToolConfigDialog<ColorComparisonDialog>(this, &originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, &originalConfig, &editedConfig, &snapshot);
@@ -613,6 +644,15 @@ QFrame *ToolsDialog::createToolCard(const ToolConfig &config, int index)
     statusBadge->setAttribute(Qt::WA_TransparentForMouseEvents);
     rowLayout->addWidget(statusBadge);
 
+    QLabel *typeIcon = new QLabel(card);
+    typeIcon->setObjectName(QStringLiteral("toolTypeIconLabel"));
+    typeIcon->setProperty("role", QStringLiteral("toolTypeIcon"));
+    typeIcon->setAlignment(Qt::AlignCenter);
+    typeIcon->setFixedSize(34, 34);
+    typeIcon->setPixmap(QIcon(toolIconForType(config.toolType)).pixmap(QSize(24, 24)));
+    typeIcon->setAttribute(Qt::WA_TransparentForMouseEvents);
+    rowLayout->addWidget(typeIcon);
+
     const QString title = toolDisplayName(config);
     QLabel *titleLabel = new QLabel(title, card);
     titleLabel->setObjectName(QStringLiteral("toolTitleLabel"));
@@ -723,6 +763,8 @@ QString ToolsDialog::toolDisplayName(const ToolConfig &config) const
         return tr("字符识别");
     case ToolType::ColorRecognition:
         return tr("颜色识别");
+    case ToolType::ColorComparison:
+        return tr("颜色比较");
     case ToolType::PatternPresence:
         return tr("图案有无");
     case ToolType::BlobPresence:

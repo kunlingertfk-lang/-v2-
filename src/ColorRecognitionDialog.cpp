@@ -6,6 +6,7 @@
 #include <QButtonGroup>
 #include <QBrush>
 #include <QByteArray>
+#include <QCheckBox>
 #include <QColor>
 #include <QComboBox>
 #include <QDebug>
@@ -42,6 +43,7 @@
 
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
+#include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
 
@@ -234,6 +236,42 @@ QString featureTypeToUi(const QString &value)
     return value == QStringLiteral("spectrum")
             ? QStringLiteral("色谱特征")
             : QStringLiteral("直方图特征");
+}
+
+void applyBottomActionButtonMetrics(QPushButton *button)
+{
+    if (!button)
+        return;
+
+    button->setMinimumSize(120, 48);
+    button->setMaximumSize(120, 48);
+    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    button->setAutoDefault(false);
+    button->setDefault(false);
+}
+
+void refreshButtonStyle(QWidget *button)
+{
+    if (!button)
+        return;
+
+    button->style()->unpolish(button);
+    button->style()->polish(button);
+    button->update();
+}
+
+void disableDialogDefaultButtonGrowth(QWidget *root)
+{
+    if (!root)
+        return;
+
+    const QList<QPushButton *> buttons = root->findChildren<QPushButton *>();
+    for (QPushButton *button : buttons) {
+        if (!button)
+            continue;
+        button->setAutoDefault(false);
+        button->setDefault(false);
+    }
 }
 
 void setComboBoxText(QComboBox *comboBox, const QString &text)
@@ -450,6 +488,10 @@ ToolConfig ColorRecognitionDialog::toToolConfig() const
                   m_maskPolygonNormalized.size() >= 3
                   ? QStringLiteral("UI configured; HALCON color runner applies mask during detection")
                   : QStringLiteral("not configured"));
+    params.insert(QStringLiteral("enablePositionCorrection"),
+                  ui->positionCorrectionSwitch->isChecked());
+    params.insert(QStringLiteral("positionCorrectionSource"),
+                  ui->positionCorrectionSourceComboBox->currentText());
     params.insert(QStringLiteral("colorDecisionMode"),
                   colorDecisionModeFromUi(ui->colorDecisionModeComboBox->currentText()));
     params.insert(QStringLiteral("colorModel"), colorModel);
@@ -513,6 +555,11 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
     if (m_maskPolygonNormalized.size() < 3)
         m_maskPolygonNormalized.clear();
     m_maskEditing = false;
+    ui->positionCorrectionSwitch->setChecked(
+                params.value(QStringLiteral("enablePositionCorrection")).toBool(false));
+    setComboBoxText(ui->positionCorrectionSourceComboBox,
+                    params.value(QStringLiteral("positionCorrectionSource"))
+                    .toString(QStringLiteral("1 基准图.位置修正信息")));
 
     m_templates.clear();
     const QJsonArray templates = colorModel.value(QStringLiteral("templates")).toArray();
@@ -564,6 +611,7 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
                     judgeRule.value(QStringLiteral("expectedLabel")).toString());
     updateJudgementControls();
     syncMaskControls();
+    refreshPositionCorrectionControls();
 
     if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid) {
         const QSignalBlocker blockDraw(ui->regionDrawButton);
@@ -601,6 +649,11 @@ void ColorRecognitionDialog::resizeEvent(QResizeEvent *event)
 
 void ColorRecognitionDialog::finishConfiguration()
 {
+    if (m_testUiMode != TestUiMode::Edit) {
+        runOnceInTestMode();
+        return;
+    }
+
     stopLiveTestRun();
     if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
@@ -611,15 +664,19 @@ void ColorRecognitionDialog::finishConfiguration()
 
 void ColorRecognitionDialog::runTest()
 {
-    if (m_liveTestRunning) {
+    if (m_testUiMode == TestUiMode::Continuous) {
         stopLiveTestRun();
+        m_testUiMode = TestUiMode::TestPaused;
+        updateBottomButtons();
+        setViewerStatusText(tr("连续运行已停止，视图保留最后一帧"));
         return;
     }
 
+    m_testUiMode = TestUiMode::Continuous;
     m_liveTestRunning = true;
     ++m_testRunGeneration;
     m_displayedSampleIndex = -1;
-    ui->testRunButton->setText(tr("停止测试"));
+    updateBottomButtons();
     if (m_previewHelper && !m_maskEditing && !m_globalDetection && m_displayedSampleIndex < 0) {
         const bool circleMode = m_detectRegionType == QStringLiteral("circle");
         m_previewHelper->setRoiDrawingEnabled(!circleMode);
@@ -636,23 +693,22 @@ void ColorRecognitionDialog::performTestRun()
     if (m_testRunBusy)
         return;
 
-    cv::Mat frame = m_previewUsesReferenceImage
-            ? ReferenceImageProvider::instance().referenceFrame()
-            : CameraFrameProvider::instance().currentFrame();
-    bool referenceSource = m_previewUsesReferenceImage && !frame.empty();
-    if (frame.empty()) {
-        frame = ReferenceImageProvider::instance().referenceFrame();
-        referenceSource = !frame.empty();
-    }
-    if (frame.empty()) {
-        frame = CameraFrameProvider::instance().currentFrame();
-        referenceSource = false;
-    }
+    cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    const bool referenceSource = false;
 
     if (frame.empty()) {
-        displayError(QStringLiteral("image_empty"), tr("当前无基准图或相机图像，无法测试"));
+        displayError(QStringLiteral("image_empty"), tr("当前帧为空"));
         stopLiveTestRun();
+        m_testUiMode = TestUiMode::TestPaused;
+        updateBottomButtons();
         return;
+    }
+
+    const QImage image = MatImageConverter::matToDisplayImage(frame, QStringLiteral("ColorRecognitionDialog"));
+    if (!image.isNull() && m_previewHelper) {
+        ui->viewerTitleLabel->setText(tr("测试图像"));
+        m_previewHelper->setImage(image);
+        refreshDisplayedRoiOverlay();
     }
 
     ToolRequest request;
@@ -669,18 +725,87 @@ void ColorRecognitionDialog::performTestRun()
     }));
 }
 
+void ColorRecognitionDialog::runReferenceTest()
+{
+    stopLiveTestRun();
+    m_testUiMode = TestUiMode::Edit;
+    updateBottomButtons();
+
+    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+    if (frame.empty()) {
+        displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
+        return;
+    }
+
+    QImage image = ReferenceImageProvider::instance().referenceImage();
+    if (image.isNull())
+        image = MatImageConverter::matToDisplayImage(frame, QStringLiteral("ColorRecognitionDialog"));
+    if (!image.isNull() && m_previewHelper) {
+        ui->viewerTitleLabel->setText(tr("基准图"));
+        m_previewHelper->setImage(image);
+        refreshDisplayedRoiOverlay();
+    }
+
+    if (m_testRunBusy)
+        return;
+
+    ToolRequest request;
+    request.config = toToolConfig();
+    request.image = frame.clone();
+    const int generation = ++m_testRunGeneration;
+    m_testRunBusy = true;
+    m_testRunWatcher->setFuture(QtConcurrent::run([request, generation]() mutable {
+        ColorRecognitionAdapter adapter;
+        ToolResult result = adapter.run(request);
+        result.payload.insert(QStringLiteral("_referenceSource"), true);
+        result.payload.insert(QStringLiteral("_testRunGeneration"), generation);
+        return result;
+    }));
+}
+
+void ColorRecognitionDialog::runOnceInTestMode()
+{
+    stopLiveTestRun();
+    m_testUiMode = TestUiMode::TestPaused;
+    updateBottomButtons();
+    performTestRun();
+}
+
+void ColorRecognitionDialog::exitTestMode()
+{
+    stopLiveTestRun();
+    m_testUiMode = TestUiMode::Edit;
+    updateBottomButtons();
+    showPreviewImage();
+}
+
 void ColorRecognitionDialog::stopLiveTestRun()
 {
     if (m_testRunTimer)
         m_testRunTimer->stop();
     ++m_testRunGeneration;
     m_liveTestRunning = false;
-    if (ui && ui->testRunButton)
-        ui->testRunButton->setText(tr("测试运行"));
     if (m_previewHelper && !m_maskEditing && !m_globalDetection && m_displayedSampleIndex < 0) {
         const bool circleMode = m_detectRegionType == QStringLiteral("circle");
         m_previewHelper->setRoiDrawingEnabled(!circleMode);
         m_previewHelper->setCircleDrawingEnabled(circleMode);
+    }
+}
+
+void ColorRecognitionDialog::updateBottomButtons()
+{
+    const bool testMode = m_testUiMode != TestUiMode::Edit;
+    if (m_referenceTestButton)
+        m_referenceTestButton->setVisible(!testMode);
+    if (m_exitTestButton)
+        m_exitTestButton->setVisible(testMode);
+    if (ui && ui->finishButton)
+        ui->finishButton->setText(testMode ? tr("运行一次") : tr("完成"));
+    if (ui && ui->testRunButton) {
+        ui->testRunButton->setText(m_testUiMode == TestUiMode::Continuous ? tr("停止运行") :
+                                   testMode ? tr("连续运行") : tr("测试运行"));
+        ui->testRunButton->setProperty("running", m_testUiMode == TestUiMode::Continuous);
+        refreshButtonStyle(ui->testRunButton);
     }
 }
 
@@ -690,6 +815,17 @@ void ColorRecognitionDialog::setupUiState()
     setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     PlanDialogUtils::applyLargeWindow(this);
+    setStyleSheet(styleSheet() + QStringLiteral(
+        "QPushButton[actionRole=\"testAction\"]{background:#ffffff;color:#1f2937;border:1px solid #cfd6df;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton[actionRole=\"testAction\"][running=\"true\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;}"
+        "QPushButton#testRunButton[actionRole=\"testAction\"]{background:#ffffff;color:#1f2937;border:1px solid #cfd6df;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton#testRunButton[actionRole=\"testAction\"][running=\"true\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;}"
+        "QPushButton[actionRole=\"testAction\"]:pressed{background:#ffe1bf;color:#ff7a00;border-color:#ff7a00;}"
+        "QPushButton[actionRole=\"testAction\"][running=\"true\"]:pressed{background:#e66f00;color:#ffffff;border-color:#e66f00;}"
+        "QPushButton[actionRole=\"testPrimary\"]{background:#ff7a00;color:#ffffff;border:1px solid #ff7a00;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton#finishButton[actionRole=\"testPrimary\"]{background:#ff7a00;color:#ffffff;border:1px solid #ff7a00;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton[actionRole=\"testPrimary\"]:pressed{background:#e66f00;color:#ffffff;border-color:#e66f00;}"
+        "QToolButton:pressed{background:#ffe1bf;color:#ff7a00;border-color:#ff7a00;}"));
 
     ui->minScoreSpinBox->setRange(0, 100);
     ui->minScoreSpinBox->setValue(80);
@@ -700,6 +836,31 @@ void ColorRecognitionDialog::setupUiState()
     ui->viewerStatusLabel->setWordWrap(false);
     ui->viewerStatusLabel->setTextFormat(Qt::PlainText);
     ui->viewerStatusLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->positionCorrectionSwitch->setObjectName(QStringLiteral("positionCorrectionSwitch"));
+    ui->positionCorrectionSwitch->setChecked(false);
+    setComboBoxText(ui->positionCorrectionSourceComboBox,
+                    QStringLiteral("1 基准图.位置修正信息"));
+    refreshPositionCorrectionControls();
+    applyBottomActionButtonMetrics(ui->testRunButton);
+    applyBottomActionButtonMetrics(ui->finishButton);
+    ui->testRunButton->setProperty("actionRole", QStringLiteral("testAction"));
+    ui->testRunButton->setProperty("running", false);
+    ui->finishButton->setProperty("actionRole", QStringLiteral("testPrimary"));
+
+    if (!m_referenceTestButton) {
+        m_referenceTestButton = new QPushButton(tr("基准图测试"), this);
+        applyBottomActionButtonMetrics(m_referenceTestButton);
+        m_referenceTestButton->setProperty("actionRole", QStringLiteral("testAction"));
+        ui->bottomButtonLayout->insertWidget(1, m_referenceTestButton);
+    }
+
+    if (!m_exitTestButton) {
+        m_exitTestButton = new QPushButton(tr("退出测试"), this);
+        m_exitTestButton->setObjectName(QStringLiteral("exitTestButton"));
+        applyBottomActionButtonMetrics(m_exitTestButton);
+        m_exitTestButton->setProperty("actionRole", QStringLiteral("testAction"));
+        ui->bottomButtonLayout->addWidget(m_exitTestButton);
+    }
 
     if (!m_maskCard) {
         m_maskCard = new QFrame(this);
@@ -772,6 +933,8 @@ void ColorRecognitionDialog::setupUiState()
     updateJudgementControls();
     syncMaskControls();
     setViewerStatusText(roiStatusText(), roiStatusText());
+    disableDialogDefaultButtonGrowth(this);
+    updateBottomButtons();
 }
 
 void ColorRecognitionDialog::connectControls()
@@ -780,6 +943,10 @@ void ColorRecognitionDialog::connectControls()
     connect(ui->headerMaximizeButton, &QToolButton::clicked, this, &ColorRecognitionDialog::showMaximized);
     connect(ui->finishButton, &QPushButton::clicked, this, &ColorRecognitionDialog::finishConfiguration);
     connect(ui->testRunButton, &QPushButton::clicked, this, &ColorRecognitionDialog::runTest);
+    if (m_referenceTestButton)
+        connect(m_referenceTestButton, &QPushButton::clicked, this, &ColorRecognitionDialog::runReferenceTest);
+    if (m_exitTestButton)
+        connect(m_exitTestButton, &QPushButton::clicked, this, &ColorRecognitionDialog::exitTestMode);
     connect(ui->addTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::addTemplate);
     connect(ui->editTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::editCurrentTemplate);
     connect(ui->importTemplateButton, &QPushButton::clicked, this, &ColorRecognitionDialog::importTemplate);
@@ -800,6 +967,10 @@ void ColorRecognitionDialog::connectControls()
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &ColorRecognitionDialog::updateJudgementControls);
+    connect(ui->positionCorrectionSwitch,
+            &QCheckBox::toggled,
+            this,
+            &ColorRecognitionDialog::refreshPositionCorrectionControls);
     if (m_maskEditButton)
         connect(m_maskEditButton, &QPushButton::clicked, this, &ColorRecognitionDialog::startMaskEditing);
     if (m_maskPolygonButton)
@@ -836,7 +1007,10 @@ void ColorRecognitionDialog::connectControls()
                     {ui->regionLabel,
                      ui->regionDrawButton,
                      ui->regionRectButton,
-                     ui->regionCircleButton});
+                     ui->regionCircleButton,
+                     ui->positionCorrectionEnableLabel,
+                     ui->positionCorrectionSwitch,
+                     ui->positionCorrectionSourceRow});
     connectCollapse(ui->judgeCollapseButton,
                     {ui->resultBasisLabel,
                      ui->resultBasisComboBox,
@@ -898,7 +1072,8 @@ void ColorRecognitionDialog::connectControls()
             &ReferenceImageProvider::referenceFrameChanged,
             this,
             [this](const QImage &) {
-        showPreviewImage();
+        if (m_testUiMode == TestUiMode::Edit)
+            showPreviewImage();
     });
 }
 
@@ -1632,6 +1807,14 @@ void ColorRecognitionDialog::syncMaskControls()
     }
     if (m_maskFinishButton)
         m_maskFinishButton->setVisible(m_maskEditing);
+}
+
+void ColorRecognitionDialog::refreshPositionCorrectionControls()
+{
+    if (!ui || !ui->positionCorrectionSwitch || !ui->positionCorrectionSourceRow)
+        return;
+
+    ui->positionCorrectionSourceRow->setVisible(ui->positionCorrectionSwitch->isChecked());
 }
 
 void ColorRecognitionDialog::refreshDisplayedRoiOverlay()

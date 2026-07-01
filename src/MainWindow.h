@@ -17,6 +17,7 @@
 #include "tooladapters/PatternPresenceAdapter.h"
 #include "tooladapters/BlobPresenceAdapter.h"
 #include "tooladapters/CirclePresenceAdapter.h"
+#include "tooladapters/ColorComparisonAdapter.h"
 #include "tooladapters/ColorRecognitionAdapter.h"
 #include "tooladapters/ContourPresenceAdapter.h"
 #include "tooladapters/EdgePresenceAdapter.h"
@@ -139,6 +140,7 @@ private:
     PatternPresenceAdapter m_patternPresenceAdapter;
     BlobPresenceAdapter m_blobPresenceAdapter;
     CirclePresenceAdapter m_circlePresenceAdapter;
+    ColorComparisonAdapter m_colorComparisonAdapter;
     ColorRecognitionAdapter m_colorRecognitionAdapter;
     ContourPresenceAdapter m_contourPresenceAdapter;
     EdgePresenceAdapter m_edgePresenceAdapter;
