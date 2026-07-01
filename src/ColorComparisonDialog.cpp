@@ -499,11 +499,11 @@ void ColorComparisonDialog::buildUi()
     setStyleSheet(styleSheet() + QStringLiteral(
         "QPushButton,QToolButton,QComboBox,QSpinBox{background:#ffffff;color:#111827;border:1px solid #cfd6df;padding:6px;}"
         "QPushButton:checked,QToolButton:checked{background:#fff3e6;color:#ff7a00;border-color:#ff7a00;}"
-        "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;border-radius:4px;padding:0;font-size:15px;font-weight:600;min-width:120px;min-height:48px;}"
         "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000;border-color:#000;}"
         "QPushButton[actionRole=\"testPrimary\"]:pressed,QPushButton[actionRole=\"testPrimary\"][flash=\"true\"]{background:#ffffff;color:#111827;border-color:#111827;}"
         "QPushButton[actionRole=\"testPrimary\"]:disabled{background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;}"
-        "QPushButton[actionRole=\"testAction\"]{background:#ffffff;color:#111827;border:1px solid #9ca3af;border-radius:4px;padding:0;font-size:15px;}"
+        "QPushButton[actionRole=\"testAction\"]{background:#ffffff;color:#111827;border:1px solid #9ca3af;border-radius:4px;padding:0;font-size:15px;font-weight:600;min-width:120px;min-height:48px;}"
         "QPushButton[actionRole=\"testAction\"]:hover{background:#f9fafb;border-color:#111827;}"
         "QPushButton[actionRole=\"testAction\"]:pressed,QPushButton[actionRole=\"testAction\"][flash=\"true\"]{background:#111827;color:#ffffff;border-color:#111827;}"
         "QPushButton[actionRole=\"testAction\"][running=\"true\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;}"
