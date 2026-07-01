@@ -588,3 +588,21 @@
 - 验证：
   - 扩展 `tests/color_recognition_mask_smoke.cpp`，覆盖位置修正开启时 payload 输出。
   - 已执行颜色识别 smoke，验证通过。
+
+### 2026-07-01 测试按钮族样式 C 方案分层权重
+
+- 按 `docs/superpowers/specs/2026-07-01-color-test-buttons-style-design.md` 落地测试按钮族视觉样式，**仅改样式，不动任何点击/状态逻辑**。
+- 三档视觉层级：
+  - `完成 / 运行一次`（`actionRole=testPrimary`）：深色实心 `#111827` 白字，hover 更黑 `#000`，点击/flash 反色，disabled 灰化。
+  - `测试运行 / 基准图测试`（`actionRole=testAction`）：白底灰边 `#9ca3af`，hover 浅灰底 `#f9fafb`+深边，点击/flash 反色，**连续运行态 `[running="true"]` 橙色实心 `#ff7a00` 白字**（此前 QSS 无 running 选择器，连续运行态与普通态无视觉区别），disabled 灰化。
+  - `退出测试`（`#exitTestButton`，靠 objectName 定向覆盖 testAction 默认态）：透明描边浅灰字，hover 浅红底 `#fef2f2`+红字红边 `#dc2626`，点击/flash 红底白字，disabled 灰化。
+- 补齐了原 QSS 缺失的 `:hover`、`[running="true"]`、`:disabled` 三类规则。
+- 本次更改：
+  - `src/ColorRecognitionDialog.cpp`：替换 `setupUiState()` 内联 QSS 块为完整规则集。该侧按钮属性已齐全（`testRunButton` 有 `actionRole=testAction`+`running`，`finishButton` 有 `testPrimary`，`m_exitTestButton` 已有 `setObjectName("exitTestButton")`），无需补 objectName。
+  - 不改动：`installActionButtonFlash`、`running` 属性设置点、`refreshButtonStyle`、`applyBottomActionButtonMetrics`、所有信号槽连接。
+- Qt QSS 约束：不支持 `box-shadow`/`animation`/`transition`/伪元素，故浏览器原型的 hover 阴影、running 呼吸光晕、过渡动画均降级为纯色/边框变化，三档层级靠底色与边框色区分。
+- 验证：
+  - 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j$(nproc)`，强制重编 `ColorRecognitionDialog.cpp` + 链接通过，`-Wall -Wextra` 无相关警告。
+  - 待手动 GUI 确认：完成/测试运行/基准图测试/退出测试四按钮的默认、hover、点击 flash、连续运行橙色态、disabled 灰化是否符合预期，且不影响基础/全部分段、ROI 绘制等回归。
+- 剩余事项：
+  - 真实 GUI 手动确认上述视觉与回归项。

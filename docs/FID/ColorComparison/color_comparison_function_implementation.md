@@ -644,6 +644,31 @@ minScore
 
 - 仍需在真实 GUI 中手动确认按钮显隐、高亮、连续运行视频刷新、停止后保留最后一帧和退出测试后的编辑态恢复。
 
+### 2026-07-01 18:17:00 CST - 测试按钮族样式 C 方案分层权重
+
+#### 已实现功能
+
+- 测试按钮族视觉样式改为 C 方案分层权重，补齐原 QSS 缺失的 `:hover`、`[running="true"]`、`:disabled` 规则。
+- 三档视觉层级：完成/运行一次（`testPrimary`）深色实心；测试运行/基准图测试（`testAction`）白底灰边，连续运行态橙色实心 `#ff7a00`；退出测试（`#exitTestButton`）透明弱化、hover 红警示。
+
+#### 本次更改
+
+- `src/ColorComparisonDialog.cpp`：替换 `buildUi()` 内联 QSS 块为完整规则集；在 `m_exitTestButton` 设置 actionRole 后补一行 `setObjectName("exitTestButton")`，使 QSS `#exitTestButton` 选择器能定向到退出测试按钮（此前比较侧缺此 objectName，识别侧已有）。
+- 不改动：`installActionButtonFlash`、`running` 属性设置点、`refreshButtonStyle`、`applyBottomActionButtonMetrics`、所有信号槽连接。
+
+#### 出现的问题与处理
+
+- 问题：浏览器原型用了 `box-shadow`/`@keyframes`/`transition`/`::after`，Qt QSS 全不支持。
+  处理：降级为纯色与边框色变化，hover 用底色+边框色、running 用静态橙色实心、flash 仍为硬切反色（退出测试为红切），三档层级靠底色区分。
+
+#### 验证
+
+- 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j$(nproc)`，强制重编 `ColorComparisonDialog.cpp` + 链接通过，`-Wall -Wextra` 无相关警告。
+
+#### 剩余事项
+
+- 真实 GUI 手动确认四按钮的默认/hover/点击 flash/连续运行橙色态/disabled 灰化，以及基础/全部分段、检测区域 ROI 绘制、完成/退出流程等回归不受影响。
+
 ## 后续记录模板
 
 后续每次实现后，在本节上方追加：
