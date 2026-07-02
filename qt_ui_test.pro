@@ -28,6 +28,7 @@ SOURCES += \
     src/CharacterRecognitionDialog.cpp \
     src/ColorRecognitionDialog.cpp \
     src/ColorComparisonDialog.cpp \
+    src/RegisteredClassificationDialog.cpp \
     src/ColorTemplateDialog.cpp \
     src/ClassificationDialog.cpp \
     src/ObjectDetectionDialog.cpp \
@@ -47,6 +48,7 @@ SOURCES += \
     src/tooladapters/OcrAdapter.cpp \
     src/tooladapters/ColorRecognitionAdapter.cpp \
     src/tooladapters/ColorComparisonAdapter.cpp \
+    src/tooladapters/RegisteredClassificationAdapter.cpp \
     src/tooladapters/PatternPresenceAdapter.cpp \
     src/tooladapters/BlobPresenceAdapter.cpp \
     src/tooladapters/CirclePresenceAdapter.cpp \
@@ -58,6 +60,7 @@ SOURCES += \
     src/algorithms/ocr/OcrHalconRunner.cpp \
     src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
     src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
+    src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
     src/algorithms/ai/AiDetectionRunner.cpp \
     src/algorithms/presence/PatternPresenceHalconApi.cpp \
     src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
@@ -79,6 +82,7 @@ HEADERS += \
     src/CharacterRecognitionDialog.h \
     src/ColorRecognitionDialog.h \
     src/ColorComparisonDialog.h \
+    src/RegisteredClassificationDialog.h \
     src/ColorTemplateDialog.h \
     src/ClassificationDialog.h \
     src/ObjectDetectionDialog.h \
@@ -105,6 +109,7 @@ HEADERS += \
     src/tooladapters/OcrAdapter.h \
     src/tooladapters/ColorRecognitionAdapter.h \
     src/tooladapters/ColorComparisonAdapter.h \
+    src/tooladapters/RegisteredClassificationAdapter.h \
     src/tooladapters/PatternPresenceAdapter.h \
     src/tooladapters/BlobPresenceAdapter.h \
     src/tooladapters/CirclePresenceAdapter.h \
@@ -116,6 +121,7 @@ HEADERS += \
     src/algorithms/ocr/OcrHalconRunner.h \
     src/algorithms/recognition/ColorRecognitionHalconRunner.h \
     src/algorithms/recognition/ColorComparisonHalconRunner.h \
+    src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
     src/algorithms/ai/AiDetectionRunner.h \
     src/algorithms/presence/PatternPresenceHalconApi.h \
     src/algorithms/presence/PatternPresenceAutoModelDomain.h \
