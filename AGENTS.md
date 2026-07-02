@@ -3,7 +3,7 @@
 ## 适用范围
 
 - 本文件只记录项目级通用约束，用于指导所有功能算子和 UI 接入。
-- 单个功能的实现计划、截图对照、字段清单、算法细节和专项测试项应放入对应功能文档，不写入根目录 `AGENTS.md`。
+- 单个功能的实现计划、截图对照、字段清单、算法细节和专项测试项应放入对应功能文档（见「文档维护」），不写入根目录 `AGENTS.md`。
 - 修改代码时保持范围收敛，只处理当前任务所需内容，不重构无关模块，不改变无关算子行为。
 
 ## 项目定位
@@ -22,30 +22,43 @@
 ## 目录导航
 
 - `src/`：Qt 业务代码、工具对话框、工具配置、adapter 和算法 runner。
-- `src/algorithms/`：算法实现目录，新增视觉核心算法应优先落在对应分类下。
-- `src/tooladapters/`、`src/toolcore/`：工具配置解析、请求结果结构和工具运行链路相关代码。
+  - `src/algorithms/`：算法实现目录，runner 按域分子目录落子：
+    - `presence/`：有无类算子（Pattern / Blob / Circle / Edge / Line / Contour Presence）。
+    - `recognition/`：识别类算子（ColorRecognition / ColorComparison 等颜色类）。
+    - `ocr/`：字符识别（OcrHalconRunner）。
+    - `ai/`：AI 检测桥接算子（AiDetectionRunner，非 HALCON，属约定例外）。
+    - `halcon/`：仅放 `HalconRuntimePaths` 运行时路径解析，不放 runner。
+  - `src/tooladapters/`：一工具一 adapter，负责配置解析、调用 runner、输出统一 `ToolResult`。
+  - `src/toolcore/`：跨工具公共结构，包括 `ToolConfig`、`ToolRequest`、`ToolResult`、`ToolTypes`、`ToolAdapter`、`ToolEngine`、`ToolOverlay`、`ToolPreviewSnapshot`。
+  - `src/frame/`：相机帧与图像输入相关代码。
 - `ui/`：Qt Designer `.ui` 文件。
 - `styles/`：全局或共用 QSS 样式。
 - `resources/`：图标、图片、字体等资源。
-- `docs/`：分析记录、功能设计、实施计划和验证记录。
+- `docs/`：分析记录、功能设计、实施计划和验证记录（结构见「文档维护」）。
+- `smoke/`、`tests/`：算法/runner 冒烟与回归用例，每个用例配独立 `.pro`。
 - `qt_ui_test.pro`：当前主要 Qt 构建入口。
 
-## 常用入口
+## 新增工具最小骨架
 
-- 工具库和工具创建入口优先从 `ToolsDialog`、`ToolLibraryDialog` 相关代码查找。
-- 工具配置字段优先从 `ToolConfig`、`ToolRequest`、`ToolResult` 相关定义查找。
-- HALCON runtime、license 和动态库路径优先从 `HalconRuntimePaths` 相关代码查找。
-- 新增 runner 的命名、生命周期和错误返回方式优先参考已有 HALCON runner。
+新增一个视觉工具至少包含以下部分，缺项应在功能文档中标注为阻塞：
 
-## HALCON 算法约束
+- 对话框：`src/<Tool>Dialog.{h,cpp}` + `ui/<Tool>Dialog.ui`，风格参考现有同类工具 dlg。
+- Adapter：`src/tooladapters/<Tool>Adapter.{h,cpp}`。
+- Runner：`src/algorithms/<域>/<Tool>HalconRunner.{h,cpp}`，命名与链路参考现有 HALCON runner。
+- 配置字段：通过 `ToolConfig.params` / `judgeRule` 保存，字段命名清晰、可回显。
+- 注册接入：在 `ToolLibraryDialog` / `ToolEngine` 中按既有方式注册，保证新建、保存、回显、运行闭环。
+- 功能文档：`docs/FID/<Tool>/`（结构见「文档维护」）。
 
-- 后续所有视觉算子的核心算法必须基于 HALCON 已有算子、类或过程实现。
-- 任意视觉算子实现前，必须先确认本机 HALCON 环境具备所需能力，并在对应功能计划中列出 HALCON 接口。
-- 若 HALCON 没有对应能力，或本机 HALCON 环境缺少所需符号，必须停止实现并向用户确认，不允许自动改用 OpenCV、自写算法或第三方库替代。
+## HALCON 红线（核心约束）
+
+以下各条贯穿全工程，任何与此冲突的实现都需先停下确认：
+
+- 所有视觉算子的核心算法必须基于 HALCON 已有算子、类或过程实现；不得用 OpenCV、自写算法或第三方库替代 HALCON 核心算法能力。
+- 任意视觉算子实现前，必须先确认本机 HALCON 环境具备所需能力，并在对应功能计划中列出 HALCON 接口。若 HALCON 没有对应能力或本机缺符号，必须停止实现并向用户确认。
+- OpenCV 只允许作为图像容器、采集、显示或必要格式桥接使用；`cv::Mat` 可作为 `ToolRequest` 图像输入载体，但进入算子核心前必须转换为 HALCON 图像并由 HALCON 算子处理。
 - 新增或重做算法 runner 必须采用 HALCON runner 形态，命名和链路参考现有 `OcrHalconRunner`、`PatternPresenceHalconRunner`、`BlobPresenceHalconRunner` 等。
-- `qmake`、运行环境、license 和 runtime 路径解析必须继续走现有 `HalconRuntimePaths` 逻辑。
-- OpenCV 只允许作为现有工程的图像容器、采集、显示或必要格式桥接使用，不允许作为新算子的核心算法实现。
-- 当前工程仍可用 `cv::Mat` 作为 `ToolRequest` 的图像输入载体，但进入算子核心后必须转换为 HALCON 图像并由 HALCON 算子处理。
+- `qmake`、运行环境、license 和 runtime 路径解析必须走现有 `HalconRuntimePaths` 逻辑。
+- 约定例外：`AiDetectionRunner` 等 AI 检测桥接算子走 AI 推理链路，不属 HALCON 约束范围，但不得借此类例外为其他算子引入非 HALCON 核心算法。
 
 ## UI 与交互约束
 
@@ -64,12 +77,44 @@
 - 对暂未实现但已预留的能力，应返回明确的 unsupported 信息，不允许静默降级到其他算法。
 - 结果 payload 应包含便于 UI 展示和问题定位的关键字段，例如类别、得分、ROI、耗时、错误码或错误信息。
 
-## 依赖与兼容
+## 工程卫生
 
-- 不新增非 HALCON 算法依赖。
-- 不以 OpenCV、自写分类器或第三方库替代 HALCON 核心算法能力。
+### 构建产物不入库
+
+- Qt/qmake 构建产物（`*.o`、`moc_*.cpp`、`ui_*.h`、`qrc_*.cpp`、`Makefile`、`*.Makefile`、`.qmake.stash`、`moc_predefs.h`、可执行文件 `qt_ui_test`、`*_smoke` 等）已在 `.gitignore` 中忽略，**不得提交入库**。
+- `smoke/`、`tests/` 子工程的产物同样不入库：源码 `.cpp`/`.pro` 入库，编译产生的可执行文件、`*.o`、`Makefile`/`*.Makefile`、`*.log` 一律不入库。
+- 运行日志（`*.log`，如 `qt_ui_test.log`）不入库。
+- `.bak`、`*.bak_*` 等手工备份文件不得入库；如需保留历史，依赖 git 而非本地备份后缀。
+
+### 影子构建
+
+- **优先在 `build/` 或影子目录构建**，避免 in-source 构建把产物散落到源码根目录与 `src/`、`smoke/`：
+  ```bash
+  mkdir build && cd build
+  /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro
+  make -j$(nproc)
+  ```
+- 若已在源码根目录执行过 in-source 构建，产物可安全清理（全部被 `.gitignore` 忽略，删除不影响源码，`make` 会重建）：
+  ```bash
+  rm -f *.o moc_*.cpp ui_*.h qrc_*.cpp Makefile .qmake.stash moc_predefs.h qt_ui_test *.log
+  ```
+
+### 误入库产物的处理
+
+- 发现构建产物被误 `git add` 入库时，用 `git rm --cached <文件>` 移出索引（保留或删除本地文件视情况而定），并确认 `.gitignore` 规则已覆盖，避免再次入库。
+
+### 依赖与链路
+
+- 不新增非 HALCON 算法依赖；不以 OpenCV、自写分类器或第三方库替代 HALCON 核心算法能力。
 - 保持已有 OCR、图案有无、Blob、圆、边、线、轮廓等 HALCON runner 链路不受无关影响。
 - 若必须调整工程文件、链接方式或运行环境变量，应说明原因，并将改动限制在必要范围内。
+
+## 文档维护
+
+- 功能文档统一落在 `docs/FID/<工具名>/`，按工具分子目录（如 `ColorRecognition/`、`ColorComparison/`），含实现文档、流程、提示词规范等。
+- 分析/修复/回归报告落在 `docs/analysis/`，文件名应能体现主题与阶段，避免一次性临时名。
+- `docs/FID/Function_Docs.md` 作为功能文档总入口，新增工具时应登记。
+- 根目录 `AGENTS.md` 不记录具体功能的完成状态，只保留项目级通用约束和文档维护规则。
 
 ## 通用完成标准
 
@@ -86,15 +131,12 @@
 - 不要删除用户提供的截图、样例图片、分析文档或功能文档，除非用户明确要求。
 - 不要在 HALCON 能力未确认时提前落地替代算法。
 - 不要让按钮点击误触发关闭窗口、退出程序或保存无效配置。
+- 不要把构建产物或 `.bak` 备份文件提交入库。
 
 ## 验证要求
 
 - 涉及 Qt 工程或 UI 接入时，至少运行 `qmake qt_ui_test.pro` 和 `make` 验证构建。
-- 涉及算法 runner 时，应验证 HALCON runtime、license、必要符号缺失时能返回明确错误。
+- 涉及算法 runner 时，应补/跑对应 `smoke/` 用例，并验证 HALCON runtime、license、必要符号缺失时能返回明确错误。
 - 涉及工具配置时，应验证新建、保存、重新打开、编辑、运行和异常输入场景。
 - 涉及 UI 交互时，应手动检查关键按钮、下拉框、ROI 操作、取消/完成、无图像/无数据状态不崩溃。
-
-## 功能文档维护
-
-- 单个功能的实现进度、完善情况、待办项、阻塞项和验证记录，应维护在对应 `docs/` 功能文档中。
-- 根目录 `AGENTS.md` 不记录具体功能的完成状态，只保留项目级通用约束和文档维护规则。
+- 颜色类（识别/比较）等带样本与 ROI 的工具，验证需额外覆盖空图、无效 ROI、缺样本/缺模板场景。
