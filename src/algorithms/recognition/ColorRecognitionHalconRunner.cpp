@@ -4,6 +4,7 @@
 
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include <QDebug>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPointF>
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <dlfcn.h>
 #include <exception>
+#include <limits>
 #include <opencv2/imgproc.hpp>
 
 namespace {
@@ -198,6 +200,14 @@ int histogramBinsForSensitivity(const QString &sensitivity)
     return 16;
 }
 
+bool isHisto2DimFeatureType(const QString &featureType)
+{
+    const QString key = featureType.trimmed().toLower();
+    return key == QStringLiteral("histogram_2dim_hs") ||
+            key == QStringLiteral("histo_2dim") ||
+            key == QStringLiteral("histogram_2dim");
+}
+
 //转bgr 8位深
 cv::Mat toBgr8(const cv::Mat &image)
 {
@@ -310,7 +320,7 @@ ColorRecognitionHalconResult runError(const QString &status,
     return result;
 }
 
-//屏蔽roi结果
+//屏蔽区域roi的结果
 ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig &config,
                                              const cv::Mat &image,
                                              const qint64 elapsedMs)
@@ -396,9 +406,13 @@ struct HalconCApi
     using DifferenceFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using AreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
+    using Histo2DimFn = Herror (*)(const Hobject, const Hobject, const Hobject, Hobject *);
+    using GetGrayvalFn = Herror (*)(const Hobject, const Htuple, const Htuple, Htuple *);
     using GrayHistoRangeFn = Herror (*)(const Hobject, const Hobject, const Htuple,
                                         const Htuple, const Htuple, Htuple *, Htuple *);
     using TupleMin2Fn = Herror (*)(const Htuple, const Htuple, Htuple *);
+    using TupleMultFn = Herror (*)(const Htuple, const Htuple, Htuple *);
+    using TupleSqrtFn = Herror (*)(const Htuple, Htuple *);
     using TupleSumFn = Herror (*)(const Htuple, Htuple *);
     using ClearObjFn = Herror (*)(const Hobject);
 
@@ -420,8 +434,12 @@ struct HalconCApi
     DifferenceFn difference = nullptr;
     AreaCenterFn areaCenter = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
+    Histo2DimFn histo2Dim = nullptr;
+    GetGrayvalFn getGrayval = nullptr;
     GrayHistoRangeFn grayHistoRange = nullptr;
     TupleMin2Fn tupleMin2 = nullptr;
+    TupleMultFn tupleMult = nullptr;
+    TupleSqrtFn tupleSqrt = nullptr;
     TupleSumFn tupleSum = nullptr;
     ClearObjFn clearObj = nullptr;
 };
@@ -452,6 +470,8 @@ void resolveOptional(void *handle, Function &target, const char *symbolName)
         target = reinterpret_cast<Function>(symbol);
 }
 
+//linux下加载动态库(.so)通过 dlopen 运行时获取所有需要的 Halcon C 接口函数地址，
+//存入 HalconCApi 函数指针表，实现不编译时链接 Halcon，做到运行时按需加载、解耦依赖。
 class HalconLibrary
 {
 public:
@@ -491,8 +511,12 @@ public:
             !resolveRequired(m_handle, api.difference, "difference", errorMessage) ||
             !resolveRequired(m_handle, api.areaCenter, "T_area_center", errorMessage) ||
             !resolveRequired(m_handle, api.reduceDomain, "reduce_domain", errorMessage) ||
+            !resolveRequired(m_handle, api.histo2Dim, "T_histo_2dim", errorMessage) ||
+            !resolveRequired(m_handle, api.getGrayval, "T_get_grayval", errorMessage) ||
             !resolveRequired(m_handle, api.grayHistoRange, "T_gray_histo_range", errorMessage) ||
             !resolveRequired(m_handle, api.tupleMin2, "T_tuple_min2", errorMessage) ||
+            !resolveRequired(m_handle, api.tupleMult, "T_tuple_mult", errorMessage) ||
+            !resolveRequired(m_handle, api.tupleSqrt, "T_tuple_sqrt", errorMessage) ||
             !resolveRequired(m_handle, api.tupleSum, "T_tuple_sum", errorMessage) ||
             !resolveRequired(m_handle, api.clearObj, "clear_obj", errorMessage)) {
             symbolMissing = true;
@@ -500,7 +524,6 @@ public:
             m_handle = nullptr;
             return false;
         }
-
         if (api.setUtf8)
             api.setUtf8(1);
         return true;
@@ -512,6 +535,8 @@ private:
     void *m_handle = nullptr;
 };
 
+//HTuple只能元组封装类，自动安全管理 Halcon 元组内存、禁止拷贝、只允许移动语义、
+//通过动态 API 表操作原生 HTuple，避免内存泄漏、野指针、重复释放。
 class HalconTuple
 {
 public:
@@ -645,6 +670,121 @@ double tupleSumValue(HalconCApi *api, const HalconTuple &tuple, const QString &s
     HalconTuple sum(api);
     checkStatus(api, api->tupleSum(tuple.value(), sum.ptr()), stage + QStringLiteral(".tuple_sum"));
     return sum.size() > 0 ? sum.doubleAt(0) : 0.0;
+}
+
+double openCvBhattacharyyaDebugDistance(const QVector<double> &referenceHistogram,
+                                        const QVector<double> &testHistogram)
+{
+    const int count = qMin(referenceHistogram.size(), testHistogram.size());
+    if (count <= 0)
+        return 0.0;
+
+    cv::Mat referenceMat(1, count, CV_32F);
+    cv::Mat testMat(1, count, CV_32F);
+    for (int i = 0; i < count; ++i) {
+        referenceMat.at<float>(0, i) = static_cast<float>(qMax(0.0, referenceHistogram.at(i)));
+        testMat.at<float>(0, i) = static_cast<float>(qMax(0.0, testHistogram.at(i)));
+    }
+
+    return cv::compareHist(referenceMat, testMat, cv::HISTCMP_BHATTACHARYYA);
+}
+
+QString histogramFirstBinsText(const QVector<double> &histogram, int start, int count)
+{
+    QStringList values;
+    const int end = qMin(histogram.size(), start + count);
+    for (int i = qMax(0, start); i < end; ++i)
+        values.append(QString::number(histogram.at(i), 'f', 6));
+    return values.join(QStringLiteral(","));
+}
+
+double histogramChannelSum(const QVector<double> &histogram, int start, int count)
+{
+    double sum = 0.0;
+    const int end = qMin(histogram.size(), start + count);
+    for (int i = qMax(0, start); i < end; ++i)
+        sum += histogram.at(i);
+    return sum;
+}
+
+int histogramMaxBin(const QVector<double> &histogram, int start, int count)
+{
+    int maxIndex = -1;
+    double maxValue = -1.0;
+    const int begin = qMax(0, start);
+    const int end = qMin(histogram.size(), start + count);
+    for (int i = begin; i < end; ++i) {
+        const double value = histogram.at(i);
+        if (value > maxValue) {
+            maxValue = value;
+            maxIndex = i - begin;
+        }
+    }
+    return maxIndex;
+}
+
+void logHistogramDebugChannels(const QString &name,
+                               const QVector<double> &histogram,
+                               int bins,
+                               bool brightnessEnabled)
+{
+    qInfo().noquote()
+            << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1] featureLength=%2 expectedLength=%3 binsPerChannel=%4 channels=%5 first10=[%6]")
+               .arg(name,
+                    QString::number(histogram.size()),
+                    QString::number(bins * (brightnessEnabled ? 3 : 2)),
+                    QString::number(bins),
+                    brightnessEnabled ? QStringLiteral("H,S,V") : QStringLiteral("H,S"),
+                    histogramFirstBinsText(histogram, 0, 10));
+
+    const QStringList channelNames = brightnessEnabled
+            ? QStringList{QStringLiteral("H"), QStringLiteral("S"), QStringLiteral("V")}
+            : QStringList{QStringLiteral("H"), QStringLiteral("S")};
+    for (int channel = 0; channel < channelNames.size(); ++channel) {
+        const int start = channel * bins;
+        qInfo().noquote()
+                << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1][%2] dim=%3 sum=%4 maxBin=%5 first10=[%6]")
+                   .arg(name,
+                        channelNames.at(channel),
+                        QString::number(qMax(0, qMin(bins, histogram.size() - start))),
+                        QString::number(histogramChannelSum(histogram, start, bins), 'f', 6),
+                        QString::number(histogramMaxBin(histogram, start, bins)),
+                        histogramFirstBinsText(histogram, start, 10));
+    }
+}
+
+void logHistogram2DimDebug(const QString &name, const QVector<double> &histogram, int bins)
+{
+    const int expectedLength = bins * bins;
+    qInfo().noquote()
+            << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1] featureType=histogram_2dim_hs colorSpace=HSV channels=H,S joint featureLength=%2 expectedLength=%3 binsPerAxis=%4 first10=[%5]")
+               .arg(name,
+                    QString::number(histogram.size()),
+                    QString::number(expectedLength),
+                    QString::number(bins),
+                    histogramFirstBinsText(histogram, 0, 10));
+
+    if (histogram.size() != expectedLength)
+        return;
+
+    int maxIndex = -1;
+    double maxValue = -1.0;
+    for (int i = 0; i < histogram.size(); ++i) {
+        if (histogram.at(i) > maxValue) {
+            maxValue = histogram.at(i);
+            maxIndex = i;
+        }
+    }
+    const int maxSaturationBin = maxIndex >= 0 ? maxIndex / bins : -1;
+    const int maxHueBin = maxIndex >= 0 ? maxIndex % bins : -1;
+    qInfo().noquote()
+            << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1][HS2D] dim=%2 sum=%3 maxHueBin=%4 maxSaturationBin=%5 maxValue=%6")
+               .arg(name,
+                    QString::number(histogram.size()),
+                    QString::number(histogramChannelSum(histogram, 0, histogram.size()), 'f', 6),
+                    QString::number(maxHueBin),
+                    QString::number(maxSaturationBin),
+                    QString::number(maxValue, 'f', 6));
 }
 
 void createDoubleArrayTuple(HalconTuple &tuple, const QVector<double> &values)
@@ -931,6 +1071,110 @@ QVector<double> histogramForChannel(HalconCApi *api,
     return normalized;
 }
 
+QVector<double> normalizeHistogramVector(const QVector<double> &histogram)
+{
+    double sum = 0.0;
+    for (const double value : histogram)
+        sum += qMax(0.0, value);
+
+    QVector<double> normalized;
+    normalized.reserve(histogram.size());
+    if (sum <= 0.0) {
+        for (int i = 0; i < histogram.size(); ++i)
+            normalized.append(0.0);
+        return normalized;
+    }
+
+    for (const double value : histogram)
+        normalized.append(qMax(0.0, value) / sum);
+    return normalized;
+}
+
+QVector<double> softenHsJointHistogram(const QVector<double> &histogram, int bins)
+{
+    QVector<double> softened(bins * bins, 0.0);
+    if (histogram.size() != bins * bins)
+        return normalizeHistogramVector(histogram);
+
+    constexpr double kHueWeights[3] = {0.25, 0.50, 0.25};
+    constexpr double kSatWeights[3] = {0.25, 0.50, 0.25};
+    for (int saturationBin = 0; saturationBin < bins; ++saturationBin) {
+        for (int hueBin = 0; hueBin < bins; ++hueBin) {
+            const double value = qMax(0.0, histogram.at(saturationBin * bins + hueBin));
+            if (value <= 0.0)
+                continue;
+
+            for (int satOffset = -1; satOffset <= 1; ++satOffset) {
+                const int targetSaturation = qBound(0, saturationBin + satOffset, bins - 1);
+                const double saturationWeight = kSatWeights[satOffset + 1];
+                for (int hueOffset = -1; hueOffset <= 1; ++hueOffset) {
+                    const int targetHue = (hueBin + hueOffset + bins) % bins;
+                    const double hueWeight = kHueWeights[hueOffset + 1];
+                    softened[targetSaturation * bins + targetHue] +=
+                            value * saturationWeight * hueWeight;
+                }
+            }
+        }
+    }
+
+    return normalizeHistogramVector(softened);
+}
+
+QVector<double> histogram2DimHsFeature(HalconCApi *api,
+                                       const Hobject roiRegion,
+                                       const Hobject hue,
+                                       const Hobject saturation,
+                                       const int bins)
+{
+    Hobject histo2Dim = NO_OBJECTS;
+    auto cleanup = [&]() {
+        clearObject(api, histo2Dim);
+    };
+
+    try {
+        checkStatus(api,
+                    api->histo2Dim(roiRegion, hue, saturation, &histo2Dim),
+                    QStringLiteral("histo_2dim.hue_saturation"));
+
+        QVector<double> rows;
+        QVector<double> columns;
+        rows.reserve(256 * 256);
+        columns.reserve(256 * 256);
+        for (int row = 0; row < 256; ++row) {
+            for (int column = 0; column < 256; ++column) {
+                rows.append(row);
+                columns.append(column);
+            }
+        }
+
+        HalconTuple rowTuple(api);
+        HalconTuple columnTuple(api);
+        HalconTuple grayValues(api);
+        createDoubleArrayTuple(rowTuple, rows);
+        createDoubleArrayTuple(columnTuple, columns);
+        checkStatus(api,
+                    api->getGrayval(histo2Dim, rowTuple.value(), columnTuple.value(), grayValues.ptr()),
+                    QStringLiteral("histo_2dim.get_grayval"));
+
+        QVector<double> jointHistogram(bins * bins, 0.0);
+        for (int row = 0; row < 256; ++row) {
+            const int saturationBin = qBound(0, row * bins / 256, bins - 1);
+            for (int column = 0; column < 256; ++column) {
+                const int hueBin = qBound(0, column * bins / 256, bins - 1);
+                const int index = row * 256 + column;
+                jointHistogram[saturationBin * bins + hueBin] +=
+                        qMax(0.0, grayValues.doubleAt(index));
+            }
+        }
+
+        cleanup();
+        return softenHsJointHistogram(jointHistogram, bins);
+    } catch (...) {
+        cleanup();
+        throw;
+    }
+}
+
 bool areHsHsvCompatibleFeatureLengths(const int lhsSize, const int rhsSize)
 {
     if (lhsSize <= 0 || rhsSize <= 0 || lhsSize == rhsSize)
@@ -1096,11 +1340,15 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
         }
 
         const int bins = histogramBinsForSensitivity(config.sensitivity);
-        result.feature.reserve(config.brightnessEnabled ? bins * 3 : bins * 2);
-        result.feature += histogramForChannel(api, effectiveRegion, hue, bins, QStringLiteral("hue"));
-        result.feature += histogramForChannel(api, effectiveRegion, saturation, bins, QStringLiteral("saturation"));
-        if (config.brightnessEnabled)
-            result.feature += histogramForChannel(api, effectiveRegion, value, bins, QStringLiteral("value"));
+        if (isHisto2DimFeatureType(config.featureType)) {
+            result.feature = histogram2DimHsFeature(api, effectiveRegion, hue, saturation, bins);
+        } else {
+            result.feature.reserve(config.brightnessEnabled ? bins * 3 : bins * 2);
+            result.feature += histogramForChannel(api, effectiveRegion, hue, bins, QStringLiteral("hue"));
+            result.feature += histogramForChannel(api, effectiveRegion, saturation, bins, QStringLiteral("saturation"));
+            if (config.brightnessEnabled)
+                result.feature += histogramForChannel(api, effectiveRegion, value, bins, QStringLiteral("value"));
+        }
 
         cleanup();
         return result;
@@ -1112,6 +1360,7 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
 
 } // namespace
 
+//与halcon做验证对比
 ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature(
         const cv::Mat &image,
         const ColorRecognitionHalconConfig &config) const
@@ -1127,9 +1376,10 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
                                 image,
                                 timer.elapsed());
         }
-        if (config.featureType.trimmed().toLower() != QStringLiteral("histogram")) {
+        if (config.featureType.trimmed().toLower() != QStringLiteral("histogram") &&
+                !isHisto2DimFeatureType(config.featureType)) {
             return featureError(QStringLiteral("unsupported_feature"),
-                                QStringLiteral("Only histogram feature is supported in the first version."),
+                                QStringLiteral("Only histogram and histogram_2dim_hs features are supported."),
                                 config,
                                 image,
                                 timer.elapsed());
@@ -1186,11 +1436,17 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
         result.message = QStringLiteral("feature extracted");
         result.elapsedMs = timer.elapsed();
         result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_feature"));
-        result.payload.insert(QStringLiteral("featureType"), QStringLiteral("histogram"));
+        result.payload.insert(QStringLiteral("featureType"),
+                              isHisto2DimFeatureType(config.featureType)
+                              ? QStringLiteral("histogram_2dim_hs")
+                              : QStringLiteral("histogram"));
         result.payload.insert(QStringLiteral("featureLength"), result.feature.size());
         result.payload.insert(QStringLiteral("histogramBins"), histogramBinsForSensitivity(config.sensitivity));
         result.payload.insert(QStringLiteral("brightnessEnabled"), config.brightnessEnabled);
         result.payload.insert(QStringLiteral("lightingNormalizationMode"),
+                              isHisto2DimFeatureType(config.featureType)
+                              ? QStringLiteral("hue_saturation_2dim_soft_kernel")
+                              :
                               config.brightnessEnabled
                               ? QStringLiteral("include_value_channel")
                               : QStringLiteral("hue_saturation_priority"));
@@ -1227,6 +1483,166 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
                             config,
                             image,
                             timer.elapsed());
+    }
+}
+
+//巴氏特征比较
+ColorRecognitionHalconHistogramCompareResult
+ColorRecognitionHalconRunner::compareHistogramBhattacharyya(
+        const QVector<double> &referenceHistogram,
+        const QVector<double> &testHistogram,
+        const ColorRecognitionHalconConfig &config) const
+{
+    QElapsedTimer timer;
+    timer.start();
+
+    ColorRecognitionHalconHistogramCompareResult result;
+    result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_tuple_bhattacharyya"));
+    result.payload.insert(QStringLiteral("method"), QStringLiteral("bhattacharyya"));
+    result.payload.insert(QStringLiteral("halconOperators"),
+                          QStringLiteral("T_tuple_mult,T_tuple_sqrt,T_tuple_sum"));
+    result.payload.insert(QStringLiteral("featureLength"), qMin(referenceHistogram.size(),
+                                                                testHistogram.size()));
+
+    try {
+        if (referenceHistogram.isEmpty() || referenceHistogram.size() != testHistogram.size()) {
+            result.status = QStringLiteral("invalid_feature_dimension");
+            result.message = QStringLiteral("Histogram feature dimensions do not match.");
+            result.elapsedMs = timer.elapsed();
+            return result;
+        }
+
+        if (config.halconSoPath.trimmed().isEmpty() || !QFileInfo::exists(config.halconSoPath)) {
+            const QString triedPaths = config.halconSoPathCandidates.isEmpty()
+                    ? config.halconSoPath
+                    : config.halconSoPathCandidates.join(QStringLiteral("; "));
+            result.status = QStringLiteral("halcon_so_not_found");
+            result.message = QStringLiteral("HALCON runtime file not found: %1. Tried: %2")
+                    .arg(config.halconSoPath, triedPaths);
+            result.elapsedMs = timer.elapsed();
+            return result;
+        }
+
+        HalconLibrary library;
+        QString loadMessage;
+        bool symbolMissing = false;
+        if (!library.load(config.halconSoPath, loadMessage, symbolMissing)) {
+            result.status = symbolMissing ? QStringLiteral("halcon_symbol_missing")
+                                          : QStringLiteral("halcon_load_failed");
+            result.message = loadMessage;
+            result.elapsedMs = timer.elapsed();
+            return result;
+        }
+
+        HalconTuple referenceTuple = featureToTuple(&library.api, referenceHistogram);
+        HalconTuple testTuple = featureToTuple(&library.api, testHistogram);
+        const double referenceSum = tupleSumValue(&library.api,
+                                                  referenceTuple,
+                                                  QStringLiteral("bhattacharyya.reference"));
+        const double testSum = tupleSumValue(&library.api,
+                                             testTuple,
+                                             QStringLiteral("bhattacharyya.test"));
+        if (referenceSum <= 0.0 || testSum <= 0.0) {
+            result.status = QStringLiteral("empty_histogram");
+            result.message = QStringLiteral("Histogram sum is zero.");
+            result.elapsedMs = timer.elapsed();
+            return result;
+        }
+
+        HalconTuple multipliedTuple(&library.api);
+        checkStatus(&library.api,
+                    library.api.tupleMult(referenceTuple.value(),
+                                          testTuple.value(),
+                                          multipliedTuple.ptr()),
+                    QStringLiteral("bhattacharyya.tuple_mult"));
+
+        HalconTuple coefficientTerms(&library.api);
+        checkStatus(&library.api,
+                    library.api.tupleSqrt(multipliedTuple.value(), coefficientTerms.ptr()),
+                    QStringLiteral("bhattacharyya.tuple_sqrt"));
+
+        const double coefficientRaw = tupleSumValue(&library.api,
+                                                    coefficientTerms,
+                                                    QStringLiteral("bhattacharyya.coefficient"));
+        const double coefficient = qBound(0.0,
+                                          coefficientRaw / std::sqrt(referenceSum * testSum),
+                                          1.0);
+        const double safeCoefficient = qMax(coefficient, std::numeric_limits<double>::min());
+        const double distance = -std::log(safeCoefficient);
+        const double openCvDistance = openCvBhattacharyyaDebugDistance(referenceHistogram,
+                                                                       testHistogram);
+        const int bins = histogramBinsForSensitivity(config.sensitivity);
+        const bool histo2Dim = isHisto2DimFeatureType(config.featureType);
+        const int expectedLength = histo2Dim
+                ? bins * bins
+                : bins * (config.brightnessEnabled ? 3 : 2);
+        qInfo().noquote()
+                << QStringLiteral("[ColorComparison][Bhattacharyya debug] HALCON(tuple -ln(BC)) distance=%1, BC=%2 | OpenCV(compareHist HISTCMP_BHATTACHARYYA) distance=%3 | absDiff=%4")
+                   .arg(QString::number(distance, 'f', 9),
+                        QString::number(coefficient, 'f', 9),
+                        QString::number(openCvDistance, 'f', 9),
+                        QString::number(std::abs(distance - openCvDistance), 'f', 9));
+        qInfo().noquote()
+                << QStringLiteral("[ColorComparison][Bhattacharyya debug][config] colorSpace=HSV histogramSource=%1 featureType=%2 sensitivity=%3 bins=%4 brightnessEnabled=%5 channels=%6 expectedLength=%7 templateLength=%8 detectLength=%9 dimensionsMatch=%10")
+                   .arg(histo2Dim
+                        ? QStringLiteral("HALCON:T_histo_2dim")
+                        : QStringLiteral("HALCON:T_gray_histo_range"),
+                        histo2Dim
+                        ? QStringLiteral("histogram_2dim_hs_soft")
+                        : QStringLiteral("histogram_1d"),
+                        config.sensitivity,
+                        QString::number(bins),
+                        config.brightnessEnabled ? QStringLiteral("true") : QStringLiteral("false"),
+                        histo2Dim
+                        ? QStringLiteral("H,S joint")
+                        : (config.brightnessEnabled ? QStringLiteral("H,S,V") : QStringLiteral("H,S")),
+                        QString::number(expectedLength),
+                        QString::number(referenceHistogram.size()),
+                        QString::number(testHistogram.size()),
+                        (referenceHistogram.size() == testHistogram.size() &&
+                         referenceHistogram.size() == expectedLength)
+                        ? QStringLiteral("true")
+                        : QStringLiteral("false"));
+        if (histo2Dim) {
+            logHistogram2DimDebug(QStringLiteral("template"), referenceHistogram, bins);
+            logHistogram2DimDebug(QStringLiteral("detect"), testHistogram, bins);
+        } else {
+            logHistogramDebugChannels(QStringLiteral("template"), referenceHistogram, bins, config.brightnessEnabled);
+            logHistogramDebugChannels(QStringLiteral("detect"), testHistogram, bins, config.brightnessEnabled);
+        }
+
+        result.success = true;
+        result.status = QStringLiteral("ok");
+        result.distance = qMax(0.0, distance);
+        result.message = QStringLiteral("distance=%1").arg(QString::number(result.distance, 'f', 6));
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("coefficient"), coefficient);
+        result.payload.insert(QStringLiteral("referenceHistogramSum"), referenceSum);
+        result.payload.insert(QStringLiteral("testHistogramSum"), testSum);
+        result.payload.insert(QStringLiteral("distance"), result.distance);
+        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
+        return result;
+    } catch (const std::pair<QString, QString> &error) {
+        result.success = false;
+        result.status = error.first;
+        result.message = error.second;
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
+        return result;
+    } catch (const std::exception &error) {
+        result.success = false;
+        result.status = QStringLiteral("exception");
+        result.message = QString::fromLocal8Bit(error.what());
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
+        return result;
+    } catch (...) {
+        result.success = false;
+        result.status = QStringLiteral("exception");
+        result.message = QStringLiteral("Unknown exception while comparing histograms.");
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
+        return result;
     }
 }
 

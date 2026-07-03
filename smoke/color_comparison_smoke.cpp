@@ -1,15 +1,56 @@
 #include "algorithms/recognition/ColorComparisonHalconRunner.h"
+#include "algorithms/recognition/ColorRecognitionHalconRunner.h"
 #include "algorithms/halcon/HalconRuntimePaths.h"
 
 #include <QCoreApplication>
 #include <QJsonObject>
 #include <QPointF>
+#include <QVector>
+#include <cmath>
 #include <iostream>
 #include <opencv2/core.hpp>
+
+QVector<double> hsvFeature(int bins, int hueBin, int saturationBin, int valueBin = -1)
+{
+    QVector<double> feature(bins * (valueBin >= 0 ? 3 : 2), 0.0);
+    feature[hueBin] = 1.0;
+    feature[bins + saturationBin] = 1.0;
+    if (valueBin >= 0)
+        feature[bins * 2 + valueBin] = 1.0;
+    return feature;
+}
 
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
+
+    const QVector<double> templateGreen = hsvFeature(16, 5, 12);
+    const QVector<double> shiftedGreen = hsvFeature(16, 6, 12);
+    const ColorComparisonHsvSimilarity shiftedGreenSimilarity =
+            compareColorComparisonHsvHistograms(templateGreen, shiftedGreen, 16, false);
+    if (shiftedGreenSimilarity.combined < 0.70) {
+        std::cerr << "medium sensitivity must tolerate nearby green hue bins, got "
+                  << shiftedGreenSimilarity.combined * 100.0 << std::endl;
+        return 1;
+    }
+
+    const QVector<double> cyanHue = hsvFeature(16, 8, 12);
+    const ColorComparisonHsvSimilarity cyanSimilarity =
+            compareColorComparisonHsvHistograms(templateGreen, cyanHue, 16, false);
+    if (cyanSimilarity.combined > 0.52) {
+        std::cerr << "cyan must not score as green, got "
+                  << cyanSimilarity.combined * 100.0 << std::endl;
+        return 1;
+    }
+
+    const QVector<double> blueHue = hsvFeature(16, 11, 12);
+    const ColorComparisonHsvSimilarity blueSimilarity =
+            compareColorComparisonHsvHistograms(templateGreen, blueHue, 16, false);
+    if (blueSimilarity.combined > 0.45) {
+        std::cerr << "blue must stay below color-match threshold, got "
+                  << blueSimilarity.combined * 100.0 << std::endl;
+        return 1;
+    }
 
     ColorComparisonHalconConfig config;
     config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
@@ -19,11 +60,71 @@ int main(int argc, char **argv)
     config.detectRegionType = QStringLiteral("rectangle");
     config.featureType = QStringLiteral("histogram");
     config.sensitivity = QStringLiteral("medium");
-    config.brightnessEnabled = true;
+    config.brightnessEnabled = false;
     config.minScore = 90;
 
     cv::Mat image(24, 24, CV_8UC3, cv::Scalar(20, 80, 180));
     ColorComparisonHalconRunner runner;
+    ColorComparisonHalconConfig missingTemplateConfig = config;
+    missingTemplateConfig.halconSoPath.clear();
+    const ColorComparisonHalconResult missingTemplate =
+            runner.run(image, missingTemplateConfig);
+    if (missingTemplate.success || missingTemplate.status != QStringLiteral("no_template_feature")) {
+        std::cerr << "missing saved template feature must fail before HALCON extraction, got "
+                  << missingTemplate.status.toStdString() << ": "
+                  << missingTemplate.message.toStdString() << std::endl;
+        return 1;
+    }
+
+    if (!qEnvironmentVariableIsSet("RUN_HALCON_LICENSED_SMOKE")) {
+        std::cerr << "HALCON licensed smoke is skipped; pure HSV assertions passed. "
+                  << "Set RUN_HALCON_LICENSED_SMOKE=1 on a machine with a valid HALCON license "
+                  << "to run Bhattacharyya tuple and image runner checks." << std::endl;
+        return 0;
+    }
+
+    ColorRecognitionHalconConfig histogramCompareConfig;
+    histogramCompareConfig.halconSoPath = config.halconSoPath;
+    histogramCompareConfig.halconSoPathCandidates = config.halconSoPathCandidates;
+    ColorRecognitionHalconRunner featureRunner;
+    const ColorRecognitionHalconHistogramCompareResult bhattacharyyaResult =
+            featureRunner.compareHistogramBhattacharyya(templateGreen,
+                                                        templateGreen,
+                                                        histogramCompareConfig);
+    if (!bhattacharyyaResult.success &&
+            bhattacharyyaResult.message.contains(QStringLiteral("license"), Qt::CaseInsensitive)) {
+        std::cerr << "HALCON license is unavailable; pure HSV assertions passed, "
+                  << "Bhattacharyya HALCON tuple execution and image runner are skipped: "
+                  << bhattacharyyaResult.message.toStdString() << std::endl;
+        return 0;
+    }
+    if (!bhattacharyyaResult.success || bhattacharyyaResult.distance > 0.001) {
+        std::cerr << "Bhattacharyya histogram mode must use available HALCON histogram/tuple "
+                  << "operators without requiring compare_histogram, got "
+                  << bhattacharyyaResult.status.toStdString() << ": "
+                  << bhattacharyyaResult.message.toStdString() << " distance="
+                  << bhattacharyyaResult.distance << std::endl;
+        return 1;
+    }
+
+    const QVector<double> referenceDistribution = {1.0, 0.0};
+    const QVector<double> testDistribution = {0.0625, 0.9375};
+    const ColorRecognitionHalconHistogramCompareResult bhattacharyyaLogResult =
+            featureRunner.compareHistogramBhattacharyya(referenceDistribution,
+                                                        testDistribution,
+                                                        histogramCompareConfig);
+    const double expectedBhattacharyyaDistance = -std::log(0.25);
+    if (!bhattacharyyaLogResult.success ||
+            std::abs(bhattacharyyaLogResult.distance - expectedBhattacharyyaDistance) > 0.001) {
+        std::cerr << "Bhattacharyya distance must use -ln(BC), expected "
+                  << expectedBhattacharyyaDistance << " got "
+                  << bhattacharyyaLogResult.status.toStdString() << ": "
+                  << bhattacharyyaLogResult.message.toStdString() << " distance="
+                  << bhattacharyyaLogResult.distance << std::endl;
+        return 1;
+    }
+
+    config.templateFeature = templateGreen;
     const ColorComparisonHalconResult result = runner.run(image, config);
     if (!result.success || !result.ok || result.score < 99.0) {
         std::cerr << "expected identical color comparison to pass, got "
@@ -33,7 +134,7 @@ int main(int argc, char **argv)
         return 1;
     }
     if (result.payload.value(QStringLiteral("comparisonMethod")).toString()
-            != QStringLiteral("hsv_histogram_intersection")) {
+            != QStringLiteral("hsv_histogram_soft_kernel_weighted")) {
         std::cerr << "comparison payload missing method" << std::endl;
         return 1;
     }

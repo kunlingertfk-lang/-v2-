@@ -158,7 +158,7 @@ void ToolLibraryDialog::setupButtonGroup()
     //识别工具
     m_buttonGroup->addButton(ui->colorRecognitionToolButton, ColorRecognition); //颜色识别
     m_buttonGroup->addButton(ui->colorComparisonToolButton, ColorComparison); //颜色比较
-    // m_buttonGroup->addButton(ui->circleLocationButton, RegistrationClass);  //注册分类
+    m_buttonGroup->addButton(ui->registrationClassToolButton, RegistrationClass);  //注册分类
     // m_buttonGroup->addButton(ui->circleLocationButton, RegisteredObjectDetection); //注册目标检测
 
 
@@ -270,6 +270,12 @@ void ToolLibraryDialog::confirmSelection()
         accept();
         return;
     }
+
+    if (tool == RegistrationClass) {//注册分类
+        m_selectedToolType = ToolType::RegisteredClassification;
+        accept();
+        return;
+    }
 /*===========================tfk end===========================*/
 
 
@@ -358,6 +364,10 @@ void ToolLibraryDialog::updatePreview(int id)
     case ColorComparison:
         ui->previewTitleLabel->setText(tr("颜色比较"));
         ui->previewDescriptionLabel->setText(tr("比较模板区域与检测区域的颜色相似度"));
+        break;
+    case RegistrationClass:
+        ui->previewTitleLabel->setText(tr("注册分类"));
+        ui->previewDescriptionLabel->setText(tr("根据已注册类别对检测区域图像进行分类"));
         break;
 
 /*===========================tfk end===========================*/

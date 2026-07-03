@@ -669,6 +669,375 @@ minScore
 
 - 真实 GUI 手动确认四按钮的默认/hover/点击 flash/连续运行橙色态/disabled 灰化，以及基础/全部分段、检测区域 ROI 绘制、完成/退出流程等回归不受影响。
 
+### 2026-07-02 10:02:09 CST - 检测区域结果文字跟随检测框显示
+
+#### 已实现功能
+
+- 颜色比较测试运行后，结果文字显示方式对齐颜色识别。
+- 检测 ROI 上显示 `OK/NG score:x.x` 结果文字。
+- 当检测框足够大时，结果文字居中显示在检测框内。
+- 当检测框较小时，结果文字按 `FrameViewHelper` 现有规则显示在检测框上方、下方或右侧，避免被检测框遮挡。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - 新增归一化 ROI 到像素 ROI 的转换。
+  - 将模板 ROI、检测 ROI、屏蔽多边形 overlay 改为像素坐标输出，匹配 `FrameViewHelper::setToolOverlays()` 的显示坐标体系。
+  - 结果文字 overlay 使用 `label=color_result_text`。
+  - 结果文字 overlay 增加 `extra.anchorRect`，复用颜色识别已有的检测框内/外自动摆放逻辑。
+  - 圆形检测区域输出圆形 overlay，并用外接矩形作为结果文字锚点。
+
+#### 出现的问题与处理
+
+- 问题：颜色比较 runner 只输出固定位置 `OK/NG` 文本，且没有 `color_result_text` 和 `anchorRect`，因此无法像颜色识别一样把结果显示到检测框上。
+  处理：按颜色识别 runner 的结果 overlay 结构补齐结果文字 label、状态字段和 anchorRect。
+- 问题：颜色比较结果 overlay 原先使用归一化坐标，`FrameViewHelper` 的 tool overlay 渲染逻辑实际按图像像素坐标处理。
+  处理：runner 输出 overlay 前统一转换为图像像素坐标。
+
+#### 验证
+
+- 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j8`，编译链接通过。
+
+#### 剩余事项
+
+- 仍需在真实 GUI 中手动确认矩形/圆形检测区域上文字显示位置、OK/NG 颜色和小 ROI 外置显示效果。
+
+### 2026-07-02 10:20:21 CST - 颜色比较评分稳定性修正
+
+#### 已实现功能
+
+- 颜色比较得分从“拼接 HSV 直方图硬分箱交集”调整为“HSV 通道分开比较 + 邻近 bin 平滑 + 分层权重汇总”。
+- 保持默认算法语义仍为模板 ROI 与检测 ROI 的 HSV 直方图交集相似度，分数越高越相似。
+- 对轻微色相、饱和度和亮度漂移更稳定，避免同类绿色 ROI 因落入相邻 bin 而出现异常低分。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - 新增 HSV 直方图通道拆分比较。
+  - Hue 通道按环形邻近 bin 平滑，Saturation/Value 通道按非环形邻近 bin 平滑。
+  - 亮度使能时使用 `hue=0.55,saturation=0.30,value=0.15`；关闭亮度时使用 `hue=0.65,saturation=0.35`。
+  - payload 中增加 `hueSimilarity`、`saturationSimilarity`、`valueSimilarity`、`hsvWeights`、`histogramSmoothing`，便于后续定位异常得分。
+  - `comparisonMethod` 更新为 `hsv_histogram_intersection_smoothed_weighted`。
+- `smoke/color_comparison_smoke.cpp`
+  - 同步检查新的 `comparisonMethod`。
+
+#### 出现的问题与处理
+
+- 问题：原先把 H/S/V 三段直方图直接拼接后逐 bin 求交集，若同色区域受光照、材质或采样 ROI 影响落到相邻 bin，交集会接近 0，出现绿色与绿色得分极低、显示效果不符合直觉的问题。
+  处理：保留 HALCON 提取 HSV 直方图的链路，只在比较阶段对相邻 bin 做平滑，并按 Hue/Saturation/Value 分层加权，降低硬分箱抖动造成的误判。
+- 问题：需要保留“亮度使能”的 UI 语义。
+  处理：亮度打开时参与 Value 通道但权重较低，避免亮度变化压过色相判断；亮度关闭时只比较 H/S。
+
+#### 验证
+
+- 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j8`，主工程编译通过。
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4`，颜色比较 smoke 编译通过。
+- 已执行 `./color_comparison_smoke`，运行阶段因本机 HALCON license 缺失失败：`gen_image_interleaved: could not find license file`。该项为环境阻塞，待 HALCON license 可用后复测。
+
+#### 剩余事项
+
+- 需要在真实 GUI 中用同一张基准图复测绿色模板对上方绿色、下方绿色、青色、红色等 ROI 的分数梯度。
+- 若仍出现同色低分，应继续结合 payload 中的三通道相似度判断是 Hue 漂移、饱和度漂移、亮度漂移还是 ROI 映射问题。
+
+### 2026-07-02 10:45:21 CST - 颜色比较同色低分二次修正
+
+#### 已实现功能
+
+- 将颜色比较 HSV 相似度从邻近 bin 平滑进一步调整为软距离核匹配。
+- 中等灵敏度下，Hue 相差少量 bin 且饱和度相近的同类颜色不再被硬分箱直接打成低分。
+- 基础页固定不启用亮度；全部页才显示并保存“亮度使能”开关。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorComparisonHalconRunner.h`
+  - 新增 `ColorComparisonHsvSimilarity` 和 `compareColorComparisonHsvHistograms()`，用于不依赖 HALCON license 的纯 HSV 相似度测试。
+  - `ColorComparisonHalconConfig::brightnessEnabled` 默认值改为 `false`。
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - HSV 通道比较改为 soft-kernel 加权匹配：Hue 使用环形距离，Saturation/Value 使用线性距离。
+  - `comparisonMethod` 更新为 `hsv_histogram_soft_kernel_weighted`。
+  - payload 保留 `hueSimilarity`、`saturationSimilarity`、`valueSimilarity`、`hsvWeights` 和 `histogramSmoothing`，便于复查低分来源。
+- `src/ColorComparisonDialog.cpp`
+  - 初始化时真正进入基础模式并隐藏全部页高级项。
+  - 基础模式保存配置时强制 `brightnessEnabled=false`、`featureType=histogram`。
+  - 全部模式下才读取亮度复选框；加载旧配置时若启用了亮度、色谱或检测屏蔽，则回显到全部模式。
+- `smoke/color_comparison_smoke.cpp`
+  - 新增纯 HSV 相似度断言：邻近绿色 Hue 应超过 70 分，远 Hue 应低于匹配阈值。
+  - 同步新的 `comparisonMethod` 和亮度默认值。
+
+#### 出现的问题与处理
+
+- 问题：上一版只做相邻 bin 平滑，若两块视觉上相近的绿色跨过多个 Hue bin，分数仍可能偏低。
+  处理：改为按 bin 距离衰减的 soft-kernel 相似度，既允许小范围 Hue 漂移，也保留远色相低分。
+- 问题：基础页只设置了“基础”按钮 checked，但没有真正调用基础模式显隐与保存逻辑，可能误把亮度开关状态带入基础测试。
+  处理：初始化调用 `setAllParamsMode(false)`，保存时按当前基础/全部模式决定亮度是否参与。
+
+#### 验证
+
+- 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j8`，主工程编译链接通过。
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4`，颜色比较 smoke 编译通过。
+- 已执行 `./color_comparison_smoke`，纯 HSV 相似度断言通过后进入 HALCON runner 阶段；运行阶段仍因本机 HALCON license 缺失失败：`gen_image_interleaved: could not find license file`。
+
+#### 剩余事项
+
+- 需要在真实 GUI 中复测与海康软件同一张图、同一模板 ROI、同一检测 ROI 的分数。
+- 若仍低于预期，应优先读取 payload 中三通道相似度；若 Hue/Saturation 已合理但总体仍不贴近海康，需要补充“主色覆盖率/颜色区域占比”模式，而不是继续扩大 Hue 容差。
+
+### 2026-07-02 11:16:38 CST - 颜色比较青蓝误判高分修正
+
+#### 已实现功能
+
+- 将颜色比较评分进一步改为模板主 Hue 覆盖率主导，避免绿色模板下青色、蓝色因饱和度相近而被判高分。
+- 基础模式仍不启用亮度；亮度只在全部页勾选后参与 Value 通道。
+- 新增纯 HSV 断言：绿色模板下，近邻绿色需通过，青色和蓝色必须低于匹配阈值。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - 新增模板 Hue 直方图主峰提取。
+  - 新增 `templateDominantHueCoverage()`：按模板主 Hue 对检测 Hue 分布做覆盖率评分。
+  - Hue 相似度改为 `模板主 Hue 覆盖率 0.80 + 直方图 soft similarity 0.20`。
+  - 基础模式权重改为 `hue=0.80,saturation=0.20`。
+  - 亮度启用时权重改为 `hue=0.70,saturation=0.15,value=0.15`。
+  - payload 的 `scoreFormula`、`hsvWeights`、`hueComparisonMode` 同步更新。
+- `smoke/color_comparison_smoke.cpp`
+  - 绿色近邻测试从 Hue 偏移 2 bin 调整为偏移 1 bin。
+  - 新增 cyan/blue 不能作为 green 高分通过的断言。
+
+#### 出现的问题与处理
+
+- 问题：上一版 soft-kernel 过于宽松，绿色模板下青色仍可得到约 63.9 的纯算法相似度，和截图中的“青色/蓝色高分”现象一致。
+  处理：将 Hue 分数从整体直方图相似度改为模板主色覆盖率主导，青色、蓝色需要真正落在模板主 Hue 附近才可得高分。
+- 问题：主工程构建时，根目录中 smoke 子工程生成的同名对象文件曾干扰主工程链接。
+  处理：按 AGENTS 工程卫生要求清理 `.gitignore` 覆盖的 qmake 构建产物后重新全量构建。
+
+#### 验证
+
+- 已执行清理后 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j8`，主工程全量编译链接通过。
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4 && ./color_comparison_smoke`，纯 HSV 相似度断言通过；随后进入 HALCON runner 阶段时因本机 HALCON license 缺失失败：`gen_image_interleaved: could not find license file`。
+
+#### 剩余事项
+
+- 需要在 GUI 中复测绿色、青色、蓝色三组 ROI：青色/蓝色应不再高于绿色。
+- 若海康分数仍有差异，下一步应补充“主色覆盖率/颜色区域占比”作为独立算法模式，并与海康的检测区域覆盖率语义对齐。
+
+### 2026-07-02 11:54:18 CST - 新增 HALCON Bhattacharyya 直方图比较模式
+
+#### 已实现功能
+
+- 颜色比较“全部”页新增比较模式：
+  - `模板主色覆盖率`：现有默认模式。
+  - `Bhattacharyya直方图`：新增模式。
+- 新增模式严格要求调用 HALCON `compare_histogram` 语义对应的 `T_compare_histogram` 符号，方法参数为 `bhattacharyya`。
+- 不实现 C++ 自算 Bhattacharyya，不做静默降级。
+- Bhattacharyya 模式得分公式为 `(1.0 - Dist) * 100`，距离越小得分越高。
+
+#### 本次更改
+
+- `src/ColorComparisonDialog.cpp/.h`
+  - “模型色彩特征”卡片新增 `比较模式` 下拉框。
+  - 基础页仍固定保存 `comparisonMode=dominant_hue_coverage`。
+  - 全部页选择 `Bhattacharyya直方图` 时保存 `comparisonMode=bhattacharyya_histogram`。
+  - 重新打开旧配置时，若保存了 Bhattacharyya 模式，则自动回显到“全部”页。
+- `src/tooladapters/ColorComparisonAdapter.cpp`
+  - 解析并传递 `comparisonMode`。
+- `src/algorithms/recognition/ColorComparisonHalconRunner.h/.cpp`
+  - `ColorComparisonHalconConfig` 新增 `comparisonMode`。
+  - runner 根据 `comparisonMode` 分支：
+    - `dominant_hue_coverage`：保留现有模板主 Hue 覆盖率算法。
+    - `bhattacharyya_histogram`：调用 `ColorRecognitionHalconRunner::compareHistogramBhattacharyya()`。
+  - payload 增加 `comparisonMode`、`distance`、`halconOperator=compare_histogram`、`halconCompareMethod=bhattacharyya`。
+- `src/algorithms/recognition/ColorRecognitionHalconRunner.h/.cpp`
+  - 新增 `ColorRecognitionHalconHistogramCompareResult`。
+  - 新增 `compareHistogramBhattacharyya()`，内部通过动态 HALCON API 调用 `T_compare_histogram(HistRef, HistTest, 'bhattacharyya', Dist)`。
+  - `T_compare_histogram` 使用可选符号绑定，缺失时返回 `halcon_symbol_missing`。
+
+#### 出现的问题与处理
+
+- 问题：本机 HALCON 24.11.1.0 的头文件和动态库中未检索到 `compare_histogram` / `T_compare_histogram` 导出。
+  处理：按 HALCON 红线，不用 C++ 替代实现；Bhattacharyya 模式只在运行时符号存在时执行，符号缺失时返回明确错误。
+- 问题：smoke 执行仍在 `gen_image_interleaved` 阶段因 HALCON license 缺失失败，无法进入 `compare_histogram` 分支。
+  处理：记录为环境阻塞；代码层面已完成编译验证。
+
+#### 验证
+
+- 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j8`，主工程编译链接通过。
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4 && ./color_comparison_smoke`，smoke 编译通过；运行阶段仍因本机 HALCON license 缺失失败：`gen_image_interleaved: could not find license file`。
+- 已执行 `git diff --check`，无空白错误。
+
+#### 剩余事项
+
+- 需要在具备 HALCON license 且存在 `T_compare_histogram` 符号的环境中复测 Bhattacharyya 模式。
+- 若目标 HALCON 版本也没有该算子，应确认实际可用的 HALCON 直方图比较算子名称，再替换绑定符号；不应回退到 C++ 自算。
+
+### 2026-07-02 15:51:51 CST - Bhattacharyya 模式改为 HALCON 基础算子组合
+
+#### 已实现功能
+
+- 确认当前目标机 HALCON 24.11.1 标准 2D 库不提供 `compare_histogram` / `T_compare_histogram`：
+  - C/C++ 头文件未检索到该接口。
+  - `libhalconc.so`、`libhalconcpp.so`、XL 变体导出符号中未检索到该接口。
+  - 本地标准帮助文档只检索到 `gray_histo`、`gray_histo_range`、`histo_2dim` 等基础直方图算子。
+- 颜色比较 `Bhattacharyya直方图` 模式不再依赖缺失的 `T_compare_histogram`。
+- 新模式改为：
+  - 继续使用 HALCON `T_gray_histo_range` 提取 HSV 直方图特征。
+  - 使用 HALCON tuple 基础算子 `T_tuple_mult`、`T_tuple_sqrt`、`T_tuple_sum` 计算 Bhattacharyya 系数。
+  - 距离公式当前为标准巴氏距离 `-ln(coefficient)`，分数公式为 `max(0, 1 - distance) * 100`。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorRecognitionHalconRunner.cpp`
+  - 移除 `T_compare_histogram` 可选符号依赖。
+  - 新增动态解析 `T_tuple_mult`、`T_tuple_sqrt`。
+  - `compareHistogramBhattacharyya()` 改为 HALCON 基础 tuple 算子组合实现。
+  - payload 标记为 `algorithm=halcon_tuple_bhattacharyya`，并记录 `coefficient`、`referenceHistogramSum`、`testHistogramSum`。
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - Bhattacharyya 模式 payload 改为 `comparisonMethod=halcon_tuple_bhattacharyya_histogram`。
+  - 移除 `halconOperator=compare_histogram` 的误导字段。
+  - 记录 `halconOperators=T_gray_histo_range,T_tuple_mult,T_tuple_sqrt,T_tuple_sum`。
+- `smoke/color_comparison_smoke.cpp`
+  - 新增 Bhattacharyya 模式 smoke 断言：相同直方图距离应接近 0。
+  - 默认只执行不依赖 HALCON license 的纯 HSV 断言。
+  - 在具备可用 HALCON license 的目标机上设置 `RUN_HALCON_LICENSED_SMOKE=1` 后，才执行 Bhattacharyya tuple 和图像 runner 实测。
+- `smoke/color_comparison_smoke.pro`
+  - 新增 `v2_color_comparison_smoke/` 独立输出目录，避免 smoke 构建产物散落到源码根目录或干扰主工程同名对象文件；该目录匹配 `.gitignore` 的 `*_smoke` 规则。
+
+#### 出现的问题与处理
+
+- 问题：本机标准 HALCON 24.11.1 中没有 `T_compare_histogram`，直接调用会返回 `halcon_symbol_missing`，导致 UI 选择 Bhattacharyya 模式没有结果输出。
+  处理：按用户确认的方案，放弃直接依赖扩展算子，改为所有版本更通用的 HALCON 基础算子组合。
+- 问题：本机 `HALCON_LICENSE_FILE` 指向的 license 文件不存在，执行 `T_tuple_sum` 时 HALCON 会直接以 license 错误退出进程，无法在 smoke 内捕获。
+  处理：smoke 默认不执行 HALCON license 相关算子；需要完整 HALCON 数值验证时，在具备有效 license 的目标机上显式设置 `RUN_HALCON_LICENSED_SMOKE=1`。
+
+#### 验证
+
+- 待执行主工程构建、smoke 和 `git diff --check`。
+
+#### 剩余事项
+
+- 在具备 HALCON license 的目标机上复测 `Bhattacharyya直方图` 模式，同一模板与检测 ROI 应输出接近 100 分，非同色 ROI 应按距离降低。
+- 后续如需更强抗光照能力，可新增基于 `histo_2dim` 的 H+S 二维联合直方图模式，不影响当前一维 HSV 分段直方图模式。
+
+### 2026-07-02 16:45:00 CST - 模板特征保存与运行语义修复
+
+#### 已实现功能
+
+- 明确颜色比较运行语义为“当前检测区与建模时保存的模板颜色特征比较”。
+- 颜色比较配置现在保存并回显 `params.colorComparison.templateFeature`。
+- 基准图测试和完成配置时会使用 HALCON 从基准图模板 ROI 提取模板特征并写入配置。
+- runner 不再从当前测试图像重新提取模板特征；缺少保存特征时返回 `no_template_feature`。
+
+#### 本次更改
+
+- `src/ColorComparisonDialog.h/.cpp`
+  - 新增 `m_templateFeature` 缓存。
+  - `colorComparisonParams()` 写入 `templateFeature`，`loadFromConfig()` 读回。
+  - 基准图测试前调用 `ColorRecognitionHalconRunner::extractFeature()` 生成模板 HSV 直方图。
+  - 完成配置时若模板特征为空，会尝试从基准图提取；失败时不保存无效配置。
+  - 模板 ROI、模板屏蔽、灵敏度、特征类型、亮度语义变化时清空旧模板特征。
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - 运行入口检查 `config.templateFeature`，为空时返回 `no_template_feature`。
+  - 后续比较使用保存的模板特征，只对当前输入图提取检测 ROI 特征。
+- `smoke/color_comparison_smoke.cpp`
+  - 新增缺少保存模板特征的 smoke 断言，确保 runner 在 HALCON runtime 前返回 `no_template_feature`。
+  - HALCON license smoke 分支显式设置 `config.templateFeature` 后再运行完整图像 runner。
+
+#### 出现的问题与处理
+
+- 问题：Adapter 已读取 `templateFeature`，runner 结构体也有字段，但 Dialog 没有写入/回显，runner 也忽略该字段并每次从当前图重提模板。
+  处理：补齐 Dialog 写入/回显/建模提取，并让 runner 只消费保存特征。
+- 问题：加载旧配置时切换基础/全部模式可能误清空刚读回的模板特征。
+  处理：增加加载态保护，用户交互切换仍会清空旧特征，配置回显不会误清。
+
+#### 验证
+
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4 && ./v2_color_comparison_smoke/color_comparison_smoke`，smoke 通过；默认跳过需要 HALCON license 的图像 runner 分支。
+- 已执行 `mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)`，主工程编译链接通过。
+
+#### 剩余事项
+
+- 需要在具备有效 HALCON license 的目标机上执行 `RUN_HALCON_LICENSED_SMOKE=1 ./v2_color_comparison_smoke/color_comparison_smoke`。
+- 需要在 GUI 中确认新建颜色比较后，点击完成或基准图测试能生成并保存模板特征，重新打开后可直接运行测试。
+
+### 2026-07-02 17:05:00 CST - 巴氏距离公式调整为负对数形式
+
+#### 已实现功能
+
+- `Bhattacharyya直方图` 模式的距离公式从 `sqrt(1 - coefficient)` 改为常规巴氏距离 `D_B = -ln(BC)`。
+- 巴氏距离结果不再裁剪到 `0..1`；颜色比较得分仍按 `max(0, 1 - distance) * 100` 避免负分。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorRecognitionHalconRunner.cpp`
+  - `compareHistogramBhattacharyya()` 中 `distance` 改为 `-std::log(coefficient)`。
+  - 对 `coefficient=0` 使用 `std::numeric_limits<double>::min()` 做有限值保护。
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - 消费巴氏距离时去掉 `0..1` 上限裁剪。
+  - payload `scoreFormula` 更新为 `max(0.0, 1.0 - bhattacharyya_distance) * 100`。
+- `smoke/color_comparison_smoke.cpp`
+  - 增加 `BC=0.25` 的 licensed smoke 断言，期望距离为 `-ln(0.25)`。
+
+#### 验证
+
+- 默认 smoke 可编译运行；完整巴氏距离数值断言仍需有效 HALCON license 后设置 `RUN_HALCON_LICENSED_SMOKE=1` 执行。
+
+### 2026-07-02 17:20:00 CST - 巴氏距离 OpenCV 对照调试输出
+
+#### 已实现功能
+
+- 在 `Bhattacharyya直方图` 模式中增加 OpenCV 巴氏距离旁路调试。
+- 每次 HALCON tuple 巴氏距离计算成功后，控制台输出：
+  - `HALCON(tuple -ln(BC)) distance`
+  - `BC`
+  - `OpenCV(compareHist HISTCMP_BHATTACHARYYA) distance`
+  - `absDiff`
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorRecognitionHalconRunner.cpp`
+  - 新增 `openCvBhattacharyyaDebugDistance()`，使用 `cv::compareHist(..., cv::HISTCMP_BHATTACHARYYA)` 计算调试距离。
+  - 使用 `qInfo().noquote()` 输出 HALCON 当前距离与 OpenCV 调试距离。
+  - OpenCV 结果不写入 `ToolResult`、不写入 payload、不参与 OK/NG、不改变 HALCON 返回值。
+
+#### 验证
+
+- 已执行 `make -C build -j$(nproc)`，主工程编译链接通过。
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4 && ./v2_color_comparison_smoke/color_comparison_smoke`，默认 smoke 通过。
+- 已执行 `git diff --check`，无空白错误。
+
+### 2026-07-02 18:55:00 CST - Bhattacharyya 模式改为 H/S 二维软核直方图
+
+#### 已实现功能
+
+- `Bhattacharyya直方图` 模式的特征提取改为 HALCON `T_histo_2dim(H,S)`。
+- 二维 H/S histogram 从 HALCON 256x256 histogram image 聚合到当前灵敏度对应的 `bins x bins`。
+- 聚合后增加 H 环形、S 邻域的 3x3 软核平滑，降低同色绿色落到相邻 Hue/Saturation bin 时的硬分箱低分。
+- 默认 `模板主色覆盖率` 模式仍使用原一维 HSV 特征，不受影响。
+
+#### 本次更改
+
+- `src/ColorComparisonDialog.cpp`
+  - 全部页选择 `Bhattacharyya直方图` 时保存 `featureType=histogram_2dim_hs`。
+  - Bhattacharyya 模式不再保存亮度通道参与比较。
+  - 比较模式切换时清空旧模板特征，防止一维/二维特征混用。
+- `src/algorithms/recognition/ColorRecognitionHalconRunner.cpp`
+  - 动态解析 `T_histo_2dim`、`T_get_grayval`。
+  - 新增 `histogram_2dim_hs` 特征类型，输出 H/S 联合二维直方图特征。
+  - 巴氏调试日志能识别并输出二维 H/S 特征摘要。
+- `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+  - 允许 `histogram_2dim_hs`，并限制它只在 `bhattacharyya_histogram` 模式下使用。
+  - payload 标记 `featureType=histogram_2dim_hs` 和 `T_histo_2dim,T_get_grayval,...` 算子链。
+
+#### 验证
+
+- 已执行 `make -C build -j$(nproc)`，主工程编译链接通过。
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4 && ./v2_color_comparison_smoke/color_comparison_smoke`，默认 smoke 通过。
+- 已执行 `git diff --check`，无空白错误。
+
+#### 剩余事项
+
+- 需要在具备有效 HALCON license 的目标机上用绿色模板/绿色检测 ROI 复测 Bhattacharyya 分数。
+- 旧的 Bhattacharyya 配置若保存的是一维 `templateFeature`，需要重新执行基准图测试或完成配置以生成二维模板特征。
+
 ## 后续记录模板
 
 后续每次实现后，在本节上方追加：

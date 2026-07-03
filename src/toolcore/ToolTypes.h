@@ -42,6 +42,7 @@ enum class ToolType {
     CategoryRecognition,
     ColorRecognition,
     ColorComparison,
+    RegisteredClassification,
 
     // Presence
     PatternPresence,
@@ -162,6 +163,8 @@ inline QString toolTypeToString(ToolType type)
         return QStringLiteral("ColorRecognition");
     case ToolType::ColorComparison:
         return QStringLiteral("ColorComparison");
+    case ToolType::RegisteredClassification:
+        return QStringLiteral("RegisteredClassification");
     case ToolType::PatternPresence:
         return QStringLiteral("PatternPresence");
     case ToolType::BlobPresence:
@@ -253,6 +256,11 @@ inline ToolType toolTypeFromString(const QString &value)
         key == QStringLiteral("color_comparison") ||
         key.contains(QStringLiteral("颜色比较")))
         return ToolType::ColorComparison;
+    if (key == QStringLiteral("registeredclassification") ||
+        key == QStringLiteral("registered_classification") ||
+        key == QStringLiteral("registrationclass") ||
+        key.contains(QStringLiteral("注册分类")))
+        return ToolType::RegisteredClassification;
     if (key == QStringLiteral("patternpresence"))
         return ToolType::PatternPresence;
     if (key == QStringLiteral("blobpresence") ||

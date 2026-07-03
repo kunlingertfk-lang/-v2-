@@ -40,6 +40,7 @@
 #include "PatternPresenceDialog.h"
 #include "PlanDialogUtils.h"
 #include "ReferenceImageDialog.h"
+#include "RegisteredClassificationDialog.h"
 #include "SchemeStore.h"
 #include "ToolLibraryDialog.h"
 #include "frame/FrameViewHelper.h"
@@ -78,6 +79,7 @@ QString toolIconForType(ToolType type)
 {
     switch (type) {
     case ToolType::ColorRecognition:
+    case ToolType::RegisteredClassification:
     case ToolType::ColorComparison:
         return QStringLiteral(":/icons/compare.svg");
     case ToolType::Ocr:
@@ -452,6 +454,9 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     case ToolType::ColorComparison:
         accepted = runToolConfigDialog<ColorComparisonDialog>(this, nullptr, &config, &snapshot);
         break;
+    case ToolType::RegisteredClassification:
+        accepted = runToolConfigDialog<RegisteredClassificationDialog>(this, nullptr, &config, &snapshot);
+        break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, nullptr, &config, &snapshot);
         break;
@@ -517,6 +522,9 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
         break;
     case ToolType::ColorComparison:
         accepted = runToolConfigDialog<ColorComparisonDialog>(this, &originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::RegisteredClassification:
+        accepted = runToolConfigDialog<RegisteredClassificationDialog>(this, &originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, &originalConfig, &editedConfig, &snapshot);
@@ -765,6 +773,8 @@ QString ToolsDialog::toolDisplayName(const ToolConfig &config) const
         return tr("颜色识别");
     case ToolType::ColorComparison:
         return tr("颜色比较");
+    case ToolType::RegisteredClassification:
+        return tr("注册分类");
     case ToolType::PatternPresence:
         return tr("图案有无");
     case ToolType::BlobPresence:

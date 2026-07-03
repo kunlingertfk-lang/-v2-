@@ -51,6 +51,7 @@
 #include "ObjectDetectionDialog.h"
 #include "PatternPresenceDialog.h"
 #include "PlanDialogUtils.h"
+#include "RegisteredClassificationDialog.h"
 #include "SchemeStore.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
@@ -398,6 +399,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolEngine.registerAdapter(&m_edgePresenceAdapter);
     m_toolEngine.registerAdapter(&m_linePresenceAdapter);
     m_toolEngine.registerAdapter(&m_aiDetectionAdapter);
+    m_toolEngine.registerAdapter(&m_registeredClassificationAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     m_toolChainWatcher = new QFutureWatcher<ToolChainRunOutput>(this);
     setupUiState();
@@ -1638,6 +1640,8 @@ QString MainWindow::toolDisplayName(const ToolConfig &config) const
         return tr("颜色识别");
     case ToolType::ColorComparison:
         return tr("颜色比较");
+    case ToolType::RegisteredClassification:
+        return tr("注册分类");
     case ToolType::PatternPresence:
         return tr("图案有无");
     case ToolType::BlobPresence:
@@ -1732,6 +1736,9 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         break;
     case ToolType::ColorComparison:
         accepted = runToolConfigDialog<ColorComparisonDialog>(this, originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::RegisteredClassification:
+        accepted = runToolConfigDialog<RegisteredClassificationDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, originalConfig, &editedConfig, &snapshot);

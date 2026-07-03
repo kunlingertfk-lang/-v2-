@@ -129,6 +129,8 @@ ColorComparisonHalconConfig toRunnerConfig(const ToolConfig &config)
                          runnerConfig.detectRoiNormalized);
     runnerConfig.detectMaskPolygonNormalized =
             pointsFromJson(colorComparison.value(QStringLiteral("detectMaskPolygon")).toArray());
+    runnerConfig.comparisonMode =
+            stringParam(colorComparison, QStringLiteral("comparisonMode"), runnerConfig.comparisonMode);
     runnerConfig.featureType =
             stringParam(colorComparison, QStringLiteral("featureType"), runnerConfig.featureType);
     runnerConfig.sensitivity =

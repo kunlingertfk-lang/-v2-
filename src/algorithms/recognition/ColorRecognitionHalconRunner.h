@@ -64,6 +64,16 @@ struct ColorRecognitionHalconFeatureResult
     QJsonObject payload;
 };
 
+struct ColorRecognitionHalconHistogramCompareResult
+{
+    bool success = false;
+    QString status;
+    QString message;
+    double distance = 1.0;
+    qint64 elapsedMs = 0;
+    QJsonObject payload;
+};
+
 struct ColorRecognitionHalconResult
 {
     bool success = false;
@@ -85,6 +95,10 @@ class ColorRecognitionHalconRunner
 public:
     ColorRecognitionHalconFeatureResult extractFeature(
             const cv::Mat &image,
+            const ColorRecognitionHalconConfig &config) const;
+    ColorRecognitionHalconHistogramCompareResult compareHistogramBhattacharyya(
+            const QVector<double> &referenceHistogram,
+            const QVector<double> &testHistogram,
             const ColorRecognitionHalconConfig &config) const;
     ColorRecognitionHalconResult run(
             const cv::Mat &image,

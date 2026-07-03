@@ -1,6 +1,8 @@
 #include "ColorComparisonDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "algorithms/halcon/HalconRuntimePaths.h"
+#include "algorithms/recognition/ColorRecognitionHalconRunner.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
@@ -94,6 +96,23 @@ QVector<QPointF> pointsFromJson(const QJsonArray &array)
         }
     }
     return points.size() >= 3 ? points : QVector<QPointF>();
+}
+
+QJsonArray featureToJson(const QVector<double> &feature)
+{
+    QJsonArray array;
+    for (const double value : feature)
+        array.append(value);
+    return array;
+}
+
+QVector<double> featureFromJson(const QJsonArray &array)
+{
+    QVector<double> feature;
+    feature.reserve(array.size());
+    for (const QJsonValue &value : array)
+        feature.append(value.toDouble());
+    return feature;
 }
 
 QJsonObject circleToJson(const CircleRoi &circle)
@@ -333,14 +352,19 @@ void ColorComparisonDialog::buildUi()
             QFrame *featureCard = card(page, tr("模型色彩特征"));
             m_featureCard = featureCard;
             QVBoxLayout *featureLayout = qobject_cast<QVBoxLayout *>(featureCard->layout());
+            if (!m_comparisonModeComboBox) {
+                m_comparisonModeComboBox = new QComboBox(this);
+                m_comparisonModeComboBox->addItems({tr("模板主色覆盖率"), tr("Bhattacharyya直方图")});
+            }
             if (!m_featureTypeComboBox) {
                 m_featureTypeComboBox = new QComboBox(this);
                 m_featureTypeComboBox->addItems({tr("直方图特征"), tr("色谱特征")});
             }
             if (!m_brightnessCheckBox) {
                 m_brightnessCheckBox = new QCheckBox(tr("亮度使能"), this);
-                m_brightnessCheckBox->setChecked(true);
+                m_brightnessCheckBox->setChecked(false);
             }
+            featureLayout->addLayout(row(tr("比较模式"), m_comparisonModeComboBox));
             featureLayout->addLayout(row(tr("特征类型"), m_featureTypeComboBox));
             featureLayout->addWidget(m_brightnessCheckBox);
             QLabel *histogramLabel = new QLabel(tr("色相        饱和度        亮度"), featureCard);
@@ -515,7 +539,7 @@ void ColorComparisonDialog::buildUi()
         "QPushButton#exitTestButton:disabled{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}"
         "QToolButton:pressed{background:#ffe1bf;color:#ff7a00;border-color:#ff7a00;}"));
 
-    m_basicButton->setChecked(true);
+    setAllParamsMode(false);
     if (m_detectRectButton)
         m_detectRectButton->setChecked(true);
     refreshEditControls();
@@ -560,6 +584,19 @@ void ColorComparisonDialog::connectControls()
     connect(m_positionCorrectionComboBox, &QComboBox::currentTextChanged, this, [this](const QString &text) {
         m_positionCorrectionSource = text;
     });
+    connect(m_sensitivityComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this]() { clearTemplateFeature(); });
+    connect(m_featureTypeComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this]() { clearTemplateFeature(); });
+    connect(m_comparisonModeComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this]() { clearTemplateFeature(); });
+    connect(m_brightnessCheckBox, &QCheckBox::toggled, this, [this]() { clearTemplateFeature(); });
     if (m_detectMaskEditButton)
         connect(m_detectMaskEditButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::DetectMaskPolygon); });
     if (m_detectMaskPolygonButton)
@@ -585,6 +622,7 @@ void ColorComparisonDialog::resizeEvent(QResizeEvent *event)
 
 void ColorComparisonDialog::setAllParamsMode(bool allMode)
 {
+    const bool wasAllMode = m_allButton && m_allButton->isChecked();
     m_paramsStack->setCurrentIndex(0);
     m_basicButton->setChecked(!allMode);
     m_allButton->setChecked(allMode);
@@ -592,6 +630,8 @@ void ColorComparisonDialog::setAllParamsMode(bool allMode)
         m_featureCard->setVisible(allMode);
     if (m_detectMaskRow)
         m_detectMaskRow->setVisible(allMode);
+    if (wasAllMode != allMode && !m_loadingConfig)
+        clearTemplateFeature();
     setEditState(EditState::None);
     refreshEditControls();
 }
@@ -724,6 +764,7 @@ void ColorComparisonDialog::handleRoiChanged(const QRectF &roi)
 {
     if (m_editState == EditState::TemplateRect) {
         m_templateRoi = normalizedRoiOrDefault(roi);
+        clearTemplateFeature();
         updateTemplatePreview();
         refreshRoiOverlay();
     } else if (m_editState == EditState::DetectRect) {
@@ -749,10 +790,12 @@ void ColorComparisonDialog::handleCircleChanged(const CircleRoi &circle)
 
 void ColorComparisonDialog::handlePolygonChanged(const QVector<QPointF> &points)
 {
-    if (m_editState == EditState::TemplateMaskPolygon)
+    if (m_editState == EditState::TemplateMaskPolygon) {
         m_templateMask = points.size() >= 3 ? points : QVector<QPointF>();
-    else if (m_editState == EditState::DetectMaskPolygon)
+        clearTemplateFeature();
+    } else if (m_editState == EditState::DetectMaskPolygon) {
         m_detectMask = points.size() >= 3 ? points : QVector<QPointF>();
+    }
     refreshRoiOverlay();
 }
 
@@ -846,6 +889,57 @@ void ColorComparisonDialog::refreshPositionCorrectionControls()
     }
 }
 
+void ColorComparisonDialog::clearTemplateFeature()
+{
+    if (m_loadingConfig)
+        return;
+    m_templateFeature.clear();
+}
+
+bool ColorComparisonDialog::refreshTemplateFeatureFromFrame(const cv::Mat &frame,
+                                                            QString *status,
+                                                            QString *message)
+{
+    if (frame.empty()) {
+        if (status)
+            *status = QStringLiteral("image_empty");
+        if (message)
+            *message = tr("当前图像为空");
+        return false;
+    }
+
+    const QJsonObject params = colorComparisonParams();
+    ColorRecognitionHalconConfig featureConfig;
+    featureConfig.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                QString(), &featureConfig.halconSoPathCandidates);
+    featureConfig.roiNormalized = m_templateRoi;
+    featureConfig.detectRegionType = QStringLiteral("rectangle");
+    featureConfig.detectMaskPolygonNormalized = m_templateMask;
+    featureConfig.featureType = params.value(QStringLiteral("featureType"))
+            .toString(QStringLiteral("histogram"));
+    featureConfig.sensitivity = params.value(QStringLiteral("sensitivity"))
+            .toString(QStringLiteral("medium"));
+    featureConfig.brightnessEnabled =
+            params.value(QStringLiteral("brightnessEnabled")).toBool(false);
+
+    ColorRecognitionHalconRunner featureRunner;
+    const ColorRecognitionHalconFeatureResult featureResult =
+            featureRunner.extractFeature(frame, featureConfig);
+    if (!featureResult.success) {
+        if (status) {
+            *status = featureResult.status == QStringLiteral("masked_roi_empty")
+                    ? QStringLiteral("template_masked_empty")
+                    : featureResult.status;
+        }
+        if (message)
+            *message = featureResult.message;
+        return false;
+    }
+
+    m_templateFeature = featureResult.feature;
+    return true;
+}
+
 QJsonObject ColorComparisonDialog::colorComparisonParams() const
 {
     QJsonObject params;
@@ -853,8 +947,18 @@ QJsonObject ColorComparisonDialog::colorComparisonParams() const
     params.insert(QStringLiteral("templateRegionMode"), QStringLiteral("custom"));
     params.insert(QStringLiteral("templateRoiNormalized"), rectToJson(m_templateRoi));
     params.insert(QStringLiteral("templateMaskPolygon"), pointsToJson(m_templateMask));
+    params.insert(QStringLiteral("templateFeature"), featureToJson(m_templateFeature));
+    const bool allMode = m_allButton && m_allButton->isChecked();
+    const bool bhattacharyyaMode =
+            allMode && m_comparisonModeComboBox && m_comparisonModeComboBox->currentIndex() == 1;
+    params.insert(QStringLiteral("comparisonMode"),
+                  bhattacharyyaMode
+                  ? QStringLiteral("bhattacharyya_histogram")
+                  : QStringLiteral("dominant_hue_coverage"));
     params.insert(QStringLiteral("featureType"),
-                  m_featureTypeComboBox && m_featureTypeComboBox->currentText().contains(QStringLiteral("色谱"))
+                  bhattacharyyaMode
+                  ? QStringLiteral("histogram_2dim_hs")
+                  : allMode && m_featureTypeComboBox && m_featureTypeComboBox->currentText().contains(QStringLiteral("色谱"))
                   ? QStringLiteral("spectrum")
                   : QStringLiteral("histogram"));
     const QString sensitivity = m_sensitivityComboBox && m_sensitivityComboBox->currentIndex() == 0
@@ -864,7 +968,7 @@ QJsonObject ColorComparisonDialog::colorComparisonParams() const
               : QStringLiteral("medium");
     params.insert(QStringLiteral("sensitivity"), sensitivity);
     params.insert(QStringLiteral("brightnessEnabled"),
-                  m_brightnessCheckBox ? m_brightnessCheckBox->isChecked() : true);
+                  !bhattacharyyaMode && allMode && m_brightnessCheckBox && m_brightnessCheckBox->isChecked());
     params.insert(QStringLiteral("detectRegionType"), m_detectRegionType);
     params.insert(QStringLiteral("detectRoiNormalized"), rectToJson(m_detectRoi));
     params.insert(QStringLiteral("detectCircleNormalized"), circleToJson(m_detectCircle));
@@ -911,6 +1015,7 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
 {
     if (config.toolType != ToolType::Unknown && config.toolType != ToolType::ColorComparison)
         return;
+    m_loadingConfig = true;
     m_toolId = config.toolId;
     m_enabled = config.enabled;
     const QJsonObject colorComparison =
@@ -919,6 +1024,7 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
                 rectFromJson(colorComparison.value(QStringLiteral("templateRoiNormalized")).toObject(),
                              m_templateRoi));
     m_templateMask = pointsFromJson(colorComparison.value(QStringLiteral("templateMaskPolygon")).toArray());
+    m_templateFeature = featureFromJson(colorComparison.value(QStringLiteral("templateFeature")).toArray());
     m_detectRoi = normalizedRoiOrDefault(config.roiNormalized.width() > 0.0 &&
                                          config.roiNormalized.height() > 0.0
                                          ? config.roiNormalized
@@ -935,8 +1041,26 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     if (m_sensitivityComboBox)
         m_sensitivityComboBox->setCurrentIndex(sensitivity == QStringLiteral("low") ? 0 :
                                                sensitivity == QStringLiteral("high") ? 2 : 1);
+    const QString featureType = colorComparison.value(QStringLiteral("featureType"))
+            .toString(QStringLiteral("histogram"));
+    const QString comparisonMode = colorComparison.value(QStringLiteral("comparisonMode"))
+            .toString(QStringLiteral("dominant_hue_coverage"));
+    if (comparisonMode == QStringLiteral("bhattacharyya_histogram") &&
+            featureType != QStringLiteral("histogram_2dim_hs")) {
+        m_templateFeature.clear();
+    }
+    if (m_comparisonModeComboBox)
+        m_comparisonModeComboBox->setCurrentIndex(comparisonMode == QStringLiteral("bhattacharyya_histogram") ? 1 : 0);
+    if (m_featureTypeComboBox)
+        m_featureTypeComboBox->setCurrentIndex(featureType == QStringLiteral("spectrum") ? 1 : 0);
+    const bool brightnessEnabled =
+            colorComparison.value(QStringLiteral("brightnessEnabled")).toBool(false);
     if (m_brightnessCheckBox)
-        m_brightnessCheckBox->setChecked(colorComparison.value(QStringLiteral("brightnessEnabled")).toBool(true));
+        m_brightnessCheckBox->setChecked(brightnessEnabled);
+    setAllParamsMode(brightnessEnabled ||
+                     comparisonMode == QStringLiteral("bhattacharyya_histogram") ||
+                     featureType == QStringLiteral("spectrum") ||
+                     m_detectMask.size() >= 3);
     if (m_minScoreSpinBox)
         m_minScoreSpinBox->setValue(config.judgeRule.value(QStringLiteral("minScore")).toInt(52));
     refreshDetectRegionButtons();
@@ -944,6 +1068,7 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     refreshEditControls();
     updateTemplatePreview();
     refreshRoiOverlay();
+    m_loadingConfig = false;
 }
 
 QString ColorComparisonDialog::summaryText() const
@@ -1117,6 +1242,16 @@ void ColorComparisonDialog::runComparisonOnFrame(const cv::Mat &frame,
     }
 
     m_comparisonRunning = true;
+    if (referenceSource) {
+        QString status;
+        QString message;
+        if (!refreshTemplateFeatureFromFrame(frame, &status, &message)) {
+            displayError(status, message);
+            m_comparisonRunning = false;
+            return;
+        }
+    }
+
     ToolRequest request;
     request.config = toToolConfig();
     request.image = frame.clone();
@@ -1159,5 +1294,14 @@ void ColorComparisonDialog::finishConfiguration()
     }
 
     setEditState(EditState::None);
+    if (m_templateFeature.isEmpty()) {
+        const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+        QString status;
+        QString message;
+        if (!refreshTemplateFeatureFromFrame(frame, &status, &message)) {
+            displayError(status, message);
+            return;
+        }
+    }
     accept();
 }

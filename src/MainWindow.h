@@ -23,6 +23,7 @@
 #include "tooladapters/EdgePresenceAdapter.h"
 #include "tooladapters/LinePresenceAdapter.h"
 #include "tooladapters/AiDetectionAdapter.h"
+#include "tooladapters/RegisteredClassificationAdapter.h"
 
 class FrameViewHelper;
 class QEvent;
@@ -146,6 +147,7 @@ private:
     EdgePresenceAdapter m_edgePresenceAdapter;
     LinePresenceAdapter m_linePresenceAdapter;
     AiDetectionAdapter m_aiDetectionAdapter;
+    RegisteredClassificationAdapter m_registeredClassificationAdapter;
     ToolEngine m_toolEngine;
     FrameViewHelper *m_previewHelper = nullptr;
     Ui::MainWindow *ui;

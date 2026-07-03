@@ -25,9 +25,10 @@ struct ColorComparisonHalconConfig
     double detectCircleRadiusNormalized = 0.0;
     QRectF detectCircleBoundingRectNormalized;
     QVector<QPointF> detectMaskPolygonNormalized;
+    QString comparisonMode = QStringLiteral("dominant_hue_coverage");
     QString featureType = QStringLiteral("histogram");
     QString sensitivity = QStringLiteral("medium");
-    bool brightnessEnabled = true;
+    bool brightnessEnabled = false;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
     int minScore = 52;
@@ -47,6 +48,22 @@ struct ColorComparisonHalconResult
     QVector<ToolOverlay> overlays;
     QJsonObject payload;
 };
+
+struct ColorComparisonHsvSimilarity
+{
+    double hue = 0.0;
+    double saturation = 0.0;
+    double value = 0.0;
+    double combined = 0.0;
+    int bins = 0;
+    bool brightnessUsed = false;
+};
+
+ColorComparisonHsvSimilarity compareColorComparisonHsvHistograms(
+        const QVector<double> &templateFeature,
+        const QVector<double> &detectFeature,
+        int bins,
+        bool brightnessEnabled);
 
 class ColorComparisonHalconRunner
 {
