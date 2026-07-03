@@ -59,11 +59,27 @@ struct ColorComparisonHsvSimilarity
     bool brightnessUsed = false;
 };
 
+struct ColorComparisonHs2dCoverage
+{
+    double coverage = 0.0;
+    int bins = 0;
+    int templateHuePeakBin = -1;
+    int templateSaturationPeakBin = -1;
+    double hueSigma = 0.0;
+    double saturationSigma = 0.0;
+};
+
 ColorComparisonHsvSimilarity compareColorComparisonHsvHistograms(
         const QVector<double> &templateFeature,
         const QVector<double> &detectFeature,
         int bins,
         bool brightnessEnabled);
+
+ColorComparisonHs2dCoverage compareColorComparisonHs2dTemplateCoverage(
+        const QVector<double> &templateFeature,
+        const QVector<double> &detectFeature,
+        int bins,
+        const QString &sensitivity);
 
 class ColorComparisonHalconRunner
 {

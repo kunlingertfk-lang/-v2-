@@ -138,7 +138,7 @@ ToolResult / overlays / payload
 
 ## 位置修正统一规范
 
-位置修正是多个 FID 算子的统一能力入口。涉及位置修正 UI 时，应使用统一字段和占位语义：
+位置修正是多个 FID 算子的统一能力入口。涉及位置修正 UI 时，应使用统一字段和占位语义。代码侧公共入口为 `src/toolcore/PositionCorrection.{h,cpp}`，当前只提供字段解析、写回和未应用 payload 占位，不代表真实位置补偿已经实现。
 
 ### UI 字段
 
@@ -169,6 +169,15 @@ Adapter 应解析并透传：
 ```text
 enablePositionCorrection
 positionCorrectionSource
+```
+
+新增或改造工具时优先使用公共结构和方法：
+
+```text
+PositionCorrectionConfig
+PositionCorrection::fromParams(...)
+PositionCorrection::writeParams(...)
+PositionCorrection::writeNotAppliedPayload(...)
 ```
 
 Runner payload 至少输出：

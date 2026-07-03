@@ -5,6 +5,14 @@ CONFIG += c++17
 TEMPLATE = app
 TARGET = qt_ui_test
 
+BUILD_ROOT = $$_PRO_FILE_PWD_/build/qt_ui_test
+DESTDIR = $$BUILD_ROOT/bin
+OBJECTS_DIR = $$BUILD_ROOT/obj
+MOC_DIR = $$BUILD_ROOT/moc
+RCC_DIR = $$BUILD_ROOT/rcc
+UI_DIR = $$BUILD_ROOT/ui
+system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
+
 INCLUDEPATH += src
 OPENCV_ROOT = /home/tt/.local/opencv-4.8.0
 INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
@@ -44,6 +52,7 @@ SOURCES += \
     src/frame/FrameViewHelper.cpp \
     src/frame/MatImageConverter.cpp \
     src/frame/ReferenceImageProvider.cpp \
+    src/toolcore/PositionCorrection.cpp \
     src/toolcore/ToolEngine.cpp \
     src/tooladapters/OcrAdapter.cpp \
     src/tooladapters/ColorRecognitionAdapter.cpp \
@@ -103,6 +112,7 @@ HEADERS += \
     src/toolcore/ToolRequest.h \
     src/toolcore/ToolResult.h \
     src/toolcore/ToolOverlay.h \
+    src/toolcore/PositionCorrection.h \
     src/toolcore/ToolPreviewSnapshot.h \
     src/toolcore/ToolAdapter.h \
     src/toolcore/ToolEngine.h \

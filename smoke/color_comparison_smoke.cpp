@@ -20,6 +20,13 @@ QVector<double> hsvFeature(int bins, int hueBin, int saturationBin, int valueBin
     return feature;
 }
 
+QVector<double> hs2dFeature(int bins, int hueBin, int saturationBin)
+{
+    QVector<double> feature(bins * bins, 0.0);
+    feature[saturationBin * bins + hueBin] = 1.0;
+    return feature;
+}
+
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
@@ -49,6 +56,27 @@ int main(int argc, char **argv)
     if (blueSimilarity.combined > 0.45) {
         std::cerr << "blue must stay below color-match threshold, got "
                   << blueSimilarity.combined * 100.0 << std::endl;
+        return 1;
+    }
+
+    const ColorComparisonHs2dCoverage shiftedGreenCoverage =
+            compareColorComparisonHs2dTemplateCoverage(hs2dFeature(8, 3, 7),
+                                                       hs2dFeature(8, 2, 5),
+                                                       8,
+                                                       QStringLiteral("low"));
+    if (shiftedGreenCoverage.coverage < 0.55) {
+        std::cerr << "low sensitivity HS coverage must tolerate green H/S drift, got "
+                  << shiftedGreenCoverage.coverage * 100.0 << std::endl;
+        return 1;
+    }
+    const ColorComparisonHs2dCoverage farHueCoverage =
+            compareColorComparisonHs2dTemplateCoverage(hs2dFeature(8, 3, 7),
+                                                       hs2dFeature(8, 6, 5),
+                                                       8,
+                                                       QStringLiteral("low"));
+    if (farHueCoverage.coverage > 0.25) {
+        std::cerr << "far hue must stay below green coverage threshold, got "
+                  << farHueCoverage.coverage * 100.0 << std::endl;
         return 1;
     }
 

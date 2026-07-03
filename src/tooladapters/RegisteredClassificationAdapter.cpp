@@ -1,6 +1,7 @@
 #include "tooladapters/RegisteredClassificationAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -24,20 +25,6 @@ QString stringParam(const QJsonObject &object,
 {
     const QString value = object.value(key).toString().trimmed();
     return value.isEmpty() ? defaultValue : value;
-}
-
-bool boolParam(const QJsonObject &object, const QString &key, bool defaultValue)
-{
-    const QJsonValue value = object.value(key);
-    if (value.isBool())
-        return value.toBool(defaultValue);
-
-    const QString text = value.toString().trimmed().toLower();
-    if (text == QStringLiteral("true") || text == QStringLiteral("1") || text == QStringLiteral("yes"))
-        return true;
-    if (text == QStringLiteral("false") || text == QStringLiteral("0") || text == QStringLiteral("no"))
-        return false;
-    return defaultValue;
 }
 
 int intParam(const QJsonObject &object, const QString &key, int defaultValue)
@@ -85,12 +72,7 @@ RegisteredClassificationHalconConfig toRunnerConfig(const ToolConfig &config)
                 config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0
                     ? config.roiNormalized
                     : runnerConfig.roiNormalized);
-    runnerConfig.enablePositionCorrection = boolParam(params,
-                                                       QStringLiteral("enablePositionCorrection"),
-                                                       runnerConfig.enablePositionCorrection);
-    runnerConfig.positionCorrectionSource = stringParam(params,
-                                                        QStringLiteral("positionCorrectionSource"),
-                                                        runnerConfig.positionCorrectionSource);
+    runnerConfig.positionCorrection = PositionCorrection::fromParams(params);
     runnerConfig.topK = qMax(1, intParam(params,
                                          QStringLiteral("topK"),
                                          runnerConfig.topK));

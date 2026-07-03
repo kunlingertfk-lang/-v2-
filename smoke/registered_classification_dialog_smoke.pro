@@ -1,10 +1,10 @@
-QT += core
+QT += core widgets
 CONFIG += console c++17
 CONFIG -= app_bundle
 TEMPLATE = app
-TARGET = registered_classification_adapter_smoke
+TARGET = registered_classification_dialog_smoke
 
-BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/registered_classification_adapter
+BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/registered_classification_dialog
 DESTDIR = $$BUILD_ROOT/bin
 OBJECTS_DIR = $$BUILD_ROOT/obj
 MOC_DIR = $$BUILD_ROOT/moc
@@ -23,16 +23,28 @@ INCLUDEPATH += $$HALCON_ROOT/include
 
 LIBS += -L$$OPENCV_ROOT/lib
 LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
-LIBS += -lopencv_core -lopencv_imgproc -ldl
+LIBS += -lopencv_core -lopencv_imgproc -lopencv_videoio -ldl
 
 SOURCES += \
-    registered_classification_adapter_smoke.cpp \
-    ../src/tooladapters/RegisteredClassificationAdapter.cpp \
+    registered_classification_dialog_smoke.cpp \
+    registered_classification_dialog_plan_stub.cpp \
+    ../src/RegisteredClassificationDialog.cpp \
+    ../src/frame/CameraFrameProvider.cpp \
+    ../src/frame/FrameViewHelper.cpp \
+    ../src/frame/MatImageConverter.cpp \
+    ../src/frame/ReferenceImageProvider.cpp \
     ../src/toolcore/PositionCorrection.cpp \
+    ../src/tooladapters/RegisteredClassificationAdapter.cpp \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp
 
 HEADERS += \
+    ../src/RegisteredClassificationDialog.h \
+    ../src/PlanDialogUtils.h \
+    ../src/frame/CameraFrameProvider.h \
+    ../src/frame/FrameViewHelper.h \
+    ../src/frame/MatImageConverter.h \
+    ../src/frame/ReferenceImageProvider.h \
     ../src/tooladapters/RegisteredClassificationAdapter.h \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
     ../src/algorithms/halcon/HalconRuntimePaths.h \
@@ -40,6 +52,7 @@ HEADERS += \
     ../src/toolcore/ToolConfig.h \
     ../src/toolcore/ToolOverlay.h \
     ../src/toolcore/PositionCorrection.h \
+    ../src/toolcore/ToolPreviewSnapshot.h \
     ../src/toolcore/ToolRequest.h \
     ../src/toolcore/ToolResult.h \
     ../src/toolcore/ToolTypes.h

@@ -132,10 +132,7 @@ RegisteredClassificationHalconResult runError(const QString &status,
     result.payload.insert(QStringLiteral("judgeMode"), config.judgeMode);
     result.payload.insert(QStringLiteral("expectedLabel"), config.expectedLabel);
     result.payload.insert(QStringLiteral("minScore"), config.minScore);
-    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
-    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
+    PositionCorrection::writeNotAppliedPayload(config.positionCorrection, &result.payload);
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
     result.payload.insert(QStringLiteral("halconSoPathCandidates"),
                           config.halconSoPathCandidates.join(QStringLiteral("; ")));
@@ -754,10 +751,7 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
         result.payload.insert(QStringLiteral("judgeMode"), resolvedJudgeMode);
         result.payload.insert(QStringLiteral("expectedLabel"), config.expectedLabel);
         result.payload.insert(QStringLiteral("minScore"), config.minScore);
-        result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
-        result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-        result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
-        result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
+        PositionCorrection::writeNotAppliedPayload(config.positionCorrection, &result.payload);
 
         // overlay：检测 ROI + OK/NG + 预测类别与得分。
         ToolOverlay roiOverlay;
@@ -769,12 +763,16 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
         ToolOverlay resultOverlay;
         resultOverlay.type = ToolOverlayType::Text;
         resultOverlay.rect = QRectF(effectiveRoi);
+        resultOverlay.p1 = QPointF(effectiveRoi.left(),
+                                   qMax(0, effectiveRoi.top() - 24));
         resultOverlay.label = QStringLiteral("result");
         resultOverlay.text = QStringLiteral("%1: %2 (%3%)")
                 .arg(ok ? QStringLiteral("OK") : QStringLiteral("NG"),
                      result.predictedLabel,
                      QString::number(result.score, 'f', 1));
         resultOverlay.score = result.score;
+        resultOverlay.extra.insert(QStringLiteral("status"),
+                                   ok ? QStringLiteral("OK") : QStringLiteral("NG"));
         result.overlays.append(resultOverlay);
 
         cleanupObjects();

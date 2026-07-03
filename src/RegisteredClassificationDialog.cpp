@@ -1,8 +1,11 @@
 #include "RegisteredClassificationDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
+#include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
+#include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolRequest.h"
 
 #include <QButtonGroup>
@@ -15,6 +18,7 @@
 #include <QFrame>
 #include <QGraphicsView>
 #include <QHBoxLayout>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
@@ -188,11 +192,8 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
                              config.roiNormalized.isNull()
                              ? QRectF(0.0, 0.0, 1.0, 1.0)
                              : config.roiNormalized));
-    m_positionCorrectionEnabled =
-            params.value(QStringLiteral("enablePositionCorrection")).toBool(true);
-    m_positionCorrectionSource =
-            params.value(QStringLiteral("positionCorrectionSource"))
-            .toString(QStringLiteral("1 基准图.位置修正信息"));
+    m_positionCorrectionEnabled = false;
+    m_positionCorrectionSource = PositionCorrection::fromParams(params).source;
 
     const bool allMode = params.value(QStringLiteral("paramMode")).toString()
             == QStringLiteral("all");
@@ -247,21 +248,55 @@ void RegisteredClassificationDialog::finishConfiguration()
 
 void RegisteredClassificationDialog::runReferenceTest()
 {
+    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+    if (frame.empty()) {
+        setViewerStatusText(tr("注册分类: no_reference_image | 请先设置基准图"));
+        if (m_previewHelper)
+            m_previewHelper->clearToolOverlays();
+        return;
+    }
+
+    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    if (!image.isNull() && m_previewHelper) {
+        m_viewerTitleLabel->setText(tr("基准图"));
+        m_previewHelper->setImage(image);
+        refreshRoiOverlay();
+    }
+
     ToolRequest request;
     request.config = toToolConfig();
-    request.referenceImage = ReferenceImageProvider::instance().referenceFrame();
+    request.image = frame.clone();
+    request.referenceImage = frame.clone();
     const ToolResult result = m_placeholderAdapter.run(request);
     m_referencePreviewSnapshot =
             makeReferenceToolPreviewSnapshot(request.config, result, effectiveRoiNormalized());
-    displayPlaceholderResult(result);
+    displayResult(result);
 }
 
 void RegisteredClassificationDialog::runTest()
 {
+    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    if (frame.empty()) {
+        setViewerStatusText(tr("注册分类: image_empty | 当前相机帧为空"));
+        if (m_previewHelper)
+            m_previewHelper->clearToolOverlays();
+        return;
+    }
+
+    const QImage image = MatImageConverter::matToDisplayImage(
+                frame, QStringLiteral("RegisteredClassificationDialog"));
+    if (!image.isNull() && m_previewHelper) {
+        m_viewerTitleLabel->setText(tr("测试图像"));
+        m_previewHelper->setImage(image);
+        refreshRoiOverlay();
+    }
+
     ToolRequest request;
     request.config = toToolConfig();
+    request.image = frame.clone();
+    request.referenceImage = ReferenceImageProvider::instance().referenceFrame();
     const ToolResult result = m_placeholderAdapter.run(request);
-    displayPlaceholderResult(result);
+    displayResult(result);
 }
 
 void RegisteredClassificationDialog::importModel()
@@ -317,7 +352,7 @@ void RegisteredClassificationDialog::deleteModel()
     m_modelPath.clear();
     m_modelName.clear();
     updateModelLabels();
-    setViewerStatusText(tr("模型已删除，后端推理仍未实现。"));
+    setViewerStatusText(tr("模型已删除。"));
 }
 
 void RegisteredClassificationDialog::openRegisterTraining()
@@ -485,7 +520,6 @@ void RegisteredClassificationDialog::buildUi()
     positionSourceLayout->addWidget(positionLabel);
     positionSourceLayout->addWidget(m_positionSourceComboBox, 1);
     detectLayout->addWidget(m_positionSourceRow);
-    paramsLayout->addWidget(detectCard);
 
     QFrame *modelCard = card(scrollContent, tr("模型训练"));
     QVBoxLayout *modelLayout = qobject_cast<QVBoxLayout *>(modelCard->layout());
@@ -509,6 +543,7 @@ void RegisteredClassificationDialog::buildUi()
     trainingButtonRow->addWidget(m_modelManagementButton);
     modelLayout->addLayout(trainingButtonRow);
     paramsLayout->addWidget(modelCard);
+    paramsLayout->addWidget(detectCard);
 
     m_advancedCard = card(scrollContent, tr("全部参数"));
     QVBoxLayout *advancedLayout = qobject_cast<QVBoxLayout *>(m_advancedCard->layout());
@@ -581,7 +616,9 @@ void RegisteredClassificationDialog::buildUi()
 
     m_basicButton->setChecked(true);
     m_globalRegionButton->setChecked(true);
-    m_positionCorrectionCheckBox->setChecked(true);
+    m_positionCorrectionCheckBox->setChecked(false);
+    m_positionCorrectionCheckBox->setEnabled(false);
+    m_positionCorrectionCheckBox->setToolTip(tr("位置修正补偿尚未实现，当前版本默认关闭。"));
 }
 
 void RegisteredClassificationDialog::connectControls()
@@ -636,8 +673,9 @@ void RegisteredClassificationDialog::refreshUiState()
     m_globalRegionButton->setChecked(m_detectRegionType == QStringLiteral("full"));
     m_rectRegionButton->setChecked(m_detectRegionType == QStringLiteral("rectangle"));
     m_positionCorrectionCheckBox->setChecked(m_positionCorrectionEnabled);
+    m_positionCorrectionCheckBox->setEnabled(false);
     if (m_positionSourceRow)
-        m_positionSourceRow->setVisible(m_positionCorrectionEnabled);
+        m_positionSourceRow->setVisible(false);
     const bool classMode = judgeMode() == QStringLiteral("class_match");
     m_expectedLabelLineEdit->setVisible(classMode);
     m_minScoreSpinBox->setVisible(!classMode);
@@ -671,9 +709,55 @@ void RegisteredClassificationDialog::setViewerStatusText(const QString &text)
         m_viewerStatusLabel->setText(text);
 }
 
-void RegisteredClassificationDialog::displayPlaceholderResult(const ToolResult &result)
+void RegisteredClassificationDialog::displayResult(const ToolResult &result)
 {
-    setViewerStatusText(tr("注册分类: %1 | %2").arg(result.status, result.message));
+    setViewerStatusText(resultStatusText(result));
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        if (!result.overlays.isEmpty())
+            m_previewHelper->setToolOverlays(result.overlays);
+        else
+            refreshRoiOverlay();
+    }
+}
+
+QString RegisteredClassificationDialog::resultStatusText(const ToolResult &result) const
+{
+    if (!result.success) {
+        return tr("注册分类: %1 | %2 | 耗时:%3ms")
+                .arg(result.status,
+                     result.message,
+                     QString::number(result.elapsedMs));
+    }
+
+    const QString state = result.ok ? QStringLiteral("OK") : QStringLiteral("NG");
+    const QString label = result.payload.value(QStringLiteral("predictedLabel"))
+            .toString(result.text);
+    const double score = result.payload.value(QStringLiteral("score")).toDouble(result.score);
+
+    QStringList topKTexts;
+    const QJsonArray topClasses = result.payload.value(QStringLiteral("topClasses")).toArray();
+    for (const QJsonValue &value : topClasses) {
+        const QJsonObject item = value.toObject();
+        const QString itemLabel = item.value(QStringLiteral("label")).toString();
+        if (itemLabel.trimmed().isEmpty())
+            continue;
+        topKTexts.append(QStringLiteral("%1:%2%")
+                         .arg(itemLabel,
+                              QString::number(item.value(QStringLiteral("score")).toDouble(),
+                                              'f',
+                                              1)));
+    }
+
+    const QString topKText = topKTexts.isEmpty()
+            ? QStringLiteral("-")
+            : topKTexts.join(QStringLiteral(", "));
+    return tr("注册分类: %1 | 类别:%2 | 分数:%3% | TopK:%4 | 耗时:%5ms")
+            .arg(state,
+                 label.trimmed().isEmpty() ? QStringLiteral("-") : label,
+                 QString::number(score, 'f', 1),
+                 topKText,
+                 QString::number(result.elapsedMs));
 }
 
 void RegisteredClassificationDialog::showTodoMessage(const QString &actionName)
@@ -708,8 +792,10 @@ QJsonObject RegisteredClassificationDialog::registeredClassificationParams() con
     params.insert(QStringLiteral("modelType"), modelType);
     params.insert(QStringLiteral("detectRegionType"), m_detectRegionType);
     params.insert(QStringLiteral("roiNormalized"), rectToJson(effectiveRoiNormalized()));
-    params.insert(QStringLiteral("enablePositionCorrection"), m_positionCorrectionEnabled);
-    params.insert(QStringLiteral("positionCorrectionSource"), m_positionCorrectionSource);
+    PositionCorrection::writeParams(PositionCorrectionConfig{
+                                        m_positionCorrectionEnabled,
+                                        m_positionCorrectionSource},
+                                    &params);
     params.insert(QStringLiteral("topK"), m_topKSpinBox->value());
     return params;
 }

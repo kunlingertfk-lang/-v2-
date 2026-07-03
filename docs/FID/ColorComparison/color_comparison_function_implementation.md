@@ -1038,6 +1038,39 @@ minScore
 - 需要在具备有效 HALCON license 的目标机上用绿色模板/绿色检测 ROI 复测 Bhattacharyya 分数。
 - 旧的 Bhattacharyya 配置若保存的是一维 `templateFeature`，需要重新执行基准图测试或完成配置以生成二维模板特征。
 
+### 2026-07-03 09:45:00 CST - H/S 二维模板覆盖率评分
+
+#### 已实现功能
+
+- 在 `histogram_2dim_hs` 特征下，颜色比较不再用原始巴氏距离直接作为分数来源。
+- 新增 H/S 二维模板覆盖率评分：
+  - 从模板二维直方图找到主峰 `templateHuePeakBin` / `templateSaturationPeakBin`。
+  - 对检测二维直方图每个 bin 计算到模板主峰的距离权重。
+  - Hue 使用环形距离，Saturation 使用线性距离。
+  - 低/中/高灵敏度分别使用不同 `hueSigma` 和 `saturationSigma`。
+  - `score = coverage * 100`。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorComparisonHalconRunner.h/.cpp`
+  - 新增 `ColorComparisonHs2dCoverage`。
+  - 新增 `compareColorComparisonHs2dTemplateCoverage()` 纯算法函数，便于无 HALCON license 的 smoke 覆盖。
+  - `bhattacharyya_histogram + histogram_2dim_hs` 分支改为使用覆盖率作为正式 `similarity`。
+  - payload 输出 `coverage`、模板 H/S 峰值 bin、`hueSigma`、`saturationSigma`。
+- `smoke/color_comparison_smoke.cpp`
+  - 新增 H/S 二维覆盖率断言：低灵敏度下 `H差1/S差2` 的绿色漂移应通过，远 Hue 应保持低分。
+
+#### 验证
+
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j4 && ./v2_color_comparison_smoke/color_comparison_smoke`，默认 smoke 通过。
+- 已执行 `make -C build -j$(nproc)`，主工程编译链接通过。
+- 已执行 `git diff --check`，无空白错误。
+
+#### 剩余事项
+
+- 需要在具备有效 HALCON license 的目标机上用 GUI 复测绿色模板/绿色检测 ROI 的实际分数。
+- 若绿色仍偏低，优先调整 `hueSigma` / `saturationSigma`，而不是回退到硬巴氏距离。
+
 ## 后续记录模板
 
 后续每次实现后，在本节上方追加：

@@ -7,11 +7,13 @@ TARGET = ai_detection_bridge_smoke
 INCLUDEPATH += ../src
 INCLUDEPATH += /usr/include/opencv4
 
-DESTDIR = /tmp/v2_ai_bridge_smoke
-OBJECTS_DIR = /tmp/v2_ai_bridge_smoke/obj
-MOC_DIR = /tmp/v2_ai_bridge_smoke/moc
-RCC_DIR = /tmp/v2_ai_bridge_smoke/rcc
-UI_DIR = /tmp/v2_ai_bridge_smoke/ui
+BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/ai_detection_bridge
+DESTDIR = $$BUILD_ROOT/bin
+OBJECTS_DIR = $$BUILD_ROOT/obj
+MOC_DIR = $$BUILD_ROOT/moc
+RCC_DIR = $$BUILD_ROOT/rcc
+UI_DIR = $$BUILD_ROOT/ui
+system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 
 SOURCES += \
     ai_detection_bridge_smoke.cpp \

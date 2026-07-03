@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QPair>
 #include <QtGlobal>
 
 #include <algorithm>
@@ -246,6 +247,33 @@ double dominantHueSigma(int bins)
     return 1.7;
 }
 
+QPair<double, double> hsCoverageSigmas(const QString &sensitivity)
+{
+    const QString normalized = sensitivity.trimmed().toLower();
+    if (normalized == QStringLiteral("high"))
+        return qMakePair(0.8, 1.2);
+    if (normalized == QStringLiteral("low"))
+        return qMakePair(1.6, 2.4);
+    return qMakePair(1.2, 1.8);
+}
+
+int dominantHs2dBin(const QVector<double> &histogram, int bins)
+{
+    if (bins <= 0 || histogram.size() < bins * bins)
+        return -1;
+
+    int bestIndex = -1;
+    double bestValue = 0.0;
+    for (int i = 0; i < bins * bins; ++i) {
+        const double value = qMax(0.0, histogram.at(i));
+        if (value > bestValue) {
+            bestValue = value;
+            bestIndex = i;
+        }
+    }
+    return bestIndex;
+}
+
 double templateDominantHueCoverage(const QVector<double> &templateHue,
                                    const QVector<double> &detectHue)
 {
@@ -420,6 +448,61 @@ ColorComparisonHsvSimilarity compareColorComparisonHsvHistograms(
     return result;
 }
 
+ColorComparisonHs2dCoverage compareColorComparisonHs2dTemplateCoverage(
+        const QVector<double> &templateFeature,
+        const QVector<double> &detectFeature,
+        int bins,
+        const QString &sensitivity)
+{
+    ColorComparisonHs2dCoverage result;
+    result.bins = bins;
+    const QPair<double, double> sigmas = hsCoverageSigmas(sensitivity);
+    result.hueSigma = sigmas.first;
+    result.saturationSigma = sigmas.second;
+
+    if (bins <= 0 ||
+            templateFeature.size() < bins * bins ||
+            detectFeature.size() < bins * bins) {
+        return result;
+    }
+
+    const int templatePeakIndex = dominantHs2dBin(templateFeature, bins);
+    if (templatePeakIndex < 0)
+        return result;
+
+    result.templateSaturationPeakBin = templatePeakIndex / bins;
+    result.templateHuePeakBin = templatePeakIndex % bins;
+
+    double detectSum = 0.0;
+    for (int i = 0; i < bins * bins; ++i)
+        detectSum += qMax(0.0, detectFeature.at(i));
+    if (detectSum <= 0.0)
+        return result;
+
+    const double hueDenominator = 2.0 * result.hueSigma * result.hueSigma;
+    const double saturationDenominator = 2.0 * result.saturationSigma * result.saturationSigma;
+    double coverage = 0.0;
+    for (int saturationBin = 0; saturationBin < bins; ++saturationBin) {
+        for (int hueBin = 0; hueBin < bins; ++hueBin) {
+            const int index = saturationBin * bins + hueBin;
+            const double detectValue = qMax(0.0, detectFeature.at(index)) / detectSum;
+            if (detectValue <= 0.0)
+                continue;
+
+            const double hueDistance = colorBinDistance(result.templateHuePeakBin, hueBin, bins, true);
+            const double saturationDistance =
+                    std::abs(result.templateSaturationPeakBin - saturationBin);
+            const double weight =
+                    std::exp(-(hueDistance * hueDistance) / hueDenominator -
+                             (saturationDistance * saturationDistance) / saturationDenominator);
+            coverage += detectValue * weight;
+        }
+    }
+
+    result.coverage = qBound(0.0, coverage, 1.0);
+    return result;
+}
+
 ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         const cv::Mat &image,
         const ColorComparisonHalconConfig &config) const
@@ -507,32 +590,54 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
     }
 
     ColorComparisonHsvSimilarity channelSimilarity;
+    ColorComparisonHs2dCoverage hs2dCoverage;
     double bhattacharyyaDistance = -1.0;
     double similarity = 0.0;
 
     if (comparisonMode == QStringLiteral("bhattacharyya_histogram")) {
-        ColorRecognitionHalconConfig compareConfig =
-                featureConfig(config,
-                              config.detectRoiNormalized,
-                              config.detectMaskPolygonNormalized,
-                              circleMode);
-        const ColorRecognitionHalconHistogramCompareResult histogramComparison =
-                featureRunner.compareHistogramBhattacharyya(templateFeature.feature,
-                                                            detectFeature.feature,
-                                                            compareConfig);
-        if (!histogramComparison.success) {
-            ColorComparisonHalconResult result =
-                    errorResult(histogramComparison.status,
-                                histogramComparison.message,
-                                config,
-                                timer.elapsed());
-            result.payload.insert(QStringLiteral("templateFeaturePayload"), templateFeature.payload);
-            result.payload.insert(QStringLiteral("detectFeaturePayload"), detectFeature.payload);
-            result.payload.insert(QStringLiteral("histogramComparePayload"), histogramComparison.payload);
-            return result;
+        if (isHisto2DimFeatureType(config.featureType)) {
+            const int bins = histogramBinsForSensitivity(config.sensitivity);
+            if (templateFeature.feature.size() != bins * bins ||
+                    detectFeature.feature.size() != bins * bins) {
+                ColorComparisonHalconResult result =
+                        errorResult(QStringLiteral("invalid_feature_dimension"),
+                                    QStringLiteral("H/S 2D template and detect feature dimensions do not match sensitivity bins."),
+                                    config,
+                                    timer.elapsed());
+                result.payload.insert(QStringLiteral("templateFeaturePayload"), templateFeature.payload);
+                result.payload.insert(QStringLiteral("detectFeaturePayload"), detectFeature.payload);
+                return result;
+            }
+            hs2dCoverage = compareColorComparisonHs2dTemplateCoverage(templateFeature.feature,
+                                                                      detectFeature.feature,
+                                                                      bins,
+                                                                      config.sensitivity);
+            similarity = hs2dCoverage.coverage;
+            bhattacharyyaDistance = qBound(0.0, 1.0 - similarity, 1.0);
+        } else {
+            ColorRecognitionHalconConfig compareConfig =
+                    featureConfig(config,
+                                  config.detectRoiNormalized,
+                                  config.detectMaskPolygonNormalized,
+                                  circleMode);
+            const ColorRecognitionHalconHistogramCompareResult histogramComparison =
+                    featureRunner.compareHistogramBhattacharyya(templateFeature.feature,
+                                                                detectFeature.feature,
+                                                                compareConfig);
+            if (!histogramComparison.success) {
+                ColorComparisonHalconResult result =
+                        errorResult(histogramComparison.status,
+                                    histogramComparison.message,
+                                    config,
+                                    timer.elapsed());
+                result.payload.insert(QStringLiteral("templateFeaturePayload"), templateFeature.payload);
+                result.payload.insert(QStringLiteral("detectFeaturePayload"), detectFeature.payload);
+                result.payload.insert(QStringLiteral("histogramComparePayload"), histogramComparison.payload);
+                return result;
+            }
+            bhattacharyyaDistance = qMax(0.0, histogramComparison.distance);
+            similarity = qBound(0.0, 1.0 - bhattacharyyaDistance, 1.0);
         }
-        bhattacharyyaDistance = qMax(0.0, histogramComparison.distance);
-        similarity = qBound(0.0, 1.0 - bhattacharyyaDistance, 1.0);
     } else {
         channelSimilarity = compareHsvHistogramFeature(templateFeature.feature, detectFeature.feature, config);
         similarity = channelSimilarity.combined;
@@ -618,23 +723,37 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           : QStringLiteral("hue_saturation_priority"));
     result.payload.insert(QStringLiteral("comparisonMethod"),
                           comparisonMode == QStringLiteral("bhattacharyya_histogram")
-                          ? QStringLiteral("halcon_tuple_bhattacharyya_histogram")
+                          ? (isHisto2DimFeatureType(config.featureType)
+                             ? QStringLiteral("halcon_hs_2dim_template_coverage")
+                             : QStringLiteral("halcon_tuple_bhattacharyya_histogram"))
                           : QStringLiteral("hsv_histogram_soft_kernel_weighted"));
     result.payload.insert(QStringLiteral("scoreDirection"),
                           QStringLiteral("higher_is_better"));
-        result.payload.insert(QStringLiteral("scoreFormula"),
-                              comparisonMode == QStringLiteral("bhattacharyya_histogram")
-                              ? QStringLiteral("max(0.0, 1.0 - bhattacharyya_distance) * 100")
-                              : QStringLiteral("template_dominant_hue_coverage_weighted_similarity_x100"));
+    result.payload.insert(QStringLiteral("scoreFormula"),
+                          comparisonMode == QStringLiteral("bhattacharyya_histogram")
+                          ? (isHisto2DimFeatureType(config.featureType)
+                             ? QStringLiteral("hs_2dim_template_coverage * 100")
+                             : QStringLiteral("max(0.0, 1.0 - bhattacharyya_distance) * 100"))
+                          : QStringLiteral("template_dominant_hue_coverage_weighted_similarity_x100"));
     result.payload.insert(QStringLiteral("similarity"), similarity);
     if (comparisonMode == QStringLiteral("bhattacharyya_histogram")) {
         result.payload.insert(QStringLiteral("distance"), bhattacharyyaDistance);
         result.payload.insert(QStringLiteral("halconOperators"),
                               isHisto2DimFeatureType(config.featureType)
-                              ? QStringLiteral("T_histo_2dim,T_get_grayval,T_tuple_mult,T_tuple_sqrt,T_tuple_sum")
+                              ? QStringLiteral("T_histo_2dim,T_get_grayval")
                               : QStringLiteral("T_gray_histo_range,T_tuple_mult,T_tuple_sqrt,T_tuple_sum"));
         result.payload.insert(QStringLiteral("halconCompareMethod"),
-                              QStringLiteral("bhattacharyya_by_base_tuple_operators"));
+                              isHisto2DimFeatureType(config.featureType)
+                              ? QStringLiteral("hs_2dim_template_coverage")
+                              : QStringLiteral("bhattacharyya_by_base_tuple_operators"));
+        if (isHisto2DimFeatureType(config.featureType)) {
+            result.payload.insert(QStringLiteral("coverage"), hs2dCoverage.coverage);
+            result.payload.insert(QStringLiteral("templateHuePeakBin"), hs2dCoverage.templateHuePeakBin);
+            result.payload.insert(QStringLiteral("templateSaturationPeakBin"),
+                                  hs2dCoverage.templateSaturationPeakBin);
+            result.payload.insert(QStringLiteral("hueSigma"), hs2dCoverage.hueSigma);
+            result.payload.insert(QStringLiteral("saturationSigma"), hs2dCoverage.saturationSigma);
+        }
     } else {
         result.payload.insert(QStringLiteral("hueSimilarity"), channelSimilarity.hue);
         result.payload.insert(QStringLiteral("saturationSimilarity"), channelSimilarity.saturation);

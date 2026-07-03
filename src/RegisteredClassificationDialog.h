@@ -62,7 +62,8 @@ private:
     void refreshPreview();
     void refreshRoiOverlay();
     void setViewerStatusText(const QString &text);
-    void displayPlaceholderResult(const ToolResult &result);
+    void displayResult(const ToolResult &result);
+    QString resultStatusText(const ToolResult &result) const;
     void showTodoMessage(const QString &actionName);
     void updateModelLabels();
     QJsonObject registeredClassificationParams() const;
@@ -80,7 +81,7 @@ private:
     QString m_modelName;
     QString m_detectRegionType = QStringLiteral("full");
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
-    bool m_positionCorrectionEnabled = true;
+    bool m_positionCorrectionEnabled = false;
     QString m_positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
     ToolPreviewSnapshot m_referencePreviewSnapshot;
     RegisteredClassificationAdapter m_placeholderAdapter;

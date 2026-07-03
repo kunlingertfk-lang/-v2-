@@ -99,21 +99,19 @@ RegisteredClassificationDialog
 +-- 左侧参数区
 |   +-- 基础 / 全部 分段按钮
 |   |
-|   +-- 检测区域卡片
-|   |   +-- 全屏
-|   |   +-- 矩形 ROI
-|   |   +-- 完成
-|   |
-|   +-- 位置修正卡片
-|   |   +-- 独立位置修正使能 ⓘ
-|   |   +-- 位置修正：1 基准图.位置修正信息
-|   |
 |   +-- 模型训练卡片
 |   |   +-- 导入模型
 |   |   +-- 注册训练
 |   |   +-- 模型管理
 |   |   +-- 导出模型
 |   |   +-- 删除模型
+|   |
+|   +-- 检测区域卡片
+|   |   +-- 全屏
+|   |   +-- 矩形 ROI
+|   |   +-- 完成
+|   |   +-- 独立位置修正使能 ⓘ
+|   |   +-- 位置修正：1 基准图.位置修正信息
 |   |
 |   +-- 全部页扩展参数
 |   |   +-- 模型类型
@@ -375,3 +373,72 @@ git diff --check
 - 海康 `.scbin`/`OLClassify*.bin` 第一版不支持，保持现状。
 - 位置修正真实补偿仍为占位。
 - 经典分类备选链（`read_class_mlp/svm/knn`）未实现，文档已列为备选。
+
+### 2026-07-03 联调阶段：测试图像传递与 UI 结果展示
+
+#### 已实现功能
+
+- `RegisteredClassificationDialog` 的“基准图测试”现在把 `ReferenceImageProvider::referenceFrame()` 同时写入 `ToolRequest.image` 和 `referenceImage`，避免后端误报 `image_empty`。
+- “测试运行”现在从 `CameraFrameProvider::currentFrame()` 获取当前相机帧并写入 `ToolRequest.image`。
+- 测试结果状态栏显示 OK/NG、预测类别、分数、TopK 和耗时；错误结果显示错误码、错误信息和耗时。
+- 预览区使用 runner 返回的 overlay 绘制检测 ROI 和结果文本。
+- 位置修正控件默认关闭并禁用，tooltip 明确说明当前版本尚未实现，避免误导用户。
+- `RegisteredClassificationHalconRunner` 为结果文本 overlay 补充 `p1` 锚点和状态字段，确保 `FrameViewHelper` 可绘制文本。
+
+#### 本次更改
+
+- 修改 `src/RegisteredClassificationDialog.{h,cpp}`：测试帧来源、结果展示、overlay 展示、位置修正默认关闭/禁用。
+- 修改 `src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp`：结果文本 overlay 增加锚点。
+- 新增 `smoke/registered_classification_dialog_smoke.{cpp,pro}` 和测试专用 `registered_classification_dialog_plan_stub.cpp`，覆盖基准图/相机帧传入与位置修正默认关闭、禁用状态。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 覆盖基准图/测试运行传入 `request.image`，以及位置修正默认关闭和禁用状态。
+- `smoke/registered_classification_adapter_smoke` 通过。
+- 主工程 `qmake qt_ui_test.pro && make -j$(nproc)` 通过。
+
+#### 剩余事项
+
+- 仍需真实 HALCON DL 分类模型验证成功推理路径的 OK/NG、TopK 和 overlay 视觉效果。
+- 连续运行、运行一次、退出测试等完整测试态尚未按颜色识别工具补齐。
+- 位置修正真实补偿仍未实现；当前 UI 明确禁用。
+
+### 2026-07-03 UI 调整：模型训练与检测区域换位
+
+#### 本次更改
+
+- `RegisteredClassificationDialog` 左侧参数区中，“模型训练”卡片调整到“检测区域”卡片上方。
+- 更新 `registered_classification_dialog_smoke`，增加模型训练卡片位于检测区域卡片上方的断言。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 通过。
+
+### 2026-07-03 公共位置修正占位 helper 接入
+
+#### 已实现功能
+
+- 新增 `src/toolcore/PositionCorrection.{h,cpp}`，沉淀 FID 公共位置修正占位能力。
+- 公共 helper 支持从 params 解析 `enablePositionCorrection` / `positionCorrectionSource`，写回 params，并向 payload 写入 `positionCorrectionApplied=false` / `positionCorrectionReason="not implemented"`。
+- 注册分类 Adapter 改为通过 `PositionCorrection::fromParams()` 解析位置修正配置。
+- 注册分类 Runner 配置改为持有 `PositionCorrectionConfig`，错误和正常结果 payload 均通过 `PositionCorrection::writeNotAppliedPayload()` 写入统一字段。
+- 注册分类 UI 保存 params 改为通过 `PositionCorrection::writeParams()` 写入位置修正字段，并清理重复 tooltip。
+
+#### 本次更改
+
+- 新增 `src/toolcore/PositionCorrection.h`、`src/toolcore/PositionCorrection.cpp`。
+- 修改 `RegisteredClassificationDialog`、`RegisteredClassificationAdapter`、`RegisteredClassificationHalconRunner` 接入公共 helper。
+- 更新 `qt_ui_test.pro`、`registered_classification_adapter_smoke.pro`、`registered_classification_dialog_smoke.pro` 链接新模块。
+- 新增 `smoke/position_correction_smoke.{cpp,pro}` 覆盖公共 helper 的解析、写回和 payload 输出。
+
+#### 验证结果
+
+- `smoke/position_correction_smoke` 通过。
+- `smoke/registered_classification_adapter_smoke` 通过。
+- `smoke/registered_classification_dialog_smoke` 通过。
+- 主工程 `qmake qt_ui_test.pro && make -j$(nproc)` 通过。
+
+#### 剩余事项
+
+- 有无类、颜色类等工具仍有各自的重复位置修正占位写法，后续可逐步迁移到 `PositionCorrection` 公共 helper。
+- 真实位置补偿仍未实现；公共 helper 仅统一当前占位语义。
