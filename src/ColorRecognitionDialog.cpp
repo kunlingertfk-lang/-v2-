@@ -1270,7 +1270,12 @@ void ColorRecognitionDialog::deleteCurrentTemplate()
     m_activeTemplateId = m_templates.isEmpty()
             ? QString()
             : m_templates.at(qMin(index, m_templates.size() - 1)).templateId;
+    m_displayedSampleIndex = -1;
+    m_referencePreviewSnapshot = ToolPreviewSnapshot();
+    ++m_testRunGeneration;
+    m_pendingRerun = false;
     updateTemplateList();
+    refreshDisplayedRoiOverlay();
 }
 
 QImage firstTemplateSampleImage(const ColorRecognitionTemplateData &colorTemplate)

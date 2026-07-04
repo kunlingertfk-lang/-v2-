@@ -1,6 +1,8 @@
 #include "RegisteredClassificationDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "RegisteredClassificationModelManagementDialog.h"
+#include "RegisteredClassificationTrainingDialog.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
@@ -124,6 +126,44 @@ void applyActionButtonMetrics(QPushButton *button)
     button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
 
+QString judgeTypeMode(const QString &judgeType)
+{
+    return judgeType == QObject::tr("任意检测区域输出结果为 OK")
+            ? QStringLiteral("any_ok")
+            : QStringLiteral("all_ok");
+}
+
+QString judgeTypeText(const QString &mode)
+{
+    return mode == QStringLiteral("any_ok")
+            ? QObject::tr("任意检测区域输出结果为 OK")
+            : QObject::tr("所有检测区域输出结果为 OK");
+}
+
+void setComboBoxText(QComboBox *comboBox, const QString &text)
+{
+    if (!comboBox || text.trimmed().isEmpty())
+        return;
+    const int index = comboBox->findText(text);
+    if (index >= 0) {
+        comboBox->setCurrentIndex(index);
+        return;
+    }
+
+    if (text.contains(QObject::tr("任意"))) {
+        const int anyIndex = comboBox->findText(judgeTypeText(QStringLiteral("any_ok")));
+        if (anyIndex >= 0)
+            comboBox->setCurrentIndex(anyIndex);
+        return;
+    }
+
+    if (text.contains(QObject::tr("所有"))) {
+        const int allIndex = comboBox->findText(judgeTypeText(QStringLiteral("all_ok")));
+        if (allIndex >= 0)
+            comboBox->setCurrentIndex(allIndex);
+    }
+}
+
 } // namespace
 
 RegisteredClassificationDialog::RegisteredClassificationDialog(QWidget *parent)
@@ -201,6 +241,10 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
 
     if (m_topKSpinBox)
         m_topKSpinBox->setValue(qBound(1, params.value(QStringLiteral("topK")).toInt(1), 10));
+    if (m_minSimilaritySpinBox) {
+        m_minSimilaritySpinBox->setValue(
+                    qBound(0, params.value(QStringLiteral("minSimilarity")).toInt(68), 100));
+    }
     if (m_modelTypeComboBox) {
         const QString modelType = params.value(QStringLiteral("modelType"))
                 .toString(QStringLiteral("halcon_dl_classification"));
@@ -217,6 +261,12 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
         m_expectedLabelLineEdit->setText(rule.value(QStringLiteral("expectedLabel")).toString());
     if (m_minScoreSpinBox)
         m_minScoreSpinBox->setValue(qBound(0, rule.value(QStringLiteral("minScore")).toInt(80), 100));
+    if (m_judgeTypeComboBox) {
+        QString typeText = rule.value(QStringLiteral("judgeTypeText")).toString();
+        if (typeText.trimmed().isEmpty())
+            typeText = judgeTypeText(rule.value(QStringLiteral("judgeType")).toString());
+        setComboBoxText(m_judgeTypeComboBox, typeText);
+    }
 
     refreshUiState();
     refreshPreview();
@@ -225,13 +275,20 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
 QString RegisteredClassificationDialog::summaryText() const
 {
     const QString modelText = m_modelName.trimmed().isEmpty() ? tr("未导入模型") : m_modelName;
+    const QString typeText = m_judgeTypeComboBox
+            ? m_judgeTypeComboBox->currentText()
+            : judgeTypeText(QStringLiteral("all_ok"));
     if (judgeMode() == QStringLiteral("min_score"))
-        return tr("模型：%1；最低得分：%2").arg(modelText).arg(m_minScoreSpinBox->value());
-    return tr("模型：%1；类别：%2")
+        return tr("模型：%1；最低得分：%2；%3")
+                .arg(modelText)
+                .arg(m_minScoreSpinBox->value())
+                .arg(typeText);
+    return tr("模型：%1；类别：%2；%3")
             .arg(modelText,
                  m_expectedLabelLineEdit->text().trimmed().isEmpty()
                  ? tr("未设置")
-                 : m_expectedLabelLineEdit->text().trimmed());
+                 : m_expectedLabelLineEdit->text().trimmed(),
+                 typeText);
 }
 
 void RegisteredClassificationDialog::resizeEvent(QResizeEvent *event)
@@ -357,12 +414,16 @@ void RegisteredClassificationDialog::deleteModel()
 
 void RegisteredClassificationDialog::openRegisterTraining()
 {
-    showTodoMessage(tr("注册训练"));
+    auto *dialog = new RegisteredClassificationTrainingDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 void RegisteredClassificationDialog::openModelManagement()
 {
-    showTodoMessage(tr("模型管理"));
+    auto *dialog = new RegisteredClassificationModelManagementDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 void RegisteredClassificationDialog::startGlobalDetection()
@@ -545,18 +606,19 @@ void RegisteredClassificationDialog::buildUi()
     paramsLayout->addWidget(modelCard);
     paramsLayout->addWidget(detectCard);
 
-    m_advancedCard = card(scrollContent, tr("全部参数"));
+    m_advancedCard = card(scrollContent, tr("参数设置"));
     QVBoxLayout *advancedLayout = qobject_cast<QVBoxLayout *>(m_advancedCard->layout());
     m_modelTypeComboBox = new QComboBox(m_advancedCard);
     m_modelTypeComboBox->addItem(tr("HALCON DL 分类"), QStringLiteral("halcon_dl_classification"));
+    m_modelTypeComboBox->hide();
     m_topKSpinBox = new QSpinBox(m_advancedCard);
     m_topKSpinBox->setRange(1, 10);
     m_topKSpinBox->setValue(1);
-    QLabel *runtimeLabel = new QLabel(tr("HALCON runtime：使用 HalconRuntimePaths 解析"), m_advancedCard);
-    runtimeLabel->setWordWrap(true);
-    advancedLayout->addLayout(row(tr("模型类型"), m_modelTypeComboBox));
-    advancedLayout->addLayout(row(tr("TopK"), m_topKSpinBox));
-    advancedLayout->addWidget(runtimeLabel);
+    m_minSimilaritySpinBox = new QSpinBox(m_advancedCard);
+    m_minSimilaritySpinBox->setRange(0, 100);
+    m_minSimilaritySpinBox->setValue(68);
+    advancedLayout->addLayout(row(tr("前K个类别"), m_topKSpinBox));
+    advancedLayout->addLayout(row(tr("最小相似度"), m_minSimilaritySpinBox));
     paramsLayout->addWidget(m_advancedCard);
 
     QFrame *judgeCard = card(scrollContent, tr("结果判断"));
@@ -569,9 +631,13 @@ void RegisteredClassificationDialog::buildUi()
     m_minScoreSpinBox = new QSpinBox(judgeCard);
     m_minScoreSpinBox->setRange(0, 100);
     m_minScoreSpinBox->setValue(80);
+    m_judgeTypeComboBox = new QComboBox(judgeCard);
+    m_judgeTypeComboBox->addItem(tr("所有检测区域输出结果为 OK"));
+    m_judgeTypeComboBox->addItem(tr("任意检测区域输出结果为 OK"));
     judgeLayout->addLayout(row(tr("判断依据"), m_resultBasisComboBox));
     judgeLayout->addLayout(row(tr("类别名称"), m_expectedLabelLineEdit));
     judgeLayout->addLayout(row(tr("最低得分"), m_minScoreSpinBox));
+    judgeLayout->addLayout(row(tr("判断类型"), m_judgeTypeComboBox));
     paramsLayout->addWidget(judgeCard);
     paramsLayout->addStretch(1);
 
@@ -786,7 +852,9 @@ QJsonObject RegisteredClassificationDialog::registeredClassificationParams() con
     params.insert(QStringLiteral("paramMode"), m_allParamsMode ? QStringLiteral("all") : QStringLiteral("basic"));
     params.insert(QStringLiteral("modelPath"), m_modelPath);
     params.insert(QStringLiteral("modelName"), m_modelName);
-    QString modelType = m_modelTypeComboBox->currentData().toString();
+    QString modelType = m_modelTypeComboBox
+            ? m_modelTypeComboBox->currentData().toString()
+            : QString();
     if (modelType.trimmed().isEmpty())
         modelType = QStringLiteral("halcon_dl_classification");
     params.insert(QStringLiteral("modelType"), modelType);
@@ -797,6 +865,7 @@ QJsonObject RegisteredClassificationDialog::registeredClassificationParams() con
                                         m_positionCorrectionSource},
                                     &params);
     params.insert(QStringLiteral("topK"), m_topKSpinBox->value());
+    params.insert(QStringLiteral("minSimilarity"), m_minSimilaritySpinBox->value());
     return params;
 }
 
@@ -807,6 +876,11 @@ QJsonObject RegisteredClassificationDialog::judgeRule() const
     rule.insert(QStringLiteral("resultBasis"), resultBasisText());
     rule.insert(QStringLiteral("expectedLabel"), m_expectedLabelLineEdit->text().trimmed());
     rule.insert(QStringLiteral("minScore"), m_minScoreSpinBox->value());
+    const QString typeText = m_judgeTypeComboBox
+            ? m_judgeTypeComboBox->currentText()
+            : judgeTypeText(QStringLiteral("all_ok"));
+    rule.insert(QStringLiteral("judgeType"), judgeTypeMode(typeText));
+    rule.insert(QStringLiteral("judgeTypeText"), typeText);
     return rule;
 }
 

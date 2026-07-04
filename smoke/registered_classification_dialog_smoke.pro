@@ -29,6 +29,8 @@ SOURCES += \
     registered_classification_dialog_smoke.cpp \
     registered_classification_dialog_plan_stub.cpp \
     ../src/RegisteredClassificationDialog.cpp \
+    ../src/RegisteredClassificationTrainingDialog.cpp \
+    ../src/RegisteredClassificationModelManagementDialog.cpp \
     ../src/frame/CameraFrameProvider.cpp \
     ../src/frame/FrameViewHelper.cpp \
     ../src/frame/MatImageConverter.cpp \
@@ -40,6 +42,8 @@ SOURCES += \
 
 HEADERS += \
     ../src/RegisteredClassificationDialog.h \
+    ../src/RegisteredClassificationTrainingDialog.h \
+    ../src/RegisteredClassificationModelManagementDialog.h \
     ../src/PlanDialogUtils.h \
     ../src/frame/CameraFrameProvider.h \
     ../src/frame/FrameViewHelper.h \

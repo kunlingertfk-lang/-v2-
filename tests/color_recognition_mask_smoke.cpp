@@ -78,6 +78,26 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    ColorRecognitionHalconConfig dilutedDominantConfig = dominantConfig;
+    dilutedDominantConfig.labels = {
+        {QStringLiteral("warm"), 1},
+        {QStringLiteral("also_warm"), 2},
+        {QStringLiteral("again_warm"), 3}
+    };
+    dilutedDominantConfig.samples = {
+        {QStringLiteral("warm"), 1, hsFeature.feature, dilutedDominantConfig.roiNormalized},
+        {QStringLiteral("also_warm"), 2, hsFeature.feature, dilutedDominantConfig.roiNormalized},
+        {QStringLiteral("again_warm"), 3, hsFeature.feature, dilutedDominantConfig.roiNormalized}
+    };
+    const ColorRecognitionHalconResult dilutedDominantResult =
+            runner.run(image, dilutedDominantConfig);
+    if (!dilutedDominantResult.success ||
+        dilutedDominantResult.score < 99.0 ||
+        dilutedDominantResult.payload.value(QStringLiteral("dominantColorRatio")).toDouble() >= 50.0) {
+        std::cerr << "dominant ratio score must use best class similarity, not diluted ratio" << std::endl;
+        return 1;
+    }
+
     ColorRecognitionHalconConfig legacyConfig = dominantConfig;
     legacyConfig.colorDecisionMode = QStringLiteral("histogram_intersection");
     const ColorRecognitionHalconResult legacyResult = runner.run(image, legacyConfig);
@@ -116,6 +136,43 @@ int main(int argc, char **argv)
         brightnessOnAlignedResult.predictedLabel != QStringLiteral("warm") ||
         brightnessOnAlignedResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
         std::cerr << "brightness-enabled detection must align older H/S samples to H/S" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig lowSensitivityConfig = dominantConfig;
+    lowSensitivityConfig.sensitivity = QStringLiteral("low");
+    lowSensitivityConfig.samples = {
+        {QStringLiteral("warm"), 1, hsFeature.feature, lowSensitivityConfig.roiNormalized}
+    };
+    const ColorRecognitionHalconResult lowSensitivityResult =
+            runner.run(image, lowSensitivityConfig);
+    if (!lowSensitivityResult.success ||
+        lowSensitivityResult.predictedLabel != QStringLiteral("warm") ||
+        lowSensitivityResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
+        std::cerr << "low-sensitivity detection must compare medium-sensitivity samples" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig highFeatureConfig = hsConfig;
+    highFeatureConfig.sensitivity = QStringLiteral("high");
+    const ColorRecognitionHalconFeatureResult highFeature =
+            runner.extractFeature(image, highFeatureConfig);
+    if (!highFeature.success) {
+        std::cerr << "high sensitivity feature extraction failed" << std::endl;
+        return 1;
+    }
+
+    ColorRecognitionHalconConfig highSensitivityConfig = dominantConfig;
+    highSensitivityConfig.sensitivity = QStringLiteral("high");
+    highSensitivityConfig.samples = {
+        {QStringLiteral("warm"), 1, hsFeature.feature, highSensitivityConfig.roiNormalized}
+    };
+    const ColorRecognitionHalconResult highSensitivityResult =
+            runner.run(image, highSensitivityConfig);
+    if (!highSensitivityResult.success ||
+        highSensitivityResult.predictedLabel != QStringLiteral("warm") ||
+        highSensitivityResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
+        std::cerr << "high-sensitivity detection must compare medium-sensitivity samples" << std::endl;
         return 1;
     }
 

@@ -442,3 +442,105 @@ git diff --check
 
 - 有无类、颜色类等工具仍有各自的重复位置修正占位写法，后续可逐步迁移到 `PositionCorrection` 公共 helper。
 - 真实位置补偿仍未实现；公共 helper 仅统一当前占位语义。
+
+### 2026-07-03 UI 占位闭环：训练窗口、模型管理与全部参数调整
+
+#### 已实现功能
+
+- 新增 `RegisteredClassificationTrainingDialog` 占位窗口，`注册训练` 按钮可打开“注册分类”训练界面。
+- 训练窗口按截图结构提供左侧注册图预览区、添加注册图、标注图像、类别列表、模型类型、任务类型、未注册状态和禁用的开始训练按钮。
+- 新增 `RegisteredClassificationModelManagementDialog` 占位窗口，`模型管理` 按钮可打开“模型训练”管理界面。
+- 模型管理窗口按截图结构提供数据集列表、创建/导入入口、模型列表、类型筛选、搜索框和提示文本。
+- 主对话框“全部参数”卡片调整为“参数设置”，内容收敛为 `前K个类别` 和 `最小相似度`。
+- `params.registeredClassification.minSimilarity` 默认保存为 `68`，`topK` 继续保存并回显。
+- 结果判断新增 `判断类型` 下拉框，支持 `所有检测区域输出结果为 OK` 和 `任意检测区域输出结果为 OK`。
+- `judgeRule.judgeType` 保存为 `all_ok` / `any_ok`，同时保存 `judgeTypeText` 供 UI 回显。
+
+#### 本次更改
+
+- 新增 `src/RegisteredClassificationTrainingDialog.{h,cpp}`。
+- 新增 `src/RegisteredClassificationModelManagementDialog.{h,cpp}`。
+- 修改 `src/RegisteredClassificationDialog.{h,cpp}`，接入两个占位窗口并调整参数/判断字段。
+- 更新 `qt_ui_test.pro` 和 `smoke/registered_classification_dialog_smoke.pro` 链接新窗口。
+- 更新 `smoke/registered_classification_dialog_smoke.cpp`，覆盖参数设置字段、判断类型默认值和两个窗口入口。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 通过，覆盖新字段默认保存、窗口可打开和既有基准图/测试运行路径。
+
+#### 剩余事项
+
+- 注册训练窗口当前只做 UI 占位，不接入本地标注、数据集落盘或 HALCON 训练流程。
+- 模型管理窗口当前只做 UI 占位，不接入真实模型仓库、重新训练、导出或删除逻辑。
+- `minSimilarity` 当前进入配置保存/回显链路，后续若要参与判定，需要同步扩展 Adapter/Runner 的多区域或相似度判定语义。
+
+### 2026-07-03 UI 调整：训练/模型管理窗口尺寸与可读性
+
+#### 本次更改
+
+- `RegisteredClassificationTrainingDialog` 和 `RegisteredClassificationModelManagementDialog` 初始尺寸改为父窗口约 `76%`，无父窗口时保留默认兜底尺寸。
+- 两个窗口统一提升标题、标签、按钮和表格字号，增加蓝色/橙色高对比边框和按钮状态，避免浅灰样式导致人眼难以识别。
+- 模型管理窗口的数据集列表去掉“生产样本”和“验证样本”，仅保留“默认数据集”占位。
+- 模型管理窗口的“创建数据集”和“导入”按钮移动到数据集列表标题栏右上角。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 通过，覆盖两个子窗口 70%-80% 初始尺寸、数据集裁剪和数据集操作按钮标题栏位置。
+
+### 2026-07-03 UI 调整：数据集创建弹窗与高对比样式
+
+#### 本次更改
+
+- 模型管理窗口的“创建数据集”和“导入”改为带图标按钮，不再依赖文本或临时符号表达动作。
+- 模型列表行的编辑、导出、删除动作改为标准图标按钮，去掉 `...` / `⇩` / `×` 文本符号样式。
+- 新增“创建数据集”弹窗，占位复刻数据集名称、训练类型和确定/取消流程。
+- “创建数据集”弹窗点击“确定”后关闭模型管理窗口，并进入注册训练窗口。
+- 注册训练窗口和模型管理窗口继续提升字体大小，并将蓝/灰重底色改为白底、深色文字、橙色强调线，提升可读性。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 通过，覆盖创建/导入图标、创建数据集弹窗打开、确认后进入注册训练窗口。
+
+### 2026-07-03 UI 调整：模型列表动作图标与提示
+
+#### 本次更改
+
+- 模型列表每行的三个操作按钮改为语义化自绘图标：
+  - 重命名：文档 + 笔形图标。
+  - 导出：向下箭头 + 托盘图标。
+  - 删除：红色圆形叉号图标。
+- 每个操作按钮增加 tooltip，鼠标悬停分别显示 `重命名`、`导出`、`删除`。
+- 为按钮增加稳定 objectName，便于后续自动化测试和交互接线。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 通过，覆盖三个模型操作按钮 tooltip。
+
+### 2026-07-03 注册训练窗口一阶段：抓图、导入和 ROI 绘制
+
+#### 已实现功能
+
+- `注册训练`窗口接入左侧预览区的 `FrameViewHelper`，用于显示注册图像和绘制 ROI。
+- `相机抓图` 从 `CameraFrameProvider::currentFrame()` 获取当前帧并显示到左侧预览区。
+- `外部导入` 打开图片文件选择框，仅允许选择图片文件，导入后显示到左侧预览区。
+- `存图导入` 保持占位禁用，并用 tooltip 明确暂未接入。
+- `全屏框选`、`矩形框选`、`多边形框选` 改为带语义图标的 `QToolButton`，并提供 tooltip。
+- ROI 按钮手动互斥：点击高亮并进入对应 ROI 模式，再次点击同一高亮按钮退出绘制状态。
+- 只有 `矩形框选` 高亮时启用矩形 ROI 绘制；只有 `多边形框选` 高亮时启用多边形 ROI 绘制；`全屏框选` 高亮时显示全屏 ROI。
+- 矩形 ROI 和多边形 ROI 当前只做 UI 交互和预览显示，不写入真实训练样本或数据集。
+
+#### 本次更改
+
+- 修改 `src/RegisteredClassificationTrainingDialog.cpp`，接入图像显示、相机抓图、图片导入、ROI 按钮图标、互斥高亮和绘制状态。
+- 更新 `smoke/registered_classification_dialog_smoke.cpp`，覆盖相机抓图显示、ROI 图标/tooltip、互斥切换和二次点击退出。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 通过。
+
+#### 剩余事项
+
+- 外部导入当前只读取本地图片并显示，不保存到数据集。
+- 矩形/多边形 ROI 当前只显示和更新训练窗口状态，不保存到真实样本标注。
+- 存图导入仍为占位禁用。
+- 真实训练、数据集落盘、类别标注和模型生成仍未接入。

@@ -647,6 +647,7 @@ QString halconErrorText(HalconCApi *api, const Herror status)
     return QStringLiteral("HALCON error code %1").arg(static_cast<qlonglong>(status));
 }
 
+//halcon错误检查封装
 void checkStatus(HalconCApi *api, const Herror status, const QString &stage)
 {
     if (!halconStatusOk(status)) {
@@ -656,6 +657,7 @@ void checkStatus(HalconCApi *api, const Herror status, const QString &stage)
     }
 }
 
+//将数组转为HTuple
 HalconTuple featureToTuple(HalconCApi *api, const QVector<double> &feature)
 {
     HalconTuple tuple(api);
@@ -822,6 +824,7 @@ double regionArea(HalconCApi *api, const Hobject region, const QString &stage)
     return area.size() > 0 ? area.doubleAt(0) : 0.0;
 }
 
+//直方图相似度计算
 double histogramIntersectionSimilarity(HalconCApi *api,
                                        const QVector<double> &queryFeature,
                                        const QVector<double> &sampleFeature)
@@ -858,6 +861,7 @@ struct ColorDecisionResult
     QString matchedSampleLabel;
     double rating = 0.0;
     double score = 0.0;
+    double dominantColorRatio = 0.0;
     QVector<QPair<QString, double>> labelAreaRatios;
     QVector<QPair<QString, double>> classSimilarities;
 };
@@ -982,6 +986,7 @@ ColorDecisionResult decideByDominantRatio(HalconCApi *api,
 
     const int bestSampleIndex = classBestSampleIndex.at(bestClassIndex);
     const ColorRecognitionHalconSample &bestSample = usableSamples.at(bestSampleIndex);
+    const double bestSimilarity = qBound(0.0, classBestSimilarity.at(bestClassIndex), 1.0);
     decision.predictedClassId = classIds.at(bestClassIndex);
     decision.predictedLabel = labelNameForClass(config.labels,
                                                 usableSamples,
@@ -989,7 +994,8 @@ ColorDecisionResult decideByDominantRatio(HalconCApi *api,
                                                 bestSample.label);
     decision.matchedSampleIndex = bestSampleIndex;
     decision.matchedSampleLabel = bestSample.label;
-    decision.rating = qBound(0.0, bestRatio, 1.0);
+    decision.dominantColorRatio = qBound(0.0, bestRatio, 1.0);
+    decision.rating = bestSimilarity;
     decision.score = qBound(0.0, decision.rating * 100.0, 100.0);
     return decision;
 }
@@ -1185,6 +1191,53 @@ bool areHsHsvCompatibleFeatureLengths(const int lhsSize, const int rhsSize)
     return minSize % 2 == 0 && maxSize == (minSize / 2) * 3;
 }
 
+bool isSupportedLinearHistogramBins(const int bins)
+{
+    return bins == 8 || bins == 16 || bins == 32;
+}
+
+struct LinearHistogramShape
+{
+    int channels = 0;
+    int bins = 0;
+};
+
+LinearHistogramShape inferLinearHistogramShape(const int featureSize)
+{
+    LinearHistogramShape shape;
+    if (featureSize <= 0)
+        return shape;
+
+    if (featureSize % 3 == 0) {
+        const int bins = featureSize / 3;
+        if (isSupportedLinearHistogramBins(bins)) {
+            shape.channels = 3;
+            shape.bins = bins;
+            return shape;
+        }
+    }
+    if (featureSize % 2 == 0) {
+        const int bins = featureSize / 2;
+        if (isSupportedLinearHistogramBins(bins)) {
+            shape.channels = 2;
+            shape.bins = bins;
+        }
+    }
+    return shape;
+}
+
+bool compatibleLinearHistogramShapes(const LinearHistogramShape &lhs,
+                                     const LinearHistogramShape &rhs)
+{
+    if (lhs.channels <= 0 || rhs.channels <= 0 || lhs.bins <= 0 || rhs.bins <= 0)
+        return false;
+    if (lhs.channels < 2 || rhs.channels < 2)
+        return false;
+    const int minBins = qMin(lhs.bins, rhs.bins);
+    const int maxBins = qMax(lhs.bins, rhs.bins);
+    return maxBins % minBins == 0;
+}
+
 int comparisonFeatureSizeForPair(const int queryFeatureSize, const int sampleFeatureSize)
 {
     if (queryFeatureSize <= 0 || sampleFeatureSize <= 0)
@@ -1193,7 +1246,39 @@ int comparisonFeatureSizeForPair(const int queryFeatureSize, const int sampleFea
         return queryFeatureSize;
     if (areHsHsvCompatibleFeatureLengths(queryFeatureSize, sampleFeatureSize))
         return qMin(queryFeatureSize, sampleFeatureSize);
+    const LinearHistogramShape queryShape = inferLinearHistogramShape(queryFeatureSize);
+    const LinearHistogramShape sampleShape = inferLinearHistogramShape(sampleFeatureSize);
+    if (compatibleLinearHistogramShapes(queryShape, sampleShape))
+        return qMin(queryShape.channels, sampleShape.channels) * qMin(queryShape.bins, sampleShape.bins);
     return 0;
+}
+
+QVector<double> downsampleLinearHistogramFeature(const QVector<double> &feature,
+                                                 const LinearHistogramShape &sourceShape,
+                                                 const int targetChannels,
+                                                 const int targetBins)
+{
+    if (targetChannels <= 0 || targetBins <= 0 ||
+        sourceShape.channels < targetChannels || sourceShape.bins < targetBins ||
+        sourceShape.bins % targetBins != 0 ||
+        feature.size() != sourceShape.channels * sourceShape.bins) {
+        return QVector<double>();
+    }
+
+    const int binGroupSize = sourceShape.bins / targetBins;
+    QVector<double> aligned;
+    aligned.reserve(targetChannels * targetBins);
+    for (int channel = 0; channel < targetChannels; ++channel) {
+        const int channelStart = channel * sourceShape.bins;
+        for (int targetBin = 0; targetBin < targetBins; ++targetBin) {
+            double sum = 0.0;
+            const int sourceStart = channelStart + targetBin * binGroupSize;
+            for (int offset = 0; offset < binGroupSize; ++offset)
+                sum += qMax(0.0, feature.at(sourceStart + offset));
+            aligned.append(sum);
+        }
+    }
+    return aligned;
 }
 
 // 将亮度开关造成的 H/S 与 H/S/V 特征差异统一对齐到 H/S 前缀，兼容旧模板样本。
@@ -1211,6 +1296,22 @@ QVector<double> alignedFeatureToComparisonSize(const QVector<double> &feature,
         if (aligned)
             *aligned = true;
         return feature.mid(0, comparisonFeatureSize);
+    }
+    const LinearHistogramShape sourceShape = inferLinearHistogramShape(feature.size());
+    const LinearHistogramShape targetShape = inferLinearHistogramShape(comparisonFeatureSize);
+    if (compatibleLinearHistogramShapes(sourceShape, targetShape) &&
+        sourceShape.channels >= targetShape.channels &&
+        sourceShape.bins >= targetShape.bins) {
+        QVector<double> downsampled =
+                downsampleLinearHistogramFeature(feature,
+                                                 sourceShape,
+                                                 targetShape.channels,
+                                                 targetShape.bins);
+        if (!downsampled.isEmpty()) {
+            if (aligned)
+                *aligned = true;
+            return downsampled;
+        }
     }
     return QVector<double>();
 }
@@ -1694,8 +1795,11 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
     QVector<double> comparisonFeature = featureResult.feature;
     bool featureAlignmentApplied = false;
     if (comparisonFeatureSize > 0 && comparisonFeatureSize < comparisonFeature.size()) {
-        comparisonFeature = comparisonFeature.mid(0, comparisonFeatureSize);
-        featureAlignmentApplied = true;
+        bool queryAligned = false;
+        comparisonFeature = alignedFeatureToComparisonSize(comparisonFeature,
+                                                           comparisonFeatureSize,
+                                                           &queryAligned);
+        featureAlignmentApplied = featureAlignmentApplied || queryAligned;
     }
 
     QVector<ColorRecognitionHalconSample> usableSamples;
@@ -1809,18 +1913,17 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         result.payload.insert(QStringLiteral("score"), decision.score);
         result.payload.insert(QStringLiteral("rating"), decision.rating);
         result.payload.insert(QStringLiteral("similarity"), decision.rating);
-        result.payload.insert(QStringLiteral("dominantColorRatio"),
-                              decision.mode == QStringLiteral("dominant_ratio") ? decision.rating : 0.0);
+        result.payload.insert(QStringLiteral("dominantColorRatio"), decision.dominantColorRatio);
         result.payload.insert(QStringLiteral("labelAreaRatios"), ratiosToJson(decision.labelAreaRatios));
         result.payload.insert(QStringLiteral("classSimilarities"), ratiosToJson(decision.classSimilarities));
         result.payload.insert(QStringLiteral("scoreDirection"), QStringLiteral("higher_is_better"));
         result.payload.insert(QStringLiteral("scoreFormula"),
                               decision.mode == QStringLiteral("dominant_ratio")
-                              ? QStringLiteral("dominant_color_ratio_x100")
+                              ? QStringLiteral("dominant_class_similarity_x100")
                               : QStringLiteral("histogram_intersection_similarity_x100"));
         result.payload.insert(QStringLiteral("ratingMode"),
                               decision.mode == QStringLiteral("dominant_ratio")
-                              ? QStringLiteral("dominant_color_ratio")
+                              ? QStringLiteral("dominant_class_similarity")
                               : QStringLiteral("histogram_intersection_similarity"));
         result.payload.insert(QStringLiteral("comparisonMethod"), decision.comparisonMethod);
         result.payload.insert(QStringLiteral("sampleCount"), result.sampleCount);

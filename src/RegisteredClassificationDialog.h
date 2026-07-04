@@ -111,8 +111,10 @@ private:
     QPushButton *m_registerTrainingButton = nullptr;
     QPushButton *m_modelManagementButton = nullptr;
     QSpinBox *m_topKSpinBox = nullptr;
+    QSpinBox *m_minSimilaritySpinBox = nullptr;
     QComboBox *m_modelTypeComboBox = nullptr;
     QComboBox *m_resultBasisComboBox = nullptr;
+    QComboBox *m_judgeTypeComboBox = nullptr;
     QLineEdit *m_expectedLabelLineEdit = nullptr;
     QSpinBox *m_minScoreSpinBox = nullptr;
     QPushButton *m_referenceTestButton = nullptr;
