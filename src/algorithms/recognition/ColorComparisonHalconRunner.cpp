@@ -247,6 +247,9 @@ double dominantHueSigma(int bins)
     return 1.7;
 }
 
+constexpr double kHs2dNormalizedCoverageWeight = 0.85;
+constexpr double kHs2dRawCoverageWeight = 0.15;
+
 QPair<double, double> hsCoverageSigmas(const QString &sensitivity)
 {
     const QString normalized = sensitivity.trimmed().toLower();
@@ -272,6 +275,47 @@ int dominantHs2dBin(const QVector<double> &histogram, int bins)
         }
     }
     return bestIndex;
+}
+
+double hs2dCoverageAgainstPeak(const QVector<double> &feature,
+                               int bins,
+                               int peakHueBin,
+                               int peakSaturationBin,
+                               double hueSigma,
+                               double saturationSigma)
+{
+    if (bins <= 0 || feature.size() < bins * bins ||
+            peakHueBin < 0 || peakSaturationBin < 0 ||
+            hueSigma <= 0.0 || saturationSigma <= 0.0) {
+        return 0.0;
+    }
+
+    double featureSum = 0.0;
+    for (int i = 0; i < bins * bins; ++i)
+        featureSum += qMax(0.0, feature.at(i));
+    if (featureSum <= 0.0)
+        return 0.0;
+
+    const double hueDenominator = 2.0 * hueSigma * hueSigma;
+    const double saturationDenominator = 2.0 * saturationSigma * saturationSigma;
+    double coverage = 0.0;
+    for (int saturationBin = 0; saturationBin < bins; ++saturationBin) {
+        for (int hueBin = 0; hueBin < bins; ++hueBin) {
+            const int index = saturationBin * bins + hueBin;
+            const double featureValue = qMax(0.0, feature.at(index)) / featureSum;
+            if (featureValue <= 0.0)
+                continue;
+
+            const double hueDistance = colorBinDistance(peakHueBin, hueBin, bins, true);
+            const double saturationDistance = std::abs(peakSaturationBin - saturationBin);
+            const double weight =
+                    std::exp(-(hueDistance * hueDistance) / hueDenominator -
+                             (saturationDistance * saturationDistance) / saturationDenominator);
+            coverage += featureValue * weight;
+        }
+    }
+
+    return qBound(0.0, coverage, 1.0);
 }
 
 double templateDominantHueCoverage(const QVector<double> &templateHue,
@@ -473,33 +517,27 @@ ColorComparisonHs2dCoverage compareColorComparisonHs2dTemplateCoverage(
     result.templateSaturationPeakBin = templatePeakIndex / bins;
     result.templateHuePeakBin = templatePeakIndex % bins;
 
-    double detectSum = 0.0;
-    for (int i = 0; i < bins * bins; ++i)
-        detectSum += qMax(0.0, detectFeature.at(i));
-    if (detectSum <= 0.0)
+    result.rawCoverage = hs2dCoverageAgainstPeak(detectFeature,
+                                                 bins,
+                                                 result.templateHuePeakBin,
+                                                 result.templateSaturationPeakBin,
+                                                 result.hueSigma,
+                                                 result.saturationSigma);
+    result.templateSelfCoverage = hs2dCoverageAgainstPeak(templateFeature,
+                                                          bins,
+                                                          result.templateHuePeakBin,
+                                                          result.templateSaturationPeakBin,
+                                                          result.hueSigma,
+                                                          result.saturationSigma);
+    if (result.templateSelfCoverage <= 0.0)
         return result;
 
-    const double hueDenominator = 2.0 * result.hueSigma * result.hueSigma;
-    const double saturationDenominator = 2.0 * result.saturationSigma * result.saturationSigma;
-    double coverage = 0.0;
-    for (int saturationBin = 0; saturationBin < bins; ++saturationBin) {
-        for (int hueBin = 0; hueBin < bins; ++hueBin) {
-            const int index = saturationBin * bins + hueBin;
-            const double detectValue = qMax(0.0, detectFeature.at(index)) / detectSum;
-            if (detectValue <= 0.0)
-                continue;
-
-            const double hueDistance = colorBinDistance(result.templateHuePeakBin, hueBin, bins, true);
-            const double saturationDistance =
-                    std::abs(result.templateSaturationPeakBin - saturationBin);
-            const double weight =
-                    std::exp(-(hueDistance * hueDistance) / hueDenominator -
-                             (saturationDistance * saturationDistance) / saturationDenominator);
-            coverage += detectValue * weight;
-        }
-    }
-
-    result.coverage = qBound(0.0, coverage, 1.0);
+    result.normalizedCoverage =
+            qBound(0.0, result.rawCoverage / result.templateSelfCoverage, 1.0);
+    result.coverage = qBound(0.0,
+                             result.normalizedCoverage * kHs2dNormalizedCoverageWeight +
+                             result.rawCoverage * kHs2dRawCoverageWeight,
+                             1.0);
     return result;
 }
 
@@ -732,7 +770,7 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
     result.payload.insert(QStringLiteral("scoreFormula"),
                           comparisonMode == QStringLiteral("bhattacharyya_histogram")
                           ? (isHisto2DimFeatureType(config.featureType)
-                             ? QStringLiteral("hs_2dim_template_coverage * 100")
+                             ? QStringLiteral("(normalized_coverage * 0.85 + raw_coverage * 0.15) * 100")
                              : QStringLiteral("max(0.0, 1.0 - bhattacharyya_distance) * 100"))
                           : QStringLiteral("template_dominant_hue_coverage_weighted_similarity_x100"));
     result.payload.insert(QStringLiteral("similarity"), similarity);
@@ -748,6 +786,13 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                               : QStringLiteral("bhattacharyya_by_base_tuple_operators"));
         if (isHisto2DimFeatureType(config.featureType)) {
             result.payload.insert(QStringLiteral("coverage"), hs2dCoverage.coverage);
+            result.payload.insert(QStringLiteral("normalizedCoverage"),
+                                  hs2dCoverage.normalizedCoverage);
+            result.payload.insert(QStringLiteral("rawCoverage"), hs2dCoverage.rawCoverage);
+            result.payload.insert(QStringLiteral("templateSelfCoverage"),
+                                  hs2dCoverage.templateSelfCoverage);
+            result.payload.insert(QStringLiteral("coverageBlend"),
+                                  QStringLiteral("normalized=0.85,raw=0.15"));
             result.payload.insert(QStringLiteral("templateHuePeakBin"), hs2dCoverage.templateHuePeakBin);
             result.payload.insert(QStringLiteral("templateSaturationPeakBin"),
                                   hs2dCoverage.templateSaturationPeakBin);

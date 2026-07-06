@@ -62,6 +62,9 @@ struct ColorComparisonHsvSimilarity
 struct ColorComparisonHs2dCoverage
 {
     double coverage = 0.0;
+    double normalizedCoverage = 0.0;
+    double rawCoverage = 0.0;
+    double templateSelfCoverage = 0.0;
     int bins = 0;
     int templateHuePeakBin = -1;
     int templateSaturationPeakBin = -1;

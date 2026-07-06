@@ -22,16 +22,19 @@ namespace {
 
 constexpr int kMinRoiPixelSize = 2;
 
+// 判断 HALCON C API 返回码是否属于正常状态。
 bool halconStatusOk(const Herror status)
 {
     return status == H_MSG_OK || status == H_MSG_TRUE || status == H_MSG_FALSE;
 }
 
+// 判断 HALCON 对象句柄是否实际分配，避免重复 clear 空对象。
 bool halconObjectAllocated(const Hobject object)
 {
     return object != 0 && object != NO_OBJECTS && object != EMPTY_REGION;
 }
 
+// 判断 QRectF 的四个分量是否都是有限值。
 bool isFiniteRect(const QRectF &rect)
 {
     return std::isfinite(rect.x()) &&
@@ -40,11 +43,13 @@ bool isFiniteRect(const QRectF &rect)
            std::isfinite(rect.height());
 }
 
+// 判断归一化 ROI 是否有有效面积。
 bool isValidNormalizedRoi(const QRectF &rect)
 {
     return isFiniteRect(rect) && rect.width() > 0.0 && rect.height() > 0.0;
 }
 
+// 判断当前检测区域是否使用圆形 ROI。
 bool isCircleRegionType(const QString &type)
 {
     return type.trimmed().toLower() == QStringLiteral("circle");
@@ -61,6 +66,7 @@ QString normalizedColorDecisionMode(const QString &mode)
     return QStringLiteral("dominant_ratio");
 }
 
+// 将 0-1 归一化 ROI 转成图像像素矩形，并过滤过小区域。
 QRect normalizedRoiToPixels(const QRectF &sourceRoi, const int width, const int height)
 {
     if (width <= 0 || height <= 0 || !isValidNormalizedRoi(sourceRoi))
@@ -86,7 +92,7 @@ QRect normalizedRoiToPixels(const QRectF &sourceRoi, const int width, const int 
     return QRect(x1, y1, roiWidth, roiHeight);
 }
 
-#if 1 //json数据配置
+// 将矩形写入结果 payload，便于 UI 和日志定位 ROI。
 QJsonObject rectToJson(const QRectF &rect)
 {
     QJsonObject json;
@@ -97,6 +103,7 @@ QJsonObject rectToJson(const QRectF &rect)
     return json;
 }
 
+// 将特征向量写入结果 payload。
 QJsonArray vectorToJson(const QVector<double> &values)
 {
     QJsonArray array;
@@ -119,6 +126,7 @@ QJsonArray ratiosToJson(const QVector<QPair<QString, double>> &ratios)
     return array;
 }
 
+// 将归一化多边形点集写入结果 payload。
 QJsonArray pointsToJson(const QVector<QPointF> &points)
 {
     QJsonArray array;
@@ -131,6 +139,7 @@ QJsonArray pointsToJson(const QVector<QPointF> &points)
     return array;
 }
 
+// 将点坐标写入结果 payload。
 QJsonObject pointToJsonObject(const QPointF &point)
 {
     QJsonObject json;
@@ -139,8 +148,7 @@ QJsonObject pointToJsonObject(const QPointF &point)
     return json;
 }
 
-#endif
-
+// 构造矩形 ROI overlay。
 ToolOverlay rectOverlay(const QRectF &rect, const QString &label, const double score = 0.0)
 {
     ToolOverlay overlay;
@@ -151,6 +159,7 @@ ToolOverlay rectOverlay(const QRectF &rect, const QString &label, const double s
     return overlay;
 }
 
+// 构造圆形 ROI overlay。
 ToolOverlay circleOverlay(const QPointF &center,
                           const double radius,
                           const QString &label,
@@ -165,6 +174,7 @@ ToolOverlay circleOverlay(const QPointF &center,
     return overlay;
 }
 
+// 将矩形写入 overlay.extra 使用的 JSON 结构。
 QJsonObject rectToJsonObject(const QRectF &rect)
 {
     QJsonObject json;
@@ -175,6 +185,7 @@ QJsonObject rectToJsonObject(const QRectF &rect)
     return json;
 }
 
+// 构造文字结果 overlay，用于显示 OK/NG、类别和分数。
 ToolOverlay textOverlay(const QPointF &position,
                         const QString &text,
                         const double score = 0.0,
@@ -189,7 +200,7 @@ ToolOverlay textOverlay(const QPointF &position,
     return overlay;
 }
 
-//直方图灵敏度 分成不同8,16,32bin
+// 按灵敏度选择直方图 bin 数：低/中/高对应 8/16/32。
 int histogramBinsForSensitivity(const QString &sensitivity)
 {
     const QString key = sensitivity.trimmed().toLower();
@@ -200,6 +211,7 @@ int histogramBinsForSensitivity(const QString &sensitivity)
     return 16;
 }
 
+// 判断是否使用 HALCON H/S 二维联合直方图特征。
 bool isHisto2DimFeatureType(const QString &featureType)
 {
     const QString key = featureType.trimmed().toLower();
@@ -208,7 +220,7 @@ bool isHisto2DimFeatureType(const QString &featureType)
             key == QStringLiteral("histogram_2dim");
 }
 
-//转bgr 8位深
+// 将输入 cv::Mat 统一转换为连续的 8-bit BGR，作为进入 HALCON 前的桥接格式。
 cv::Mat toBgr8(const cv::Mat &image)
 {
     if (image.empty())
@@ -234,7 +246,7 @@ cv::Mat toBgr8(const cv::Mat &image)
     return bgr;
 }
 
-//错误信息的特征结果合成
+// 生成特征提取阶段的错误结果，并保留图像、ROI、HALCON 路径等诊断信息。
 ColorRecognitionHalconFeatureResult featureError(const QString &status,
                                                  const QString &message,
                                                  const ColorRecognitionHalconConfig &config,
@@ -276,7 +288,7 @@ ColorRecognitionHalconFeatureResult featureError(const QString &status,
     return result;
 }
 
-//错误信息的运行结果合成
+// 生成完整识别阶段的错误结果，统一 Adapter/UI 可读取的 payload 字段。
 ColorRecognitionHalconResult runError(const QString &status,
                                       const QString &message,
                                       const ColorRecognitionHalconConfig &config,
@@ -320,7 +332,7 @@ ColorRecognitionHalconResult runError(const QString &status,
     return result;
 }
 
-//屏蔽区域roi的结果
+// 生成 ROI 被屏蔽区完全覆盖时的明确结果和展示 overlay。
 ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig &config,
                                              const cv::Mat &image,
                                              const qint64 elapsedMs)
@@ -383,7 +395,7 @@ ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig 
     return result;
 }
 
-//声明halcon API接口
+// HALCON C API 函数指针表：运行时动态解析，避免工程在编译期强链接 HALCON。
 struct HalconCApi
 {
     using SetUtf8Fn = void (*)(int);
@@ -444,6 +456,7 @@ struct HalconCApi
     ClearObjFn clearObj = nullptr;
 };
 
+// 解析必需 HALCON 符号，缺失时返回可诊断的错误信息。
 template <typename Function>
 bool resolveRequired(void *handle, Function &target, const char *symbolName, QString &errorMessage)
 {
@@ -460,6 +473,7 @@ bool resolveRequired(void *handle, Function &target, const char *symbolName, QSt
     return true;
 }
 
+// 解析可选 HALCON 符号，缺失不影响主流程。
 template <typename Function>
 void resolveOptional(void *handle, Function &target, const char *symbolName)
 {
@@ -470,17 +484,18 @@ void resolveOptional(void *handle, Function &target, const char *symbolName)
         target = reinterpret_cast<Function>(symbol);
 }
 
-//linux下加载动态库(.so)通过 dlopen 运行时获取所有需要的 Halcon C 接口函数地址，
-//存入 HalconCApi 函数指针表，实现不编译时链接 Halcon，做到运行时按需加载、解耦依赖。
+// 运行时加载 HALCON 动态库，并把颜色识别需要的 C API 全部解析到函数指针表。
 class HalconLibrary
 {
 public:
+    // 释放 dlopen 句柄。
     ~HalconLibrary()
     {
         if (m_handle)
             dlclose(m_handle);
     }
 
+    // 加载指定 HALCON 动态库路径并解析必需/可选符号。
     bool load(const QString &path, QString &errorMessage, bool &symbolMissing)
     {
         symbolMissing = false;
@@ -535,11 +550,11 @@ private:
     void *m_handle = nullptr;
 };
 
-//HTuple只能元组封装类，自动安全管理 Halcon 元组内存、禁止拷贝、只允许移动语义、
-//通过动态 API 表操作原生 HTuple，避免内存泄漏、野指针、重复释放。
+// HTuple RAII 封装：自动管理 HALCON tuple 生命周期，避免泄漏和重复释放。
 class HalconTuple
 {
 public:
+    // 绑定 HALCON API 表；未绑定时对象保持空 tuple。
     explicit HalconTuple(HalconCApi *api = nullptr)
         : m_api(api)
     {
@@ -548,6 +563,7 @@ public:
     HalconTuple(const HalconTuple &) = delete;
     HalconTuple &operator=(const HalconTuple &) = delete;
 
+    // 移动构造转移 tuple 所有权。
     HalconTuple(HalconTuple &&other) noexcept
         : m_api(other.m_api)
         , m_tuple(other.m_tuple)
@@ -556,6 +572,7 @@ public:
         other.m_tuple = HTUPLE_INITIALIZER;
     }
 
+    // 移动赋值前释放当前 tuple，再接管来源对象。
     HalconTuple &operator=(HalconTuple &&other) noexcept
     {
         if (this == &other)
@@ -569,26 +586,31 @@ public:
         return *this;
     }
 
+    // 析构时释放 HALCON tuple 内存。
     ~HalconTuple()
     {
         destroy();
     }
 
+    // 返回可传给 HALCON C API 的 tuple 指针。
     Htuple *ptr()
     {
         return &m_tuple;
     }
 
+    // 返回只读 tuple 引用，供 HALCON C API 输入参数使用。
     const Htuple &value() const
     {
         return m_tuple;
     }
 
+    // 返回 tuple 当前元素数量。
     int size() const
     {
         return static_cast<int>(m_tuple.num);
     }
 
+    // 重新创建指定长度的 tuple。
     void create(const int size)
     {
         destroy();
@@ -596,34 +618,40 @@ public:
             m_api->createTuple(&m_tuple, size);
     }
 
+    // 设置 double 元素。
     void setDouble(const int index, const double value)
     {
         if (m_api && m_api->setDouble)
             m_api->setDouble(&m_tuple, value, index);
     }
 
+    // 设置整数元素。
     void setInt(const int index, const Hlong value)
     {
         if (m_api && m_api->setInt)
             m_api->setInt(&m_tuple, value, index);
     }
 
+    // 设置字符串元素。
     void setString(const int index, const char *value)
     {
         if (m_api && m_api->setString)
             m_api->setString(&m_tuple, value, index);
     }
 
+    // 读取 double 元素。
     double doubleAt(const int index) const
     {
         return m_api && m_api->getDouble ? m_api->getDouble(&m_tuple, index) : 0.0;
     }
 
+    // 读取整数元素。
     Hlong intAt(const int index) const
     {
         return m_api && m_api->getInt ? m_api->getInt(&m_tuple, index) : 0;
     }
 
+    // 释放当前 tuple 并重置为空。
     void destroy()
     {
         if (m_api && m_api->destroyTuple && (m_tuple.num > 0 || m_tuple.capacity > 0))
@@ -636,6 +664,7 @@ private:
     Htuple m_tuple = HTUPLE_INITIALIZER;
 };
 
+// 将 HALCON 错误码转换为可读文本。
 QString halconErrorText(HalconCApi *api, const Herror status)
 {
     char buffer[1024] = {0};
@@ -647,7 +676,7 @@ QString halconErrorText(HalconCApi *api, const Herror status)
     return QStringLiteral("HALCON error code %1").arg(static_cast<qlonglong>(status));
 }
 
-//halcon错误检查封装
+// 检查 HALCON 调用结果，失败时抛出带 stage 的统一错误。
 void checkStatus(HalconCApi *api, const Herror status, const QString &stage)
 {
     if (!halconStatusOk(status)) {
@@ -657,7 +686,7 @@ void checkStatus(HalconCApi *api, const Herror status, const QString &stage)
     }
 }
 
-//将数组转为HTuple
+// 将 C++ 特征向量转换为 HALCON HTuple。
 HalconTuple featureToTuple(HalconCApi *api, const QVector<double> &feature)
 {
     HalconTuple tuple(api);
@@ -667,6 +696,7 @@ HalconTuple featureToTuple(HalconCApi *api, const QVector<double> &feature)
     return tuple;
 }
 
+// 调用 HALCON tuple_sum 并返回求和结果。
 double tupleSumValue(HalconCApi *api, const HalconTuple &tuple, const QString &stage)
 {
     HalconTuple sum(api);
@@ -674,6 +704,7 @@ double tupleSumValue(HalconCApi *api, const HalconTuple &tuple, const QString &s
     return sum.size() > 0 ? sum.doubleAt(0) : 0.0;
 }
 
+// 调用 OpenCV compareHist 只做调试对比，不参与颜色识别核心判定。
 double openCvBhattacharyyaDebugDistance(const QVector<double> &referenceHistogram,
                                         const QVector<double> &testHistogram)
 {
@@ -691,6 +722,7 @@ double openCvBhattacharyyaDebugDistance(const QVector<double> &referenceHistogra
     return cv::compareHist(referenceMat, testMat, cv::HISTCMP_BHATTACHARYYA);
 }
 
+// 格式化直方图指定区间，供调试日志输出。
 QString histogramFirstBinsText(const QVector<double> &histogram, int start, int count)
 {
     QStringList values;
@@ -700,6 +732,7 @@ QString histogramFirstBinsText(const QVector<double> &histogram, int start, int 
     return values.join(QStringLiteral(","));
 }
 
+// 计算直方图指定通道区间的归一化和值。
 double histogramChannelSum(const QVector<double> &histogram, int start, int count)
 {
     double sum = 0.0;
@@ -709,6 +742,7 @@ double histogramChannelSum(const QVector<double> &histogram, int start, int coun
     return sum;
 }
 
+// 找到直方图指定通道区间的最大 bin 下标。
 int histogramMaxBin(const QVector<double> &histogram, int start, int count)
 {
     int maxIndex = -1;
@@ -725,6 +759,7 @@ int histogramMaxBin(const QVector<double> &histogram, int start, int count)
     return maxIndex;
 }
 
+// 输出一维 H/S(/V) 直方图调试信息。
 void logHistogramDebugChannels(const QString &name,
                                const QVector<double> &histogram,
                                int bins,
@@ -755,6 +790,7 @@ void logHistogramDebugChannels(const QString &name,
     }
 }
 
+// 输出二维 H/S 联合直方图调试信息。
 void logHistogram2DimDebug(const QString &name, const QVector<double> &histogram, int bins)
 {
     const int expectedLength = bins * bins;
@@ -789,6 +825,7 @@ void logHistogram2DimDebug(const QString &name, const QVector<double> &histogram
                     QString::number(maxValue, 'f', 6));
 }
 
+// 将 double 数组写入已创建的 HALCON tuple。
 void createDoubleArrayTuple(HalconTuple &tuple, const QVector<double> &values)
 {
     tuple.create(values.size());
@@ -796,6 +833,7 @@ void createDoubleArrayTuple(HalconTuple &tuple, const QVector<double> &values)
         tuple.setDouble(i, values.at(i));
 }
 
+// 将归一化屏蔽多边形点转换为图像像素坐标。
 QVector<QPointF> maskPolygonToPixels(const QVector<QPointF> &normalizedPoints,
                                      const int width,
                                      const int height)
@@ -814,6 +852,7 @@ QVector<QPointF> maskPolygonToPixels(const QVector<QPointF> &normalizedPoints,
     return pixels.size() >= 3 ? pixels : QVector<QPointF>();
 }
 
+// 通过 HALCON area_center 计算区域面积，用于判断有效 ROI 是否为空。
 double regionArea(HalconCApi *api, const Hobject region, const QString &stage)
 {
     HalconTuple area(api);
@@ -824,7 +863,7 @@ double regionArea(HalconCApi *api, const Hobject region, const QString &stage)
     return area.size() > 0 ? area.doubleAt(0) : 0.0;
 }
 
-//直方图相似度计算
+// 使用 HALCON tuple_min2 + tuple_sum 计算直方图交集相似度。
 double histogramIntersectionSimilarity(HalconCApi *api,
                                        const QVector<double> &queryFeature,
                                        const QVector<double> &sampleFeature)
@@ -1015,6 +1054,7 @@ ColorDecisionResult decideByHalconColorSegmentationReserved(HalconCApi *api,
             QStringLiteral("HALCON color segmentation/cluster mode is reserved but not implemented."));
 }
 
+// 安全释放 HALCON Hobject，并把句柄重置为空对象。
 void clearObject(HalconCApi *api, Hobject &object)
 {
     if (api && api->clearObj && halconObjectAllocated(object))
@@ -1022,6 +1062,7 @@ void clearObject(HalconCApi *api, Hobject &object)
     object = NO_OBJECTS;
 }
 
+// 在指定 HALCON ROI 区域内提取单通道灰度直方图并归一化。
 QVector<double> histogramForChannel(HalconCApi *api,
                                     const Hobject roiRegion,
                                     const Hobject channel,
@@ -1077,6 +1118,7 @@ QVector<double> histogramForChannel(HalconCApi *api,
     return normalized;
 }
 
+// 将任意直方图向量按非负和归一化。
 QVector<double> normalizeHistogramVector(const QVector<double> &histogram)
 {
     double sum = 0.0;
@@ -1096,6 +1138,7 @@ QVector<double> normalizeHistogramVector(const QVector<double> &histogram)
     return normalized;
 }
 
+// 对 H/S 二维联合直方图做轻量邻域平滑，降低 bin 边界抖动。
 QVector<double> softenHsJointHistogram(const QVector<double> &histogram, int bins)
 {
     QVector<double> softened(bins * bins, 0.0);
@@ -1126,6 +1169,7 @@ QVector<double> softenHsJointHistogram(const QVector<double> &histogram, int bin
     return normalizeHistogramVector(softened);
 }
 
+// 调用 HALCON histo_2dim 提取 H/S 联合直方图并降采样到配置 bin 数。
 QVector<double> histogram2DimHsFeature(HalconCApi *api,
                                        const Hobject roiRegion,
                                        const Hobject hue,
@@ -1181,6 +1225,7 @@ QVector<double> histogram2DimHsFeature(HalconCApi *api,
     }
 }
 
+// 判断 H/S 与 H/S/V 两种旧新特征长度是否可按前缀兼容。
 bool areHsHsvCompatibleFeatureLengths(const int lhsSize, const int rhsSize)
 {
     if (lhsSize <= 0 || rhsSize <= 0 || lhsSize == rhsSize)
@@ -1191,6 +1236,7 @@ bool areHsHsvCompatibleFeatureLengths(const int lhsSize, const int rhsSize)
     return minSize % 2 == 0 && maxSize == (minSize / 2) * 3;
 }
 
+// 判断一维直方图 bin 数是否属于本工具支持的灵敏度档位。
 bool isSupportedLinearHistogramBins(const int bins)
 {
     return bins == 8 || bins == 16 || bins == 32;
@@ -1202,6 +1248,7 @@ struct LinearHistogramShape
     int bins = 0;
 };
 
+// 从一维直方图特征长度推断通道数和每通道 bin 数。
 LinearHistogramShape inferLinearHistogramShape(const int featureSize)
 {
     LinearHistogramShape shape;
@@ -1226,6 +1273,7 @@ LinearHistogramShape inferLinearHistogramShape(const int featureSize)
     return shape;
 }
 
+// 判断两组一维直方图形状是否可通过降采样对齐。
 bool compatibleLinearHistogramShapes(const LinearHistogramShape &lhs,
                                      const LinearHistogramShape &rhs)
 {
@@ -1238,6 +1286,7 @@ bool compatibleLinearHistogramShapes(const LinearHistogramShape &lhs,
     return maxBins % minBins == 0;
 }
 
+// 计算查询特征与样本特征可共同比较的目标长度。
 int comparisonFeatureSizeForPair(const int queryFeatureSize, const int sampleFeatureSize)
 {
     if (queryFeatureSize <= 0 || sampleFeatureSize <= 0)
@@ -1253,6 +1302,7 @@ int comparisonFeatureSizeForPair(const int queryFeatureSize, const int sampleFea
     return 0;
 }
 
+// 将一维 H/S(/V) 特征按通道和 bin 数降采样到目标形状。
 QVector<double> downsampleLinearHistogramFeature(const QVector<double> &feature,
                                                  const LinearHistogramShape &sourceShape,
                                                  const int targetChannels,
@@ -1325,6 +1375,7 @@ struct HistogramExtractionResult
     double effectiveRoiArea = 0.0;
 };
 
+// 颜色特征提取核心：OpenCV 图像桥接 HALCON，生成 ROI/屏蔽区后提取 HSV 直方图。
 HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
                                                   const QRect &roiPixels,
                                                   const ColorRecognitionHalconConfig &config,
@@ -1375,6 +1426,8 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
         checkStatus(api, api->transFromRgb(red, green, blue, &hue, &saturation, &value, "hsv"),
                     QStringLiteral("trans_from_rgb"));
         HistogramExtractionResult result;
+
+        //生成圆形或矩形区域
         if (isCircleRegionType(config.detectRegionType)) {
             const double radiusPixels = config.detectCircleRadiusNormalized *
                     static_cast<double>(qMax(bgr.cols, bgr.rows));
@@ -1461,7 +1514,7 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
 
 } // namespace
 
-//与halcon做验证对比
+// 从输入图像中提取颜色识别特征，负责 HALCON runtime 校验、ROI 校验和诊断 payload。
 ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature(
         const cv::Mat &image,
         const ColorRecognitionHalconConfig &config) const
@@ -1587,7 +1640,7 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
     }
 }
 
-//巴氏特征比较
+// 使用 HALCON tuple 算子计算直方图 Bhattacharyya 距离，主要供颜色比较链路复用。
 ColorRecognitionHalconHistogramCompareResult
 ColorRecognitionHalconRunner::compareHistogramBhattacharyya(
         const QVector<double> &referenceHistogram,
@@ -1747,6 +1800,7 @@ ColorRecognitionHalconRunner::compareHistogramBhattacharyya(
     }
 }
 
+// 颜色识别主流程：提取检测 ROI 特征、对齐模板特征、分类判定并输出 ToolOverlay。
 ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         const cv::Mat &image,
         const ColorRecognitionHalconConfig &config) const

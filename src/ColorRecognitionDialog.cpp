@@ -62,11 +62,13 @@ constexpr int kSampleItem = 3;
 constexpr int kLiveTestIntervalMs = 500;
 constexpr int kActionButtonFlashMs = 120;
 
+// 判断浮点值是否可用于归一化 ROI/点位计算。
 bool finiteValue(qreal value)
 {
     return std::isfinite(static_cast<double>(value));
 }
 
+// 规范化并裁剪 ROI，非法 ROI 回退到整图，避免保存或运行时崩溃。
 QRectF normalizedRoiOrDefault(const QRectF &roi)
 {
     if (!finiteValue(roi.x()) ||
@@ -89,6 +91,7 @@ QRectF normalizedRoiOrDefault(const QRectF &roi)
             : QRectF(0.0, 0.0, 1.0, 1.0);
 }
 
+// 获取结果状态栏可用宽度，宽度暂不可用时提供一个稳定默认值。
 int labelDisplayWidth(const QLabel *label)
 {
     if (!label)
@@ -98,6 +101,7 @@ int labelDisplayWidth(const QLabel *label)
     return width > 80 ? width : 640;
 }
 
+// 将归一化矩形序列化到 ToolConfig/模板 JSON。
 QJsonObject rectToJson(const QRectF &rect)
 {
     QJsonObject json;
@@ -108,6 +112,7 @@ QJsonObject rectToJson(const QRectF &rect)
     return json;
 }
 
+// 将归一化点序列化到 JSON。
 QJsonObject pointToJson(const QPointF &point)
 {
     QJsonObject json;
@@ -116,12 +121,14 @@ QJsonObject pointToJson(const QPointF &point)
     return json;
 }
 
+// 从 JSON 还原归一化点。
 QPointF pointFromJson(const QJsonObject &json)
 {
     return QPointF(json.value(QStringLiteral("x")).toDouble(),
                    json.value(QStringLiteral("y")).toDouble());
 }
 
+// 将多边形点集序列化到 JSON 数组。
 QJsonArray pointsToJson(const QVector<QPointF> &points)
 {
     QJsonArray array;
@@ -130,6 +137,7 @@ QJsonArray pointsToJson(const QVector<QPointF> &points)
     return array;
 }
 
+// 从 JSON 数组还原并裁剪屏蔽区多边形点集。
 QVector<QPointF> pointsFromJson(const QJsonArray &array)
 {
     QVector<QPointF> points;
@@ -143,6 +151,7 @@ QVector<QPointF> pointsFromJson(const QJsonArray &array)
     return points;
 }
 
+// 将圆形检测 ROI 序列化到 ToolConfig.params。
 QJsonObject circleToJson(const CircleRoi &circle)
 {
     QJsonObject json;
@@ -153,6 +162,7 @@ QJsonObject circleToJson(const CircleRoi &circle)
     return json;
 }
 
+// 从 ToolConfig.params 回显圆形检测 ROI。
 CircleRoi circleFromJson(const QJsonObject &json)
 {
     CircleRoi circle;
@@ -176,6 +186,7 @@ CircleRoi circleFromJson(const QJsonObject &json)
     return circle;
 }
 
+// 从 JSON 还原矩形，缺字段时使用 fallback。
 QRectF rectFromJson(const QJsonObject &json, const QRectF &fallback)
 {
     if (json.isEmpty())
@@ -187,6 +198,7 @@ QRectF rectFromJson(const QJsonObject &json, const QRectF &fallback)
                   json.value(QStringLiteral("height")).toDouble(fallback.height()));
 }
 
+// 将模板样本特征向量序列化为 JSON 数组。
 QJsonArray featureToJson(const QVector<double> &feature)
 {
     QJsonArray array;
@@ -195,6 +207,7 @@ QJsonArray featureToJson(const QVector<double> &feature)
     return array;
 }
 
+// 从 JSON 数组还原模板样本特征向量。
 QVector<double> featureFromJson(const QJsonArray &array)
 {
     QVector<double> feature;
@@ -204,6 +217,7 @@ QVector<double> featureFromJson(const QJsonArray &array)
     return feature;
 }
 
+// 将 UI 判定方式文案转换为 ToolConfig.judgeRule 的稳定枚举值。
 QString judgeModeFromUi(const QString &text)
 {
     return text.contains(QStringLiteral("类别"))
@@ -211,6 +225,7 @@ QString judgeModeFromUi(const QString &text)
             : QStringLiteral("min_score");
 }
 
+// 将 ToolConfig.judgeRule 中的判定方式转换为 UI 文案。
 QString judgeModeToUi(const QString &value)
 {
     return value == QStringLiteral("category")
@@ -218,6 +233,7 @@ QString judgeModeToUi(const QString &value)
             : QStringLiteral("最低分数");
 }
 
+// 将 UI 颜色判别方式转换为 runner 可识别的配置值。
 QString colorDecisionModeFromUi(const QString &text)
 {
     return text.contains(QStringLiteral("整体"))
@@ -225,6 +241,7 @@ QString colorDecisionModeFromUi(const QString &text)
             : QStringLiteral("dominant_ratio");
 }
 
+// 将颜色判别方式配置值转换为 UI 文案。
 QString colorDecisionModeToUi(const QString &value)
 {
     return value == QStringLiteral("histogram_intersection")
@@ -232,6 +249,7 @@ QString colorDecisionModeToUi(const QString &value)
             : QStringLiteral("主颜色占比");
 }
 
+// 将模板特征类型配置值转换为 UI 文案。
 QString featureTypeToUi(const QString &value)
 {
     return value == QStringLiteral("spectrum")
@@ -239,6 +257,7 @@ QString featureTypeToUi(const QString &value)
             : QStringLiteral("直方图特征");
 }
 
+// 固定底部动作按钮尺寸，避免 default button 状态引发布局跳动。
 void applyBottomActionButtonMetrics(QPushButton *button)
 {
     if (!button)
@@ -251,6 +270,7 @@ void applyBottomActionButtonMetrics(QPushButton *button)
     button->setDefault(false);
 }
 
+// 重新应用按钮样式，用于动态属性变化后的即时刷新。
 void refreshButtonStyle(QWidget *button)
 {
     if (!button)
@@ -261,6 +281,7 @@ void refreshButtonStyle(QWidget *button)
     button->update();
 }
 
+// 给底部动作按钮安装短暂点击反馈，不改变按钮原有业务信号。
 void installActionButtonFlash(QPushButton *button)
 {
     if (!button)
@@ -276,6 +297,7 @@ void installActionButtonFlash(QPushButton *button)
     });
 }
 
+// 禁用 Dialog 内按钮的默认按钮增长效果，保持工业工具界面尺寸稳定。
 void disableDialogDefaultButtonGrowth(QWidget *root)
 {
     if (!root)
@@ -290,6 +312,7 @@ void disableDialogDefaultButtonGrowth(QWidget *root)
     }
 }
 
+// 按显示文本设置下拉框选项，未找到时保持当前值。
 void setComboBoxText(QComboBox *comboBox, const QString &text)
 {
     if (!comboBox)
@@ -300,6 +323,7 @@ void setComboBoxText(QComboBox *comboBox, const QString &text)
         comboBox->setCurrentIndex(index);
 }
 
+// 将模板类别标签序列化到模板 JSON。
 QJsonObject labelToJson(const ColorRecognitionLabelData &label)
 {
     QJsonObject json;
@@ -308,6 +332,7 @@ QJsonObject labelToJson(const ColorRecognitionLabelData &label)
     return json;
 }
 
+// 从模板 JSON 还原类别标签。
 ColorRecognitionLabelData labelFromJson(const QJsonObject &json)
 {
     ColorRecognitionLabelData label;
@@ -316,6 +341,7 @@ ColorRecognitionLabelData labelFromJson(const QJsonObject &json)
     return label;
 }
 
+// 将单个模板样本序列化到模板 JSON，包含特征、ROI 和缩略图数据。
 QJsonObject sampleToJson(const ColorRecognitionSampleData &sample)
 {
     QJsonObject json;
@@ -329,6 +355,7 @@ QJsonObject sampleToJson(const ColorRecognitionSampleData &sample)
     return json;
 }
 
+// 从模板 JSON 还原单个样本，并过滤非法 ROI。
 ColorRecognitionSampleData sampleFromJson(const QJsonObject &json)
 {
     ColorRecognitionSampleData sample;
@@ -344,6 +371,7 @@ ColorRecognitionSampleData sampleFromJson(const QJsonObject &json)
     return sample;
 }
 
+// 将完整颜色模板序列化为可保存/导出的 JSON 对象。
 QJsonObject templateToJson(const ColorRecognitionTemplateData &colorTemplate)
 {
     QJsonArray labels;
@@ -367,6 +395,7 @@ QJsonObject templateToJson(const ColorRecognitionTemplateData &colorTemplate)
     return json;
 }
 
+// 从保存/导入的 JSON 中还原颜色模板，并过滤不完整标签和样本。
 ColorRecognitionTemplateData templateFromJson(const QJsonObject &json)
 {
     ColorRecognitionTemplateData colorTemplate;
@@ -395,11 +424,13 @@ ColorRecognitionTemplateData templateFromJson(const QJsonObject &json)
     return colorTemplate;
 }
 
+// 统计模板样本数，集中表达模板列表摘要的计数口径。
 int sampleCount(const ColorRecognitionTemplateData &colorTemplate)
 {
     return colorTemplate.samples.size();
 }
 
+// 过滤结果 overlay 中的检测 ROI，避免和正在编辑的 ROI overlay 重复显示。
 QVector<ToolOverlay> colorRecognitionPreviewOverlaysWithoutRoi(const QVector<ToolOverlay> &overlays)
 {
     QVector<ToolOverlay> filtered;
@@ -420,6 +451,7 @@ QVector<ToolOverlay> colorRecognitionPreviewOverlaysWithoutRoi(const QVector<Too
 
 } // namespace
 
+// 构造颜色识别配置对话框：初始化预览、测试 watcher、默认工具 id 和控件连接。
 ColorRecognitionDialog::ColorRecognitionDialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::ColorRecognitionDialog)
@@ -452,6 +484,7 @@ ColorRecognitionDialog::ColorRecognitionDialog(QWidget *parent)
     showPreviewImage();
 }
 
+// 析构前停止测试任务并等待异步 watcher 结束，避免关闭窗口后回调访问 UI。
 ColorRecognitionDialog::~ColorRecognitionDialog()
 {
     stopLiveTestRun();
@@ -462,6 +495,7 @@ ColorRecognitionDialog::~ColorRecognitionDialog()
     delete ui;
 }
 
+// 汇总当前 Dialog 内存态配置，供保存前和外部调用读取。
 ColorRecognitionDialogConfig ColorRecognitionDialog::configuration() const
 {
     ColorRecognitionDialogConfig config;
@@ -473,6 +507,7 @@ ColorRecognitionDialogConfig ColorRecognitionDialog::configuration() const
     return config;
 }
 
+// 将当前 UI、模板、ROI、屏蔽区和判定规则序列化为工具引擎使用的 ToolConfig。
 ToolConfig ColorRecognitionDialog::toToolConfig() const
 {
     const ColorRecognitionDialogConfig colorConfig = configuration();
@@ -544,16 +579,19 @@ ToolConfig ColorRecognitionDialog::toToolConfig() const
     return config;
 }
 
+// 返回当前可交给工具链运行的 ToolConfig。
 ToolConfig ColorRecognitionDialog::toolConfig() const
 {
     return toToolConfig();
 }
 
+// 返回 Dialog 维护的基准图快照，供外部保存预览图上下文。
 ToolPreviewSnapshot ColorRecognitionDialog::referencePreviewSnapshot() const
 {
     return m_referencePreviewSnapshot;
 }
 
+// 从已保存配置回填 UI、模板、检测 ROI、屏蔽区和判定规则。
 void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
 {
     if (!config.toolId.trimmed().isEmpty())
@@ -648,6 +686,7 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
     setViewerStatusText(roiStatusText(), roiStatusText());
 }
 
+// 生成颜色识别工具在工具列表中的摘要文字。
 QString ColorRecognitionDialog::summaryText() const
 {
     const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
@@ -661,12 +700,14 @@ QString ColorRecognitionDialog::summaryText() const
             .arg(ui->minScoreSpinBox->value());
 }
 
+// 窗口尺寸变化时重新适配预览画布。
 void ColorRecognitionDialog::resizeEvent(QResizeEvent *event)
 {
     QDialog::resizeEvent(event);
     fitPreview();
 }
 
+// 点击完成时把当前 UI 状态固化为 ToolConfig，并通过 accept 交还调用方。
 void ColorRecognitionDialog::finishConfiguration()
 {
     if (m_testUiMode != TestUiMode::Edit) {
@@ -682,6 +723,7 @@ void ColorRecognitionDialog::finishConfiguration()
     accept();
 }
 
+// 点击相机测试时进入连续测试模式，并立即启动一次检测。
 void ColorRecognitionDialog::runTest()
 {
     if (m_testUiMode == TestUiMode::Continuous) {
@@ -708,12 +750,14 @@ void ColorRecognitionDialog::runTest()
         m_testRunTimer->start();
 }
 
+// 根据当前测试来源取帧并启动检测，是连续测试定时器的执行入口。
 void ColorRecognitionDialog::performTestRun()
 {
     // 连续运行定时器触发：以最新相机帧重跑（m_liveTestSource == Camera, Continuous）。
     rerunLiveTest();
 }
 
+// 按测试来源重新获取基准图/相机帧，用于 ROI 或屏蔽区变化后的自动重测。
 void ColorRecognitionDialog::rerunLiveTest()
 {
     if (m_liveTestSource == LiveTestSource::None)
@@ -748,6 +792,7 @@ void ColorRecognitionDialog::rerunLiveTest()
     launchDetection(frame, referenceSource);
 }
 
+// 统一发起异步检测任务，处理在途请求排队、generation 标记和结果回调识别。
 void ColorRecognitionDialog::launchDetection(const cv::Mat &frame, bool referenceSource)
 {
     if (m_testRunBusy) {
@@ -782,6 +827,7 @@ void ColorRecognitionDialog::launchDetection(const cv::Mat &frame, bool referenc
     }));
 }
 
+// 使用基准图执行一次颜色识别，适合无相机输入时快速验证配置。
 void ColorRecognitionDialog::runReferenceTest()
 {
     stopLiveTestRun();
@@ -798,6 +844,7 @@ void ColorRecognitionDialog::runReferenceTest()
     setViewerStatusText(tr("已进入基准图测试，可继续绘制检测区域，松开即自动判别"));
 }
 
+// 在测试态下锁定当前相机帧执行单次检测，避免结果被后续帧刷新。
 void ColorRecognitionDialog::runOnceInTestMode()
 {
     stopLiveTestRun();
@@ -809,6 +856,7 @@ void ColorRecognitionDialog::runOnceInTestMode()
     setViewerStatusText(tr("已运行一次，视图锁定当前帧，可继续绘制检测区域即时重测"));
 }
 
+// 退出测试态，停止连续检测并恢复编辑态预览。
 void ColorRecognitionDialog::exitTestMode()
 {
     stopLiveTestRun();
@@ -818,6 +866,7 @@ void ColorRecognitionDialog::exitTestMode()
     showPreviewImage();
 }
 
+// 停止连续测试计时器并清理测试状态标记。
 void ColorRecognitionDialog::stopLiveTestRun()
 {
     if (m_testRunTimer)
@@ -831,6 +880,7 @@ void ColorRecognitionDialog::stopLiveTestRun()
     }
 }
 
+// 根据编辑/连续/暂停测试态刷新底部按钮的显示、启用和文案。
 void ColorRecognitionDialog::updateBottomButtons()
 {
     const bool testMode = m_testUiMode != TestUiMode::Edit;
@@ -848,6 +898,7 @@ void ColorRecognitionDialog::updateBottomButtons()
     }
 }
 
+// 初始化控件默认值、按钮组、预览 helper、屏蔽区控件和测试按钮。
 void ColorRecognitionDialog::setupUiState()
 {
     setWindowTitle(tr("方案编辑 - 颜色识别"));
@@ -985,6 +1036,7 @@ void ColorRecognitionDialog::setupUiState()
     updateBottomButtons();
 }
 
+// 连接所有 UI 操作、模板列表、ROI helper 和测试流程信号。
 void ColorRecognitionDialog::connectControls()
 {
     connect(ui->headerCloseButton, &QToolButton::clicked, this, &ColorRecognitionDialog::reject);
@@ -1125,6 +1177,7 @@ void ColorRecognitionDialog::connectControls()
     });
 }
 
+// 切换基础/全部参数模式，控制高级参数卡片显隐。
 void ColorRecognitionDialog::setAllParamsMode(bool allMode)
 {
     ui->basicSegmentButton->setChecked(!allMode);
@@ -1134,6 +1187,7 @@ void ColorRecognitionDialog::setAllParamsMode(bool allMode)
         m_maskCard->setVisible(allMode);
 }
 
+// 新增模板并打开模板编辑器采样，成功后刷新列表和判定类别。
 void ColorRecognitionDialog::addTemplate()
 {
     ColorRecognitionTemplateData colorTemplate;
@@ -1152,6 +1206,7 @@ void ColorRecognitionDialog::addTemplate()
     updateTemplateList();
 }
 
+// 编辑当前模板，保存后同步模板列表、摘要和期望类别下拉框。
 void ColorRecognitionDialog::editCurrentTemplate()
 {
     const int index = currentTemplateIndex();
@@ -1171,6 +1226,7 @@ void ColorRecognitionDialog::editCurrentTemplate()
     updateTemplateList();
 }
 
+// 从 JSON 文件导入颜色模板，并作为当前活动模板。
 void ColorRecognitionDialog::importTemplate()
 {
     const QString fileName = QFileDialog::getOpenFileName(
@@ -1209,6 +1265,7 @@ void ColorRecognitionDialog::importTemplate()
     setViewerStatusText(tr("已导入模板：%1").arg(colorTemplate.name));
 }
 
+// 将当前活动模板导出为 JSON 文件，便于复用或迁移。
 void ColorRecognitionDialog::exportCurrentTemplate()
 {
     const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
@@ -1238,6 +1295,7 @@ void ColorRecognitionDialog::exportCurrentTemplate()
     setViewerStatusText(tr("已导出模板：%1").arg(colorTemplate->name));
 }
 
+// 重命名当前活动模板并刷新列表选中态。
 void ColorRecognitionDialog::renameCurrentTemplate()
 {
     ColorRecognitionTemplateData *colorTemplate = activeTemplate();
@@ -1260,6 +1318,7 @@ void ColorRecognitionDialog::renameCurrentTemplate()
     updateTemplateList();
 }
 
+// 删除当前活动模板，并选择下一个可用模板作为活动项。
 void ColorRecognitionDialog::deleteCurrentTemplate()
 {
     const int index = currentTemplateIndex();
@@ -1278,6 +1337,7 @@ void ColorRecognitionDialog::deleteCurrentTemplate()
     refreshDisplayedRoiOverlay();
 }
 
+// 取模板的首张样本缩略图，用于模板列表主项预览。
 QImage firstTemplateSampleImage(const ColorRecognitionTemplateData &colorTemplate)
 {
     for (const ColorRecognitionSampleData &sample : colorTemplate.samples) {
@@ -1333,6 +1393,7 @@ QWidget *makeTemplateRoiSampleCard(const QImage &sourceImage,
     return card;
 }
 
+// 重建模板树形列表，按模板、标签、样本三级展示。
 void ColorRecognitionDialog::updateTemplateList()
 {
     const QString selectedId = activeTemplateId();
@@ -1423,6 +1484,7 @@ void ColorRecognitionDialog::updateTemplateList()
     updateExpectedLabelCombo();
 }
 
+// 刷新右侧当前模板摘要，包括特征类型、灵敏度、类别和样本数。
 void ColorRecognitionDialog::updateActiveTemplateSummary()
 {
     const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
@@ -1448,6 +1510,7 @@ void ColorRecognitionDialog::updateActiveTemplateSummary()
     ui->allTemplateSummaryLabel->setText(text);
 }
 
+// 根据当前模板标签刷新类别判定下拉框。
 void ColorRecognitionDialog::updateExpectedLabelCombo()
 {
     const QString currentExpected = ui->expectedLabelComboBox->currentText();
@@ -1462,6 +1525,7 @@ void ColorRecognitionDialog::updateExpectedLabelCombo()
     setComboBoxText(ui->expectedLabelComboBox, currentExpected);
 }
 
+// 根据判定模式启用分数阈值或期望类别控件。
 void ColorRecognitionDialog::updateJudgementControls()
 {
     const bool categoryMode = judgeModeFromUi(ui->resultBasisComboBox->currentText()) == QStringLiteral("category");
@@ -1471,6 +1535,7 @@ void ColorRecognitionDialog::updateJudgementControls()
     ui->expectedLabelComboBox->setVisible(categoryMode);
 }
 
+// 处理模板列表点击，切换当前模板或定位到样本所属模板。
 void ColorRecognitionDialog::handleTemplateListItemClicked(QListWidgetItem *item)
 {
     if (!item)
@@ -1513,6 +1578,7 @@ void ColorRecognitionDialog::handleTemplateListItemClicked(QListWidgetItem *item
     setViewerStatusText(roiStatusText(), roiStatusText());
 }
 
+// 查找当前活动模板索引，优先按 activeTemplateId 匹配。
 int ColorRecognitionDialog::currentTemplateIndex() const
 {
     QString id;
@@ -1530,18 +1596,21 @@ int ColorRecognitionDialog::currentTemplateIndex() const
     return -1;
 }
 
+// 返回当前活动模板的可修改指针。
 ColorRecognitionTemplateData *ColorRecognitionDialog::activeTemplate()
 {
     const int index = currentTemplateIndex();
     return index >= 0 && index < m_templates.size() ? &m_templates[index] : nullptr;
 }
 
+// 返回当前活动模板的只读指针。
 const ColorRecognitionTemplateData *ColorRecognitionDialog::activeTemplate() const
 {
     const int index = currentTemplateIndex();
     return index >= 0 && index < m_templates.size() ? &m_templates.at(index) : nullptr;
 }
 
+// 返回当前活动模板 id，未设置时回退为首个模板 id。
 QString ColorRecognitionDialog::activeTemplateId() const
 {
     if (const ColorRecognitionTemplateData *colorTemplate = activeTemplate())
@@ -1549,12 +1618,14 @@ QString ColorRecognitionDialog::activeTemplateId() const
     return m_activeTemplateId;
 }
 
+// 将预览图适配到当前视图窗口。
 void ColorRecognitionDialog::fitPreview()
 {
     if (m_previewHelper)
         m_previewHelper->fitToView();
 }
 
+// 显示基准图或空预览，并同步当前 ROI/屏蔽区 overlay。
 void ColorRecognitionDialog::showPreviewImage()
 {
     if (!m_previewHelper)
@@ -1582,6 +1653,7 @@ void ColorRecognitionDialog::showPreviewImage()
     refreshDisplayedRoiOverlay();
 }
 
+// ROI 编辑前切换到可交互图像帧，优先使用当前基准图。
 void ColorRecognitionDialog::showFrameForRoiEditing()
 {
     if (!m_previewHelper)
@@ -1611,6 +1683,7 @@ void ColorRecognitionDialog::showFrameForRoiEditing()
     refreshDisplayedRoiOverlay();
 }
 
+// 切换为整图检测，清理局部 ROI 选择并刷新测试结果。
 void ColorRecognitionDialog::startGlobalDetection()
 {
     showFrameForRoiEditing();
@@ -1636,6 +1709,7 @@ void ColorRecognitionDialog::startGlobalDetection()
     setViewerStatusText(text, text);
 }
 
+// 启动矩形检测 ROI 框选。
 void ColorRecognitionDialog::startRectangleRoiEditing()
 {
     m_globalDetection = false;
@@ -1656,6 +1730,7 @@ void ColorRecognitionDialog::startRectangleRoiEditing()
     setViewerStatusText(text, text);
 }
 
+// 启动圆形检测 ROI 框选。
 void ColorRecognitionDialog::startCircleRoiEditing()
 {
     m_globalDetection = false;
@@ -1684,11 +1759,13 @@ void ColorRecognitionDialog::startCircleRoiEditing()
     setViewerStatusText(text, text);
 }
 
+// 展示暂不支持区域模式的统一提示。
 void ColorRecognitionDialog::showUnsupportedRegionMessage()
 {
     startRectangleRoiEditing();
 }
 
+// 同步矩形/圆形区域按钮 checked 状态，避免信号递归。
 void ColorRecognitionDialog::syncRegionButtons(bool rectangleRegion)
 {
     if (!rectangleRegion)
@@ -1702,6 +1779,7 @@ void ColorRecognitionDialog::syncRegionButtons(bool rectangleRegion)
     ui->regionCircleButton->setChecked(false);
 }
 
+// 保存矩形 ROI 编辑结果，并在测试态下立即重跑检测。
 void ColorRecognitionDialog::handleRoiChanged(const QRectF &roi)
 {
     m_roiNormalized = normalizedRoiOrDefault(roi);
@@ -1722,6 +1800,7 @@ void ColorRecognitionDialog::handleRoiChanged(const QRectF &roi)
         rerunLiveTest();  // 测试态下绘制完成立即以新 ROI 重跑检测
 }
 
+// 处理矩形 ROI 编辑取消，恢复按钮状态和 overlay。
 void ColorRecognitionDialog::handleRoiSelectionRejected()
 {
     const QString text = tr("ROI 无效，请拖拽宽高至少 2 像素的矩形");
@@ -1729,6 +1808,7 @@ void ColorRecognitionDialog::handleRoiSelectionRejected()
     refreshDisplayedRoiOverlay();
 }
 
+// 保存圆形 ROI 编辑结果，并在测试态下立即重跑检测。
 void ColorRecognitionDialog::handleCircleRoiChanged(const CircleRoi &roi)
 {
     if (!roi.valid)
@@ -1762,6 +1842,7 @@ void ColorRecognitionDialog::handleCircleRoiChanged(const CircleRoi &roi)
         rerunLiveTest();  // 测试态下绘制完成立即以新 ROI 重跑检测
 }
 
+// 处理圆形 ROI 编辑取消，恢复按钮状态和 overlay。
 void ColorRecognitionDialog::handleCircleRoiSelectionRejected()
 {
     const QString text = tr("ROI 无效，请从圆心拖拽半径至少 2 像素的圆形");
@@ -1769,6 +1850,7 @@ void ColorRecognitionDialog::handleCircleRoiSelectionRejected()
     refreshDisplayedRoiOverlay();
 }
 
+// 进入屏蔽区编辑态并刷新屏蔽区按钮状态。
 void ColorRecognitionDialog::startMaskEditing()
 {
     stopLiveTestRun();
@@ -1793,6 +1875,7 @@ void ColorRecognitionDialog::startMaskEditing()
     setViewerStatusText(text, text);
 }
 
+// 启动屏蔽多边形绘制。
 void ColorRecognitionDialog::startMaskPolygonDrawing()
 {
     if (!m_maskEditing)
@@ -1814,6 +1897,7 @@ void ColorRecognitionDialog::startMaskPolygonDrawing()
     setViewerStatusText(text, text);
 }
 
+// 完成屏蔽区编辑，回到普通配置态并按需重跑检测。
 void ColorRecognitionDialog::finishMaskEditing()
 {
     if (m_previewHelper) {
@@ -1831,6 +1915,7 @@ void ColorRecognitionDialog::finishMaskEditing()
     setViewerStatusText(text, text);
 }
 
+// 保存屏蔽多边形编辑结果，并在测试态下立即重跑检测。
 void ColorRecognitionDialog::handleMaskPolygonChanged(const QVector<QPointF> &points)
 {
     if (!m_maskEditing)
@@ -1844,6 +1929,7 @@ void ColorRecognitionDialog::handleMaskPolygonChanged(const QVector<QPointF> &po
     setViewerStatusText(text, text);
 }
 
+// 处理屏蔽区绘制取消或点数不足的提示。
 void ColorRecognitionDialog::handleMaskPolygonSelectionRejected(int pointCount)
 {
     if (!m_maskEditing)
@@ -1854,6 +1940,7 @@ void ColorRecognitionDialog::handleMaskPolygonSelectionRejected(int pointCount)
     syncMaskControls();
 }
 
+// 根据屏蔽区是否存在和是否正在编辑刷新屏蔽区控件。
 void ColorRecognitionDialog::syncMaskControls()
 {
     if (m_maskEditButton)
@@ -1866,6 +1953,7 @@ void ColorRecognitionDialog::syncMaskControls()
         m_maskFinishButton->setVisible(m_maskEditing);
 }
 
+// 刷新位置修正控件的启用状态和来源选择状态。
 void ColorRecognitionDialog::refreshPositionCorrectionControls()
 {
     if (!ui || !ui->positionCorrectionSwitch || !ui->positionCorrectionSourceRow)
@@ -1874,6 +1962,7 @@ void ColorRecognitionDialog::refreshPositionCorrectionControls()
     ui->positionCorrectionSourceRow->setVisible(ui->positionCorrectionSwitch->isChecked());
 }
 
+// 重绘预览中的检测 ROI、圆形 ROI 和屏蔽区 overlay。
 void ColorRecognitionDialog::refreshDisplayedRoiOverlay()
 {
     if (!m_previewHelper)
@@ -1903,6 +1992,7 @@ void ColorRecognitionDialog::refreshDisplayedRoiOverlay()
     }
 }
 
+// 将 Adapter 返回的 ToolResult 展示为状态栏文本和图形 overlay。
 void ColorRecognitionDialog::displayResult(const ToolResult &result, bool referenceSource)
 {
     if (m_previewHelper) {
@@ -1943,6 +2033,7 @@ void ColorRecognitionDialog::displayResult(const ToolResult &result, bool refere
     }
 }
 
+// 将本地错误包装为颜色识别 ToolResult 并复用展示路径。
 void ColorRecognitionDialog::displayError(const QString &status, const QString &message)
 {
     ToolResult result;
@@ -1955,6 +2046,7 @@ void ColorRecognitionDialog::displayError(const QString &status, const QString &
     displayResult(result, false);
 }
 
+// 更新预览状态栏文字，并根据控件宽度压缩显示。
 void ColorRecognitionDialog::setViewerStatusText(const QString &displayText,
                                                  const QString &tooltipText)
 {
@@ -1970,6 +2062,7 @@ void ColorRecognitionDialog::setViewerStatusText(const QString &displayText,
     label->setToolTip(tooltipText.isEmpty() ? displayText : tooltipText);
 }
 
+// 生成当前 ROI/整图检测状态说明。
 QString ColorRecognitionDialog::roiStatusText() const
 {
     if (m_globalDetection)
@@ -1990,6 +2083,7 @@ QString ColorRecognitionDialog::roiStatusText() const
             .arg(roi.height(), 0, 'f', 3);
 }
 
+// 计算当前有效检测 ROI，整图模式返回全图。
 QRectF ColorRecognitionDialog::effectiveRoiNormalized() const
 {
     return normalizedRoiOrDefault(m_roiNormalized);

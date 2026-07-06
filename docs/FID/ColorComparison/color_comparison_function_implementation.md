@@ -1071,6 +1071,59 @@ minScore
 - 需要在具备有效 HALCON license 的目标机上用 GUI 复测绿色模板/绿色检测 ROI 的实际分数。
 - 若绿色仍偏低，优先调整 `hueSigma` / `saturationSigma`，而不是回退到硬巴氏距离。
 
+### 2026-07-04 16:30:00 CST - H/S 二维覆盖率自归一化
+
+#### 已实现功能
+
+- `histogram_2dim_hs` 覆盖率评分改为以模板自身覆盖率为基准归一化。
+- 同一模板特征与同一检测特征在高灵敏度软化分布下应接近 100 分，避免纯色同区域只得到约 67 分。
+- payload 保留 `coverage`，并新增 `rawCoverage`、`templateSelfCoverage`，便于现场判断原始覆盖率和归一化基准。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorComparisonHalconRunner.h/.cpp`
+  - `ColorComparisonHs2dCoverage` 新增 `rawCoverage`、`templateSelfCoverage`。
+  - 抽出 H/S 二维特征对模板峰值的覆盖率计算。
+  - 最终 `coverage = rawCoverage / templateSelfCoverage`，并限制在 `0..1`。
+  - `scoreFormula` 更新为 `min(1.0, hs_2dim_detect_coverage / hs_2dim_template_self_coverage) * 100`。
+- `smoke/color_comparison_smoke.cpp`
+  - 新增高灵敏度软化 H/S 特征的同特征断言，防止同一区域再次回落到未归一化低分。
+
+#### 验证
+
+- 已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j$(nproc) && ./build/smoke/color_comparison/bin/color_comparison_smoke`，默认 smoke 通过。
+
+#### 剩余事项
+
+- 需要在具备有效 HALCON license 的目标机上用 GUI 复测截图场景，确认模板和检测 ROI 同区域时显示接近 100 分。
+
+### 2026-07-04 16:55:00 CST - H/S 二维分数梯度修正
+
+#### 已实现功能
+
+- `histogram_2dim_hs` 最终分数从纯自归一化覆盖率改为归一化覆盖率和原始覆盖率混合。
+- 公式调整为 `coverage = normalizedCoverage * 0.85 + rawCoverage * 0.15`。
+- 同一软化 H/S 特征仍保持高分，但不再直接饱和到 100，减少现场结果只呈现 100/0 的观感。
+
+#### 本次更改
+
+- `src/algorithms/recognition/ColorComparisonHalconRunner.h/.cpp`
+  - `ColorComparisonHs2dCoverage` 新增 `normalizedCoverage`。
+  - 新增覆盖率混合权重常量：`normalized=0.85`、`raw=0.15`。
+  - payload 新增 `normalizedCoverage` 和 `coverageBlend`，保留 `rawCoverage`、`templateSelfCoverage`。
+  - `scoreFormula` 更新为 `(normalized_coverage * 0.85 + raw_coverage * 0.15) * 100`。
+- `smoke/color_comparison_smoke.cpp`
+  - 高灵敏度软化 H/S 同特征断言改为“高分但不饱和”，防止评分再次退化为直接 100。
+
+#### 验证
+
+- RED：修改 smoke 后旧实现输出 `100`，触发 `identical softened HS feature must keep a high but non-saturated score` 失败。
+- GREEN：已执行 `qmake smoke/color_comparison_smoke.pro -o /tmp/color_comparison_smoke.Makefile && make -f /tmp/color_comparison_smoke.Makefile -j$(nproc) && ./build/smoke/color_comparison/bin/color_comparison_smoke`，默认 smoke 通过。
+
+#### 剩余事项
+
+- 需要在具备有效 HALCON license 的目标机上用 GUI 复测截图场景，确认同色高分有梯度、相近偏色不再过快塌到 0。
+
 ## 后续记录模板
 
 后续每次实现后，在本节上方追加：

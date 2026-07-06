@@ -27,6 +27,30 @@ QVector<double> hs2dFeature(int bins, int hueBin, int saturationBin)
     return feature;
 }
 
+QVector<double> softenedHs2dFeature(int bins, int hueBin, int saturationBin)
+{
+    QVector<double> feature(bins * bins, 0.0);
+    const double weights[3] = {0.25, 0.50, 0.25};
+    for (int saturationOffset = -1; saturationOffset <= 1; ++saturationOffset) {
+        const int targetSaturation = qBound(0, saturationBin + saturationOffset, bins - 1);
+        const double saturationWeight = weights[saturationOffset + 1];
+        for (int hueOffset = -1; hueOffset <= 1; ++hueOffset) {
+            const int targetHue = (hueBin + hueOffset + bins) % bins;
+            const double hueWeight = weights[hueOffset + 1];
+            feature[targetSaturation * bins + targetHue] += saturationWeight * hueWeight;
+        }
+    }
+
+    double sum = 0.0;
+    for (const double value : feature)
+        sum += value;
+    if (sum > 0.0) {
+        for (double &value : feature)
+            value /= sum;
+    }
+    return feature;
+}
+
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
@@ -77,6 +101,18 @@ int main(int argc, char **argv)
     if (farHueCoverage.coverage > 0.25) {
         std::cerr << "far hue must stay below green coverage threshold, got "
                   << farHueCoverage.coverage * 100.0 << std::endl;
+        return 1;
+    }
+    const QVector<double> identicalSoftHigh = softenedHs2dFeature(32, 4, 31);
+    const ColorComparisonHs2dCoverage identicalSoftHighCoverage =
+            compareColorComparisonHs2dTemplateCoverage(identicalSoftHigh,
+                                                       identicalSoftHigh,
+                                                       32,
+                                                       QStringLiteral("high"));
+    if (identicalSoftHighCoverage.coverage < 0.94 ||
+            identicalSoftHighCoverage.coverage > 0.99) {
+        std::cerr << "identical softened HS feature must keep a high but non-saturated score, got "
+                  << identicalSoftHighCoverage.coverage * 100.0 << std::endl;
         return 1;
     }
 
