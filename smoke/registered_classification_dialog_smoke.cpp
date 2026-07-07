@@ -201,11 +201,13 @@ int main(int argc, char **argv)
         QPushButton *externalImportButton = buttonByText(*trainingDialog, QStringLiteral("外部导入"));
         check(cameraCaptureButton != nullptr, "training dialog must have camera capture button");
         check(externalImportButton != nullptr, "training dialog must have external import button");
+        CameraFrameProvider::instance().clearFrame();
         clickAndProcess(cameraCaptureButton);
+        CameraFrameProvider::instance().setCurrentFrame(frame);
         FrameViewHelper *trainingPreviewHelper = trainingDialog->findChild<FrameViewHelper *>(
                     QStringLiteral("registeredTrainingPreviewHelper"));
         check(trainingPreviewHelper && trainingPreviewHelper->hasImage(),
-              "camera capture must display current camera frame in training preview");
+              "camera capture must display fallback reference frame when current camera frame is empty");
 
         QListWidget *thumbnailList = trainingDialog->findChild<QListWidget *>(
                     QStringLiteral("registeredTrainingThumbnailList"));
@@ -214,8 +216,8 @@ int main(int argc, char **argv)
               "camera capture must add one thumbnail");
         check(thumbnailList && thumbnailList->currentRow() == 0,
               "camera capture thumbnail must be selected");
-        check(thumbnailList && thumbnailList->item(0)->text().contains(QStringLiteral("相机抓图")),
-              "camera capture thumbnail must show source name");
+        check(thumbnailList && thumbnailList->item(0)->text().contains(QStringLiteral("基准图")),
+              "camera capture fallback thumbnail must show reference image source name");
 
         QToolButton *fullRoiButton = toolButtonByObjectName(*trainingDialog,
                                                             QStringLiteral("trainingFullRoiButton"));
@@ -241,12 +243,18 @@ int main(int argc, char **argv)
                     QStringLiteral("registeredTrainingPreviewClassButton_0"));
         QToolButton *deleteClassMarkButton = toolButtonByObjectName(*trainingDialog,
                     QStringLiteral("registeredTrainingDeleteClassMarkButton_0"));
+        QToolButton *renameClassButton = toolButtonByObjectName(*trainingDialog,
+                    QStringLiteral("registeredTrainingRenameClassButton_0"));
         QPushButton *clearAllMarksButton = buttonByText(*trainingDialog,
                                                         QStringLiteral("清除全部标注"));
         check(classList != nullptr, "training dialog must use class list container");
+        check(classList && widgetCenterIsLight(classList),
+              "training class list must render with light project style");
         check(classCountLabel && classCountLabel->text() == QStringLiteral("分类列表(1)"),
               "class list title must show default class count");
         check(createClassButton != nullptr, "training dialog must have create class button");
+        check(renameClassButton && renameClassButton->toolTip() == QStringLiteral("重命名"),
+              "class row rename button must have semantic tooltip");
         check(previewClassButton && previewClassButton->toolTip() == QStringLiteral("预览类别 ROI"),
               "class row preview button must have semantic tooltip");
         check(deleteClassMarkButton && deleteClassMarkButton->toolTip() == QStringLiteral("删除当前 ROI"),
@@ -281,6 +289,8 @@ int main(int argc, char **argv)
             check(!trainingPreviewHelper->isRoiDrawingEnabled() &&
                   !trainingPreviewHelper->isPolygonDrawingEnabled(),
                   "class preview must leave ROI drawing modes idle");
+            check(labelByText(*trainingDialog, QStringLiteral("正在预览类别 ROI：Classification0")) != nullptr,
+                  "class preview must show clear preview status text");
             clickAndProcess(deleteClassMarkButton);
             check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
                   "deleting current ROI must clear thumbnail annotation state");

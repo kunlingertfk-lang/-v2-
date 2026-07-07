@@ -3,6 +3,7 @@
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
+#include "frame/ReferenceImageProvider.h"
 
 #include <QButtonGroup>
 #include <QApplication>
@@ -14,7 +15,9 @@
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMap>
@@ -309,6 +312,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     classScrollArea->setFrameShape(QFrame::NoFrame);
     QWidget *classListWidget = new QWidget(classScrollArea);
     classListWidget->setObjectName(QStringLiteral("registeredTrainingClassList"));
+    classListWidget->setProperty("panelRole", QStringLiteral("classList"));
     QVBoxLayout *classListLayout = new QVBoxLayout(classListWidget);
     classListLayout->setContentsMargins(0, 0, 0, 0);
     classListLayout->setSpacing(8);
@@ -488,10 +492,23 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
             rowLayout->addWidget(deleteButton);
             classListLayout->addWidget(rowFrame);
 
-            connect(renameButton, &QToolButton::clicked, this, [state, classIndex, editStatusLabel]() {
+            connect(renameButton, &QToolButton::clicked, this, [state, classIndex, editStatusLabel, refreshClassList]() {
                 state->currentClass = classIndex;
-                editStatusLabel->setText(QObject::tr("重命名暂未接入，当前类别：%1")
-                                         .arg(state->classes.value(classIndex)));
+                bool accepted = false;
+                const QString currentName = state->classes.value(classIndex);
+                const QString name = QInputDialog::getText(nullptr,
+                                                           QObject::tr("重命名类别"),
+                                                           QObject::tr("类别名称"),
+                                                           QLineEdit::Normal,
+                                                           currentName,
+                                                           &accepted).trimmed();
+                if (!accepted || name.isEmpty()) {
+                    editStatusLabel->setText(QObject::tr("已取消重命名"));
+                    return;
+                }
+                state->classes[classIndex] = name;
+                (*refreshClassList)();
+                editStatusLabel->setText(QObject::tr("已重命名类别：%1").arg(name));
             });
             connect(previewButton, &QToolButton::clicked, this, [state, classIndex, previewHelper, editStatusLabel, showCurrentImage, refreshClassList]() {
                 state->currentClass = classIndex;
@@ -586,15 +603,28 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
 
     connect(cameraButton, &QPushButton::clicked, this, [appendTrainingImage, editStatusLabel, state]() {
         const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
-        if (frame.empty()) {
-            editStatusLabel->setText(QObject::tr("当前相机帧为空，无法抓图"));
+        if (!frame.empty()) {
+            const QImage image = MatImageConverter::matToDisplayImage(
+                        frame, QStringLiteral("RegisteredClassificationTrainingDialog"));
+            appendTrainingImage(image,
+                                QObject::tr("相机抓图%1").arg(state->images.size() + 1),
+                                QObject::tr("已从当前相机帧抓图"));
             return;
         }
-        const QImage image = MatImageConverter::matToDisplayImage(
-                    frame, QStringLiteral("RegisteredClassificationTrainingDialog"));
-        appendTrainingImage(image,
-                            QObject::tr("相机抓图%1").arg(state->images.size() + 1),
-                            QObject::tr("已从当前相机帧抓图"));
+
+        cv::Mat referenceFrame = ReferenceImageProvider::instance().referenceFrame();
+        QImage referenceImage = ReferenceImageProvider::instance().referenceImage();
+        if (referenceImage.isNull() && !referenceFrame.empty()) {
+            referenceImage = MatImageConverter::matToDisplayImage(
+                        referenceFrame, QStringLiteral("RegisteredClassificationTrainingDialogReference"));
+        }
+        if (referenceImage.isNull()) {
+            editStatusLabel->setText(QObject::tr("当前图像帧为空，且未设置基准图"));
+            return;
+        }
+        appendTrainingImage(referenceImage,
+                            QObject::tr("基准图%1").arg(state->images.size() + 1),
+                            QObject::tr("当前图像帧为空，已获取基准图"));
     });
 
     connect(externalImportButton, &QPushButton::clicked, this, [this, appendTrainingImage, editStatusLabel]() {
@@ -690,6 +720,10 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QFrame[panelRole=\"rightPanel\"]{background:#ffffff;border:0;}"
         "QFrame[panelRole=\"previewToolbar\"]{background:#ffffff;border-bottom:4px solid #ff7a00;border-top-left-radius:8px;border-top-right-radius:8px;}"
         "QFrame[panelRole=\"statusBar\"]{background:#fff7ed;border-top:3px solid #ffb366;color:#7c2d12;}"
+        "QFrame[panelRole=\"classHeader\"]{background:#f1f5f9;border:0;border-radius:4px;}"
+        "QWidget[panelRole=\"classList\"]{background:#ffffff;color:#0f172a;}"
+        "QFrame[panelRole=\"classRow\"]{background:#f8fafc;border:2px solid #dbeafe;border-radius:6px;}"
+        "QFrame[panelRole=\"classRow\"][selected=\"true\"]{background:#dcfce7;border-color:#22c55e;}"
         "QGraphicsView[panelRole=\"trainingCanvas\"]{border:0;background:#05070a;}"
         "QLabel{background:transparent;font-size:18px;color:#0f172a;font-weight:600;}"
         "QLabel[role=\"windowTitle\"]{font-size:28px;font-weight:800;color:#08386f;}"
@@ -699,6 +733,11 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QPushButton:hover,QToolButton:hover{background:#e0f2fe;border-color:#0284c7;}"
         "QPushButton[actionRole=\"primary\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;font-size:20px;font-weight:800;}"
         "QPushButton:disabled{background:#f8fafc;color:#64748b;border-color:#94a3b8;}"
+        "QListWidget{background:#27303c;color:#ffffff;border-top:3px solid #4094ff;font-size:15px;font-weight:700;}"
+        "QListWidget::item{background:#344155;color:#ffffff;border:2px solid transparent;padding:6px;margin:5px;}"
+        "QListWidget::item:selected{background:#0ea5e9;color:#ffffff;border-color:#ff7a00;}"
+        "QScrollArea{background:#ffffff;border:0;}"
+        "QScrollArea > QWidget > QWidget{background:#ffffff;}"
         "QTableWidget{background:#ffffff;color:#0f172a;border:2px solid #93c5fd;gridline-color:#bfdbfe;font-size:18px;selection-background-color:#dbeafe;}"
         "QHeaderView::section{background:#dbeafe;color:#08386f;font-weight:800;font-size:18px;border:0;padding:8px;}"));
 }

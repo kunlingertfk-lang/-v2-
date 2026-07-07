@@ -557,16 +557,21 @@ git diff --check
 - 矩形 ROI 和多边形 ROI 完成后，会更新当前图片的已标注状态、类别统计和左侧缩略图文本。
 - 点击类别预览按钮会在左侧大图显示当前类别的 ROI；删除当前 ROI 和清除全部标注会更新缩略图和统计。
 - 无图片时 ROI 按钮不会产生有效标注，并在状态栏提示先添加注册图。
+- `相机抓图` 在当前相机帧为空但基准图存在时，会自动取基准图加入注册图列表并显示，状态栏提示 `当前图像帧为空，已获取基准图`。
+- 分类列表改为浅色高对比样式，避免深色底和字体颜色不符合项目控件规范。
+- 分类行 `重命名` 按钮接入重命名弹窗，可修改当前会话内类别名称。
+- 类别 ROI 预览时状态栏明确显示 `正在预览类别 ROI：<类别名>`。
 
 #### 本次更改
 
 - 修改 `src/RegisteredClassificationTrainingDialog.cpp`，新增训练窗口内会话状态、缩略图列表、分类列表、类别操作按钮和 ROI 缓存刷新逻辑。
 - 修改 `smoke/registered_classification_dialog_smoke.cpp`，覆盖缩略图生成、分类列表控件、ROI 标注状态、类别预览、删除当前 ROI、清除全部标注和新建类别。
+- 根据截图反馈补充当前帧为空取基准图、分类列表浅色规范样式、类别重命名和预览状态文案。
 - 新增 `docs/superpowers/plans/2026-07-07-registered-classification-training-window-ui.md` 记录本次实施计划。
 
 #### 验证结果
 
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖训练窗口二阶段关键控件和交互。
+- `smoke/registered_classification_dialog_smoke` 通过，覆盖训练窗口二阶段关键控件和交互，以及当前帧为空取基准图的路径。
 
 #### 剩余事项
 
