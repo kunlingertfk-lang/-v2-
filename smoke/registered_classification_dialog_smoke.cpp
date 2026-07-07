@@ -13,6 +13,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
+#include <QLineEdit>
 #include <QPixmap>
 #include <QPushButton>
 #include <QToolButton>
@@ -218,6 +219,31 @@ int main(int argc, char **argv)
               "camera capture thumbnail must be selected");
         check(thumbnailList && thumbnailList->item(0)->text().contains(QStringLiteral("基准图")),
               "camera capture fallback thumbnail must show reference image source name");
+        CameraFrameProvider::instance().clearFrame();
+        clickAndProcess(cameraCaptureButton);
+        CameraFrameProvider::instance().setCurrentFrame(frame);
+        check(thumbnailList && thumbnailList->count() == 2,
+              "second capture must add another thumbnail");
+        check(thumbnailList && thumbnailList->currentRow() == 1,
+              "second capture thumbnail must be selected");
+        QToolButton *previousImageButton = toolButtonByObjectName(*trainingDialog,
+                    QStringLiteral("registeredTrainingPreviousImageButton"));
+        QToolButton *nextImageButton = toolButtonByObjectName(*trainingDialog,
+                    QStringLiteral("registeredTrainingNextImageButton"));
+        check(previousImageButton && previousImageButton->toolTip() == QStringLiteral("上一张注册图"),
+              "training dialog must have previous image button with tooltip");
+        check(nextImageButton && nextImageButton->toolTip() == QStringLiteral("下一张注册图"),
+              "training dialog must have next image button with tooltip");
+        if (thumbnailList && previousImageButton && nextImageButton) {
+            clickAndProcess(nextImageButton);
+            check(thumbnailList->currentRow() == 0,
+                  "next image button must cycle from last image to first image");
+            clickAndProcess(previousImageButton);
+            check(thumbnailList->currentRow() == 1,
+                  "previous image button must cycle from first image to last image");
+            thumbnailList->setCurrentRow(0);
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        }
 
         QToolButton *fullRoiButton = toolButtonByObjectName(*trainingDialog,
                                                             QStringLiteral("trainingFullRoiButton"));
@@ -255,6 +281,32 @@ int main(int argc, char **argv)
         check(createClassButton != nullptr, "training dialog must have create class button");
         check(renameClassButton && renameClassButton->toolTip() == QStringLiteral("重命名"),
               "class row rename button must have semantic tooltip");
+        if (renameClassButton) {
+            QTimer::singleShot(0, []() {
+                QDialog *renameDialog = topLevelDialogByTitle(QStringLiteral("重命名类别"));
+                check(renameDialog != nullptr, "rename class dialog must open");
+                if (!renameDialog)
+                    return;
+                QLineEdit *lineEdit = renameDialog->findChild<QLineEdit *>();
+                check(lineEdit != nullptr, "rename class dialog must have line edit");
+                if (lineEdit)
+                    lineEdit->setText(QStringLiteral("Widget"));
+                QPushButton *okButton = buttonByText(*renameDialog, QStringLiteral("OK"));
+                if (!okButton)
+                    okButton = buttonByText(*renameDialog, QStringLiteral("确定"));
+                check(okButton != nullptr, "rename class dialog must have confirm button");
+                if (okButton)
+                    okButton->click();
+            });
+            clickAndProcess(renameClassButton);
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            check(labelByText(*trainingDialog, QStringLiteral("Widget")) != nullptr,
+                  "renaming class must update class row label");
+            previewClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingPreviewClassButton_0"));
+            deleteClassMarkButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingDeleteClassMarkButton_0"));
+        }
         check(previewClassButton && previewClassButton->toolTip() == QStringLiteral("预览类别 ROI"),
               "class row preview button must have semantic tooltip");
         check(deleteClassMarkButton && deleteClassMarkButton->toolTip() == QStringLiteral("删除当前 ROI"),
@@ -289,7 +341,7 @@ int main(int argc, char **argv)
             check(!trainingPreviewHelper->isRoiDrawingEnabled() &&
                   !trainingPreviewHelper->isPolygonDrawingEnabled(),
                   "class preview must leave ROI drawing modes idle");
-            check(labelByText(*trainingDialog, QStringLiteral("正在预览类别 ROI：Classification0")) != nullptr,
+            check(labelByText(*trainingDialog, QStringLiteral("正在预览类别 ROI：Widget")) != nullptr,
                   "class preview must show clear preview status text");
             clickAndProcess(deleteClassMarkButton);
             check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),

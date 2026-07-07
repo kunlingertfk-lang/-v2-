@@ -204,6 +204,12 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     previewTitle->setProperty("role", QStringLiteral("windowTitle"));
     toolbarLayout->addWidget(previewTitle);
     toolbarLayout->addStretch(1);
+    QToolButton *previousImageButton = iconButton(toolbar, QStringLiteral("‹"), tr("上一张注册图"));
+    previousImageButton->setObjectName(QStringLiteral("registeredTrainingPreviousImageButton"));
+    QToolButton *nextImageButton = iconButton(toolbar, QStringLiteral("›"), tr("下一张注册图"));
+    nextImageButton->setObjectName(QStringLiteral("registeredTrainingNextImageButton"));
+    toolbarLayout->addWidget(previousImageButton);
+    toolbarLayout->addWidget(nextImageButton);
     toolbarLayout->addWidget(iconButton(toolbar, QStringLiteral("＋"), tr("放大")));
     toolbarLayout->addWidget(iconButton(toolbar, QStringLiteral("－"), tr("缩小")));
     toolbarLayout->addWidget(iconButton(toolbar, QStringLiteral("⟲"), tr("适配窗口")));
@@ -649,6 +655,24 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
             return;
         state->currentImage = row;
         (*showCurrentImage)(QObject::tr("当前注册图：%1").arg(state->images.at(row).name));
+    });
+
+    auto switchImageByOffset = [state, thumbnailList, editStatusLabel](const int offset) {
+        if (state->images.isEmpty()) {
+            editStatusLabel->setText(QObject::tr("请先添加注册图"));
+            return;
+        }
+        const int current = state->currentImage < 0 ? 0 : state->currentImage;
+        const int count = state->images.size();
+        const int next = (current + offset + count) % count;
+        thumbnailList->setCurrentRow(next);
+    };
+
+    connect(previousImageButton, &QToolButton::clicked, this, [switchImageByOffset]() {
+        switchImageByOffset(-1);
+    });
+    connect(nextImageButton, &QToolButton::clicked, this, [switchImageByOffset]() {
+        switchImageByOffset(1);
     });
 
     connect(createClassButton, &QPushButton::clicked, this, [state, refreshClassList, editStatusLabel]() {

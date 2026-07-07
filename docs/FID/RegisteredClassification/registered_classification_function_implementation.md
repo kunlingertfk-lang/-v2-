@@ -561,17 +561,18 @@ git diff --check
 - 分类列表改为浅色高对比样式，避免深色底和字体颜色不符合项目控件规范。
 - 分类行 `重命名` 按钮接入重命名弹窗，可修改当前会话内类别名称。
 - 类别 ROI 预览时状态栏明确显示 `正在预览类别 ROI：<类别名>`。
+- 注册图像工具栏新增 `上一张注册图` / `下一张注册图` 按钮，按循环列表语义切换当前缩略图和大图。
 
 #### 本次更改
 
 - 修改 `src/RegisteredClassificationTrainingDialog.cpp`，新增训练窗口内会话状态、缩略图列表、分类列表、类别操作按钮和 ROI 缓存刷新逻辑。
 - 修改 `smoke/registered_classification_dialog_smoke.cpp`，覆盖缩略图生成、分类列表控件、ROI 标注状态、类别预览、删除当前 ROI、清除全部标注和新建类别。
-- 根据截图反馈补充当前帧为空取基准图、分类列表浅色规范样式、类别重命名和预览状态文案。
+- 根据截图反馈补充当前帧为空取基准图、分类列表浅色规范样式、类别重命名、类别预览状态文案和注册图循环切换。
 - 新增 `docs/superpowers/plans/2026-07-07-registered-classification-training-window-ui.md` 记录本次实施计划。
 
 #### 验证结果
 
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖训练窗口二阶段关键控件和交互，以及当前帧为空取基准图的路径。
+- `smoke/registered_classification_dialog_smoke` 通过，覆盖训练窗口二阶段关键控件和交互、当前帧为空取基准图、类别重命名以及注册图循环切换路径。
 
 #### 剩余事项
 
