@@ -2025,10 +2025,8 @@ void ColorRecognitionDialog::displayResult(const ToolResult &result, bool refere
     setViewerStatusText(displayText, displayText);
 
     if (referenceSource && result.success) {
-        ToolResult snapshotResult = result;
-        snapshotResult.overlays = colorRecognitionPreviewOverlaysWithoutRoi(result.overlays);
         m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(toToolConfig(),
-                                                                      snapshotResult,
+                                                                      result,
                                                                       effectiveRoiNormalized());
     }
 }

@@ -4435,15 +4435,15 @@
             "ok": true,
             "payload": {
                 "_referenceSource": true,
-                "_testRunGeneration": 6,
+                "_testRunGeneration": 2,
                 "algorithm": "halcon_histogram_intersection_color_recognition",
                 "brightnessEnabled": false,
                 "circleDetectRoiApplied": false,
                 "classSimilarities": [
                     {
                         "label": "red",
-                        "ratio": 0.009387755102040816,
-                        "score": 0.9387755102040816
+                        "ratio": 0.008310249307479225,
+                        "score": 0.8310249307479225
                     },
                     {
                         "label": "greeen",
@@ -4457,8 +4457,8 @@
                     },
                     {
                         "label": "yellow",
-                        "ratio": 0,
-                        "score": 0
+                        "ratio": 0.48476454293628807,
+                        "score": 48.476454293628805
                     },
                     {
                         "label": "qingse",
@@ -4472,8 +4472,8 @@
                     },
                     {
                         "label": "huise",
-                        "ratio": 0.27828425229741016,
-                        "score": 27.828425229741015
+                        "ratio": 0.13036703601108032,
+                        "score": 13.036703601108032
                     }
                 ],
                 "colorDecisionMode": "dominant_ratio",
@@ -4495,9 +4495,9 @@
                 "detectMaskPolygon": [
                 ],
                 "detectRegionType": "rectangle",
-                "dominantColorRatio": 0.9673664629836392,
-                "effectiveRoiArea": 2520,
-                "elapsedMs": 8,
+                "dominantColorRatio": 0.7775617883921133,
+                "effectiveRoiArea": 1083,
+                "elapsedMs": 41,
                 "enablePositionCorrection": false,
                 "expectedLabel": "red",
                 "featureAlignmentApplied": false,
@@ -4509,8 +4509,8 @@
                 "labelAreaRatios": [
                     {
                         "label": "red",
-                        "ratio": 0.032633537016360854,
-                        "score": 3.2633537016360856
+                        "ratio": 0.013329630658150515,
+                        "score": 1.3329630658150515
                     },
                     {
                         "label": "greeen",
@@ -4524,8 +4524,8 @@
                     },
                     {
                         "label": "yellow",
-                        "ratio": 0,
-                        "score": 0
+                        "ratio": 0.7775617883921133,
+                        "score": 77.75617883921133
                     },
                     {
                         "label": "qingse",
@@ -4539,22 +4539,23 @@
                     },
                     {
                         "label": "huise",
-                        "ratio": 0.9673664629836392,
-                        "score": 96.73664629836392
+                        "ratio": 0.20910858094973617,
+                        "score": 20.910858094973616
                     }
                 ],
                 "lightingNormalizationMode": "hue_saturation_priority",
-                "matchedSampleIndex": 6,
-                "matchedSampleLabel": "huise",
+                "matchedSampleIndex": 3,
+                "matchedSampleLabel": "yellow",
                 "minScore": 20,
                 "positionCorrectionApplied": false,
                 "positionCorrectionReason": "not implemented",
                 "positionCorrectionSource": "1 基准图.位置修正信息",
-                "predictedClassId": 7,
-                "predictedLabel": "huise",
+                "predictedClassId": 4,
+                "predictedLabel": "yellow",
                 "queryFeature": [
-                    0.9984126984126984,
-                    0.0015873015873015873,
+                    0.01662049861495845,
+                    0.013850415512465374,
+                    0.9695290858725761,
                     0,
                     0,
                     0,
@@ -4576,34 +4577,33 @@
                     0,
                     0,
                     0,
-                    0,
-                    0,
-                    0,
-                    0.0007936507936507937,
-                    0.9630952380952381,
-                    0.03611111111111111,
-                    0,
-                    0,
+                    0.003693444136657433,
+                    0.8079409048938134,
+                    0.14035087719298245,
+                    0.014773776546629732,
+                    0.02585410895660203,
+                    0.0046168051708217915,
+                    0.002770083102493075,
                     0
                 ],
-                "rating": 0.27828425229741016,
+                "rating": 0.48476454293628807,
                 "ratingMode": "dominant_class_similarity",
                 "roiPixelsRect": {
-                    "height": 42,
-                    "width": 60,
-                    "x": 236,
-                    "y": 327
+                    "height": 57,
+                    "width": 19,
+                    "x": 198,
+                    "y": 181
                 },
                 "sampleCount": 7,
-                "score": 27.828425229741015,
+                "score": 48.476454293628805,
                 "scoreDirection": "higher_is_better",
                 "scoreFormula": "dominant_class_similarity_x100",
-                "similarity": 0.27828425229741016
+                "similarity": 0.48476454293628807
             },
             "result": {
                 "count": 7,
-                "elapsedMs": 8,
-                "message": "label=huise, score=27.83",
+                "elapsedMs": 41,
+                "message": "label=yellow, score=48.48",
                 "ok": true,
                 "overlays": [
                     {
@@ -4612,18 +4612,47 @@
                             "y": 0
                         },
                         "extra": {
+                        },
+                        "label": "ROI",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 57,
+                            "width": 19,
+                            "x": 198,
+                            "y": 181
+                        },
+                        "score": 48.476454293628805,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
                             "anchorRect": {
-                                "height": 42,
-                                "width": 60,
-                                "x": 236,
-                                "y": 327
+                                "height": 57,
+                                "width": 19,
+                                "x": 198,
+                                "y": 181
                             },
                             "status": "OK"
                         },
                         "label": "color_result_text",
                         "p1": {
-                            "x": 236,
-                            "y": 327
+                            "x": 198,
+                            "y": 181
                         },
                         "p2": {
                             "x": 0,
@@ -4638,22 +4667,22 @@
                             "x": 0,
                             "y": 0
                         },
-                        "score": 27.828425229741015,
-                        "text": "OK huise 27.8",
+                        "score": 48.476454293628805,
+                        "text": "OK yellow 48.5",
                         "type": "Text"
                     }
                 ],
                 "payload": {
                     "_referenceSource": true,
-                    "_testRunGeneration": 6,
+                    "_testRunGeneration": 2,
                     "algorithm": "halcon_histogram_intersection_color_recognition",
                     "brightnessEnabled": false,
                     "circleDetectRoiApplied": false,
                     "classSimilarities": [
                         {
                             "label": "red",
-                            "ratio": 0.009387755102040816,
-                            "score": 0.9387755102040816
+                            "ratio": 0.008310249307479225,
+                            "score": 0.8310249307479225
                         },
                         {
                             "label": "greeen",
@@ -4667,8 +4696,8 @@
                         },
                         {
                             "label": "yellow",
-                            "ratio": 0,
-                            "score": 0
+                            "ratio": 0.48476454293628807,
+                            "score": 48.476454293628805
                         },
                         {
                             "label": "qingse",
@@ -4682,8 +4711,8 @@
                         },
                         {
                             "label": "huise",
-                            "ratio": 0.27828425229741016,
-                            "score": 27.828425229741015
+                            "ratio": 0.13036703601108032,
+                            "score": 13.036703601108032
                         }
                     ],
                     "colorDecisionMode": "dominant_ratio",
@@ -4705,9 +4734,9 @@
                     "detectMaskPolygon": [
                     ],
                     "detectRegionType": "rectangle",
-                    "dominantColorRatio": 0.9673664629836392,
-                    "effectiveRoiArea": 2520,
-                    "elapsedMs": 8,
+                    "dominantColorRatio": 0.7775617883921133,
+                    "effectiveRoiArea": 1083,
+                    "elapsedMs": 41,
                     "enablePositionCorrection": false,
                     "expectedLabel": "red",
                     "featureAlignmentApplied": false,
@@ -4719,8 +4748,8 @@
                     "labelAreaRatios": [
                         {
                             "label": "red",
-                            "ratio": 0.032633537016360854,
-                            "score": 3.2633537016360856
+                            "ratio": 0.013329630658150515,
+                            "score": 1.3329630658150515
                         },
                         {
                             "label": "greeen",
@@ -4734,8 +4763,8 @@
                         },
                         {
                             "label": "yellow",
-                            "ratio": 0,
-                            "score": 0
+                            "ratio": 0.7775617883921133,
+                            "score": 77.75617883921133
                         },
                         {
                             "label": "qingse",
@@ -4749,22 +4778,23 @@
                         },
                         {
                             "label": "huise",
-                            "ratio": 0.9673664629836392,
-                            "score": 96.73664629836392
+                            "ratio": 0.20910858094973617,
+                            "score": 20.910858094973616
                         }
                     ],
                     "lightingNormalizationMode": "hue_saturation_priority",
-                    "matchedSampleIndex": 6,
-                    "matchedSampleLabel": "huise",
+                    "matchedSampleIndex": 3,
+                    "matchedSampleLabel": "yellow",
                     "minScore": 20,
                     "positionCorrectionApplied": false,
                     "positionCorrectionReason": "not implemented",
                     "positionCorrectionSource": "1 基准图.位置修正信息",
-                    "predictedClassId": 7,
-                    "predictedLabel": "huise",
+                    "predictedClassId": 4,
+                    "predictedLabel": "yellow",
                     "queryFeature": [
-                        0.9984126984126984,
-                        0.0015873015873015873,
+                        0.01662049861495845,
+                        0.013850415512465374,
+                        0.9695290858725761,
                         0,
                         0,
                         0,
@@ -4786,49 +4816,48 @@
                         0,
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0.0007936507936507937,
-                        0.9630952380952381,
-                        0.03611111111111111,
-                        0,
-                        0,
+                        0.003693444136657433,
+                        0.8079409048938134,
+                        0.14035087719298245,
+                        0.014773776546629732,
+                        0.02585410895660203,
+                        0.0046168051708217915,
+                        0.002770083102493075,
                         0
                     ],
-                    "rating": 0.27828425229741016,
+                    "rating": 0.48476454293628807,
                     "ratingMode": "dominant_class_similarity",
                     "roiPixelsRect": {
-                        "height": 42,
-                        "width": 60,
-                        "x": 236,
-                        "y": 327
+                        "height": 57,
+                        "width": 19,
+                        "x": 198,
+                        "y": 181
                     },
                     "sampleCount": 7,
-                    "score": 27.828425229741015,
+                    "score": 48.476454293628805,
                     "scoreDirection": "higher_is_better",
                     "scoreFormula": "dominant_class_similarity_x100",
-                    "similarity": 0.27828425229741016
+                    "similarity": 0.48476454293628807
                 },
                 "schemaVersion": 1,
-                "score": 27.828425229741015,
+                "score": 48.476454293628805,
                 "status": "ok",
                 "success": true,
-                "text": "huise",
+                "text": "yellow",
                 "toolId": "color_recognition_07fad450-1e5e-4a23-87f2-b951e678dc11",
                 "toolType": "ColorRecognition",
-                "value": 0.27828425229741016
+                "value": 0.48476454293628807
             },
             "roiNormalized": {
-                "height": 0.09935205183585316,
-                "width": 0.10646358345192342,
-                "x": 0.42424124920993755,
-                "y": 0.7868970482361412
+                "height": 0.13505747126436785,
+                "width": 0.03165562640582764,
+                "x": 0.35679646711653146,
+                "y": 0.43606321839080453
             },
-            "score": 27.828425229741015,
+            "score": 48.476454293628805,
             "sourceType": "referenceImage",
-            "statusText": "ok | label=huise, score=27.83",
-            "timestamp": "2026-07-06T11:41:56",
+            "statusText": "ok | label=yellow, score=48.48",
+            "timestamp": "2026-07-07T10:23:36",
             "toolId": "color_recognition_07fad450-1e5e-4a23-87f2-b951e678dc11",
             "toolType": "ColorRecognition",
             "valid": true
@@ -6454,10 +6483,10 @@
                 "sensitivity": "medium"
             },
             "roiNormalized": {
-                "height": 0.09935205183585316,
-                "width": 0.10646358345192342,
-                "x": 0.42424124920993755,
-                "y": 0.7868970482361412
+                "height": 0.13505747126436785,
+                "width": 0.03165562640582764,
+                "x": 0.35679646711653146,
+                "y": 0.43606321839080453
             },
             "schemaVersion": 1,
             "summary": "颜色模板1；直方图特征；样本 7；最低分 20",
@@ -7617,6 +7646,8 @@
             "enabled": true,
             "judgeRule": {
                 "expectedLabel": "",
+                "judgeType": "all_ok",
+                "judgeTypeText": "所有检测区域输出结果为 OK",
                 "minScore": 80,
                 "mode": "class_match",
                 "resultBasis": "类别判断"
@@ -7624,7 +7655,8 @@
             "params": {
                 "registeredClassification": {
                     "detectRegionType": "full",
-                    "enablePositionCorrection": true,
+                    "enablePositionCorrection": false,
+                    "minSimilarity": 68,
                     "modelName": "",
                     "modelPath": "",
                     "modelType": "halcon_dl_classification",
@@ -7647,11 +7679,11 @@
                 "y": 0
             },
             "schemaVersion": 1,
-            "summary": "模型：未导入模型；类别：未设置",
+            "summary": "模型：未导入模型；类别：未设置；所有检测区域输出结果为 OK",
             "toolId": "registered_classification_a6cdc725-06b5-403f-b405-a688610b2619",
             "toolName": "RegisteredClassification",
             "toolType": "RegisteredClassification"
         }
     ],
-    "updatedAt": "2026-07-06T11:42:36"
+    "updatedAt": "2026-07-07T10:29:59"
 }

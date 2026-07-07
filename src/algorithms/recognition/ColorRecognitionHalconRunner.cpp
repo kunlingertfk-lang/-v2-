@@ -1460,6 +1460,7 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
         }
         effectiveRegion = roiRegion;
 
+        //多边形有效屏蔽区域
         const QVector<QPointF> maskPixels =
                 maskPolygonToPixels(config.detectMaskPolygonNormalized, bgr.cols, bgr.rows);
         if (maskPixels.size() >= 3) {
@@ -1492,7 +1493,8 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
                     QStringLiteral("masked_roi_empty"),
                     QStringLiteral("Detection ROI is fully covered by the mask ROI."));
         }
-
+        
+        //获取灵敏度，决定bin数
         const int bins = histogramBinsForSensitivity(config.sensitivity);
         if (isHisto2DimFeatureType(config.featureType)) {
             result.feature = histogram2DimHsFeature(api, effectiveRegion, hue, saturation, bins);
@@ -1814,7 +1816,7 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                         config,
                         image,
                         timer.elapsed());
-    }
+    }//判断是否选择了色谱方式，暂未实现
 
     const ColorRecognitionHalconFeatureResult featureResult = extractFeature(image, config);
     if (!featureResult.success) {
@@ -1828,7 +1830,7 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                                                       timer.elapsed());
         error.payload.insert(QStringLiteral("featurePayload"), featureResult.payload);
         return error;
-    }
+    }//特征直方图取值，与阈值进行判断是否达标
 
     if (config.samples.isEmpty()) {
         return runError(QStringLiteral("no_model_samples"),
@@ -1839,7 +1841,7 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
     }
 
     int comparisonFeatureSize = featureResult.feature.size();
-    for (const ColorRecognitionHalconSample &sample : config.samples) {
+    for (const ColorRecognitionHalconSample &sample : config.samples) {//检测特征与模板特征进行比对
         const int candidateSize =
                 comparisonFeatureSizeForPair(featureResult.feature.size(), sample.feature.size());
         if (candidateSize > 0)

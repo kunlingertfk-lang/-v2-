@@ -55,6 +55,8 @@ ToolResult / overlays / payload
 - ROI、屏蔽区、模板区等互斥操作必须使用单一编辑状态或 `QButtonGroup` 管理，避免同时编辑多个目标。
 - 点击普通操作按钮不得误触发 `accept`、`reject` 或程序退出。
 - ROI 数据必须保存、回显，并在测试运行时通过 overlays 或 payload 给出可定位信息。
+- 工具页/主览窗口显示测试结果时，必须显示当前检测 ROI 框；不得因为清理配置阶段交互 ROI 而过滤 runner 输出的 `ROI` 结果 overlay。
+- 只允许清理配置 Dialog 关闭后残留的交互式编辑 ROI、样本 ROI 或屏蔽区编辑态图形；检测运行产生的 ROI overlay 属于结果展示内容，应与 OK/NG、类别、得分和耗时一起保留。
 
 ## FID UI 可读性和占位窗口样式规范
 
