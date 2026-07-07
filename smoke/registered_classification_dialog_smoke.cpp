@@ -12,6 +12,7 @@
 #include <QGraphicsView>
 #include <QJsonObject>
 #include <QLabel>
+#include <QListWidget>
 #include <QPixmap>
 #include <QPushButton>
 #include <QToolButton>
@@ -206,6 +207,16 @@ int main(int argc, char **argv)
         check(trainingPreviewHelper && trainingPreviewHelper->hasImage(),
               "camera capture must display current camera frame in training preview");
 
+        QListWidget *thumbnailList = trainingDialog->findChild<QListWidget *>(
+                    QStringLiteral("registeredTrainingThumbnailList"));
+        check(thumbnailList != nullptr, "training dialog must have thumbnail list");
+        check(thumbnailList && thumbnailList->count() == 1,
+              "camera capture must add one thumbnail");
+        check(thumbnailList && thumbnailList->currentRow() == 0,
+              "camera capture thumbnail must be selected");
+        check(thumbnailList && thumbnailList->item(0)->text().contains(QStringLiteral("相机抓图")),
+              "camera capture thumbnail must show source name");
+
         QToolButton *fullRoiButton = toolButtonByObjectName(*trainingDialog,
                                                             QStringLiteral("trainingFullRoiButton"));
         QToolButton *rectRoiButton = toolButtonByObjectName(*trainingDialog,
@@ -221,6 +232,26 @@ int main(int argc, char **argv)
         check(polygonRoiButton && !polygonRoiButton->icon().isNull() &&
               polygonRoiButton->toolTip() == QStringLiteral("多边形框选"),
               "polygon ROI button must be icon button with tooltip");
+        QWidget *classList = trainingDialog->findChild<QWidget *>(
+                    QStringLiteral("registeredTrainingClassList"));
+        QLabel *classCountLabel = trainingDialog->findChild<QLabel *>(
+                    QStringLiteral("registeredTrainingClassCountLabel"));
+        QPushButton *createClassButton = buttonByText(*trainingDialog, QStringLiteral("+ 新建"));
+        QToolButton *previewClassButton = toolButtonByObjectName(*trainingDialog,
+                    QStringLiteral("registeredTrainingPreviewClassButton_0"));
+        QToolButton *deleteClassMarkButton = toolButtonByObjectName(*trainingDialog,
+                    QStringLiteral("registeredTrainingDeleteClassMarkButton_0"));
+        QPushButton *clearAllMarksButton = buttonByText(*trainingDialog,
+                                                        QStringLiteral("清除全部标注"));
+        check(classList != nullptr, "training dialog must use class list container");
+        check(classCountLabel && classCountLabel->text() == QStringLiteral("分类列表(1)"),
+              "class list title must show default class count");
+        check(createClassButton != nullptr, "training dialog must have create class button");
+        check(previewClassButton && previewClassButton->toolTip() == QStringLiteral("预览类别 ROI"),
+              "class row preview button must have semantic tooltip");
+        check(deleteClassMarkButton && deleteClassMarkButton->toolTip() == QStringLiteral("删除当前 ROI"),
+              "class row delete button must have semantic tooltip");
+        check(clearAllMarksButton != nullptr, "training dialog must have clear all marks button");
         if (rectRoiButton && polygonRoiButton && trainingPreviewHelper) {
             clickAndProcess(rectRoiButton);
             check(rectRoiButton->isChecked(), "rect ROI button must highlight after click");
@@ -236,6 +267,39 @@ int main(int argc, char **argv)
             check(!polygonRoiButton->isChecked() &&
                   !trainingPreviewHelper->isPolygonDrawingEnabled(),
                   "clicking highlighted polygon ROI button again must restore idle state");
+        }
+        if (trainingPreviewHelper && rectRoiButton && thumbnailList &&
+            previewClassButton && deleteClassMarkButton && clearAllMarksButton) {
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.12, 0.15, 0.32, 0.28));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.12, 0.15, 0.32, 0.28));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            check(thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+                  "ROI completion must mark current thumbnail as annotated");
+            check(classCountLabel && classCountLabel->text().contains(QStringLiteral("1")),
+                  "ROI completion must update class list count");
+            clickAndProcess(previewClassButton);
+            check(!trainingPreviewHelper->isRoiDrawingEnabled() &&
+                  !trainingPreviewHelper->isPolygonDrawingEnabled(),
+                  "class preview must leave ROI drawing modes idle");
+            clickAndProcess(deleteClassMarkButton);
+            check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+                  "deleting current ROI must clear thumbnail annotation state");
+            const QVector<QPointF> polygonPoints = QVector<QPointF>()
+                    << QPointF(0.1, 0.1) << QPointF(0.4, 0.1) << QPointF(0.2, 0.4);
+            trainingPreviewHelper->setPolygonRoiNormalized(polygonPoints);
+            emit trainingPreviewHelper->polygonChanged(polygonPoints);
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            clickAndProcess(clearAllMarksButton);
+            check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+                  "clear all marks must clear thumbnail annotation state");
+        }
+        if (createClassButton && classCountLabel) {
+            clickAndProcess(createClassButton);
+            check(classCountLabel->text() == QStringLiteral("分类列表(2)"),
+                  "create class button must append a new class");
+            check(toolButtonByObjectName(*trainingDialog,
+                  QStringLiteral("registeredTrainingPreviewClassButton_1")) != nullptr,
+                  "new class row must have preview button");
         }
         trainingDialog->close();
     }
