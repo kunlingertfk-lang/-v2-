@@ -8,12 +8,14 @@
 #include <QAbstractButton>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QContextMenuEvent>
 #include <QDialog>
 #include <QGraphicsView>
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPixmap>
 #include <QPushButton>
 #include <QToolButton>
@@ -337,12 +339,72 @@ int main(int argc, char **argv)
                   "ROI completion must mark current thumbnail as annotated");
             check(classCountLabel && classCountLabel->text().contains(QStringLiteral("1")),
                   "ROI completion must update class list count");
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.46, 0.18, 0.22, 0.25));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.46, 0.18, 0.22, 0.25));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            check(labelByText(*trainingDialog, QStringLiteral("2")) != nullptr,
+                  "second ROI must show number label 2 on the big image");
+            clickAndProcess(previewClassButton);
+            QWidget *previewPage = trainingDialog->findChild<QWidget *>(
+                        QStringLiteral("registeredTrainingPreviewPage"));
+            check(previewPage != nullptr && previewPage->isVisible(),
+                  "class preview must show ROI preview page");
+            check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：2")) != nullptr,
+                  "preview page header must show class name and ROI count");
+            check(trainingDialog->findChild<QWidget *>(
+                      QStringLiteral("registeredTrainingRoiPreviewCard_0_0_0")) != nullptr,
+                  "preview page must show first ROI preview card");
+            check(trainingDialog->findChild<QWidget *>(
+                      QStringLiteral("registeredTrainingRoiPreviewCard_0_0_1")) != nullptr,
+                  "preview page must show second ROI preview card");
+            clickAndProcess(previewClassButton);
+            check(previewPage && !previewPage->isVisible(),
+                  "clicking the same preview button again must return to big image");
+            clickAndProcess(previewClassButton);
+            QToolButton *previewCloseButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingPreviewCloseButton"));
+            check(previewCloseButton != nullptr, "preview page must have close button");
+            clickAndProcess(previewCloseButton);
+            check(previewPage && !previewPage->isVisible(),
+                  "preview close button must return to big image");
             clickAndProcess(previewClassButton);
             check(!trainingPreviewHelper->isRoiDrawingEnabled() &&
                   !trainingPreviewHelper->isPolygonDrawingEnabled(),
                   "class preview must leave ROI drawing modes idle");
             check(labelByText(*trainingDialog, QStringLiteral("正在预览类别 ROI：Widget")) != nullptr,
                   "class preview must show clear preview status text");
+            QWidget *secondCard = trainingDialog->findChild<QWidget *>(
+                        QStringLiteral("registeredTrainingRoiPreviewCard_0_0_1"));
+            if (secondCard) {
+                secondCard->setFocus();
+                QContextMenuEvent event(QContextMenuEvent::Mouse,
+                                        secondCard->rect().center(),
+                                        secondCard->mapToGlobal(secondCard->rect().center()));
+                QApplication::sendEvent(secondCard, &event);
+                QMenu *menu = nullptr;
+                for (QWidget *widget : QApplication::topLevelWidgets()) {
+                    menu = qobject_cast<QMenu *>(widget);
+                    if (menu)
+                        break;
+                }
+                check(menu != nullptr, "right-clicking selected ROI card must open context menu");
+                if (menu) {
+                    QAction *deleteAction = nullptr;
+                    for (QAction *action : menu->actions()) {
+                        if (action && action->text() == QStringLiteral("删除当前 ROI"))
+                            deleteAction = action;
+                    }
+                    check(deleteAction != nullptr, "ROI context menu must contain delete action");
+                    if (deleteAction)
+                        deleteAction->trigger();
+                }
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            }
+            check(trainingDialog->findChild<QWidget *>(
+                      QStringLiteral("registeredTrainingRoiPreviewCard_0_0_1")) == nullptr,
+                  "deleting one ROI from preview page must remove only that ROI card");
+            check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：1")) != nullptr,
+                  "preview page header must update after deleting one ROI");
             clickAndProcess(deleteClassMarkButton);
             check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
                   "deleting current ROI must clear thumbnail annotation state");
@@ -362,6 +424,19 @@ int main(int argc, char **argv)
             check(toolButtonByObjectName(*trainingDialog,
                   QStringLiteral("registeredTrainingPreviewClassButton_1")) != nullptr,
                   "new class row must have preview button");
+            QToolButton *deleteSecondClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingDeleteClassMarkButton_1"));
+            check(deleteSecondClassButton != nullptr, "second class row must have delete button");
+            clickAndProcess(deleteSecondClassButton);
+            check(classCountLabel->text() == QStringLiteral("分类列表(1)"),
+                  "deleting a non-last class must remove the class row");
+            QToolButton *deleteLastClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingDeleteClassMarkButton_0"));
+            clickAndProcess(deleteLastClassButton);
+            check(classCountLabel->text() == QStringLiteral("分类列表(1)"),
+                  "deleting the last class must keep one default class");
+            check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+                  "deleting the last class must clear its ROI marks");
         }
         trainingDialog->close();
     }
