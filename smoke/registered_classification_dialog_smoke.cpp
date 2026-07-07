@@ -10,12 +10,14 @@
 #include <QComboBox>
 #include <QContextMenuEvent>
 #include <QDialog>
+#include <QFrame>
 #include <QGraphicsView>
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPixmap>
 #include <QPushButton>
 #include <QToolButton>
@@ -71,6 +73,28 @@ void clickAndProcess(QAbstractButton *button)
     if (!button)
         return;
     button->click();
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+}
+
+void clickWidgetAndProcess(QWidget *widget)
+{
+    if (!widget)
+        return;
+    const QPoint center = widget->rect().center();
+    QMouseEvent press(QEvent::MouseButtonPress,
+                      center,
+                      widget->mapToGlobal(center),
+                      Qt::LeftButton,
+                      Qt::LeftButton,
+                      Qt::NoModifier);
+    QApplication::sendEvent(widget, &press);
+    QMouseEvent release(QEvent::MouseButtonRelease,
+                        center,
+                        widget->mapToGlobal(center),
+                        Qt::LeftButton,
+                        Qt::NoButton,
+                        Qt::NoModifier);
+    QApplication::sendEvent(widget, &release);
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
 }
 
@@ -485,6 +509,43 @@ int main(int argc, char **argv)
             check(toolButtonByObjectName(*trainingDialog,
                   QStringLiteral("registeredTrainingPreviewClassButton_1")) != nullptr,
                   "new class row must have preview button");
+            QFrame *firstClassRow = trainingDialog->findChild<QFrame *>(
+                        QStringLiteral("registeredTrainingClassRow_0"));
+            QFrame *secondClassRow = trainingDialog->findChild<QFrame *>(
+                        QStringLiteral("registeredTrainingClassRow_1"));
+            check(firstClassRow != nullptr, "first class row must expose stable object name");
+            check(secondClassRow != nullptr, "second class row must expose stable object name");
+            clickWidgetAndProcess(secondClassRow);
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.20, 0.20, 0.18, 0.18));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.20, 0.20, 0.18, 0.18));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            QToolButton *previewSecondClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingPreviewClassButton_1"));
+            check(previewSecondClassButton != nullptr, "second class row must keep preview button");
+            clickAndProcess(previewSecondClassButton);
+            check(labelByText(*trainingDialog, QStringLiteral("Classification1 | 已标注目标：1")) != nullptr,
+                  "row body selection must make new ROI belong to the selected class");
+            clickAndProcess(previewSecondClassButton);
+            QToolButton *previewFirstClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingPreviewClassButton_0"));
+            check(previewFirstClassButton != nullptr, "first class row must keep preview button");
+            clickAndProcess(previewFirstClassButton);
+            QWidget *previewPageFromRowSwitch = trainingDialog->findChild<QWidget *>(
+                        QStringLiteral("registeredTrainingPreviewPage"));
+            check(previewPageFromRowSwitch != nullptr && previewPageFromRowSwitch->isVisible(),
+                  "first class preview must open preview page before row switch");
+            clickWidgetAndProcess(secondClassRow);
+            check(previewPageFromRowSwitch && !previewPageFromRowSwitch->isVisible(),
+                  "clicking another class row body from preview page must return to big image");
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.55, 0.20, 0.18, 0.18));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.55, 0.20, 0.18, 0.18));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            previewSecondClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingPreviewClassButton_1"));
+            clickAndProcess(previewSecondClassButton);
+            check(labelByText(*trainingDialog, QStringLiteral("Classification1 | 已标注目标：2")) != nullptr,
+                  "row body switch from preview page must make later ROI belong to the switched class");
+            clickAndProcess(previewSecondClassButton);
             QToolButton *deleteSecondClassButton = toolButtonByObjectName(*trainingDialog,
                         QStringLiteral("registeredTrainingDeleteClassMarkButton_1"));
             check(deleteSecondClassButton != nullptr, "second class row must have delete button");

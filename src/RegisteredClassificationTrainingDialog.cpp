@@ -224,6 +224,26 @@ protected:
     }
 };
 
+class ClickableClassRow : public QFrame
+{
+public:
+    explicit ClickableClassRow(QWidget *parent = nullptr)
+        : QFrame(parent)
+    {
+        setCursor(Qt::PointingHandCursor);
+    }
+
+    std::function<void()> clickHandler;
+
+protected:
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        if (event->button() == Qt::LeftButton && rect().contains(event->pos()) && clickHandler)
+            clickHandler();
+        QFrame::mouseReleaseEvent(event);
+    }
+};
+
 QRectF normalizedBoundingRect(const TrainingRoiMark &mark)
 {
     if (mark.type == QStringLiteral("polygon")) {
@@ -773,7 +793,8 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
 
         classCountLabel->setText(QObject::tr("分类列表(%1)").arg(state->classes.size()));
         for (int classIndex = 0; classIndex < state->classes.size(); ++classIndex) {
-            QFrame *rowFrame = new QFrame(classListWidget);
+            ClickableClassRow *rowFrame = new ClickableClassRow(classListWidget);
+            rowFrame->setObjectName(QStringLiteral("registeredTrainingClassRow_%1").arg(classIndex));
             rowFrame->setProperty("panelRole", QStringLiteral("classRow"));
             if (classIndex == state->currentClass)
                 rowFrame->setProperty("selected", true);
@@ -806,6 +827,21 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
             rowLayout->addWidget(previewButton);
             rowLayout->addWidget(deleteButton);
             classListLayout->addWidget(rowFrame);
+
+            auto selectClassRow = [=]() {
+                if (classIndex < 0 || classIndex >= state->classes.size())
+                    return;
+                state->currentClass = classIndex;
+                previewHelper->setRoiDrawingEnabled(false);
+                previewHelper->setPolygonDrawingEnabled(false);
+                if (state->previewClass >= 0) {
+                    (*returnToImagePage)(QObject::tr("当前类别：%1").arg(state->classes.value(classIndex)));
+                } else {
+                    (*showCurrentImage)(QObject::tr("当前类别：%1").arg(state->classes.value(classIndex)));
+                }
+                (*refreshClassList)();
+            };
+            rowFrame->clickHandler = selectClassRow;
 
             connect(renameButton, &QToolButton::clicked, this, [state, classIndex, editStatusLabel, refreshClassList, returnToImagePage]() {
                 bool accepted = false;

@@ -33,7 +33,7 @@
   - `registeredTrainingClassRow_0`
   - `registeredTrainingClassRow_1`
 
-- [ ] **Step 1: Add Qt includes**
+- [x] **Step 1: Add Qt includes**
 
 Add the includes needed to click a non-button widget:
 
@@ -42,7 +42,7 @@ Add the includes needed to click a non-button widget:
 #include <QMouseEvent>
 ```
 
-- [ ] **Step 2: Add a widget click helper**
+- [x] **Step 2: Add a widget click helper**
 
 Add this helper next to `clickAndProcess`:
 
@@ -70,7 +70,7 @@ void clickWidgetAndProcess(QWidget *widget)
 }
 ```
 
-- [ ] **Step 3: Add row body selection assertions**
+- [x] **Step 3: Add row body selection assertions**
 
 Inside the existing `if (createClassButton && classCountLabel)` block, after the existing assertion that the new class row has a preview button, add:
 
@@ -94,7 +94,7 @@ check(labelByText(*trainingDialog, QStringLiteral("Classification1 | 已标注�
 clickAndProcess(previewSecondClassButton);
 ```
 
-- [ ] **Step 4: Add preview-open row switching assertions**
+- [x] **Step 4: Add preview-open row switching assertions**
 
 After returning from the second class preview in Step 3, add:
 
@@ -121,7 +121,7 @@ check(labelByText(*trainingDialog, QStringLiteral("Classification1 | 已标注�
 clickAndProcess(previewSecondClassButton);
 ```
 
-- [ ] **Step 5: Keep existing button semantics assertions**
+- [x] **Step 5: Keep existing button semantics assertions**
 
 Keep the existing preview-button assertions unchanged:
 
@@ -133,7 +133,7 @@ check(toolButtonByObjectName(*trainingDialog,
 
 The test must continue to prove that clicking the preview button opens/closes preview page, not that it is the only way to select the class.
 
-- [ ] **Step 6: Run smoke and verify red**
+- [x] **Step 6: Run smoke and verify red**
 
 Run:
 
@@ -161,7 +161,7 @@ Expected: build succeeds, executable fails because `registeredTrainingClassRow_0
   - refreshes class row selected state
   - returns from preview page to big image when `state->previewClass >= 0`
 
-- [ ] **Step 1: Add `ClickableClassRow` local helper class**
+- [x] **Step 1: Add `ClickableClassRow` local helper class**
 
 Add this local class in the anonymous namespace near `TrainingRoiPreviewCard`:
 
@@ -189,7 +189,7 @@ protected:
 
 `RegisteredClassificationTrainingDialog.cpp` already includes `<QMouseEvent>` from the ROI preview implementation.
 
-- [ ] **Step 2: Replace class row frame construction**
+- [x] **Step 2: Replace class row frame construction**
 
 Inside `*refreshClassList`, replace:
 
@@ -210,7 +210,7 @@ Keep the existing:
 rowFrame->setProperty("panelRole", QStringLiteral("classRow"));
 ```
 
-- [ ] **Step 3: Add `selectClassRow` lambda**
+- [x] **Step 3: Add `selectClassRow` lambda**
 
 Before connecting the row action buttons, add this lambda inside the `for` loop after `classListLayout->addWidget(rowFrame);`:
 
@@ -233,7 +233,7 @@ rowFrame->clickHandler = selectClassRow;
 
 This keeps row selection on the row body only. The child `QToolButton` widgets continue to consume their own clicks and execute their own command actions.
 
-- [ ] **Step 4: Do not move action-button semantics into row click**
+- [x] **Step 4: Do not move action-button semantics into row click**
 
 Keep the existing `renameButton`, `previewButton`, and `deleteButton` connections as command actions.
 
@@ -251,7 +251,7 @@ or:
 
 It must not become the only way to select `currentClass`.
 
-- [ ] **Step 5: Run smoke and verify green**
+- [x] **Step 5: Run smoke and verify green**
 
 Run:
 
@@ -275,7 +275,7 @@ Expected: `registered_classification_dialog_smoke: all checks passed`.
 - Consumes completed behavior from Tasks 1-2.
 - Produces `[已完成]` completion marker for class row selection.
 
-- [ ] **Step 1: Update prompt completion status**
+- [x] **Step 1: Update prompt completion status**
 
 In `docs/FID/RegisteredClassification/注册分类提示词规范.md`, move:
 
@@ -301,7 +301,7 @@ to:
 `[已完成]` 标签类型列表行点击切换当前类别。
 ```
 
-- [ ] **Step 2: Update implementation record**
+- [x] **Step 2: Update implementation record**
 
 Append this dated note to `docs/FID/RegisteredClassification/registered_classification_function_implementation.md`:
 
@@ -323,7 +323,7 @@ Append this dated note to `docs/FID/RegisteredClassification/registered_classifi
 - `git diff --check` 通过。
 ```
 
-- [ ] **Step 3: Run smoke**
+- [x] **Step 3: Run smoke**
 
 ```bash
 cd smoke
@@ -334,7 +334,7 @@ make -j8
 
 Expected: `registered_classification_dialog_smoke: all checks passed`.
 
-- [ ] **Step 4: Run main build**
+- [x] **Step 4: Run main build**
 
 ```bash
 mkdir -p build
@@ -345,7 +345,7 @@ make -j8
 
 Expected: build exits 0.
 
-- [ ] **Step 5: Run diff check**
+- [x] **Step 5: Run diff check**
 
 ```bash
 git diff --check
@@ -353,11 +353,11 @@ git diff --check
 
 Expected: exits 0.
 
-- [ ] **Step 6: Mark plan checkboxes complete**
+- [x] **Step 6: Mark plan checkboxes complete**
 
 After implementation and verification, replace completed `- [ ]` checklist items in this plan with `- [x]`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/RegisteredClassificationTrainingDialog.cpp \
@@ -368,7 +368,7 @@ git add src/RegisteredClassificationTrainingDialog.cpp \
 git commit -m "feat: add registered classification class row selection"
 ```
 
-- [ ] **Step 8: Backfill completion commit hash**
+- [x] **Step 8: Backfill completion commit hash**
 
 After Step 7 creates the feature commit, run:
 

@@ -609,3 +609,19 @@ git diff --check
 - 大图 overlay 的点击选中 ROI 暂未实现，仍作为后续优化；当前只实现预览页卡片选中和右键删除单个 ROI。
 - ROI、类别和预览卡片仍为窗口会话内状态，不落盘、不生成真实数据集。
 - 真实 HALCON 训练、模型生成、数据集落盘和 `.scbin` 支持仍未接入。
+
+### 2026-07-07 注册训练窗口四阶段：标签类型行点击切换当前类别
+
+#### 已实现功能
+
+- 分类列表行主体区域支持 `current item selection`，点击标签名称、统计区域或行空白区域会切换当前类别。
+- 被选中类别成为后续 ROI 标注的 `active class` / `current class`。
+- 行内 `重命名`、`预览类别 ROI`、`删除类别` 保持独立 `command action`，不把按钮区域作为行主体点击处理。
+- 预览页打开时点击其他类别行主体区域，会返回大图页并切换到该类别。
+- 切换类别时退出矩形/多边形 ROI 绘制状态，避免后续 ROI 写入错误类别。
+
+#### 验证结果
+
+- `smoke/registered_classification_dialog_smoke` 通过。
+- 影子目录执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j8` 通过。
+- `git diff --check` 通过。
