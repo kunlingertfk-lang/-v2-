@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QColor>
+#include <QContextMenuEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -21,15 +22,19 @@
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMap>
+#include <QMenu>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
 #include <QPixmap>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QSharedPointer>
 #include <QSize>
 #include <QSizePolicy>
 #include <QSignalBlocker>
+#include <QStackedWidget>
 #include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -154,19 +159,18 @@ QToolButton *roiButton(QWidget *parent,
     return button;
 }
 
-struct TrainingMarkState
+struct TrainingRoiMark
 {
     QString type;
     QRectF rect;
     QVector<QPointF> polygon;
-    bool hasMark = false;
 };
 
 struct TrainingImageState
 {
     QImage image;
     QString name;
-    QMap<int, TrainingMarkState> marksByClass;
+    QMap<int, QVector<TrainingRoiMark>> marksByClass;
 };
 
 struct TrainingSessionState
@@ -175,7 +179,79 @@ struct TrainingSessionState
     QStringList classes = QStringList() << QStringLiteral("Classification0");
     int currentImage = -1;
     int currentClass = 0;
+    int previewClass = -1;
+    int selectedPreviewImage = -1;
+    int selectedPreviewRoi = -1;
+    int activeEditImage = -1;
+    int activeEditClass = -1;
+    int activeEditRoi = -1;
 };
+
+class TrainingRoiPreviewCard : public QFrame
+{
+public:
+    explicit TrainingRoiPreviewCard(QWidget *parent = nullptr)
+        : QFrame(parent)
+    {
+        setCursor(Qt::PointingHandCursor);
+    }
+
+    std::function<void()> selectHandler;
+    std::function<void()> deleteHandler;
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        if (selectHandler)
+            selectHandler();
+        QFrame::mousePressEvent(event);
+    }
+
+    void contextMenuEvent(QContextMenuEvent *event) override
+    {
+        if (selectHandler)
+            selectHandler();
+        QMenu *menu = new QMenu(this);
+        menu->setObjectName(QStringLiteral("registeredTrainingRoiContextMenu"));
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        QAction *deleteAction = menu->addAction(QObject::tr("删除当前 ROI"));
+        QObject::connect(deleteAction, &QAction::triggered, this, [this]() {
+            if (deleteHandler)
+                deleteHandler();
+        });
+        menu->popup(event->globalPos());
+        event->accept();
+    }
+};
+
+QRectF normalizedBoundingRect(const TrainingRoiMark &mark)
+{
+    if (mark.type == QStringLiteral("polygon")) {
+        QPolygonF polygon;
+        for (const QPointF &point : mark.polygon)
+            polygon << point;
+        return polygon.boundingRect().normalized();
+    }
+    return mark.rect.normalized();
+}
+
+QRect imageCropRect(const QImage &image, const TrainingRoiMark &mark)
+{
+    if (image.isNull())
+        return QRect();
+    if (mark.type == QStringLiteral("full"))
+        return image.rect();
+
+    const QRectF normalized = normalizedBoundingRect(mark).intersected(QRectF(0.0, 0.0, 1.0, 1.0));
+    QRect crop(qRound(normalized.x() * image.width()),
+               qRound(normalized.y() * image.height()),
+               qRound(normalized.width() * image.width()),
+               qRound(normalized.height() * image.height()));
+    crop = crop.normalized().intersected(image.rect());
+    if (crop.width() <= 0 || crop.height() <= 0)
+        return QRect();
+    return crop;
+}
 
 } // namespace
 
@@ -215,12 +291,54 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     toolbarLayout->addWidget(iconButton(toolbar, QStringLiteral("⟲"), tr("适配窗口")));
     previewLayout->addWidget(toolbar);
 
-    QGraphicsView *view = new QGraphicsView(previewPanel);
+    QStackedWidget *previewStack = new QStackedWidget(previewPanel);
+    previewStack->setObjectName(QStringLiteral("registeredTrainingPreviewStack"));
+
+    QWidget *imagePage = new QWidget(previewStack);
+    QVBoxLayout *imagePageLayout = new QVBoxLayout(imagePage);
+    imagePageLayout->setContentsMargins(0, 0, 0, 0);
+    imagePageLayout->setSpacing(0);
+    QGraphicsView *view = new QGraphicsView(imagePage);
     view->setObjectName(QStringLiteral("registeredTrainingPreviewView"));
     view->setProperty("panelRole", QStringLiteral("trainingCanvas"));
     FrameViewHelper *previewHelper = new FrameViewHelper(view, this);
     previewHelper->setObjectName(QStringLiteral("registeredTrainingPreviewHelper"));
-    previewLayout->addWidget(view, 1);
+    imagePageLayout->addWidget(view, 1);
+    previewStack->addWidget(imagePage);
+
+    QWidget *previewPage = new QWidget(previewStack);
+    previewPage->setObjectName(QStringLiteral("registeredTrainingPreviewPage"));
+    previewPage->setProperty("panelRole", QStringLiteral("roiPreviewPage"));
+    QVBoxLayout *previewPageLayout = new QVBoxLayout(previewPage);
+    previewPageLayout->setContentsMargins(24, 22, 24, 22);
+    previewPageLayout->setSpacing(16);
+    QHBoxLayout *previewHeaderLayout = new QHBoxLayout;
+    QLabel *previewPageTitle = new QLabel(tr("Classification0 | 已标注目标：0"), previewPage);
+    previewPageTitle->setProperty("role", QStringLiteral("previewPageTitle"));
+    QToolButton *previewCloseButton = iconButton(previewPage, QStringLiteral("×"), tr("关闭预览"));
+    previewCloseButton->setObjectName(QStringLiteral("registeredTrainingPreviewCloseButton"));
+    previewHeaderLayout->addWidget(previewPageTitle);
+    previewHeaderLayout->addStretch(1);
+    previewHeaderLayout->addWidget(previewCloseButton);
+    previewPageLayout->addLayout(previewHeaderLayout);
+
+    QLabel *previewEmptyLabel = new QLabel(tr("当前类别暂无 ROI 标注"), previewPage);
+    previewEmptyLabel->setAlignment(Qt::AlignCenter);
+    previewEmptyLabel->setProperty("role", QStringLiteral("previewEmpty"));
+    QScrollArea *roiPreviewScrollArea = new QScrollArea(previewPage);
+    roiPreviewScrollArea->setWidgetResizable(true);
+    roiPreviewScrollArea->setFrameShape(QFrame::NoFrame);
+    QWidget *roiPreviewListWidget = new QWidget(roiPreviewScrollArea);
+    roiPreviewListWidget->setObjectName(QStringLiteral("registeredTrainingRoiPreviewList"));
+    QVBoxLayout *roiPreviewListLayout = new QVBoxLayout(roiPreviewListWidget);
+    roiPreviewListLayout->setContentsMargins(0, 0, 0, 0);
+    roiPreviewListLayout->setSpacing(14);
+    roiPreviewScrollArea->setWidget(roiPreviewListWidget);
+    previewPageLayout->addWidget(previewEmptyLabel);
+    previewPageLayout->addWidget(roiPreviewScrollArea, 1);
+    previewStack->addWidget(previewPage);
+    previewStack->setCurrentWidget(imagePage);
+    previewLayout->addWidget(previewStack, 1);
 
     QFrame *statusBar = new QFrame(previewPanel);
     statusBar->setProperty("panelRole", QStringLiteral("statusBar"));
@@ -362,8 +480,8 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     auto imageHasAnyMark = [state](const int imageIndex) {
         if (imageIndex < 0 || imageIndex >= state->images.size())
             return false;
-        for (const TrainingMarkState &mark : state->images[imageIndex].marksByClass) {
-            if (mark.hasMark)
+        for (const QVector<TrainingRoiMark> &marks : state->images[imageIndex].marksByClass) {
+            if (!marks.isEmpty())
                 return true;
         }
         return false;
@@ -372,9 +490,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     auto classTargetCount = [state](const int classIndex) {
         int count = 0;
         for (const TrainingImageState &image : state->images) {
-            const TrainingMarkState mark = image.marksByClass.value(classIndex);
-            if (mark.hasMark)
-                ++count;
+            count += image.marksByClass.value(classIndex).size();
         }
         return count;
     };
@@ -382,8 +498,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     auto classImageCount = [state](const int classIndex) {
         int count = 0;
         for (const TrainingImageState &image : state->images) {
-            const TrainingMarkState mark = image.marksByClass.value(classIndex);
-            if (mark.hasMark)
+            if (!image.marksByClass.value(classIndex).isEmpty())
                 ++count;
         }
         return count;
@@ -392,10 +507,8 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     auto totalMarkCount = [state]() {
         int count = 0;
         for (const TrainingImageState &image : state->images) {
-            for (const TrainingMarkState &mark : image.marksByClass) {
-                if (mark.hasMark)
-                    ++count;
-            }
+            for (const QVector<TrainingRoiMark> &marks : image.marksByClass)
+                count += marks.size();
         }
         return count;
     };
@@ -411,6 +524,38 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     QSharedPointer<std::function<void()>> refreshClassList(new std::function<void()>);
     QSharedPointer<std::function<void(const QString &)>> showCurrentImage(
                 new std::function<void(const QString &)>);
+    QSharedPointer<std::function<void(int)>> renderPreviewPage(new std::function<void(int)>);
+    QSharedPointer<std::function<void(const QString &)>> returnToImagePage(
+                new std::function<void(const QString &)>);
+
+    auto clearRoiNumberLabels = [view]() {
+        const QList<QLabel *> labels = view->findChildren<QLabel *>(
+                    QRegularExpression(QStringLiteral("^registeredTrainingRoiNumberLabel_\\d+$")));
+        for (QLabel *label : labels)
+            label->deleteLater();
+    };
+
+    auto makeImageRect = [](const QImage &image, const TrainingRoiMark &mark) {
+        const QRect crop = imageCropRect(image, mark);
+        return QRectF(crop);
+    };
+
+    auto addNumberLabel = [view](const int index, const QRectF &normalizedRect) {
+        QLabel *label = new QLabel(QString::number(index + 1), view);
+        label->setObjectName(QStringLiteral("registeredTrainingRoiNumberLabel_%1").arg(index));
+        label->setAlignment(Qt::AlignCenter);
+        label->setStyleSheet(QStringLiteral(
+            "background:rgba(255,255,255,210);color:#ef1f2d;border:1px solid #ef1f2d;"
+            "border-radius:2px;font-size:15px;font-weight:800;"));
+        label->setFixedSize(22, 22);
+        const QRect viewportRect = view->viewport()->rect();
+        const int x = qBound(6, qRound(normalizedRect.x() * viewportRect.width()) + 8,
+                             qMax(6, viewportRect.width() - 28));
+        const int y = qBound(6, qRound(normalizedRect.y() * viewportRect.height()) + 8,
+                             qMax(6, viewportRect.height() - 28));
+        label->move(x, y);
+        label->show();
+    };
 
     *refreshThumbnails = [state, thumbnailList, imageHasAnyMark]() {
         QSignalBlocker blocker(thumbnailList);
@@ -432,19 +577,74 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
             thumbnailList->setCurrentRow(state->currentImage);
     };
 
-    *showCurrentImage = [state, currentImageState, previewHelper, editStatusLabel](const QString &message) {
+    *showCurrentImage = [state,
+                         currentImageState,
+                         previewHelper,
+                         previewStack,
+                         imagePage,
+                         editStatusLabel,
+                         clearRoiNumberLabels,
+                         makeImageRect,
+                         addNumberLabel](const QString &message) {
         TrainingImageState *imageState = currentImageState();
         if (!imageState) {
             previewHelper->clear();
+            clearRoiNumberLabels();
             editStatusLabel->setText(QObject::tr("请先添加注册图"));
             return;
         }
 
+        previewStack->setCurrentWidget(imagePage);
+        state->previewClass = -1;
+        state->selectedPreviewImage = -1;
+        state->selectedPreviewRoi = -1;
+        state->activeEditImage = -1;
+        state->activeEditClass = -1;
+        state->activeEditRoi = -1;
         previewHelper->setImage(imageState->image);
         previewHelper->clearRoi();
         previewHelper->clearPolygonRoi();
-        const TrainingMarkState mark = imageState->marksByClass.value(state->currentClass);
-        if (mark.hasMark) {
+        previewHelper->clearToolOverlays();
+        clearRoiNumberLabels();
+        const QVector<TrainingRoiMark> marks = imageState->marksByClass.value(state->currentClass);
+        QVector<ToolOverlay> overlays;
+        for (int markIndex = 0; markIndex < marks.size(); ++markIndex) {
+            const TrainingRoiMark &mark = marks.at(markIndex);
+            const QRectF imageRect = makeImageRect(imageState->image, mark);
+            if (imageRect.isEmpty())
+                continue;
+            if (mark.type == QStringLiteral("polygon")) {
+                ToolOverlay polygonOverlay;
+                polygonOverlay.type = ToolOverlayType::Polygon;
+                polygonOverlay.label = QStringLiteral("roi");
+                for (const QPointF &point : mark.polygon) {
+                    polygonOverlay.points.append(QPointF(point.x() * imageState->image.width(),
+                                                         point.y() * imageState->image.height()));
+                }
+                overlays.append(polygonOverlay);
+            } else {
+                ToolOverlay rectOverlay;
+                rectOverlay.type = ToolOverlayType::Rect;
+                rectOverlay.label = QStringLiteral("roi");
+                rectOverlay.rect = imageRect;
+                overlays.append(rectOverlay);
+            }
+
+            ToolOverlay textOverlay;
+            textOverlay.type = ToolOverlayType::Text;
+            textOverlay.label = QStringLiteral("roi_number");
+            textOverlay.text = QString::number(markIndex + 1);
+            textOverlay.p1 = imageRect.topLeft();
+            overlays.append(textOverlay);
+            addNumberLabel(markIndex, normalizedBoundingRect(mark));
+        }
+        if (!overlays.isEmpty())
+            previewHelper->setToolOverlays(overlays);
+        if (!marks.isEmpty()) {
+            state->activeEditImage = state->currentImage;
+            state->activeEditClass = state->currentClass;
+            state->activeEditRoi = marks.size() - 1;
+            const TrainingRoiMark mark = marks.last();
             if (mark.type == QStringLiteral("polygon")) {
                 previewHelper->setPolygonRoiNormalized(mark.polygon);
             } else {
@@ -454,6 +654,115 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         previewHelper->fitToView();
         editStatusLabel->setText(message);
     };
+
+    *returnToImagePage = [state, showCurrentImage](const QString &message) {
+        state->previewClass = -1;
+        state->selectedPreviewImage = -1;
+        state->selectedPreviewRoi = -1;
+        (*showCurrentImage)(message);
+    };
+
+    *renderPreviewPage = [=](const int classIndex) {
+        if (classIndex < 0 || classIndex >= state->classes.size())
+            return;
+
+        state->currentClass = classIndex;
+        state->previewClass = classIndex;
+        state->selectedPreviewImage = -1;
+        state->selectedPreviewRoi = -1;
+        previewHelper->setRoiDrawingEnabled(false);
+        previewHelper->setPolygonDrawingEnabled(false);
+        previewStack->setCurrentWidget(previewPage);
+        clearRoiNumberLabels();
+
+        while (QLayoutItem *item = roiPreviewListLayout->takeAt(0)) {
+            if (QWidget *widget = item->widget()) {
+                widget->hide();
+                widget->setObjectName(QString());
+                widget->deleteLater();
+            }
+            delete item;
+        }
+
+        const int targetCount = classTargetCount(classIndex);
+        previewPageTitle->setText(QObject::tr("%1 | 已标注目标：%2")
+                                  .arg(state->classes.value(classIndex))
+                                  .arg(targetCount));
+        previewEmptyLabel->setVisible(targetCount == 0);
+        roiPreviewScrollArea->setVisible(targetCount > 0);
+
+        for (int imageIndex = 0; imageIndex < state->images.size(); ++imageIndex) {
+            TrainingImageState &imageState = state->images[imageIndex];
+            const QVector<TrainingRoiMark> marks = imageState.marksByClass.value(classIndex);
+            for (int roiIndex = 0; roiIndex < marks.size(); ++roiIndex) {
+                const TrainingRoiMark mark = marks.at(roiIndex);
+                TrainingRoiPreviewCard *card = new TrainingRoiPreviewCard(roiPreviewListWidget);
+                card->setObjectName(QStringLiteral("registeredTrainingRoiPreviewCard_%1_%2_%3")
+                                    .arg(classIndex)
+                                    .arg(imageIndex)
+                                    .arg(roiIndex));
+                card->setProperty("panelRole", QStringLiteral("roiPreviewCard"));
+                QVBoxLayout *cardLayout = new QVBoxLayout(card);
+                cardLayout->setContentsMargins(8, 8, 8, 8);
+                cardLayout->setSpacing(6);
+
+                QLabel *imageLabel = new QLabel(card);
+                imageLabel->setAlignment(Qt::AlignCenter);
+                imageLabel->setMinimumSize(220, 120);
+                imageLabel->setStyleSheet(QStringLiteral("background:#f8fafc;border:2px solid #0f172a;"));
+                const QRect cropRect = imageCropRect(imageState.image, mark);
+                if (!cropRect.isEmpty()) {
+                    imageLabel->setPixmap(QPixmap::fromImage(imageState.image.copy(cropRect).scaled(
+                                             240, 150, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+                }
+                QLabel *caption = new QLabel(QObject::tr("%1 #%2").arg(imageState.name).arg(roiIndex + 1), card);
+                caption->setAlignment(Qt::AlignCenter);
+                cardLayout->addWidget(imageLabel);
+                cardLayout->addWidget(caption);
+                roiPreviewListLayout->addWidget(card);
+
+                card->selectHandler = [state, roiPreviewListWidget, card, imageIndex, roiIndex]() {
+                    const QList<QFrame *> cards = roiPreviewListWidget->findChildren<QFrame *>();
+                    for (QFrame *other : cards) {
+                        if (other->property("panelRole").toString() == QStringLiteral("roiPreviewCard")) {
+                            other->setProperty("selected", false);
+                            other->style()->unpolish(other);
+                            other->style()->polish(other);
+                        }
+                    }
+                    state->selectedPreviewImage = imageIndex;
+                    state->selectedPreviewRoi = roiIndex;
+                    card->setProperty("selected", true);
+                    card->style()->unpolish(card);
+                    card->style()->polish(card);
+                };
+                card->deleteHandler = [=]() {
+                    if (imageIndex < 0 || imageIndex >= state->images.size())
+                        return;
+                    QVector<TrainingRoiMark> &mutableMarks =
+                            state->images[imageIndex].marksByClass[classIndex];
+                    if (roiIndex >= 0 && roiIndex < mutableMarks.size())
+                        mutableMarks.removeAt(roiIndex);
+                    if (mutableMarks.isEmpty())
+                        state->images[imageIndex].marksByClass.remove(classIndex);
+                    refreshStatus();
+                    (*refreshThumbnails)();
+                    (*refreshClassList)();
+                    (*renderPreviewPage)(classIndex);
+                    editStatusLabel->setText(QObject::tr("已删除当前 ROI"));
+                };
+            }
+        }
+        roiPreviewListLayout->addStretch(1);
+        editStatusLabel->setText(QObject::tr("正在预览类别 ROI：%1").arg(state->classes.value(classIndex)));
+    };
+
+    connect(previewCloseButton, &QToolButton::clicked, this, [state, returnToImagePage]() {
+        (*returnToImagePage)(QObject::tr("当前注册图：%1")
+                             .arg(state->currentImage >= 0 && state->currentImage < state->images.size()
+                                  ? state->images.at(state->currentImage).name
+                                  : QObject::tr("无")));
+    });
 
     *refreshClassList = [=]() {
         while (QLayoutItem *item = classListLayout->takeAt(0)) {
@@ -489,7 +798,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
                         rowFrame,
                         QStringLiteral("registeredTrainingDeleteClassMarkButton_%1").arg(classIndex),
                         QApplication::style()->standardIcon(QStyle::SP_TrashIcon),
-                        QObject::tr("删除当前 ROI"));
+                        QObject::tr("删除类别"));
 
             rowLayout->addWidget(nameLabel, 2);
             rowLayout->addWidget(countLabel, 1);
@@ -498,8 +807,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
             rowLayout->addWidget(deleteButton);
             classListLayout->addWidget(rowFrame);
 
-            connect(renameButton, &QToolButton::clicked, this, [state, classIndex, editStatusLabel, refreshClassList]() {
-                state->currentClass = classIndex;
+            connect(renameButton, &QToolButton::clicked, this, [state, classIndex, editStatusLabel, refreshClassList, returnToImagePage]() {
                 bool accepted = false;
                 const QString currentName = state->classes.value(classIndex);
                 const QString name = QInputDialog::getText(nullptr,
@@ -512,37 +820,80 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
                     editStatusLabel->setText(QObject::tr("已取消重命名"));
                     return;
                 }
+                state->currentClass = classIndex;
                 state->classes[classIndex] = name;
                 (*refreshClassList)();
-                editStatusLabel->setText(QObject::tr("已重命名类别：%1").arg(name));
+                if (state->previewClass >= 0) {
+                    (*returnToImagePage)(QObject::tr("已重命名类别：%1").arg(name));
+                } else {
+                    editStatusLabel->setText(QObject::tr("已重命名类别：%1").arg(name));
+                }
             });
-            connect(previewButton, &QToolButton::clicked, this, [state, classIndex, previewHelper, editStatusLabel, showCurrentImage, refreshClassList]() {
-                state->currentClass = classIndex;
-                previewHelper->setRoiDrawingEnabled(false);
-                previewHelper->setPolygonDrawingEnabled(false);
-                (*showCurrentImage)(QObject::tr("正在预览类别 ROI：%1").arg(state->classes.value(classIndex)));
+            connect(previewButton, &QToolButton::clicked, this, [state, classIndex, renderPreviewPage, returnToImagePage, refreshClassList]() {
+                if (state->previewClass == classIndex) {
+                    (*returnToImagePage)(QObject::tr("当前注册图：%1")
+                                         .arg(state->currentImage >= 0 && state->currentImage < state->images.size()
+                                              ? state->images.at(state->currentImage).name
+                                              : QObject::tr("无")));
+                } else {
+                    (*renderPreviewPage)(classIndex);
+                }
                 (*refreshClassList)();
             });
-            connect(deleteButton, &QToolButton::clicked, this, [state, classIndex, currentImageState, previewHelper, editStatusLabel, refreshStatus, refreshThumbnails, refreshClassList, showCurrentImage]() {
-                state->currentClass = classIndex;
-                if (TrainingImageState *imageState = currentImageState())
-                    imageState->marksByClass.remove(classIndex);
+            connect(deleteButton, &QToolButton::clicked, this, [state, classIndex, previewHelper, editStatusLabel, refreshStatus, refreshThumbnails, refreshClassList, returnToImagePage]() {
+                const QString className = state->classes.value(classIndex);
+                if (state->classes.size() > 1) {
+                    state->classes.removeAt(classIndex);
+                    for (TrainingImageState &imageState : state->images) {
+                        QMap<int, QVector<TrainingRoiMark>> reindexed;
+                        for (auto it = imageState.marksByClass.cbegin(); it != imageState.marksByClass.cend(); ++it) {
+                            if (it.key() < classIndex) {
+                                reindexed.insert(it.key(), it.value());
+                            } else if (it.key() > classIndex) {
+                                reindexed.insert(it.key() - 1, it.value());
+                            }
+                        }
+                        imageState.marksByClass = reindexed;
+                    }
+                    state->currentClass = qMin(classIndex, state->classes.size() - 1);
+                    editStatusLabel->setText(QObject::tr("已删除类别：%1").arg(className));
+                } else {
+                    for (TrainingImageState &imageState : state->images)
+                        imageState.marksByClass.remove(0);
+                    state->currentClass = 0;
+                    editStatusLabel->setText(QObject::tr("已清除默认类别 ROI"));
+                }
+                state->previewClass = -1;
                 previewHelper->clearRoi();
                 previewHelper->clearPolygonRoi();
+                previewHelper->clearToolOverlays();
                 refreshStatus();
                 (*refreshThumbnails)();
                 (*refreshClassList)();
-                (*showCurrentImage)(QObject::tr("已删除当前 ROI"));
+                (*returnToImagePage)(editStatusLabel->text());
             });
         }
         classListLayout->addStretch(1);
     };
 
-    auto storeCurrentMark = [state, currentImageState, refreshStatus, refreshThumbnails, refreshClassList](const TrainingMarkState &mark) {
+    auto storeCurrentMark = [state, currentImageState, refreshStatus, refreshThumbnails, refreshClassList](const TrainingRoiMark &mark,
+                                                                                                            const bool replaceActive) {
         TrainingImageState *imageState = currentImageState();
         if (!imageState)
             return;
-        imageState->marksByClass.insert(state->currentClass, mark);
+        QVector<TrainingRoiMark> &marks = imageState->marksByClass[state->currentClass];
+        if (replaceActive &&
+            state->activeEditImage == state->currentImage &&
+            state->activeEditClass == state->currentClass &&
+            state->activeEditRoi >= 0 &&
+            state->activeEditRoi < marks.size()) {
+            marks[state->activeEditRoi] = mark;
+        } else {
+            marks.append(mark);
+            state->activeEditImage = state->currentImage;
+            state->activeEditClass = state->currentClass;
+            state->activeEditRoi = marks.size() - 1;
+        }
         refreshStatus();
         (*refreshThumbnails)();
         (*refreshClassList)();
@@ -568,7 +919,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         (*showCurrentImage)(sourceText);
     };
 
-    auto setRoiMode = [state, previewHelper, fullButton, rectButton, polygonButton, editStatusLabel, storeCurrentMark](QToolButton *button) {
+    auto setRoiMode = [state, previewHelper, fullButton, rectButton, polygonButton, editStatusLabel, storeCurrentMark, showCurrentImage](QToolButton *button) {
         const bool turnOn = button->isChecked();
         fullButton->setChecked(false);
         rectButton->setChecked(false);
@@ -587,15 +938,17 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         }
 
         button->setChecked(true);
+        state->activeEditImage = -1;
+        state->activeEditClass = -1;
+        state->activeEditRoi = -1;
         if (button == fullButton) {
             previewHelper->clearPolygonRoi();
             previewHelper->setRoiRectNormalized(QRectF(0.0, 0.0, 1.0, 1.0));
-            TrainingMarkState mark;
+            TrainingRoiMark mark;
             mark.type = QStringLiteral("full");
             mark.rect = QRectF(0.0, 0.0, 1.0, 1.0);
-            mark.hasMark = true;
-            storeCurrentMark(mark);
-            editStatusLabel->setText(QObject::tr("已选择全屏 ROI"));
+            storeCurrentMark(mark, false);
+            (*showCurrentImage)(QObject::tr("已选择全屏 ROI"));
         } else if (button == rectButton) {
             previewHelper->clearPolygonRoi();
             previewHelper->setRoiDrawingEnabled(true);
@@ -675,22 +1028,28 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         switchImageByOffset(1);
     });
 
-    connect(createClassButton, &QPushButton::clicked, this, [state, refreshClassList, editStatusLabel]() {
+    connect(createClassButton, &QPushButton::clicked, this, [state, refreshClassList, editStatusLabel, returnToImagePage]() {
         state->classes.append(QObject::tr("Classification%1").arg(state->classes.size()));
         state->currentClass = state->classes.size() - 1;
         (*refreshClassList)();
-        editStatusLabel->setText(QObject::tr("已新建类别：%1").arg(state->classes.last()));
+        if (state->previewClass >= 0) {
+            (*returnToImagePage)(QObject::tr("已新建类别：%1").arg(state->classes.last()));
+        } else {
+            editStatusLabel->setText(QObject::tr("已新建类别：%1").arg(state->classes.last()));
+        }
     });
 
-    connect(clearAllMarksButton, &QPushButton::clicked, this, [state, previewHelper, refreshStatus, refreshThumbnails, refreshClassList, editStatusLabel]() {
+    connect(clearAllMarksButton, &QPushButton::clicked, this, [state, previewHelper, refreshStatus, refreshThumbnails, refreshClassList, returnToImagePage]() {
         for (TrainingImageState &imageState : state->images)
             imageState.marksByClass.clear();
         previewHelper->clearRoi();
         previewHelper->clearPolygonRoi();
+        previewHelper->clearToolOverlays();
+        state->previewClass = -1;
         refreshStatus();
         (*refreshThumbnails)();
         (*refreshClassList)();
-        editStatusLabel->setText(QObject::tr("已清除全部标注"));
+        (*returnToImagePage)(QObject::tr("已清除全部标注"));
     });
 
     connect(fullButton, &QToolButton::clicked, this, [setRoiMode, fullButton]() {
@@ -703,32 +1062,30 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         setRoiMode(polygonButton);
     });
 
-    connect(previewHelper, &FrameViewHelper::roiChanged, this, [previewHelper, rectButton, editStatusLabel, storeCurrentMark](const QRectF &roi) {
+    connect(previewHelper, &FrameViewHelper::roiChanged, this, [state, previewHelper, rectButton, storeCurrentMark, showCurrentImage](const QRectF &roi) {
         rectButton->setChecked(true);
         previewHelper->setRoiRectNormalized(roi);
-        TrainingMarkState mark;
+        TrainingRoiMark mark;
         mark.type = QStringLiteral("rect");
         mark.rect = roi;
-        mark.hasMark = true;
-        storeCurrentMark(mark);
-        editStatusLabel->setText(QObject::tr("矩形 ROI：x=%1 y=%2 w=%3 h=%4")
-                                 .arg(roi.x(), 0, 'f', 3)
-                                 .arg(roi.y(), 0, 'f', 3)
-                                 .arg(roi.width(), 0, 'f', 3)
-                                 .arg(roi.height(), 0, 'f', 3));
+        storeCurrentMark(mark, false);
+        (*showCurrentImage)(QObject::tr("矩形 ROI：x=%1 y=%2 w=%3 h=%4")
+                            .arg(roi.x(), 0, 'f', 3)
+                            .arg(roi.y(), 0, 'f', 3)
+                            .arg(roi.width(), 0, 'f', 3)
+                            .arg(roi.height(), 0, 'f', 3));
     });
     connect(previewHelper, &FrameViewHelper::roiSelectionRejected, this, [editStatusLabel](const QRectF &) {
         editStatusLabel->setText(QObject::tr("矩形 ROI 无效，请重新绘制"));
     });
-    connect(previewHelper, &FrameViewHelper::polygonChanged, this, [previewHelper, polygonButton, editStatusLabel, storeCurrentMark](const QVector<QPointF> &points) {
+    connect(previewHelper, &FrameViewHelper::polygonChanged, this, [previewHelper, polygonButton, storeCurrentMark, showCurrentImage](const QVector<QPointF> &points) {
         polygonButton->setChecked(true);
         previewHelper->setPolygonRoiNormalized(points);
-        TrainingMarkState mark;
+        TrainingRoiMark mark;
         mark.type = QStringLiteral("polygon");
         mark.polygon = points;
-        mark.hasMark = true;
-        storeCurrentMark(mark);
-        editStatusLabel->setText(QObject::tr("多边形 ROI：%1 个点").arg(points.size()));
+        storeCurrentMark(mark, true);
+        (*showCurrentImage)(QObject::tr("多边形 ROI：%1 个点").arg(points.size()));
     });
     connect(previewHelper, &FrameViewHelper::polygonSelectionRejected, this, [editStatusLabel](int pointCount) {
         editStatusLabel->setText(QObject::tr("多边形 ROI 至少需要 3 个点，当前 %1 个点").arg(pointCount));
@@ -745,6 +1102,9 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QFrame[panelRole=\"previewToolbar\"]{background:#ffffff;border-bottom:4px solid #ff7a00;border-top-left-radius:8px;border-top-right-radius:8px;}"
         "QFrame[panelRole=\"statusBar\"]{background:#fff7ed;border-top:3px solid #ffb366;color:#7c2d12;}"
         "QFrame[panelRole=\"classHeader\"]{background:#f1f5f9;border:0;border-radius:4px;}"
+        "QWidget[panelRole=\"roiPreviewPage\"]{background:#ffffff;border:0;}"
+        "QFrame[panelRole=\"roiPreviewCard\"]{background:#f8fafc;border:2px solid #cbd5e1;border-radius:6px;}"
+        "QFrame[panelRole=\"roiPreviewCard\"][selected=\"true\"]{background:#eff6ff;border-color:#2563eb;}"
         "QWidget[panelRole=\"classList\"]{background:#ffffff;color:#0f172a;}"
         "QFrame[panelRole=\"classRow\"]{background:#f8fafc;border:2px solid #dbeafe;border-radius:6px;}"
         "QFrame[panelRole=\"classRow\"][selected=\"true\"]{background:#dcfce7;border-color:#22c55e;}"
@@ -752,6 +1112,8 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QLabel{background:transparent;font-size:18px;color:#0f172a;font-weight:600;}"
         "QLabel[role=\"windowTitle\"]{font-size:28px;font-weight:800;color:#08386f;}"
         "QLabel[role=\"cardTitle\"]{font-size:23px;font-weight:800;color:#08386f;}"
+        "QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#1f2937;}"
+        "QLabel[role=\"previewEmpty\"]{font-size:22px;font-weight:700;color:#94a3b8;}"
         "QLabel[role=\"stateLabel\"]{font-size:24px;font-weight:800;color:#c2410c;}"
         "QPushButton,QToolButton,QComboBox{background:#ffffff;color:#0f172a;border:2px solid #4094ff;border-radius:6px;padding:10px;font-size:18px;font-weight:700;}"
         "QPushButton:hover,QToolButton:hover{background:#e0f2fe;border-color:#0284c7;}"

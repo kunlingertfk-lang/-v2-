@@ -311,7 +311,7 @@ int main(int argc, char **argv)
         }
         check(previewClassButton && previewClassButton->toolTip() == QStringLiteral("预览类别 ROI"),
               "class row preview button must have semantic tooltip");
-        check(deleteClassMarkButton && deleteClassMarkButton->toolTip() == QStringLiteral("删除当前 ROI"),
+        check(deleteClassMarkButton && deleteClassMarkButton->toolTip() == QStringLiteral("删除类别"),
               "class row delete button must have semantic tooltip");
         check(clearAllMarksButton != nullptr, "training dialog must have clear all marks button");
         if (rectRoiButton && polygonRoiButton && trainingPreviewHelper) {
@@ -393,7 +393,15 @@ int main(int argc, char **argv)
                 QApplication::sendEvent(secondCard, &event);
                 QMenu *menu = nullptr;
                 for (QWidget *widget : QApplication::topLevelWidgets()) {
-                    menu = qobject_cast<QMenu *>(widget);
+                    QMenu *candidate = qobject_cast<QMenu *>(widget);
+                    if (!candidate)
+                        continue;
+                    for (QAction *action : candidate->actions()) {
+                        if (action && action->text() == QStringLiteral("删除当前 ROI")) {
+                            menu = candidate;
+                            break;
+                        }
+                    }
                     if (menu)
                         break;
                 }
@@ -415,6 +423,38 @@ int main(int argc, char **argv)
                   "deleting one ROI from preview page must remove only that ROI card");
             check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：1")) != nullptr,
                   "preview page header must update after deleting one ROI");
+            renameClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingRenameClassButton_0"));
+            if (renameClassButton) {
+                QTimer::singleShot(0, []() {
+                    QDialog *renameDialog = topLevelDialogByTitle(QStringLiteral("重命名类别"));
+                    check(renameDialog != nullptr, "rename dialog from preview mode must open");
+                    if (renameDialog)
+                        renameDialog->reject();
+                });
+                clickAndProcess(renameClassButton);
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                check(previewPage && previewPage->isVisible(),
+                      "canceling rename from preview mode must keep preview page open");
+                check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：1")) != nullptr,
+                      "canceling rename from preview mode must keep preview header unchanged");
+            }
+            clickAndProcess(createClassButton);
+            check(classCountLabel->text() == QStringLiteral("分类列表(2)"),
+                  "creating a class from preview mode must append a new class");
+            check(previewPage && !previewPage->isVisible(),
+                  "creating a class from preview mode must return to big image");
+            QToolButton *previewCreateDeleteSecondClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingDeleteClassMarkButton_1"));
+            check(previewCreateDeleteSecondClassButton != nullptr,
+                  "preview-created class row must have delete button");
+            clickAndProcess(previewCreateDeleteSecondClassButton);
+            check(classCountLabel->text() == QStringLiteral("分类列表(1)"),
+                  "cleanup after preview-created class must restore one class");
+            previewClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingPreviewClassButton_0"));
+            deleteClassMarkButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingDeleteClassMarkButton_0"));
             clickAndProcess(deleteClassMarkButton);
             check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
                   "deleting current ROI must clear thumbnail annotation state");
@@ -423,6 +463,17 @@ int main(int argc, char **argv)
             trainingPreviewHelper->setPolygonRoiNormalized(polygonPoints);
             emit trainingPreviewHelper->polygonChanged(polygonPoints);
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            const QVector<QPointF> editedPolygonPoints = QVector<QPointF>()
+                    << QPointF(0.12, 0.12) << QPointF(0.42, 0.12) << QPointF(0.24, 0.42);
+            trainingPreviewHelper->setPolygonRoiNormalized(editedPolygonPoints);
+            emit trainingPreviewHelper->polygonChanged(editedPolygonPoints);
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            previewClassButton = toolButtonByObjectName(*trainingDialog,
+                        QStringLiteral("registeredTrainingPreviewClassButton_0"));
+            clickAndProcess(previewClassButton);
+            check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：1")) != nullptr,
+                  "editing the current polygon ROI must not append a duplicate ROI");
+            clickAndProcess(previewClassButton);
             clickAndProcess(clearAllMarksButton);
             check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
                   "clear all marks must clear thumbnail annotation state");

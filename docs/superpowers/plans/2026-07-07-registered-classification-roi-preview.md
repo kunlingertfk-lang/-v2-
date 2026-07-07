@@ -35,7 +35,7 @@
   - `registeredTrainingRoiNumberLabel_0`
   - `registeredTrainingRoiNumberLabel_1`
 
-- [ ] **Step 1: Add Qt includes**
+- [x] **Step 1: Add Qt includes**
 
 Add:
 
@@ -43,7 +43,7 @@ Add:
 #include <QMenu>
 ```
 
-- [ ] **Step 2: Add second ROI assertion**
+- [x] **Step 2: Add second ROI assertion**
 
 Inside the existing training dialog block, after the first `roiChanged(...)` assertion that marks the thumbnail as annotated, emit a second ROI:
 
@@ -55,7 +55,7 @@ check(labelByText(*trainingDialog, QStringLiteral("2")) != nullptr,
       "second ROI must show number label 2 on the big image");
 ```
 
-- [ ] **Step 3: Add preview page assertions**
+- [x] **Step 3: Add preview page assertions**
 
 After clicking `previewClassButton`, assert the preview page and cards:
 
@@ -72,7 +72,7 @@ check(trainingDialog->findChild<QWidget *>(QStringLiteral("registeredTrainingRoi
       "preview page must show second ROI preview card");
 ```
 
-- [ ] **Step 4: Add toggle-close assertions**
+- [x] **Step 4: Add toggle-close assertions**
 
 After the preview page assertions:
 
@@ -90,7 +90,7 @@ check(!previewPage->isVisible(),
 clickAndProcess(previewClassButton);
 ```
 
-- [ ] **Step 5: Add single ROI deletion assertion**
+- [x] **Step 5: Add single ROI deletion assertion**
 
 After reopening preview page, right-click the second card:
 
@@ -128,7 +128,7 @@ check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：1"
       "preview page header must update after deleting one ROI");
 ```
 
-- [ ] **Step 6: Add category deletion semantics assertions**
+- [x] **Step 6: Add category deletion semantics assertions**
 
 After the existing create-class assertion, delete the new category and then delete the last remaining category:
 
@@ -148,7 +148,7 @@ check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
       "deleting the last class must clear its ROI marks");
 ```
 
-- [ ] **Step 7: Run smoke and verify red**
+- [x] **Step 7: Run smoke and verify red**
 
 Run:
 
@@ -170,7 +170,7 @@ Expected: build succeeds, executable fails on missing preview page/multi-ROI beh
 - Consumes existing local structs `TrainingMarkState`, `TrainingImageState`, `TrainingSessionState`.
 - Produces new local struct `TrainingRoiMark` and `QMap<int, QVector<TrainingRoiMark>> marksByClass`.
 
-- [ ] **Step 1: Replace mark struct**
+- [x] **Step 1: Replace mark struct**
 
 Replace:
 
@@ -201,11 +201,11 @@ Change `TrainingImageState::marksByClass` to:
 QMap<int, QVector<TrainingRoiMark>> marksByClass;
 ```
 
-- [ ] **Step 2: Update count helpers**
+- [x] **Step 2: Update count helpers**
 
 Change `imageHasAnyMark`, `classTargetCount`, `classImageCount`, and `totalMarkCount` to count non-empty ROI vectors rather than `hasMark`.
 
-- [ ] **Step 3: Update mark storage**
+- [x] **Step 3: Update mark storage**
 
 Change `storeCurrentMark` to append:
 
@@ -215,7 +215,7 @@ imageState->marksByClass[state->currentClass].append(mark);
 
 Do not replace existing ROI marks.
 
-- [ ] **Step 4: Update full/rect/polygon mark creation**
+- [x] **Step 4: Update full/rect/polygon mark creation**
 
 Create `TrainingRoiMark` values without `hasMark`, set `type`, `rect` or `polygon`, and pass them to `storeCurrentMark`.
 
@@ -231,7 +231,7 @@ Create `TrainingRoiMark` values without `hasMark`, set `type`, `rect` or `polygo
   - `registeredTrainingPreviewCloseButton`
   - `registeredTrainingRoiPreviewCard_<class>_<image>_<roi>`
 
-- [ ] **Step 1: Add includes**
+- [x] **Step 1: Add includes**
 
 Add:
 
@@ -241,7 +241,7 @@ Add:
 #include <QStackedWidget>
 ```
 
-- [ ] **Step 2: Wrap left workspace in stacked widget**
+- [x] **Step 2: Wrap left workspace in stacked widget**
 
 Replace direct `previewLayout->addWidget(view, 1)` with a `QStackedWidget` containing:
 
@@ -250,7 +250,7 @@ Replace direct `previewLayout->addWidget(view, 1)` with a `QStackedWidget` conta
 
 Keep the status bar and thumbnail list outside the stacked widget.
 
-- [ ] **Step 3: Build preview page layout**
+- [x] **Step 3: Build preview page layout**
 
 Create:
 
@@ -259,7 +259,7 @@ Create:
 - Scroll area with card container.
 - Empty-state label `当前类别暂无 ROI 标注`.
 
-- [ ] **Step 4: Add crop helper**
+- [x] **Step 4: Add crop helper**
 
 Add a local helper lambda/function that returns a QImage:
 
@@ -269,7 +269,7 @@ Add a local helper lambda/function that returns a QImage:
 
 Clamp crop rect to the image bounds and return null if invalid.
 
-- [ ] **Step 5: Add render preview page lambda**
+- [x] **Step 5: Add render preview page lambda**
 
 `renderPreviewPage(classIndex)` should:
 
@@ -282,7 +282,7 @@ Clamp crop rect to the image bounds and return null if invalid.
 - Enable click selection with selected styling.
 - Enable context menu `删除当前 ROI` for selected card.
 
-- [ ] **Step 6: Add return-to-image lambda**
+- [x] **Step 6: Add return-to-image lambda**
 
 `returnToImagePage(message)` should:
 
@@ -299,18 +299,18 @@ Clamp crop rect to the image bounds and return null if invalid.
 - Consumes preview-page functions from Task 3.
 - Produces final preview toggle/delete behavior.
 
-- [ ] **Step 1: Update preview button**
+- [x] **Step 1: Update preview button**
 
 Replace preview button behavior:
 
 - If currently previewing same class, call return-to-image.
 - Else call renderPreviewPage(classIndex).
 
-- [ ] **Step 2: Update close button**
+- [x] **Step 2: Update close button**
 
 Close button calls return-to-image with `当前注册图：<name>`.
 
-- [ ] **Step 3: Update delete class button**
+- [x] **Step 3: Update delete class button**
 
 Delete button behavior:
 
@@ -323,11 +323,11 @@ Delete button behavior:
   - Clear all ROI vectors for class 0.
 - Refresh status, thumbnails, class list, preview/image page.
 
-- [ ] **Step 4: Update showCurrentImage**
+- [x] **Step 4: Update showCurrentImage**
 
 Display all ROI marks for current image/current class. If direct drawing through `FrameViewHelper` can only show one ROI, use `ToolOverlay` rectangles/text labels to show all ROI and numeric labels. Keep `FrameViewHelper` ROI/polygon drawing state for the most recent ROI only if needed.
 
-- [ ] **Step 5: Update ROI number labels**
+- [x] **Step 5: Update ROI number labels**
 
 Create text labels through overlay or child labels with object names:
 
@@ -346,7 +346,7 @@ registeredTrainingRoiNumberLabel_1
 - Consumes completed code and smoke test.
 - Produces updated implementation record and completed checklist.
 
-- [ ] **Step 1: Run smoke**
+- [x] **Step 1: Run smoke**
 
 ```bash
 cd smoke
@@ -357,7 +357,7 @@ make -j8
 
 Expected: `registered_classification_dialog_smoke: all checks passed`.
 
-- [ ] **Step 2: Run main build**
+- [x] **Step 2: Run main build**
 
 ```bash
 mkdir -p build
@@ -368,7 +368,7 @@ make -j8
 
 Expected: build exits 0.
 
-- [ ] **Step 3: Run diff check**
+- [x] **Step 3: Run diff check**
 
 ```bash
 git diff --check
@@ -376,7 +376,7 @@ git diff --check
 
 Expected: exits 0.
 
-- [ ] **Step 4: Update implementation record**
+- [x] **Step 4: Update implementation record**
 
 Append a dated note describing:
 
@@ -386,11 +386,11 @@ Append a dated note describing:
 - Category delete semantics.
 - Big-image overlay selection remains future optimization.
 
-- [ ] **Step 5: Mark plan checkboxes complete**
+- [x] **Step 5: Mark plan checkboxes complete**
 
 Replace each `- [ ]` with `- [x]` after the step has actually been completed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/RegisteredClassificationTrainingDialog.cpp \
