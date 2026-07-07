@@ -342,8 +342,18 @@ int main(int argc, char **argv)
             trainingPreviewHelper->setRoiRectNormalized(QRectF(0.46, 0.18, 0.22, 0.25));
             emit trainingPreviewHelper->roiChanged(QRectF(0.46, 0.18, 0.22, 0.25));
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-            check(labelByText(*trainingDialog, QStringLiteral("2")) != nullptr,
-                  "second ROI must show number label 2 on the big image");
+            QLabel *firstRoiNumberLabel = trainingDialog->findChild<QLabel *>(
+                        QStringLiteral("registeredTrainingRoiNumberLabel_0"));
+            QLabel *secondRoiNumberLabel = trainingDialog->findChild<QLabel *>(
+                        QStringLiteral("registeredTrainingRoiNumberLabel_1"));
+            check(firstRoiNumberLabel != nullptr,
+                  "first ROI must expose registeredTrainingRoiNumberLabel_0");
+            check(secondRoiNumberLabel != nullptr,
+                  "second ROI must expose registeredTrainingRoiNumberLabel_1");
+            check(firstRoiNumberLabel && firstRoiNumberLabel->text() == QStringLiteral("1"),
+                  "first ROI number label must show 1 on the big image");
+            check(secondRoiNumberLabel && secondRoiNumberLabel->text() == QStringLiteral("2"),
+                  "second ROI number label must show 2 on the big image");
             clickAndProcess(previewClassButton);
             QWidget *previewPage = trainingDialog->findChild<QWidget *>(
                         QStringLiteral("registeredTrainingPreviewPage"));
