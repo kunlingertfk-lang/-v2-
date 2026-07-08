@@ -46,6 +46,7 @@ public:
         ColorRecognition,       //颜色识别
         ColorComparison,        //颜色比较
         RegistrationClass,      //注册分类
+        RegistrationClassDetection,      //注册目标检测
         RegisteredObjectDetection        //注册目标检测
 /*===========================tfk end===========================*/
 

@@ -152,6 +152,25 @@ bool widgetCenterIsLight(QWidget *widget)
     return color.red() >= 220 && color.green() >= 220 && color.blue() >= 220;
 }
 
+bool thumbnailCaptionContains(QWidget &root, const int imageIndex, const QString &text)
+{
+    QLabel *caption = root.findChild<QLabel *>(
+                QStringLiteral("registeredTrainingThumbnailCaption_%1").arg(imageIndex));
+    return caption && caption->isVisible() && caption->text().contains(text);
+}
+
+bool anyThumbnailCaptionContains(QWidget &root, const QString &text)
+{
+    const QList<QLabel *> labels = root.findChildren<QLabel *>();
+    for (QLabel *label : labels) {
+        if (label && label->isVisible() &&
+            label->objectName().startsWith(QStringLiteral("registeredTrainingThumbnailCaption_")) &&
+            label->text().contains(text))
+            return true;
+    }
+    return false;
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -243,8 +262,22 @@ int main(int argc, char **argv)
               "camera capture must add one thumbnail");
         check(thumbnailList && thumbnailList->currentRow() == 0,
               "camera capture thumbnail must be selected");
-        check(thumbnailList && thumbnailList->item(0)->text().contains(QStringLiteral("基准图")),
+        QComboBox *thumbnailFilter = trainingDialog->findChild<QComboBox *>(
+                    QStringLiteral("registeredTrainingFilterCombo"));
+        check(thumbnailFilter != nullptr,
+              "registered classification thumbnail area must expose filter combo");
+        check(thumbnailFilter && thumbnailFilter->itemText(0) == QStringLiteral("全部") &&
+              thumbnailFilter->itemText(1) == QStringLiteral("标注") &&
+              thumbnailFilter->itemText(2) == QStringLiteral("未标注"),
+              "registered classification thumbnail filter must contain all/marked/unmarked options");
+        check(thumbnailCaptionContains(*trainingDialog, 0, QStringLiteral("基准图")),
               "camera capture fallback thumbnail must show reference image source name");
+        check(toolButtonByObjectName(*trainingDialog,
+              QStringLiteral("registeredTrainingDeleteImageButton_0")) != nullptr,
+              "registered classification thumbnail must expose single image delete button");
+        check(toolButtonByObjectName(*trainingDialog,
+              QStringLiteral("registeredTrainingDeleteAllImagesButton")) != nullptr,
+              "registered classification thumbnail area must expose delete-all images button");
         CameraFrameProvider::instance().clearFrame();
         clickAndProcess(cameraCaptureButton);
         CameraFrameProvider::instance().setCurrentFrame(frame);
@@ -359,8 +392,24 @@ int main(int argc, char **argv)
             trainingPreviewHelper->setRoiRectNormalized(QRectF(0.12, 0.15, 0.32, 0.28));
             emit trainingPreviewHelper->roiChanged(QRectF(0.12, 0.15, 0.32, 0.28));
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-            check(thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+            check(anyThumbnailCaptionContains(*trainingDialog, QStringLiteral("已标注")),
                   "ROI completion must mark current thumbnail as annotated");
+            if (thumbnailFilter) {
+                thumbnailFilter->setCurrentText(QStringLiteral("标注"));
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                check(thumbnailList->count() == 1,
+                      "registered classification marked filter must show only annotated thumbnails");
+                thumbnailFilter->setCurrentText(QStringLiteral("未标注"));
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                check(thumbnailList->count() == 1,
+                      "registered classification unmarked filter must show only unannotated thumbnails");
+                thumbnailFilter->setCurrentText(QStringLiteral("全部"));
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                check(thumbnailList->count() == 2,
+                      "registered classification all filter must show all thumbnails");
+                thumbnailList->setCurrentRow(0);
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            }
             check(classCountLabel && classCountLabel->text().contains(QStringLiteral("1")),
                   "ROI completion must update class list count");
             trainingPreviewHelper->setRoiRectNormalized(QRectF(0.46, 0.18, 0.22, 0.25));
@@ -480,7 +529,7 @@ int main(int argc, char **argv)
             deleteClassMarkButton = toolButtonByObjectName(*trainingDialog,
                         QStringLiteral("registeredTrainingDeleteClassMarkButton_0"));
             clickAndProcess(deleteClassMarkButton);
-            check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+            check(!anyThumbnailCaptionContains(*trainingDialog, QStringLiteral("已标注")),
                   "deleting current ROI must clear thumbnail annotation state");
             const QVector<QPointF> polygonPoints = QVector<QPointF>()
                     << QPointF(0.1, 0.1) << QPointF(0.4, 0.1) << QPointF(0.2, 0.4);
@@ -499,7 +548,7 @@ int main(int argc, char **argv)
                   "editing the current polygon ROI must not append a duplicate ROI");
             clickAndProcess(previewClassButton);
             clickAndProcess(clearAllMarksButton);
-            check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+            check(!anyThumbnailCaptionContains(*trainingDialog, QStringLiteral("已标注")),
                   "clear all marks must clear thumbnail annotation state");
         }
         if (createClassButton && classCountLabel) {
@@ -557,7 +606,7 @@ int main(int argc, char **argv)
             clickAndProcess(deleteLastClassButton);
             check(classCountLabel->text() == QStringLiteral("分类列表(1)"),
                   "deleting the last class must keep one default class");
-            check(!thumbnailList->item(0)->text().contains(QStringLiteral("已标注")),
+            check(!anyThumbnailCaptionContains(*trainingDialog, QStringLiteral("已标注")),
                   "deleting the last class must clear its ROI marks");
         }
         trainingDialog->close();

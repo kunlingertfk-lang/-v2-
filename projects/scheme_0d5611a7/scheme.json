@@ -7602,7 +7602,7 @@
                 "existOk": true,
                 "judgeBasis": "score",
                 "judgeBasisText": "最低得分",
-                "minScore": 50,
+                "minScore": 48,
                 "modelAutoCreate": true,
                 "modelCacheKey": "pattern_presence_model_377430b6-a4ef-4ce1-a095-4087c28d91d6",
                 "modelPath": "",
@@ -7660,7 +7660,7 @@
                     "modelName": "",
                     "modelPath": "",
                     "modelType": "halcon_dl_classification",
-                    "paramMode": "basic",
+                    "paramMode": "all",
                     "positionCorrectionSource": "1 基准图.位置修正信息",
                     "roiNormalized": {
                         "height": 1,
@@ -7683,7 +7683,96 @@
             "toolId": "registered_classification_a6cdc725-06b5-403f-b405-a688610b2619",
             "toolName": "RegisteredClassification",
             "toolType": "RegisteredClassification"
+        },
+        {
+            "category": "Recognition",
+            "displayName": "字符识别",
+            "enabled": true,
+            "judgeRule": {
+                "maxCount": 10,
+                "minCount": 1,
+                "mode": "char_count"
+            },
+            "params": {
+                "baselineText": "2026-4-22",
+                "binaryThreshold": 128,
+                "independentPositionCorrection": true,
+                "maxAspectRatio": 10,
+                "maxCharArea": 100000,
+                "maxCharHeight": 99999,
+                "maxCharWidth": 99999,
+                "maxCount": 10,
+                "minAspectRatio": 0.1,
+                "minCharArea": 20,
+                "minCharHeight": 0,
+                "minCharWidth": 0,
+                "minConfidence": 70,
+                "minCount": 1,
+                "minScore": 70,
+                "modelName": "Common.bin 系统模型",
+                "modelPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/ocr/OCRB_0-9A-Z_NoRej.omc",
+                "ocrModelPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/ocr/OCRB_0-9A-Z_NoRej.omc",
+                "ocr_model_path": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/ocr/OCRB_0-9A-Z_NoRej.omc",
+                "polarity": "暗目标",
+                "positionCorrection": "1 基准图.位置修正信息",
+                "resultBasis": "字符个数"
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "模型: Common.bin 系统模型, 判断: 字符个数, 字符数: 1-10",
+            "toolId": "ocr_9f40352a-845c-44d0-b442-88e319445f32",
+            "toolName": "字符识别",
+            "toolType": "Ocr"
+        },
+        {
+            "category": "Recognition",
+            "displayName": "注册目标检测",
+            "enabled": true,
+            "judgeRule": {
+                "expectedLabel": "",
+                "judgeType": "all_ok",
+                "judgeTypeText": "所有检测区域输出结果为 OK",
+                "minScore": 80,
+                "mode": "class_match",
+                "resultBasis": "类别判断"
+            },
+            "params": {
+                "registeredClassificationDetection": {
+                    "detectRegionType": "full",
+                    "enablePositionCorrection": false,
+                    "minSimilarity": 68,
+                    "modelName": "",
+                    "modelPath": "",
+                    "modelType": "halcon_dl_classification",
+                    "paramMode": "basic",
+                    "positionCorrectionSource": "1 基准图.位置修正信息",
+                    "roiNormalized": {
+                        "height": 1,
+                        "width": 1,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "topK": 1,
+                    "version": 1
+                }
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "模型：未导入模型；类别：未设置；所有检测区域输出结果为 OK",
+            "toolId": "registered_classification_detection_6b0a221c-cbaf-498f-8194-f5886d6bb104",
+            "toolName": "RegisteredClassificationDetection",
+            "toolType": "RegisteredClassificationDetection"
         }
     ],
-    "updatedAt": "2026-07-07T10:29:59"
+    "updatedAt": "2026-07-08T16:32:30"
 }

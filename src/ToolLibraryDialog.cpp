@@ -159,6 +159,7 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->colorRecognitionToolButton, ColorRecognition); //颜色识别
     m_buttonGroup->addButton(ui->colorComparisonToolButton, ColorComparison); //颜色比较
     m_buttonGroup->addButton(ui->registrationClassToolButton, RegistrationClass);  //注册分类
+    m_buttonGroup->addButton(ui->registrationClassDetectionToolButton, RegistrationClassDetection);  //注册目标检测
     // m_buttonGroup->addButton(ui->circleLocationButton, RegisteredObjectDetection); //注册目标检测
 
 
@@ -276,6 +277,12 @@ void ToolLibraryDialog::confirmSelection()
         accept();
         return;
     }
+
+    if (tool == RegistrationClassDetection) {//注册目标检测
+        m_selectedToolType = ToolType::RegisteredClassificationDetection;
+        accept();
+        return;
+    }
 /*===========================tfk end===========================*/
 
 
@@ -368,6 +375,10 @@ void ToolLibraryDialog::updatePreview(int id)
     case RegistrationClass:
         ui->previewTitleLabel->setText(tr("注册分类"));
         ui->previewDescriptionLabel->setText(tr("根据已注册类别对检测区域图像进行分类"));
+        break;
+    case RegistrationClassDetection:
+        ui->previewTitleLabel->setText(tr("注册目标检测"));
+        ui->previewDescriptionLabel->setText(tr("复刻注册分类配置界面，预留目标检测功能接入"));
         break;
 
 /*===========================tfk end===========================*/

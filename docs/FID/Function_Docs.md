@@ -7,6 +7,7 @@
 - 颜色识别：`docs/FID/ColorRecognition/颜色识别提示词规范.md`、`docs/FID/ColorRecognition/color_recognition_function_implementation.md`
 - 颜色比较：`docs/FID/ColorComparison/颜色比较提示词规范.md`、`docs/FID/ColorComparison/color_comparison_function_implementation.md`
 - 注册分类：`docs/FID/RegisteredClassification/注册分类提示词规范.md`、`docs/FID/RegisteredClassification/registered_classification_function_implementation.md`
+- 注册目标检测：`docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md`、`docs/FID/RegisteredClassificationDetection/registered_classification_detection_function_implementation.md`
 
 ## 约束优先级
 
@@ -85,6 +86,7 @@ ToolResult / overlays / payload
 
 - 参数卡片和二级窗口卡片使用明确边框，不使用难以分辨的浅灰边框；推荐白底、蓝色边框、6-8px 圆角。
 - 输入框、下拉框和普通按钮使用白底、深色文字、蓝色边框；hover 可使用浅蓝底。
+- 位于图像预览、缩略图状态栏等深色工作区内的筛选下拉可以使用深底浅字，但必须保证高对比、右侧有明确下拉提示区，展开列表也必须显式设置高对比底色和文字色；不得依赖系统 palette。
 - 主按钮使用橙底白字；二级按钮可使用蓝底白字；取消按钮使用白底深字。
 - 表格表头使用浅蓝底、深蓝字、加粗；表格内容使用白底深字。
 - 禁用控件必须仍可读，推荐浅灰底、深灰字和可见边框。
@@ -92,6 +94,35 @@ ToolResult / overlays / payload
 - 弹窗或二级窗口的内容区不得使用未命名、未设样式的普通 `QWidget` 承接布局；必须使用设置了 `objectName` 或 `panelRole` 的 `QFrame` / `QWidget`，并在 QSS 中显式声明背景色和文字色。
 - 严禁依赖系统 palette 或父窗口默认背景来决定内容区底色；深色系统主题下也必须保持白底深字或等价高对比组合。
 - 对关键弹窗应增加自动化检查，至少断言内容容器存在明确样式属性；能渲染采样时，应验证内容区实际像素不是深色背景。
+
+### 注册训练和检测控件样式
+
+注册训练、注册目标检测训练等带图像标注和模型训练入口的二级窗口，应以 `RegisteredClassificationTrainingDialog` 的控件风格为基准。后续新增检测类训练窗口若没有单独设计稿，应直接复用以下视觉规范，避免同一类窗口出现字号、边框和按钮状态不一致。
+
+- 窗口整体使用白底深字，推荐根样式为 `QDialog{background:#ffffff;color:#0f172a;font-size:18px;}`。
+- 左侧图像预览面板和右侧训练卡片统一使用白底、蓝色高可见边框，推荐 `border:3px solid #60a5fa;border-radius:8px;`。
+- 右侧内容区使用白底，不使用灰底或深底；推荐 `QFrame[panelRole="rightPanel"]{background:#ffffff;border:0;}`。
+- 图像画布允许使用近黑底，推荐 `QGraphicsView[panelRole="trainingCanvas"]{background:#05070a;border:0;}`，但画布外状态栏必须使用浅色底和深色文字。
+- 预览工具栏保持白底，并使用橙色上/下分隔强调，推荐 `border-bottom:4px solid #ff7a00;`。
+- 底部图像状态栏使用浅橙底、橙色边线和深棕文字，推荐 `background:#fff7ed;border-top:3px solid #ffb366;color:#7c2d12;`。
+- 普通标签默认不小于 `18px`，颜色 `#0f172a`，字重建议 `600`；不得在训练/检测窗口中使用小于 `16px` 的主要操作文字。
+- 窗口标题使用 `role="windowTitle"`，推荐 `font-size:28px;font-weight:800;color:#08386f;`。
+- 步骤卡片标题使用 `role="cardTitle"`，推荐 `font-size:23px;font-weight:800;color:#08386f;`。
+- ROI 预览页标题使用 `role="previewPageTitle"`，推荐 `font-size:26px;font-weight:800;color:#1f2937;`。
+- 空状态提示使用 `role="previewEmpty"`，推荐 `font-size:22px;font-weight:700;color:#94a3b8;`。
+- 关键状态文字使用 `role="stateLabel"`，推荐 `font-size:24px;font-weight:800;color:#c2410c;`；例如 `未注册`、训练未接入、无图或无标注提示。
+- 普通按钮、ROI 工具按钮、图标按钮和下拉框统一使用白底深字、蓝色边框，推荐 `border:2px solid #4094ff;border-radius:6px;padding:10px;font-size:18px;font-weight:700;`。
+- 缩略图状态栏中的过滤下拉属于深色工作区控件，可使用深灰底白字，并需要独立右侧下拉提示区；下拉展开列表必须同步设置深底白字或白底深字的高对比样式。
+- 普通按钮 hover 使用浅蓝底，推荐 `background:#e0f2fe;border-color:#0284c7;`。
+- 主按钮必须使用橙底白字，推荐 `QPushButton[actionRole="primary"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;font-size:20px;font-weight:800;}`。
+- 禁用按钮必须保持可读，推荐 `background:#f8fafc;color:#64748b;border-color:#94a3b8;`。
+- ROI 工具按钮应具有明确选中态；选中态可使用橙色边框或浅橙底，且必须与 hover 态可区分。
+- 缩略图列表使用深色背景时，文字必须为白色，推荐 `QListWidget{background:#27303c;color:#ffffff;border-top:3px solid #4094ff;font-size:15px;font-weight:700;}`。
+- 缩略图列表项推荐 `background:#344155;color:#ffffff;border:2px solid transparent;padding:6px;margin:5px;`，选中态推荐 `background:#0ea5e9;color:#ffffff;border-color:#ff7a00;`。
+- 分类列表、目标列表的表头使用浅蓝或浅灰蓝底；列表行默认白/浅灰底，选中行使用浅绿底和绿色边框，推荐 `background:#dcfce7;border-color:#22c55e;`。
+- 分类行、目标行内操作按钮使用纯图标或图标+tooltip；图标按钮最小尺寸不小于 `38x38`，目标/类别行内按钮建议 `40x40` 到 `44x44`。
+- 训练/检测窗口中所有卡片、列表、预览页、状态栏、目标行和分类行必须设置稳定 `panelRole` 或 `objectName`，并在 QSS 中显式声明背景、文字和边框。
+- 注册目标检测训练窗口若参考注册分类训练窗口，只能按功能差异删减控件，不得降低字体、边框、对比度或主按钮语义。检测窗口的 `矩形框选`、`多边形框选`、`目标列表`、`角度使能`、`最优模型分辨率设置使能` 等控件应与注册分类训练窗口的按钮和标签字号保持一致。
 
 ### 图标和提示
 

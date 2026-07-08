@@ -5,14 +5,17 @@
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 
+#include <QAbstractItemView>
 #include <QButtonGroup>
 #include <QApplication>
 #include <QComboBox>
 #include <QColor>
 #include <QContextMenuEvent>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
+#include <QGridLayout>
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QHBoxLayout>
@@ -22,6 +25,7 @@
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMap>
+#include <QMessageBox>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -176,15 +180,43 @@ struct TrainingImageState
 struct TrainingSessionState
 {
     QVector<TrainingImageState> images;
+    QVector<int> visibleImageIndexes;
     QStringList classes = QStringList() << QStringLiteral("Classification0");
     int currentImage = -1;
     int currentClass = 0;
+    QString thumbnailFilter = QStringLiteral("all");
     int previewClass = -1;
     int selectedPreviewImage = -1;
     int selectedPreviewRoi = -1;
     int activeEditImage = -1;
     int activeEditClass = -1;
     int activeEditRoi = -1;
+};
+
+class ThumbnailHoverFilter : public QObject
+{
+public:
+    explicit ThumbnailHoverFilter(QToolButton *button, QObject *parent = nullptr)
+        : QObject(parent)
+        , button_(button)
+    {
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        Q_UNUSED(watched)
+        if (!button_)
+            return false;
+        if (event->type() == QEvent::Enter)
+            button_->show();
+        else if (event->type() == QEvent::Leave)
+            button_->hide();
+        return false;
+    }
+
+private:
+    QToolButton *button_ = nullptr;
 };
 
 class TrainingRoiPreviewCard : public QFrame
@@ -364,7 +396,22 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     statusBar->setProperty("panelRole", QStringLiteral("statusBar"));
     QHBoxLayout *statusLayout = new QHBoxLayout(statusBar);
     statusLayout->setContentsMargins(16, 10, 16, 10);
+    QComboBox *filterCombo = new QComboBox(statusBar);
+    filterCombo->setObjectName(QStringLiteral("registeredTrainingFilterCombo"));
+    filterCombo->setProperty("role", QStringLiteral("filterBox"));
+    filterCombo->addItem(tr("全部"), QStringLiteral("all"));
+    filterCombo->addItem(tr("标注"), QStringLiteral("marked"));
+    filterCombo->addItem(tr("未标注"), QStringLiteral("unmarked"));
+    filterCombo->view()->setObjectName(QStringLiteral("registeredTrainingFilterComboView"));
+    filterCombo->view()->setStyleSheet(QStringLiteral(
+        "QAbstractItemView{background:#2d333f;color:#ffffff;"
+        "selection-background-color:#0ea5e9;selection-color:#ffffff;"
+        "border:2px solid #94a3b8;font-size:18px;font-weight:700;outline:0;}"
+        "QAbstractItemView::item{min-height:34px;padding:6px 10px;background:#2d333f;color:#ffffff;}"
+        "QAbstractItemView::item:hover,QAbstractItemView::item:selected{background:#0ea5e9;color:#ffffff;}"));
     QLabel *imageStatusLabel = new QLabel(tr("图像 0 / 标注 0 / 类别 1"), statusBar);
+    statusLayout->addWidget(filterCombo);
+    statusLayout->addSpacing(18);
     statusLayout->addWidget(imageStatusLabel);
     statusLayout->addStretch(1);
     QLabel *editStatusLabel = new QLabel(tr("占位界面，训练算法未接入"), statusBar);
@@ -381,6 +428,19 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     thumbnailList->setFlow(QListView::LeftToRight);
     thumbnailList->setFixedHeight(154);
     thumbnailList->setSpacing(8);
+    QFrame *thumbnailToolbar = new QFrame(previewPanel);
+    thumbnailToolbar->setProperty("panelRole", QStringLiteral("thumbnailToolbar"));
+    QHBoxLayout *thumbnailToolbarLayout = new QHBoxLayout(thumbnailToolbar);
+    thumbnailToolbarLayout->setContentsMargins(12, 6, 12, 6);
+    thumbnailToolbarLayout->addStretch(1);
+    QToolButton *deleteAllImagesButton = new QToolButton(thumbnailToolbar);
+    deleteAllImagesButton->setObjectName(QStringLiteral("registeredTrainingDeleteAllImagesButton"));
+    deleteAllImagesButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_TrashIcon));
+    deleteAllImagesButton->setIconSize(QSize(20, 20));
+    deleteAllImagesButton->setToolTip(tr("删除全部注册图"));
+    deleteAllImagesButton->setMinimumSize(34, 34);
+    thumbnailToolbarLayout->addWidget(deleteAllImagesButton);
+    previewLayout->addWidget(thumbnailToolbar);
     previewLayout->addWidget(thumbnailList);
     root->addWidget(previewPanel, 1);
 
@@ -506,6 +566,22 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         }
         return false;
     };
+    auto imageMatchesFilter = [state, imageHasAnyMark](const int imageIndex) {
+        if (imageIndex < 0 || imageIndex >= state->images.size())
+            return false;
+        if (state->thumbnailFilter == QStringLiteral("marked"))
+            return imageHasAnyMark(imageIndex);
+        if (state->thumbnailFilter == QStringLiteral("unmarked"))
+            return !imageHasAnyMark(imageIndex);
+        return true;
+    };
+    auto firstVisibleImage = [state, imageMatchesFilter]() {
+        for (int index = 0; index < state->images.size(); ++index) {
+            if (imageMatchesFilter(index))
+                return index;
+        }
+        return -1;
+    };
 
     auto classTargetCount = [state](const int classIndex) {
         int count = 0;
@@ -547,6 +623,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     QSharedPointer<std::function<void(int)>> renderPreviewPage(new std::function<void(int)>);
     QSharedPointer<std::function<void(const QString &)>> returnToImagePage(
                 new std::function<void(const QString &)>);
+    QSharedPointer<std::function<void(int)>> deleteImage(new std::function<void(int)>);
 
     auto clearRoiNumberLabels = [view]() {
         const QList<QLabel *> labels = view->findChildren<QLabel *>(
@@ -577,24 +654,71 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         label->show();
     };
 
-    *refreshThumbnails = [state, thumbnailList, imageHasAnyMark]() {
+    *refreshThumbnails = [=]() {
         QSignalBlocker blocker(thumbnailList);
+        QSignalBlocker filterBlocker(filterCombo);
+        const int filterIndex = filterCombo->findData(state->thumbnailFilter);
+        if (filterIndex >= 0)
+            filterCombo->setCurrentIndex(filterIndex);
         thumbnailList->clear();
+        state->visibleImageIndexes.clear();
         for (int index = 0; index < state->images.size(); ++index) {
+            if (!imageMatchesFilter(index))
+                continue;
+            state->visibleImageIndexes.append(index);
             const TrainingImageState &imageState = state->images.at(index);
             const QString text = imageHasAnyMark(index)
-                    ? QObject::tr("%1\n已标注").arg(imageState.name)
+                    ? QObject::tr("%1 已标注").arg(imageState.name)
                     : imageState.name;
-            QListWidgetItem *item = new QListWidgetItem(
-                        QIcon(QPixmap::fromImage(imageState.image.scaled(96, 72,
-                                                                         Qt::KeepAspectRatio,
-                                                                         Qt::SmoothTransformation))),
-                        text);
-            item->setTextAlignment(Qt::AlignCenter);
+            QListWidgetItem *item = new QListWidgetItem(thumbnailList);
+            item->setData(Qt::UserRole, index);
+            item->setSizeHint(QSize(132, 106));
             thumbnailList->addItem(item);
+            QFrame *thumbnailCard = new QFrame(thumbnailList);
+            thumbnailCard->setObjectName(QStringLiteral("registeredTrainingThumbnail_%1").arg(index));
+            thumbnailCard->setProperty("panelRole", QStringLiteral("thumbnailCard"));
+            QVBoxLayout *thumbnailLayout = new QVBoxLayout(thumbnailCard);
+            thumbnailLayout->setContentsMargins(6, 6, 6, 6);
+            thumbnailLayout->setSpacing(4);
+            QFrame *imageFrame = new QFrame(thumbnailCard);
+            imageFrame->setProperty("panelRole", QStringLiteral("thumbnailImageFrame"));
+            QGridLayout *imageLayout = new QGridLayout(imageFrame);
+            imageLayout->setContentsMargins(0, 0, 0, 0);
+            QLabel *imageLabel = new QLabel(imageFrame);
+            imageLabel->setAlignment(Qt::AlignCenter);
+            imageLabel->setFixedSize(108, 66);
+            imageLabel->setPixmap(QPixmap::fromImage(imageState.image.scaled(108, 66,
+                                                                             Qt::KeepAspectRatio,
+                                                                             Qt::SmoothTransformation)));
+            QToolButton *deleteImageButton = new QToolButton(imageFrame);
+            deleteImageButton->setObjectName(QStringLiteral("registeredTrainingDeleteImageButton_%1").arg(index));
+            deleteImageButton->setProperty("role", QStringLiteral("thumbnailDeleteButton"));
+            deleteImageButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_TitleBarCloseButton));
+            deleteImageButton->setIconSize(QSize(18, 18));
+            deleteImageButton->setToolTip(QObject::tr("删除注册图"));
+            deleteImageButton->setFixedSize(28, 28);
+            deleteImageButton->hide();
+            imageLayout->addWidget(imageLabel, 0, 0);
+            imageLayout->addWidget(deleteImageButton, 0, 0, Qt::AlignTop | Qt::AlignRight);
+            QLabel *caption = new QLabel(text, thumbnailCard);
+            caption->setObjectName(QStringLiteral("registeredTrainingThumbnailCaption_%1").arg(index));
+            caption->setProperty("role", QStringLiteral("thumbnailCaption"));
+            caption->setAlignment(Qt::AlignCenter);
+            thumbnailLayout->addWidget(imageFrame);
+            thumbnailLayout->addWidget(caption);
+            thumbnailList->setItemWidget(item, thumbnailCard);
+            ThumbnailHoverFilter *hoverFilter = new ThumbnailHoverFilter(deleteImageButton, thumbnailCard);
+            thumbnailCard->installEventFilter(hoverFilter);
+            imageFrame->installEventFilter(hoverFilter);
+            imageLabel->installEventFilter(hoverFilter);
+            caption->installEventFilter(hoverFilter);
+            QObject::connect(deleteImageButton, &QToolButton::clicked, thumbnailList, [=]() {
+                (*deleteImage)(index);
+            });
         }
-        if (state->currentImage >= 0 && state->currentImage < thumbnailList->count())
-            thumbnailList->setCurrentRow(state->currentImage);
+        const int currentVisibleRow = state->visibleImageIndexes.indexOf(state->currentImage);
+        if (currentVisibleRow >= 0)
+            thumbnailList->setCurrentRow(currentVisibleRow);
     };
 
     *showCurrentImage = [state,
@@ -775,6 +899,40 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         }
         roiPreviewListLayout->addStretch(1);
         editStatusLabel->setText(QObject::tr("正在预览类别 ROI：%1").arg(state->classes.value(classIndex)));
+    };
+
+    *deleteImage = [=](const int index) {
+        if (index < 0 || index >= state->images.size())
+            return;
+        const QString deletedName = state->images.at(index).name;
+        state->images.removeAt(index);
+        state->activeEditImage = -1;
+        state->activeEditClass = -1;
+        state->activeEditRoi = -1;
+        state->previewClass = -1;
+        state->selectedPreviewImage = -1;
+        state->selectedPreviewRoi = -1;
+        if (state->images.isEmpty()) {
+            state->currentImage = -1;
+            refreshStatus();
+            (*refreshThumbnails)();
+            (*refreshClassList)();
+            (*showCurrentImage)(QObject::tr("请先添加注册图"));
+            return;
+        }
+        if (state->currentImage == index)
+            state->currentImage = qMin(index, state->images.size() - 1);
+        else if (state->currentImage > index)
+            --state->currentImage;
+        if (!imageMatchesFilter(state->currentImage))
+            state->currentImage = firstVisibleImage();
+        refreshStatus();
+        (*refreshThumbnails)();
+        (*refreshClassList)();
+        if (state->currentImage < 0)
+            (*showCurrentImage)(QObject::tr("当前筛选无注册图"));
+        else
+            (*showCurrentImage)(QObject::tr("已删除注册图：%1").arg(deletedName));
     };
 
     connect(previewCloseButton, &QToolButton::clicked, this, [state, returnToImagePage]() {
@@ -1040,13 +1198,54 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     });
 
     connect(thumbnailList, &QListWidget::currentRowChanged, this, [state, showCurrentImage](int row) {
-        if (row < 0 || row >= state->images.size())
+        if (row < 0 || row >= state->visibleImageIndexes.size())
             return;
-        state->currentImage = row;
-        (*showCurrentImage)(QObject::tr("当前注册图：%1").arg(state->images.at(row).name));
+        const int imageIndex = state->visibleImageIndexes.at(row);
+        if (imageIndex < 0 || imageIndex >= state->images.size())
+            return;
+        state->currentImage = imageIndex;
+        (*showCurrentImage)(QObject::tr("当前注册图：%1").arg(state->images.at(imageIndex).name));
     });
 
-    auto switchImageByOffset = [state, thumbnailList, editStatusLabel](const int offset) {
+    connect(filterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [=](int index) {
+        state->thumbnailFilter = filterCombo->itemData(index).toString();
+        if (!imageMatchesFilter(state->currentImage))
+            state->currentImage = firstVisibleImage();
+        (*refreshThumbnails)();
+        if (state->currentImage < 0)
+            (*showCurrentImage)(QObject::tr("当前筛选无注册图"));
+        else
+            (*showCurrentImage)(QObject::tr("当前注册图：%1").arg(state->images.at(state->currentImage).name));
+    });
+
+    connect(deleteAllImagesButton, &QToolButton::clicked, this, [=]() {
+        if (state->images.isEmpty()) {
+            editStatusLabel->setText(QObject::tr("请先添加注册图"));
+            return;
+        }
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+                    this,
+                    tr("删除全部注册图"),
+                    tr("确认删除全部注册图及其 ROI 标注？"),
+                    QMessageBox::Yes | QMessageBox::No,
+                    QMessageBox::No);
+        if (answer != QMessageBox::Yes)
+            return;
+        state->images.clear();
+        state->currentImage = -1;
+        state->previewClass = -1;
+        state->selectedPreviewImage = -1;
+        state->selectedPreviewRoi = -1;
+        state->activeEditImage = -1;
+        state->activeEditClass = -1;
+        state->activeEditRoi = -1;
+        refreshStatus();
+        (*refreshThumbnails)();
+        (*refreshClassList)();
+        (*showCurrentImage)(QObject::tr("请先添加注册图"));
+    });
+
+    auto switchImageByOffset = [state, thumbnailList, editStatusLabel, showCurrentImage](const int offset) {
         if (state->images.isEmpty()) {
             editStatusLabel->setText(QObject::tr("请先添加注册图"));
             return;
@@ -1054,7 +1253,13 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         const int current = state->currentImage < 0 ? 0 : state->currentImage;
         const int count = state->images.size();
         const int next = (current + offset + count) % count;
-        thumbnailList->setCurrentRow(next);
+        const int visibleRow = state->visibleImageIndexes.indexOf(next);
+        if (visibleRow >= 0) {
+            thumbnailList->setCurrentRow(visibleRow);
+            return;
+        }
+        state->currentImage = next;
+        (*showCurrentImage)(QObject::tr("当前注册图：%1").arg(state->images.at(next).name));
     };
 
     connect(previousImageButton, &QToolButton::clicked, this, [switchImageByOffset]() {
@@ -1137,6 +1342,10 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QFrame[panelRole=\"rightPanel\"]{background:#ffffff;border:0;}"
         "QFrame[panelRole=\"previewToolbar\"]{background:#ffffff;border-bottom:4px solid #ff7a00;border-top-left-radius:8px;border-top-right-radius:8px;}"
         "QFrame[panelRole=\"statusBar\"]{background:#fff7ed;border-top:3px solid #ffb366;color:#7c2d12;}"
+        "QFrame[panelRole=\"thumbnailToolbar\"]{background:#27303c;border-top:3px solid #4094ff;border-radius:0;}"
+        "QFrame[panelRole=\"thumbnailCard\"]{background:#344155;border:2px solid transparent;border-radius:4px;}"
+        "QFrame[panelRole=\"thumbnailCard\"]:hover{border-color:#ff7a00;}"
+        "QFrame[panelRole=\"thumbnailImageFrame\"]{background:#1f2937;border:0;border-radius:2px;}"
         "QFrame[panelRole=\"classHeader\"]{background:#f1f5f9;border:0;border-radius:4px;}"
         "QWidget[panelRole=\"roiPreviewPage\"]{background:#ffffff;border:0;}"
         "QFrame[panelRole=\"roiPreviewCard\"]{background:#f8fafc;border:2px solid #cbd5e1;border-radius:6px;}"
@@ -1151,12 +1360,19 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#1f2937;}"
         "QLabel[role=\"previewEmpty\"]{font-size:22px;font-weight:700;color:#94a3b8;}"
         "QLabel[role=\"stateLabel\"]{font-size:24px;font-weight:800;color:#c2410c;}"
+        "QLabel[role=\"thumbnailCaption\"]{color:#ffffff;font-size:15px;font-weight:800;}"
+        "QComboBox[role=\"filterBox\"]{background:#2d333f;border:2px solid #94a3b8;border-radius:3px;color:#ffffff;padding:8px 38px 8px 12px;font-size:18px;font-weight:700;min-width:150px;}"
+        "QComboBox[role=\"filterBox\"]:hover{border-color:#cbd5e1;background:#343b49;}"
+        "QComboBox[role=\"filterBox\"]::drop-down{subcontrol-origin:padding;subcontrol-position:top right;width:34px;border-left:2px solid #94a3b8;background:#2d333f;}"
+        "QComboBox[role=\"filterBox\"]::down-arrow{image:none;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #ffffff;margin-right:10px;}"
         "QPushButton,QToolButton,QComboBox{background:#ffffff;color:#0f172a;border:2px solid #4094ff;border-radius:6px;padding:10px;font-size:18px;font-weight:700;}"
         "QPushButton:hover,QToolButton:hover{background:#e0f2fe;border-color:#0284c7;}"
+        "QToolButton[role=\"thumbnailDeleteButton\"]{background:#ff7a00;color:#ffffff;border:2px solid #ff7a00;border-radius:14px;padding:0;}"
+        "QToolButton[role=\"thumbnailDeleteButton\"]:hover{background:#dc2626;border-color:#dc2626;}"
         "QPushButton[actionRole=\"primary\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;font-size:20px;font-weight:800;}"
         "QPushButton:disabled{background:#f8fafc;color:#64748b;border-color:#94a3b8;}"
-        "QListWidget{background:#27303c;color:#ffffff;border-top:3px solid #4094ff;font-size:15px;font-weight:700;}"
-        "QListWidget::item{background:#344155;color:#ffffff;border:2px solid transparent;padding:6px;margin:5px;}"
+        "QListWidget{background:#27303c;color:#ffffff;border-top:0;font-size:15px;font-weight:700;}"
+        "QListWidget::item{background:transparent;color:#ffffff;border:0;padding:0;margin:4px;}"
         "QListWidget::item:selected{background:#0ea5e9;color:#ffffff;border-color:#ff7a00;}"
         "QScrollArea{background:#ffffff;border:0;}"
         "QScrollArea > QWidget > QWidget{background:#ffffff;}"

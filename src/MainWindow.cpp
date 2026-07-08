@@ -52,6 +52,7 @@
 #include "PatternPresenceDialog.h"
 #include "PlanDialogUtils.h"
 #include "RegisteredClassificationDialog.h"
+#include "RegisteredClassificationDetectionDialog.h"
 #include "SchemeStore.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
@@ -1642,6 +1643,8 @@ QString MainWindow::toolDisplayName(const ToolConfig &config) const
         return tr("颜色比较");
     case ToolType::RegisteredClassification:
         return tr("注册分类");
+    case ToolType::RegisteredClassificationDetection:
+        return tr("注册目标检测");
     case ToolType::PatternPresence:
         return tr("图案有无");
     case ToolType::BlobPresence:
@@ -1739,6 +1742,9 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         break;
     case ToolType::RegisteredClassification:
         accepted = runToolConfigDialog<RegisteredClassificationDialog>(this, originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::RegisteredClassificationDetection:
+        accepted = runToolConfigDialog<RegisteredClassificationDetectionDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::PatternPresence:
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
