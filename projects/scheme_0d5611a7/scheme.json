@@ -7743,7 +7743,7 @@
             },
             "params": {
                 "registeredClassificationDetection": {
-                    "detectRegionType": "full",
+                    "detectRegionType": "rectangle",
                     "enablePositionCorrection": false,
                     "minSimilarity": 68,
                     "modelName": "",
@@ -7774,5 +7774,5 @@
             "toolType": "RegisteredClassificationDetection"
         }
     ],
-    "updatedAt": "2026-07-08T16:32:30"
+    "updatedAt": "2026-07-08T17:59:01"
 }

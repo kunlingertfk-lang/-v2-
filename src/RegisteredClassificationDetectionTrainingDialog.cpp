@@ -11,6 +11,7 @@
 #include <QCheckBox>
 #include <QColor>
 #include <QComboBox>
+#include <QContextMenuEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QEvent>
@@ -25,6 +26,7 @@
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
@@ -40,6 +42,8 @@
 #include <QtGlobal>
 
 #include <opencv2/core.hpp>
+
+#include <functional>
 
 namespace {
 
@@ -62,6 +66,8 @@ struct DetectionTrainingState
     QVector<DetectionImageState> images;
     QVector<int> visibleImageIndexes;
     int currentImage = -1;
+    int selectedRoiImage = -1;
+    int selectedRoiIndex = -1;
     QString thumbnailFilter = QStringLiteral("all");
     bool previewOpen = false;
     bool angleEnabled = false;
@@ -182,6 +188,19 @@ QRect imageCropRect(const QImage &image, const DetectionMark &mark)
     return crop.width() > 0 && crop.height() > 0 ? crop : QRect();
 }
 
+bool markContainsNormalizedPoint(const DetectionMark &mark, const QPointF &point)
+{
+    if (point.x() < 0.0 || point.x() > 1.0 || point.y() < 0.0 || point.y() > 1.0)
+        return false;
+    if (mark.type == QStringLiteral("polygon") && mark.polygon.size() >= 3) {
+        QPolygonF polygon;
+        for (const QPointF &polygonPoint : mark.polygon)
+            polygon << polygonPoint;
+        return polygon.containsPoint(point, Qt::OddEvenFill);
+    }
+    return mark.rect.normalized().contains(point);
+}
+
 class ThumbnailHoverFilter : public QObject
 {
 public:
@@ -206,6 +225,32 @@ protected:
 
 private:
     QToolButton *button_ = nullptr;
+};
+
+class RoiContextMenuFilter : public QObject
+{
+public:
+    explicit RoiContextMenuFilter(QObject *parent = nullptr)
+        : QObject(parent)
+    {
+    }
+
+    std::function<void(const QPoint &, const QPoint &)> openMenu;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        Q_UNUSED(watched)
+        if (!openMenu)
+            return false;
+        if (event->type() == QEvent::ContextMenu) {
+            QContextMenuEvent *contextEvent = static_cast<QContextMenuEvent *>(event);
+            openMenu(contextEvent->pos(), contextEvent->globalPos());
+            event->accept();
+            return true;
+        }
+        return false;
+    }
 };
 
 } // namespace
@@ -531,6 +576,24 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
     QSharedPointer<std::function<void(const QString &)>> showImage(new std::function<void(const QString &)>);
     QSharedPointer<std::function<void()>> showPreviewPage(new std::function<void()>);
     QSharedPointer<std::function<void(int)>> deleteImage(new std::function<void(int)>);
+    QSharedPointer<std::function<void(int, int, const QString &)>> deleteRoi(
+                new std::function<void(int, int, const QString &)>);
+
+    auto closeRoiDeleteMenus = []() {
+        const QList<QWidget *> widgets = QApplication::topLevelWidgets();
+        for (QWidget *widget : widgets) {
+            QMenu *menu = qobject_cast<QMenu *>(widget);
+            if (!menu)
+                continue;
+            const QString name = menu->objectName();
+            if (name != QStringLiteral("registeredDetectionTrainingRoiContextMenu") &&
+                name != QStringLiteral("registeredDetectionTrainingPreviewRoiContextMenu"))
+                continue;
+            menu->hide();
+            menu->close();
+            menu->deleteLater();
+        }
+    };
 
     *refreshUi = [=]() {
         QSignalBlocker thumbnailBlocker(thumbnailList);
@@ -702,6 +765,8 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
                 deleteRoiButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_TrashIcon));
                 deleteRoiButton->setIconSize(QSize(20, 20));
                 deleteRoiButton->setToolTip(QObject::tr("删除当前 ROI"));
+                deleteRoiButton->setStatusTip(QObject::tr("删除当前 ROI"));
+                deleteRoiButton->setWhatsThis(QObject::tr("删除当前 ROI"));
                 deleteRoiButton->setMinimumSize(34, 34);
                 cardHeader->addWidget(caption, 1);
                 cardHeader->addWidget(deleteRoiButton);
@@ -718,20 +783,54 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
                 cardLayout->addLayout(cardHeader);
                 cardLayout->addWidget(previewImage);
                 roiPreviewListLayout->addWidget(previewCard);
+                auto openPreviewRoiMenu = [=](const QPoint &globalPos) {
+                    QMenu *menu = new QMenu(previewCard);
+                    menu->setObjectName(QStringLiteral("registeredDetectionTrainingPreviewRoiContextMenu"));
+                    menu->setAttribute(Qt::WA_DeleteOnClose);
+                    QAction *deleteAction = menu->addAction(QObject::tr("删除当前 ROI"));
+                    QObject::connect(deleteAction, &QAction::triggered, menu, [=]() {
+                        menu->hide();
+                        menu->close();
+                        menu->deleteLater();
+                        (*deleteRoi)(imageIndex, roiIndex, QObject::tr("已删除当前 ROI"));
+                    });
+                    menu->popup(globalPos);
+                };
+                previewCard->setContextMenuPolicy(Qt::CustomContextMenu);
+                previewImage->setContextMenuPolicy(Qt::CustomContextMenu);
+                caption->setContextMenuPolicy(Qt::CustomContextMenu);
+                QObject::connect(previewCard, &QWidget::customContextMenuRequested, previewCard, [=](const QPoint &pos) {
+                    openPreviewRoiMenu(previewCard->mapToGlobal(pos));
+                });
+                QObject::connect(previewImage, &QWidget::customContextMenuRequested, previewCard, [=](const QPoint &pos) {
+                    openPreviewRoiMenu(previewImage->mapToGlobal(pos));
+                });
+                QObject::connect(caption, &QWidget::customContextMenuRequested, previewCard, [=](const QPoint &pos) {
+                    openPreviewRoiMenu(caption->mapToGlobal(pos));
+                });
                 QObject::connect(deleteRoiButton, &QToolButton::clicked, previewCard, [=]() {
-                    if (imageIndex < 0 || imageIndex >= state->images.size())
-                        return;
-                    if (roiIndex < 0 || roiIndex >= state->images[imageIndex].marks.size())
-                        return;
-                    state->images[imageIndex].marks.removeAt(roiIndex);
-                    (*refreshUi)();
-                    (*showPreviewPage)();
-                    trainingStatusLabel->setText(QObject::tr("已删除当前 ROI"));
+                    (*deleteRoi)(imageIndex, roiIndex, QObject::tr("已删除当前 ROI"));
                 });
             }
         }
         roiPreviewListLayout->addStretch(1);
         trainingStatusLabel->setText(QObject::tr("正在预览目标 ROI：Target"));
+    };
+    *deleteRoi = [=](const int imageIndex, const int roiIndex, const QString &message) {
+        closeRoiDeleteMenus();
+        if (imageIndex < 0 || imageIndex >= state->images.size())
+            return;
+        if (roiIndex < 0 || roiIndex >= state->images[imageIndex].marks.size())
+            return;
+        state->images[imageIndex].marks.removeAt(roiIndex);
+        state->selectedRoiImage = -1;
+        state->selectedRoiIndex = -1;
+        (*refreshUi)();
+        if (state->previewOpen)
+            (*showPreviewPage)();
+        else
+            (*showImage)(message);
+        trainingStatusLabel->setText(message);
     };
     *deleteImage = [=](const int index) {
         if (index < 0 || index >= state->images.size())
@@ -754,6 +853,53 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
         else
             (*showImage)(QObject::tr("已删除注册图：%1").arg(deletedName));
     };
+
+    auto roiIndexAtViewPos = [=](const QPoint &viewPos) {
+        DetectionImageState *image = currentImage();
+        if (!image || image->image.isNull())
+            return -1;
+        const QPointF imagePoint = previewHelper->viewToImage(viewPos);
+        if (imagePoint.x() < 0.0 || imagePoint.y() < 0.0 ||
+            imagePoint.x() > image->image.width() || imagePoint.y() > image->image.height())
+            return -1;
+        const QPointF normalizedPoint(imagePoint.x() / qMax(1, image->image.width()),
+                                      imagePoint.y() / qMax(1, image->image.height()));
+        for (int index = image->marks.size() - 1; index >= 0; --index) {
+            if (markContainsNormalizedPoint(image->marks.at(index), normalizedPoint))
+                return index;
+        }
+        return -1;
+    };
+
+    RoiContextMenuFilter *roiContextMenuFilter = new RoiContextMenuFilter(view);
+    roiContextMenuFilter->openMenu = [=](const QPoint &viewPos, const QPoint &globalPos) {
+        if (state->currentImage < 0 || state->currentImage >= state->images.size()) {
+            trainingStatusLabel->setText(QObject::tr("请先添加注册图"));
+            return;
+        }
+        const int roiIndex = roiIndexAtViewPos(viewPos);
+        if (roiIndex < 0) {
+            trainingStatusLabel->setText(QObject::tr("请右键目标 ROI"));
+            return;
+        }
+        state->selectedRoiImage = state->currentImage;
+        state->selectedRoiIndex = roiIndex;
+        QMenu *menu = new QMenu(view);
+        menu->setObjectName(QStringLiteral("registeredDetectionTrainingRoiContextMenu"));
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        QAction *deleteAction = menu->addAction(QObject::tr("删除当前 ROI"));
+        QObject::connect(deleteAction, &QAction::triggered, menu, [=]() {
+            menu->hide();
+            menu->close();
+            menu->deleteLater();
+            (*deleteRoi)(state->selectedRoiImage,
+                         state->selectedRoiIndex,
+                         QObject::tr("已删除当前 ROI"));
+        });
+        menu->popup(globalPos);
+        trainingStatusLabel->setText(QObject::tr("已选中 ROI %1").arg(roiIndex + 1));
+    };
+    view->viewport()->installEventFilter(roiContextMenuFilter);
 
     auto appendImage = [=](const QImage &image, const QString &name, const QString &message) {
         if (image.isNull()) {
@@ -964,7 +1110,7 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
         "QFrame[panelRole=\"thumbnailCard\"]:hover{border-color:#ff7a00;}"
         "QFrame[panelRole=\"thumbnailImageFrame\"]{background:#1f2937;border:0;border-radius:2px;}"
         "QFrame[panelRole=\"classHeader\"]{background:#f1f5f9;border:0;border-radius:4px;}"
-        "QFrame[panelRole=\"roiPreviewPage\"]{background:#ffffff;border:0;}"
+        "QWidget[panelRole=\"roiPreviewPage\"]{background:#2d333f;border:0;}"
         "QFrame[panelRole=\"roiPreviewCard\"]{background:#f8fafc;border:2px solid #cbd5e1;border-radius:6px;}"
         "QFrame[panelRole=\"classRow\"]{background:#dcfce7;border:2px solid #22c55e;border-radius:6px;}"
         "QGraphicsView[panelRole=\"trainingCanvas\"]{border:0;background:#05070a;}"
@@ -977,8 +1123,8 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
         "QComboBox[role=\"filterBox\"]:hover{border-color:#cbd5e1;background:#343b49;}"
         "QComboBox[role=\"filterBox\"]::drop-down{subcontrol-origin:padding;subcontrol-position:top right;width:34px;border-left:2px solid #94a3b8;background:#2d333f;}"
         "QComboBox[role=\"filterBox\"]::down-arrow{image:none;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #ffffff;margin-right:10px;}"
-        "QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#1f2937;}"
-        "QLabel[role=\"previewEmpty\"]{font-size:22px;font-weight:700;color:#94a3b8;}"
+        "QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#ffffff;}"
+        "QLabel[role=\"previewEmpty\"]{font-size:22px;font-weight:700;color:#e2e8f0;}"
         "QLabel[role=\"stateLabel\"]{font-size:24px;font-weight:800;color:#c2410c;}"
         "QLabel[role=\"thumbnailCaption\"]{color:#ffffff;font-size:15px;font-weight:800;}"
         "QPushButton,QToolButton,QComboBox{background:#ffffff;color:#0f172a;border:2px solid #4094ff;border-radius:6px;padding:10px;font-size:18px;font-weight:700;}"

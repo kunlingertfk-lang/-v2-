@@ -434,6 +434,13 @@ int main(int argc, char **argv)
                   "class preview must show ROI preview page");
             check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：2")) != nullptr,
                   "preview page header must show class name and ROI count");
+            QLabel *previewPageTitle = labelByText(*trainingDialog,
+                                                   QStringLiteral("Widget | 已标注目标：2"));
+            check(previewPageTitle && previewPageTitle->styleSheet().isEmpty(),
+                  "classification preview title should rely on role QSS rather than inline style");
+            check(trainingDialog->styleSheet().contains(
+                      QStringLiteral("QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#ffffff;}")),
+                  "classification ROI preview page title must use white text on dark preview page");
             check(trainingDialog->findChild<QWidget *>(
                       QStringLiteral("registeredTrainingRoiPreviewCard_0_0_0")) != nullptr,
                   "preview page must show first ROI preview card");
@@ -456,6 +463,14 @@ int main(int argc, char **argv)
                   "class preview must leave ROI drawing modes idle");
             check(labelByText(*trainingDialog, QStringLiteral("正在预览类别 ROI：Widget")) != nullptr,
                   "class preview must show clear preview status text");
+            QToolButton *deleteRoiButton = trainingDialog->findChild<QToolButton *>(
+                        QStringLiteral("registeredTrainingDeleteRoiButton_0_0_1"));
+            check(deleteRoiButton != nullptr,
+                  "classification ROI preview card must expose delete ROI button");
+            check(deleteRoiButton && deleteRoiButton->toolTip() == QStringLiteral("删除当前 ROI"),
+                  "hovering classification ROI delete icon must explain delete current ROI");
+            check(deleteRoiButton && deleteRoiButton->statusTip() == QStringLiteral("删除当前 ROI"),
+                  "classification ROI delete icon must expose delete current ROI status tip");
             QWidget *secondCard = trainingDialog->findChild<QWidget *>(
                         QStringLiteral("registeredTrainingRoiPreviewCard_0_0_1"));
             if (secondCard) {
@@ -467,18 +482,12 @@ int main(int argc, char **argv)
                 QMenu *menu = nullptr;
                 for (QWidget *widget : QApplication::topLevelWidgets()) {
                     QMenu *candidate = qobject_cast<QMenu *>(widget);
-                    if (!candidate)
-                        continue;
-                    for (QAction *action : candidate->actions()) {
-                        if (action && action->text() == QStringLiteral("删除当前 ROI")) {
-                            menu = candidate;
-                            break;
-                        }
-                    }
-                    if (menu)
+                    if (candidate && candidate->objectName() == QStringLiteral("registeredTrainingPreviewRoiContextMenu")) {
+                        menu = candidate;
                         break;
+                    }
                 }
-                check(menu != nullptr, "right-clicking selected ROI card must open context menu");
+                check(menu != nullptr, "right-clicking selected ROI card must open preview ROI context menu");
                 if (menu) {
                     QAction *deleteAction = nullptr;
                     for (QAction *action : menu->actions()) {
@@ -496,6 +505,87 @@ int main(int argc, char **argv)
                   "deleting one ROI from preview page must remove only that ROI card");
             check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：1")) != nullptr,
                   "preview page header must update after deleting one ROI");
+            clickAndProcess(previewClassButton);
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.40, 0.40, 0.20, 0.20));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.40, 0.40, 0.20, 0.20));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            QGraphicsView *trainingView = trainingDialog->findChild<QGraphicsView *>(
+                        QStringLiteral("registeredTrainingPreviewView"));
+            check(trainingView != nullptr,
+                  "classification training preview view must exist for ROI context menu");
+            if (trainingView) {
+                const QPoint center = trainingView->viewport()->rect().center();
+                QMouseEvent rightPress(QEvent::MouseButtonPress,
+                                       center,
+                                       trainingView->viewport()->mapToGlobal(center),
+                                       Qt::RightButton,
+                                       Qt::RightButton,
+                                       Qt::NoModifier);
+                QApplication::sendEvent(trainingView->viewport(), &rightPress);
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                QMenu *pressMenu = nullptr;
+                for (QWidget *widget : QApplication::topLevelWidgets()) {
+                    QMenu *candidate = qobject_cast<QMenu *>(widget);
+                    if (candidate && candidate->objectName() == QStringLiteral("registeredTrainingRoiContextMenu")) {
+                        pressMenu = candidate;
+                        break;
+                    }
+                }
+                check(pressMenu == nullptr,
+                      "right mouse press on classification ROI must not open delete menu before context-menu event");
+                check(labelByText(*trainingDialog, QStringLiteral("1 / 1")) != nullptr,
+                      "right mouse press on classification ROI must not delete ROI directly");
+                if (pressMenu)
+                    pressMenu->close();
+                QContextMenuEvent contextEvent(QContextMenuEvent::Mouse,
+                                               center,
+                                               trainingView->viewport()->mapToGlobal(center));
+                QApplication::sendEvent(trainingView->viewport(), &contextEvent);
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                QMenu *menu = nullptr;
+                for (QWidget *widget : QApplication::topLevelWidgets()) {
+                    QMenu *candidate = qobject_cast<QMenu *>(widget);
+                    if (!candidate ||
+                        candidate->objectName() != QStringLiteral("registeredTrainingRoiContextMenu"))
+                        continue;
+                    for (QAction *action : candidate->actions()) {
+                        if (action && action->text() == QStringLiteral("删除当前 ROI")) {
+                            menu = candidate;
+                            break;
+                        }
+                    }
+                    if (menu)
+                        break;
+                }
+                check(menu != nullptr,
+                      "right-clicking selected classification ROI must open delete-current-ROI menu");
+                if (menu) {
+                    for (QAction *action : menu->actions()) {
+                        if (action && action->text() == QStringLiteral("删除当前 ROI")) {
+                            action->trigger();
+                            break;
+                        }
+                    }
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                }
+                bool lingeringDeleteMenu = false;
+                for (QWidget *widget : QApplication::topLevelWidgets()) {
+                    QMenu *candidate = qobject_cast<QMenu *>(widget);
+                    if (candidate && candidate->isVisible() &&
+                        candidate->objectName() == QStringLiteral("registeredTrainingRoiContextMenu")) {
+                        lingeringDeleteMenu = true;
+                        break;
+                    }
+                }
+                check(!lingeringDeleteMenu,
+                      "classification ROI delete menu must disappear after delete action");
+                check(labelByText(*trainingDialog, QStringLiteral("0 / 0")) != nullptr,
+                      "right-click delete current classification ROI must update class count to zero");
+            }
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.40, 0.40, 0.20, 0.20));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.40, 0.40, 0.20, 0.20));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            clickAndProcess(previewClassButton);
             renameClassButton = toolButtonByObjectName(*trainingDialog,
                         QStringLiteral("registeredTrainingRenameClassButton_0"));
             if (renameClassButton) {
@@ -509,8 +599,17 @@ int main(int argc, char **argv)
                 QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
                 check(previewPage && previewPage->isVisible(),
                       "canceling rename from preview mode must keep preview page open");
-                check(labelByText(*trainingDialog, QStringLiteral("Widget | 已标注目标：1")) != nullptr,
-                      "canceling rename from preview mode must keep preview header unchanged");
+                bool widgetPreviewTitleVisible = false;
+                const QList<QLabel *> labels = trainingDialog->findChildren<QLabel *>();
+                for (QLabel *label : labels) {
+                    if (label && label->isVisible() &&
+                        label->text().startsWith(QStringLiteral("Widget | 已标注目标："))) {
+                        widgetPreviewTitleVisible = true;
+                        break;
+                    }
+                }
+                check(widgetPreviewTitleVisible,
+                      "canceling rename from preview mode must keep Widget preview header visible");
             }
             clickAndProcess(createClassButton);
             check(classCountLabel->text() == QStringLiteral("分类列表(2)"),

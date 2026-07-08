@@ -191,6 +191,9 @@ struct TrainingSessionState
     int activeEditImage = -1;
     int activeEditClass = -1;
     int activeEditRoi = -1;
+    int selectedRoiImage = -1;
+    int selectedRoiClass = -1;
+    int selectedRoiIndex = -1;
 };
 
 class ThumbnailHoverFilter : public QObject
@@ -244,15 +247,46 @@ protected:
         if (selectHandler)
             selectHandler();
         QMenu *menu = new QMenu(this);
-        menu->setObjectName(QStringLiteral("registeredTrainingRoiContextMenu"));
+        menu->setObjectName(QStringLiteral("registeredTrainingPreviewRoiContextMenu"));
         menu->setAttribute(Qt::WA_DeleteOnClose);
         QAction *deleteAction = menu->addAction(QObject::tr("删除当前 ROI"));
         QObject::connect(deleteAction, &QAction::triggered, this, [this]() {
+            if (QMenu *menu = qobject_cast<QMenu *>(sender()->parent())) {
+                menu->hide();
+                menu->close();
+                menu->deleteLater();
+            }
             if (deleteHandler)
                 deleteHandler();
         });
         menu->popup(event->globalPos());
         event->accept();
+    }
+};
+
+class TrainingRoiContextMenuFilter : public QObject
+{
+public:
+    explicit TrainingRoiContextMenuFilter(QObject *parent = nullptr)
+        : QObject(parent)
+    {
+    }
+
+    std::function<void(const QPoint &, const QPoint &)> openMenu;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        Q_UNUSED(watched)
+        if (!openMenu)
+            return false;
+        if (event->type() == QEvent::ContextMenu) {
+            QContextMenuEvent *contextEvent = static_cast<QContextMenuEvent *>(event);
+            openMenu(contextEvent->pos(), contextEvent->globalPos());
+            event->accept();
+            return true;
+        }
+        return false;
     }
 };
 
@@ -303,6 +337,19 @@ QRect imageCropRect(const QImage &image, const TrainingRoiMark &mark)
     if (crop.width() <= 0 || crop.height() <= 0)
         return QRect();
     return crop;
+}
+
+bool markContainsNormalizedPoint(const TrainingRoiMark &mark, const QPointF &point)
+{
+    if (point.x() < 0.0 || point.x() > 1.0 || point.y() < 0.0 || point.y() > 1.0)
+        return false;
+    if (mark.type == QStringLiteral("polygon") && mark.polygon.size() >= 3) {
+        QPolygonF polygon;
+        for (const QPointF &polygonPoint : mark.polygon)
+            polygon << polygonPoint;
+        return polygon.containsPoint(point, Qt::OddEvenFill);
+    }
+    return mark.rect.normalized().contains(point);
 }
 
 } // namespace
@@ -624,6 +671,24 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     QSharedPointer<std::function<void(const QString &)>> returnToImagePage(
                 new std::function<void(const QString &)>);
     QSharedPointer<std::function<void(int)>> deleteImage(new std::function<void(int)>);
+    QSharedPointer<std::function<void(int, int, int, const QString &)>> deleteRoi(
+                new std::function<void(int, int, int, const QString &)>);
+
+    auto closeRoiDeleteMenus = []() {
+        const QList<QWidget *> widgets = QApplication::topLevelWidgets();
+        for (QWidget *widget : widgets) {
+            QMenu *menu = qobject_cast<QMenu *>(widget);
+            if (!menu)
+                continue;
+            const QString name = menu->objectName();
+            if (name != QStringLiteral("registeredTrainingRoiContextMenu") &&
+                name != QStringLiteral("registeredTrainingPreviewRoiContextMenu"))
+                continue;
+            menu->hide();
+            menu->close();
+            menu->deleteLater();
+        }
+    };
 
     auto clearRoiNumberLabels = [view]() {
         const QList<QLabel *> labels = view->findChildren<QLabel *>(
@@ -745,6 +810,9 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         state->activeEditImage = -1;
         state->activeEditClass = -1;
         state->activeEditRoi = -1;
+        state->selectedRoiImage = -1;
+        state->selectedRoiClass = -1;
+        state->selectedRoiIndex = -1;
         previewHelper->setImage(imageState->image);
         previewHelper->clearRoi();
         previewHelper->clearPolygonRoi();
@@ -850,6 +918,24 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
                 cardLayout->setContentsMargins(8, 8, 8, 8);
                 cardLayout->setSpacing(6);
 
+                QHBoxLayout *cardHeader = new QHBoxLayout;
+                cardHeader->setContentsMargins(0, 0, 0, 0);
+                cardHeader->setSpacing(6);
+                QLabel *caption = new QLabel(QObject::tr("%1 #%2").arg(imageState.name).arg(roiIndex + 1), card);
+                caption->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+                QToolButton *deleteRoiButton = new QToolButton(card);
+                deleteRoiButton->setObjectName(QStringLiteral("registeredTrainingDeleteRoiButton_%1_%2_%3")
+                                               .arg(classIndex)
+                                               .arg(imageIndex)
+                                               .arg(roiIndex));
+                deleteRoiButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_TrashIcon));
+                deleteRoiButton->setIconSize(QSize(20, 20));
+                deleteRoiButton->setToolTip(QObject::tr("删除当前 ROI"));
+                deleteRoiButton->setStatusTip(QObject::tr("删除当前 ROI"));
+                deleteRoiButton->setWhatsThis(QObject::tr("删除当前 ROI"));
+                deleteRoiButton->setMinimumSize(34, 34);
+                cardHeader->addWidget(caption, 1);
+                cardHeader->addWidget(deleteRoiButton);
                 QLabel *imageLabel = new QLabel(card);
                 imageLabel->setAlignment(Qt::AlignCenter);
                 imageLabel->setMinimumSize(220, 120);
@@ -859,10 +945,8 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
                     imageLabel->setPixmap(QPixmap::fromImage(imageState.image.copy(cropRect).scaled(
                                              240, 150, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
                 }
-                QLabel *caption = new QLabel(QObject::tr("%1 #%2").arg(imageState.name).arg(roiIndex + 1), card);
-                caption->setAlignment(Qt::AlignCenter);
+                cardLayout->addLayout(cardHeader);
                 cardLayout->addWidget(imageLabel);
-                cardLayout->addWidget(caption);
                 roiPreviewListLayout->addWidget(card);
 
                 card->selectHandler = [state, roiPreviewListWidget, card, imageIndex, roiIndex]() {
@@ -881,24 +965,72 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
                     card->style()->polish(card);
                 };
                 card->deleteHandler = [=]() {
-                    if (imageIndex < 0 || imageIndex >= state->images.size())
-                        return;
-                    QVector<TrainingRoiMark> &mutableMarks =
-                            state->images[imageIndex].marksByClass[classIndex];
-                    if (roiIndex >= 0 && roiIndex < mutableMarks.size())
-                        mutableMarks.removeAt(roiIndex);
-                    if (mutableMarks.isEmpty())
-                        state->images[imageIndex].marksByClass.remove(classIndex);
-                    refreshStatus();
-                    (*refreshThumbnails)();
-                    (*refreshClassList)();
-                    (*renderPreviewPage)(classIndex);
-                    editStatusLabel->setText(QObject::tr("已删除当前 ROI"));
+                    (*deleteRoi)(imageIndex, classIndex, roiIndex, QObject::tr("已删除当前 ROI"));
                 };
+                QObject::connect(deleteRoiButton, &QToolButton::clicked, card, [=]() {
+                    (*deleteRoi)(imageIndex, classIndex, roiIndex, QObject::tr("已删除当前 ROI"));
+                });
+                auto openPreviewRoiMenu = [=](const QPoint &globalPos) {
+                    if (card->selectHandler)
+                        card->selectHandler();
+                    QMenu *menu = new QMenu(card);
+                    menu->setObjectName(QStringLiteral("registeredTrainingPreviewRoiContextMenu"));
+                    menu->setAttribute(Qt::WA_DeleteOnClose);
+                    QAction *deleteAction = menu->addAction(QObject::tr("删除当前 ROI"));
+                    QObject::connect(deleteAction, &QAction::triggered, menu, [=]() {
+                        menu->hide();
+                        menu->close();
+                        menu->deleteLater();
+                        (*deleteRoi)(imageIndex, classIndex, roiIndex, QObject::tr("已删除当前 ROI"));
+                    });
+                    menu->popup(globalPos);
+                };
+                card->setContextMenuPolicy(Qt::CustomContextMenu);
+                imageLabel->setContextMenuPolicy(Qt::CustomContextMenu);
+                caption->setContextMenuPolicy(Qt::CustomContextMenu);
+                QObject::connect(card, &QWidget::customContextMenuRequested, card, [=](const QPoint &pos) {
+                    openPreviewRoiMenu(card->mapToGlobal(pos));
+                });
+                QObject::connect(imageLabel, &QWidget::customContextMenuRequested, card, [=](const QPoint &pos) {
+                    openPreviewRoiMenu(imageLabel->mapToGlobal(pos));
+                });
+                QObject::connect(caption, &QWidget::customContextMenuRequested, card, [=](const QPoint &pos) {
+                    openPreviewRoiMenu(caption->mapToGlobal(pos));
+                });
             }
         }
         roiPreviewListLayout->addStretch(1);
         editStatusLabel->setText(QObject::tr("正在预览类别 ROI：%1").arg(state->classes.value(classIndex)));
+    };
+
+    *deleteRoi = [=](const int imageIndex, const int classIndex, const int roiIndex, const QString &message) {
+        closeRoiDeleteMenus();
+        if (imageIndex < 0 || imageIndex >= state->images.size())
+            return;
+        if (classIndex < 0 || classIndex >= state->classes.size())
+            return;
+        QVector<TrainingRoiMark> &marks = state->images[imageIndex].marksByClass[classIndex];
+        if (roiIndex < 0 || roiIndex >= marks.size())
+            return;
+        marks.removeAt(roiIndex);
+        if (marks.isEmpty())
+            state->images[imageIndex].marksByClass.remove(classIndex);
+        state->selectedPreviewImage = -1;
+        state->selectedPreviewRoi = -1;
+        state->selectedRoiImage = -1;
+        state->selectedRoiClass = -1;
+        state->selectedRoiIndex = -1;
+        state->activeEditImage = -1;
+        state->activeEditClass = -1;
+        state->activeEditRoi = -1;
+        refreshStatus();
+        (*refreshThumbnails)();
+        (*refreshClassList)();
+        if (state->previewClass >= 0)
+            (*renderPreviewPage)(state->previewClass);
+        else
+            (*showCurrentImage)(message);
+        editStatusLabel->setText(message);
     };
 
     *deleteImage = [=](const int index) {
@@ -912,6 +1044,9 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         state->previewClass = -1;
         state->selectedPreviewImage = -1;
         state->selectedPreviewRoi = -1;
+        state->selectedRoiImage = -1;
+        state->selectedRoiClass = -1;
+        state->selectedRoiIndex = -1;
         if (state->images.isEmpty()) {
             state->currentImage = -1;
             refreshStatus();
@@ -934,6 +1069,60 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         else
             (*showCurrentImage)(QObject::tr("已删除注册图：%1").arg(deletedName));
     };
+
+    auto roiIndexAtViewPos = [=](const QPoint &viewPos) {
+        TrainingImageState *image = currentImageState();
+        if (!image || image->image.isNull())
+            return -1;
+        const QPointF imagePoint = previewHelper->viewToImage(viewPos);
+        if (imagePoint.x() < 0.0 || imagePoint.y() < 0.0 ||
+            imagePoint.x() > image->image.width() || imagePoint.y() > image->image.height())
+            return -1;
+        const QPointF normalizedPoint(imagePoint.x() / qMax(1, image->image.width()),
+                                      imagePoint.y() / qMax(1, image->image.height()));
+        const QVector<TrainingRoiMark> marks = image->marksByClass.value(state->currentClass);
+        for (int index = marks.size() - 1; index >= 0; --index) {
+            if (markContainsNormalizedPoint(marks.at(index), normalizedPoint))
+                return index;
+        }
+        return -1;
+    };
+
+    TrainingRoiContextMenuFilter *roiContextMenuFilter = new TrainingRoiContextMenuFilter(view);
+    roiContextMenuFilter->openMenu = [=](const QPoint &viewPos, const QPoint &globalPos) {
+        if (state->currentImage < 0 || state->currentImage >= state->images.size()) {
+            editStatusLabel->setText(QObject::tr("请先添加注册图"));
+            return;
+        }
+        if (state->previewClass >= 0) {
+            editStatusLabel->setText(QObject::tr("请先返回注册图大图"));
+            return;
+        }
+        const int roiIndex = roiIndexAtViewPos(viewPos);
+        if (roiIndex < 0) {
+            editStatusLabel->setText(QObject::tr("请右键目标 ROI"));
+            return;
+        }
+        state->selectedRoiImage = state->currentImage;
+        state->selectedRoiClass = state->currentClass;
+        state->selectedRoiIndex = roiIndex;
+        QMenu *menu = new QMenu(view);
+        menu->setObjectName(QStringLiteral("registeredTrainingRoiContextMenu"));
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        QAction *deleteAction = menu->addAction(QObject::tr("删除当前 ROI"));
+        QObject::connect(deleteAction, &QAction::triggered, menu, [=]() {
+            menu->hide();
+            menu->close();
+            menu->deleteLater();
+            (*deleteRoi)(state->selectedRoiImage,
+                         state->selectedRoiClass,
+                         state->selectedRoiIndex,
+                         QObject::tr("已删除当前 ROI"));
+        });
+        menu->popup(globalPos);
+        editStatusLabel->setText(QObject::tr("已选中 ROI %1").arg(roiIndex + 1));
+    };
+    view->viewport()->installEventFilter(roiContextMenuFilter);
 
     connect(previewCloseButton, &QToolButton::clicked, this, [state, returnToImagePage]() {
         (*returnToImagePage)(QObject::tr("当前注册图：%1")
@@ -1347,7 +1536,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QFrame[panelRole=\"thumbnailCard\"]:hover{border-color:#ff7a00;}"
         "QFrame[panelRole=\"thumbnailImageFrame\"]{background:#1f2937;border:0;border-radius:2px;}"
         "QFrame[panelRole=\"classHeader\"]{background:#f1f5f9;border:0;border-radius:4px;}"
-        "QWidget[panelRole=\"roiPreviewPage\"]{background:#ffffff;border:0;}"
+        "QWidget[panelRole=\"roiPreviewPage\"]{background:#2d333f;border:0;}"
         "QFrame[panelRole=\"roiPreviewCard\"]{background:#f8fafc;border:2px solid #cbd5e1;border-radius:6px;}"
         "QFrame[panelRole=\"roiPreviewCard\"][selected=\"true\"]{background:#eff6ff;border-color:#2563eb;}"
         "QWidget[panelRole=\"classList\"]{background:#ffffff;color:#0f172a;}"
@@ -1357,8 +1546,8 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QLabel{background:transparent;font-size:18px;color:#0f172a;font-weight:600;}"
         "QLabel[role=\"windowTitle\"]{font-size:28px;font-weight:800;color:#08386f;}"
         "QLabel[role=\"cardTitle\"]{font-size:23px;font-weight:800;color:#08386f;}"
-        "QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#1f2937;}"
-        "QLabel[role=\"previewEmpty\"]{font-size:22px;font-weight:700;color:#94a3b8;}"
+        "QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#ffffff;}"
+        "QLabel[role=\"previewEmpty\"]{font-size:22px;font-weight:700;color:#e2e8f0;}"
         "QLabel[role=\"stateLabel\"]{font-size:24px;font-weight:800;color:#c2410c;}"
         "QLabel[role=\"thumbnailCaption\"]{color:#ffffff;font-size:15px;font-weight:800;}"
         "QComboBox[role=\"filterBox\"]{background:#2d333f;border:2px solid #94a3b8;border-radius:3px;color:#ffffff;padding:8px 38px 8px 12px;font-size:18px;font-weight:700;min-width:150px;}"
