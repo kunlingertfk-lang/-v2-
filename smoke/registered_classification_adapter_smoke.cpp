@@ -1,10 +1,14 @@
 #include "tooladapters/RegisteredClassificationAdapter.h"
+#include "algorithms/recognition/RegisteredClassificationTrainingRunner.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QJsonObject>
+#include <QFileInfo>
 #include <iostream>
 
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 namespace {
 
@@ -21,6 +25,7 @@ void check(bool condition, const char *message)
 // 构造一个带注册分类参数的 ToolConfig。可按需覆盖单个字段。
 ToolConfig makeConfig(const QString &modelPath,
                       const QString &modelName,
+                      const QString &modelType,
                       const QString &detectRegionType,
                       const QRectF &roi,
                       const QString &halconSoPath,
@@ -39,7 +44,7 @@ ToolConfig makeConfig(const QString &modelPath,
     nested.insert(QStringLiteral("version"), 1);
     nested.insert(QStringLiteral("modelName"), modelName);
     nested.insert(QStringLiteral("modelPath"), modelPath);
-    nested.insert(QStringLiteral("modelType"), QStringLiteral("halcon_dl_classification"));
+    nested.insert(QStringLiteral("modelType"), modelType);
     nested.insert(QStringLiteral("detectRegionType"), detectRegionType);
     nested.insert(QStringLiteral("roiNormalized"), QJsonObject{
             {QStringLiteral("x"), roi.x()},
@@ -69,6 +74,51 @@ ToolRequest requestWithImage(const ToolConfig &config, const cv::Mat &image)
     return request;
 }
 
+QString smokeModelDir(const QString &name)
+{
+    QDir dir(QDir::tempPath());
+    const QString path = dir.filePath(
+                QStringLiteral("registered_classification_adapter_smoke_model/%1").arg(name));
+    QDir(path).removeRecursively();
+    dir.mkpath(path);
+    return path;
+}
+
+cv::Mat makeBrightTrainingImage()
+{
+    cv::Mat image(80, 100, CV_8UC3, cv::Scalar(30, 30, 30));
+    cv::rectangle(image, cv::Rect(20, 20, 40, 30), cv::Scalar(220, 220, 220), -1);
+    return image;
+}
+
+cv::Mat makeDarkTrainingImage()
+{
+    cv::Mat image(80, 100, CV_8UC3, cv::Scalar(220, 220, 220));
+    cv::rectangle(image, cv::Rect(20, 20, 40, 30), cv::Scalar(30, 30, 30), -1);
+    return image;
+}
+
+RegisteredClassificationTrainingRequest makeTrainingRequest(const QString &modelDir)
+{
+    RegisteredClassificationTrainingRequest request;
+    request.outputModelDir = modelDir;
+    request.classLabels = {
+        {0, QStringLiteral("OK")},
+        {1, QStringLiteral("NG")}
+    };
+    request.mlp.numHidden = 8;
+    request.mlp.maxIterations = 100;
+    request.mlp.randSeed = 42;
+    request.thresholds.minScore = 80;
+    request.thresholds.rejectScore = 60;
+    request.thresholds.top2Gap = 0;
+    for (int i = 0; i < 4; ++i) {
+        request.samples.append({makeBrightTrainingImage(), QRectF(0.2, 0.2, 0.4, 0.4), 0});
+        request.samples.append({makeDarkTrainingImage(), QRectF(0.2, 0.2, 0.4, 0.4), 1});
+    }
+    return request;
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -81,11 +131,21 @@ int main(int argc, char **argv)
 
     // 一张有效占位图像，用于需要非空图像的异常路径。
     cv::Mat dummyImage = cv::Mat::zeros(64, 64, CV_8UC3);
+    const QString trainedModelDir = smokeModelDir(QStringLiteral("trained"));
+    RegisteredClassificationTrainingRunner trainer;
+    const RegisteredClassificationTrainingResult trainResult =
+            trainer.train(makeTrainingRequest(trainedModelDir));
+    check(trainResult.success, "MLP training fixture must succeed");
+    check(QFileInfo(registeredClassificationMetadataPath(trainedModelDir)).exists(),
+          "fixture metadata.json must exist");
+    check(QFileInfo(registeredClassificationMlpPath(trainedModelDir)).exists(),
+          "fixture model.gmc must exist");
 
     // 1. 空图像 -> image_empty
     {
         ToolConfig config = makeConfig(QStringLiteral("/tmp/DemoModel.hdl"),
                                        QStringLiteral("DemoModel"),
+                                       QStringLiteral("halcon_mlp_registered_classification"),
                                        QStringLiteral("full"),
                                        QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
@@ -95,44 +155,36 @@ int main(int argc, char **argv)
         check(!result.success && !result.ok, "empty image must not report success/ok");
     }
 
-    // 2. 无 modelPath -> no_model
+    // 2. 无 modelPath -> model_path_empty
     {
         ToolConfig config = makeConfig(QString(), QString(),
+                                       QStringLiteral("halcon_mlp_registered_classification"),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
         const ToolResult result = adapter.run(requestWithImage(config, dummyImage));
-        check(result.status == QStringLiteral("no_model"), "missing model must yield no_model");
+        check(result.status == QStringLiteral("model_path_empty"),
+              "missing model path must yield model_path_empty");
     }
 
-    // 3. .scbin 模型 -> unsupported_model_format
+    // 3. 旧 DL modelType -> unsupported_model_type
     {
-        ToolConfig config = makeConfig(QStringLiteral("/tmp/Model.scbin"),
-                                       QStringLiteral("Model"),
+        ToolConfig config = makeConfig(QStringLiteral("/tmp/LegacyModel.hdl"),
+                                       QStringLiteral("LegacyModel"),
+                                       QStringLiteral("halcon_dl_classification"),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
         const ToolResult result = adapter.run(requestWithImage(config, dummyImage));
-        check(result.status == QStringLiteral("unsupported_model_format"),
-              ".scbin must yield unsupported_model_format");
+        check(result.status == QStringLiteral("unsupported_model_type"),
+              "old DL model type must yield unsupported_model_type");
     }
 
-    // 4. 模型名含非法字符 -> invalid_model_name
+    // 4. 模型目录不存在 -> model_file_not_found
     {
-        ToolConfig config = makeConfig(QStringLiteral("/tmp/Bad-Name.hdl"),
-                                       QStringLiteral("Bad-Name"),
-                                       QStringLiteral("full"), QRectF(0, 0, 1, 1),
-                                       QString(), QStringLiteral("class_match"),
-                                       QStringLiteral("OK"), 80);
-        const ToolResult result = adapter.run(requestWithImage(config, dummyImage));
-        check(result.status == QStringLiteral("invalid_model_name"),
-              "illegal model name must yield invalid_model_name");
-    }
-
-    // 5. 模型文件不存在 -> model_file_not_found
-    {
-        ToolConfig config = makeConfig(QStringLiteral("/tmp/__nonexistent_model__.hdl"),
+        ToolConfig config = makeConfig(QStringLiteral("/tmp/__nonexistent_model__"),
                                        QStringLiteral("NonExist"),
+                                       QStringLiteral("halcon_mlp_registered_classification"),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
@@ -141,12 +193,13 @@ int main(int argc, char **argv)
               "missing model file must yield model_file_not_found");
     }
 
-    // 6. 矩形检测 ROI 无效 -> invalid_roi
+    // 5. 矩形检测 ROI 无效 -> invalid_roi
     //    modelPath 用 smoke 自身可执行文件（一定存在）让模型存在性校验通过；
     //    ROI 用极小归一化矩形，在小图上换算后像素 < kMinRoiPixelSize(2)，触发 invalid_roi。
     {
-        ToolConfig config = makeConfig(QCoreApplication::applicationFilePath(),
-                                       QStringLiteral("DemoModel"),
+        ToolConfig config = makeConfig(trainedModelDir,
+                                       QStringLiteral("FixtureModel"),
+                                       QStringLiteral("halcon_mlp_registered_classification"),
                                        QStringLiteral("rectangle"), QRectF(0, 0, 0.05, 0.05),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
@@ -156,10 +209,11 @@ int main(int argc, char **argv)
               "invalid rectangle ROI must yield invalid_roi");
     }
 
-    // 7. class_match 缺 expectedLabel -> missing_expected_label
+    // 6. class_match 缺 expectedLabel -> missing_expected_label
     {
-        ToolConfig config = makeConfig(QCoreApplication::applicationFilePath(),
-                                       QStringLiteral("DemoModel"),
+        ToolConfig config = makeConfig(trainedModelDir,
+                                       QStringLiteral("FixtureModel"),
+                                       QStringLiteral("halcon_mlp_registered_classification"),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QString(), 80);
@@ -168,29 +222,11 @@ int main(int argc, char **argv)
               "class_match without expected label must yield missing_expected_label");
     }
 
-    // 8. modelPath 指向非模型文件（smoke 自身可执行文件）-> read_dl_model 失败
-    //    HALCON so 路径由 resolveHalconLibPath 容错回退到默认库，故不会走到 halcon_so_not_found；
-    //    非模型文件会让 T_read_dl_model 失败，返回 model_load_failed 或 halcon_error。
-    {
-        ToolConfig config = makeConfig(QCoreApplication::applicationFilePath(),
-                                       QStringLiteral("DemoModel"),
-                                       QStringLiteral("full"), QRectF(0, 0, 1, 1),
-                                       QString(), QStringLiteral("class_match"),
-                                       QStringLiteral("OK"), 80);
-        const ToolResult result = adapter.run(requestWithImage(config, dummyImage));
-        const bool isModelLoadError =
-                result.status == QStringLiteral("model_load_failed")
-                || result.status == QStringLiteral("halcon_error")
-                || result.status == QStringLiteral("exception");
-        check(isModelLoadError,
-              "non-model file must yield model_load_failed / halcon_error / exception");
-        check(!result.success && !result.ok, "non-model file must not report success/ok");
-    }
-
-    // 9. 位置修正占位 payload 必须存在且未应用（用一个返回错误的场景验证 payload 字段）。
+    // 7. 位置修正占位 payload 必须存在且未应用（用一个返回错误的场景验证 payload 字段）。
     {
         ToolConfig config = makeConfig(QStringLiteral("/tmp/DemoModel.hdl"),
                                        QStringLiteral("DemoModel"),
+                                       QStringLiteral("halcon_mlp_registered_classification"),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);

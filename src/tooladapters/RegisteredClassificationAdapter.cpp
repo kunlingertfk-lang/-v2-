@@ -63,7 +63,7 @@ RegisteredClassificationHalconConfig toRunnerConfig(const ToolConfig &config)
     runnerConfig.modelName = stringParam(params, QStringLiteral("modelName"));
     runnerConfig.modelType = stringParam(params,
                                          QStringLiteral("modelType"),
-                                         runnerConfig.modelType);
+                                         QStringLiteral("halcon_mlp_registered_classification"));
     runnerConfig.detectRegionType = stringParam(params,
                                                  QStringLiteral("detectRegionType"),
                                                  runnerConfig.detectRegionType);
