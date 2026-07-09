@@ -245,13 +245,9 @@ public:
             return false;
         }
 
-        resolveRequired(m_handle, api.getErrorText, "get_error_text", errorMessage);
-        dlerror();
-        void *utf8Symbol = dlsym(m_handle, "SetHcInterfaceStringEncodingIsUtf8");
-        if (dlerror() == nullptr && utf8Symbol != nullptr)
-            api.setUtf8 = reinterpret_cast<HalconFeatureApi::SetUtf8Fn>(utf8Symbol);
-
-        if (!resolveRequired(m_handle, api.createTuple, "F_create_tuple", errorMessage) ||
+        if (!resolveRequired(m_handle, api.setUtf8, "SetHcInterfaceStringEncodingIsUtf8", errorMessage) ||
+            !resolveRequired(m_handle, api.getErrorText, "get_error_text", errorMessage) ||
+            !resolveRequired(m_handle, api.createTuple, "F_create_tuple", errorMessage) ||
             !resolveRequired(m_handle, api.setDouble, "F_set_d", errorMessage) ||
             !resolveRequired(m_handle, api.setInt, "F_set_i", errorMessage) ||
             !resolveRequired(m_handle, api.setString, "F_set_s", errorMessage) ||
@@ -274,8 +270,7 @@ public:
             return false;
         }
 
-        if (api.setUtf8)
-            api.setUtf8(1);
+        api.setUtf8(1);
         return true;
     }
 
