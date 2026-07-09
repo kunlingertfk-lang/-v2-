@@ -1,7 +1,8 @@
 # Task 3 Report
 
 - Status: DONE
-- Commits made: `cbe08c1fc7eb216a84eaf4f5276f53f842b0b536` (`feat: train registered classification mlp models`)
+- Commits made:
+  - `test: preserve registered classification trained smoke package`
 
 ## Files changed
 
@@ -34,6 +35,7 @@
 18. `git add qt_ui_test.pro smoke/registered_classification_mlp_backend_smoke.cpp smoke/registered_classification_mlp_backend_smoke.pro src/algorithms/recognition/RegisteredClassificationTrainingRunner.h src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp`
 19. `git add -f .superpowers/sdd/task-3-report.md`
 20. `git commit -m "feat: train registered classification mlp models"`
+21. `git add -f .superpowers/sdd/task-3-report.md && git commit --amend --no-edit`
 
 ## Key outputs
 
@@ -54,8 +56,9 @@
   - `F_set_s`
 - Post-implementation smoke build succeeded.
 - Smoke executable output:
-  - `registered_classification_mlp_backend_smoke: metadata and feature checks passed`
+  - `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`
 - Root Qt build succeeded and linked `build/qt_ui_test/bin/qt_ui_test`.
+- Final task commit is recorded in git history.
 
 ## Self-review notes
 
@@ -63,8 +66,30 @@
 - HALCON is used for the MLP training path only; OpenCV remains the image container/bridge.
 - The runner validates output dir, class labels, and per-class valid sample coverage before training.
 - Model package writes go through `<outputModelDir>.tmp` and only swap into place after `model.gmc`, `metadata.json`, and `training_report.json` all exist.
-- The smoke’s `tempModelDir()` helper clears the shared temp root on each call, so the later one-class negative check removes the earlier trained output after it has already been asserted. The checks still pass, but the trained artifacts do not remain on disk after the smoke exits.
+- The smoke now writes the positive training output under `/tmp/registered_classification_mlp_backend_smoke_model/trained` and keeps the one-class negative case in a separate sibling directory, so the trained artifacts remain present after the smoke exits.
 
 ## Concerns
 
-- Minor: the current smoke success line still says `metadata and feature checks passed` even though it now also covers training.
+- None.
+
+## Follow-up Fix
+
+The review finding about post-smoke artifact preservation is fixed in `smoke/registered_classification_mlp_backend_smoke.cpp`:
+
+- Positive training output stays in `/tmp/registered_classification_mlp_backend_smoke_model/trained`.
+- The one-class negative case uses its own temp root and no longer clears the trained output.
+- The smoke now re-checks `model.gmc`, `metadata.json`, and `training_report.json` after the negative case completes.
+- The success banner now reads `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`.
+
+### Commands run
+
+1. `cd smoke && /home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc) && ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke`
+2. `test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/model.gmc && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/metadata.json && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/training_report.json`
+3. `mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)`
+
+### Outputs
+
+- Smoke run output:
+  - `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`
+- Artifact existence check succeeded with exit status `0`.
+- Qt build succeeded.

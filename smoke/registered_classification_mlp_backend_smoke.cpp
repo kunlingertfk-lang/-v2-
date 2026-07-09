@@ -23,8 +23,13 @@ void check(bool condition, const char *message)
 
 QString tempModelDir()
 {
-    QDir dir(QDir::tempPath());
-    const QString path = dir.filePath(QStringLiteral("registered_classification_mlp_backend_smoke_model"));
+    return QDir::tempPath();
+}
+
+QString smokeModelDir(const QString &name)
+{
+    QDir dir(tempModelDir());
+    const QString path = dir.filePath(QStringLiteral("registered_classification_mlp_backend_smoke_model/%1").arg(name));
     QDir(path).removeRecursively();
     dir.mkpath(path);
     return path;
@@ -99,7 +104,7 @@ int main(int argc, char **argv)
     metadata.mlp.randSeed = 42;
     metadata.trainingSampleCount = 6;
 
-    const QString modelDir = tempModelDir();
+    const QString modelDir = smokeModelDir(QStringLiteral("metadata"));
     const RegisteredClassificationModelPackageResult writeResult =
             writeRegisteredClassificationMetadata(modelDir, metadata);
     check(writeResult.success, "metadata write must succeed");
@@ -171,12 +176,21 @@ int main(int argc, char **argv)
               "missing HALCON symbols status must be halcon_symbol_missing");
     }
 
-    const QString trainedModelDir = QDir(tempModelDir()).filePath(QStringLiteral("trained"));
+    const QString trainedModelDir = smokeModelDir(QStringLiteral("trained"));
     RegisteredClassificationTrainingRunner trainer;
     const RegisteredClassificationTrainingResult trainResult =
             trainer.train(makeTrainingRequest(trainedModelDir));
     check(trainResult.success, "MLP training must succeed");
     check(trainResult.status == QStringLiteral("ok"), "training status must be ok");
+
+    RegisteredClassificationTrainingRequest oneClass = makeTrainingRequest(
+                smokeModelDir(QStringLiteral("one_class")));
+    oneClass.classLabels = {{0, QStringLiteral("Only")}};
+    const RegisteredClassificationTrainingResult oneClassResult = trainer.train(oneClass);
+    check(!oneClassResult.success, "one-class training must fail");
+    check(oneClassResult.status == QStringLiteral("training_not_enough_classes"),
+          "one-class training status must be training_not_enough_classes");
+
     check(QFileInfo(registeredClassificationMlpPath(trainedModelDir)).exists(),
           "training must create model.gmc");
     check(QFileInfo(registeredClassificationMetadataPath(trainedModelDir)).exists(),
@@ -184,16 +198,8 @@ int main(int argc, char **argv)
     check(QFileInfo(registeredClassificationTrainingReportPath(trainedModelDir)).exists(),
           "training must create training_report.json");
 
-    RegisteredClassificationTrainingRequest oneClass = makeTrainingRequest(
-                QDir(tempModelDir()).filePath(QStringLiteral("one_class")));
-    oneClass.classLabels = {{0, QStringLiteral("Only")}};
-    const RegisteredClassificationTrainingResult oneClassResult = trainer.train(oneClass);
-    check(!oneClassResult.success, "one-class training must fail");
-    check(oneClassResult.status == QStringLiteral("training_not_enough_classes"),
-          "one-class training status must be training_not_enough_classes");
-
     if (g_failures > 0)
         return 1;
-    std::cout << "registered_classification_mlp_backend_smoke: metadata and feature checks passed" << std::endl;
+    std::cout << "registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed" << std::endl;
     return 0;
 }
