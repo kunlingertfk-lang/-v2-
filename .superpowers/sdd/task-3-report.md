@@ -93,3 +93,25 @@ The review finding about post-smoke artifact preservation is fixed in `smoke/reg
   - `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`
 - Artifact existence check succeeded with exit status `0`.
 - Qt build succeeded.
+
+## Task 3 Review Fixes
+
+- Fixed `training_report.json` field casing in `RegisteredClassificationTrainingRunner.cpp` from lowercase `error` / `errorLog` to HALCON-spec `Error` / `ErrorLog`.
+- Hardened `HalconMlpHandleGuard` so cleanup only runs after `create_class_mlp` succeeds: `outPtr()` no longer marks the handle valid, and `markCreated()` is called only after a successful create.
+- Extended `registered_classification_mlp_backend_smoke.cpp` to open `training_report.json` after training and assert the exact `Error` and `ErrorLog` keys exist.
+
+### Review-fix commands run
+
+1. `cd smoke && /home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc) && ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke`
+2. `test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/model.gmc && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/metadata.json && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/training_report.json`
+3. `mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)`
+
+### Review-fix outputs
+
+- Red step before the runner patch:
+  - `FAIL: training_report.json must contain Error`
+  - `FAIL: training_report.json must contain ErrorLog`
+- Post-fix smoke run:
+  - `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`
+- Artifact existence check succeeded with exit status `0`.
+- Repo build completed and linked `build/qt_ui_test/bin/qt_ui_test`.

@@ -5,6 +5,8 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QStringList>
 #include <iostream>
@@ -197,6 +199,17 @@ int main(int argc, char **argv)
           "training must create metadata.json");
     check(QFileInfo(registeredClassificationTrainingReportPath(trainedModelDir)).exists(),
           "training must create training_report.json");
+    QFile trainingReportFile(registeredClassificationTrainingReportPath(trainedModelDir));
+    check(trainingReportFile.open(QIODevice::ReadOnly), "training_report.json must be readable");
+    if (trainingReportFile.isOpen()) {
+        const QJsonObject trainingReport =
+                QJsonDocument::fromJson(trainingReportFile.readAll()).object();
+        trainingReportFile.close();
+        check(trainingReport.contains(QStringLiteral("Error")),
+              "training_report.json must contain Error");
+        check(trainingReport.contains(QStringLiteral("ErrorLog")),
+              "training_report.json must contain ErrorLog");
+    }
 
     if (g_failures > 0)
         return 1;

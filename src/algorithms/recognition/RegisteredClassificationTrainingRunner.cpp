@@ -274,10 +274,14 @@ public:
             m_api->clearClassMlp(m_handle.value());
     }
 
-    Htuple *ptr()
+    Htuple *outPtr()
+    {
+        return m_handle.ptr();
+    }
+
+    void markCreated()
     {
         m_hasHandle = true;
-        return m_handle.ptr();
     }
 
     const Htuple &value() const
@@ -523,12 +527,13 @@ RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::t
                                                     preprocessing.value(),
                                                     numComponents.value(),
                                                     randSeed.value(),
-                                                    mlpHandle.ptr());
+                                                    mlpHandle.outPtr());
     if (!halconStatusOk(createStatus)) {
         cleanupTmp();
         return resultWithStatus(QStringLiteral("mlp_create_failed"),
                                 halconErrorText(api, createStatus));
     }
+    mlpHandle.markCreated();
 
     for (const PreparedSample &sample : preparedSamples) {
         features.create(sample.feature.size());
@@ -603,8 +608,8 @@ RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::t
     report.insert(QStringLiteral("invalidSamplesByClass"), mapToJsonObject(invalidSamplesByClass));
     report.insert(QStringLiteral("elapsedMs"), static_cast<double>(timer.elapsed()));
     report.insert(QStringLiteral("halconSoPath"), halconLibPath);
-    report.insert(QStringLiteral("error"), trainError.size() > 0 ? trainError.getDouble(0) : 0.0);
-    report.insert(QStringLiteral("errorLog"), doubleVectorToJson([&errorLog]() {
+    report.insert(QStringLiteral("Error"), trainError.size() > 0 ? trainError.getDouble(0) : 0.0);
+    report.insert(QStringLiteral("ErrorLog"), doubleVectorToJson([&errorLog]() {
         QVector<double> values;
         values.reserve(errorLog.size());
         for (int i = 0; i < errorLog.size(); ++i)
@@ -644,8 +649,8 @@ RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::t
     result.payload.insert(QStringLiteral("validSamplesByClass"), mapToJsonObject(validSamplesByClass));
     result.payload.insert(QStringLiteral("invalidSamplesByClass"), mapToJsonObject(invalidSamplesByClass));
     result.payload.insert(QStringLiteral("warnings"), stringListToJson(warnings));
-    result.payload.insert(QStringLiteral("errorLog"), report.value(QStringLiteral("errorLog")).toArray());
-    result.payload.insert(QStringLiteral("trainingError"), report.value(QStringLiteral("error")));
+    result.payload.insert(QStringLiteral("errorLog"), report.value(QStringLiteral("ErrorLog")).toArray());
+    result.payload.insert(QStringLiteral("trainingError"), report.value(QStringLiteral("Error")));
     result.payload.insert(QStringLiteral("elapsedMs"), report.value(QStringLiteral("elapsedMs")));
     return result;
 }
