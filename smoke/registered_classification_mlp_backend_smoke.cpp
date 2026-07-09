@@ -1,5 +1,6 @@
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "algorithms/recognition/RegisteredClassificationFeatureExtractor.h"
+#include "algorithms/recognition/RegisteredClassificationTrainingRunner.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -49,6 +50,30 @@ cv::Mat makeFeatureImage()
     cv::Mat image(80, 100, CV_8UC3, cv::Scalar(20, 20, 20));
     cv::rectangle(image, cv::Rect(20, 20, 40, 30), cv::Scalar(220, 220, 220), -1);
     return image;
+}
+
+RegisteredClassificationTrainingRequest makeTrainingRequest(const QString &modelDir)
+{
+    RegisteredClassificationTrainingRequest request;
+    request.halconSoPath = QString();
+    request.outputModelDir = modelDir;
+    request.classLabels = {
+        {0, QStringLiteral("Bright")},
+        {1, QStringLiteral("Dark")}
+    };
+    request.mlp.numHidden = 8;
+    request.mlp.maxIterations = 100;
+    request.mlp.randSeed = 42;
+    for (int i = 0; i < 4; ++i) {
+        cv::Mat bright(80, 100, CV_8UC3, cv::Scalar(30, 30, 30));
+        cv::rectangle(bright, cv::Rect(20, 20, 40, 30), cv::Scalar(220, 220, 220), -1);
+        request.samples.append({bright, QRectF(0.2, 0.2, 0.4, 0.4), 0});
+
+        cv::Mat dark(80, 100, CV_8UC3, cv::Scalar(220, 220, 220));
+        cv::rectangle(dark, cv::Rect(20, 20, 40, 30), cv::Scalar(30, 30, 30), -1);
+        request.samples.append({dark, QRectF(0.2, 0.2, 0.4, 0.4), 1});
+    }
+    return request;
 }
 }
 
@@ -145,6 +170,27 @@ int main(int argc, char **argv)
         check(missingSymbols.status == QStringLiteral("halcon_symbol_missing"),
               "missing HALCON symbols status must be halcon_symbol_missing");
     }
+
+    const QString trainedModelDir = QDir(tempModelDir()).filePath(QStringLiteral("trained"));
+    RegisteredClassificationTrainingRunner trainer;
+    const RegisteredClassificationTrainingResult trainResult =
+            trainer.train(makeTrainingRequest(trainedModelDir));
+    check(trainResult.success, "MLP training must succeed");
+    check(trainResult.status == QStringLiteral("ok"), "training status must be ok");
+    check(QFileInfo(registeredClassificationMlpPath(trainedModelDir)).exists(),
+          "training must create model.gmc");
+    check(QFileInfo(registeredClassificationMetadataPath(trainedModelDir)).exists(),
+          "training must create metadata.json");
+    check(QFileInfo(registeredClassificationTrainingReportPath(trainedModelDir)).exists(),
+          "training must create training_report.json");
+
+    RegisteredClassificationTrainingRequest oneClass = makeTrainingRequest(
+                QDir(tempModelDir()).filePath(QStringLiteral("one_class")));
+    oneClass.classLabels = {{0, QStringLiteral("Only")}};
+    const RegisteredClassificationTrainingResult oneClassResult = trainer.train(oneClass);
+    check(!oneClassResult.success, "one-class training must fail");
+    check(oneClassResult.status == QStringLiteral("training_not_enough_classes"),
+          "one-class training status must be training_not_enough_classes");
 
     if (g_failures > 0)
         return 1;
