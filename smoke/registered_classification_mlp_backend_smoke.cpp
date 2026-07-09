@@ -1,10 +1,12 @@
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
+#include "algorithms/recognition/RegisteredClassificationFeatureExtractor.h"
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonObject>
 #include <iostream>
+#include <opencv2/imgproc.hpp>
 
 namespace {
 int g_failures = 0;
@@ -24,6 +26,13 @@ QString tempModelDir()
     QDir(path).removeRecursively();
     dir.mkpath(path);
     return path;
+}
+
+cv::Mat makeFeatureImage()
+{
+    cv::Mat image(80, 100, CV_8UC3, cv::Scalar(20, 20, 20));
+    cv::rectangle(image, cv::Rect(20, 20, 40, 30), cv::Scalar(220, 220, 220), -1);
+    return image;
 }
 }
 
@@ -82,6 +91,30 @@ int main(int argc, char **argv)
     check(!missingRead.success, "missing metadata must fail");
     check(missingRead.status == QStringLiteral("model_file_not_found"),
           "missing metadata status must be model_file_not_found");
+
+    RegisteredClassificationFeatureExtractor extractor;
+    RegisteredClassificationFeatureConfig featureConfig;
+    featureConfig.halconSoPath = QString();
+    featureConfig.halconSoPathCandidates.clear();
+
+    const RegisteredClassificationFeatureResult featureResult =
+            extractor.extract(makeFeatureImage(), QRectF(0.1, 0.1, 0.7, 0.7), featureConfig);
+    check(featureResult.success, "feature extraction must succeed on synthetic image");
+    check(featureResult.feature.size() == 28, "feature vector must have v1 length");
+    check(featureResult.featureNames == registeredClassificationFeatureNamesV1(),
+          "feature names must match v1 metadata");
+    check(featureResult.feature.value(0) > 0.0, "roiAspect must be positive");
+    check(featureResult.feature.value(12) >= 0.0, "grayHist00 must be non-negative");
+
+    const RegisteredClassificationFeatureResult emptyFeature =
+            extractor.extract(cv::Mat(), QRectF(0, 0, 1, 1), featureConfig);
+    check(!emptyFeature.success, "empty image feature extraction must fail");
+    check(emptyFeature.status == QStringLiteral("image_empty"), "empty image status must be image_empty");
+
+    const RegisteredClassificationFeatureResult invalidRoi =
+            extractor.extract(makeFeatureImage(), QRectF(0, 0, 0.001, 0.001), featureConfig);
+    check(!invalidRoi.success, "tiny ROI must fail");
+    check(invalidRoi.status == QStringLiteral("invalid_roi"), "tiny ROI status must be invalid_roi");
 
     if (g_failures > 0)
         return 1;

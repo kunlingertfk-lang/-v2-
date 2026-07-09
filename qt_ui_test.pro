@@ -74,6 +74,7 @@ SOURCES += \
     src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
     src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
     src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
+    src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
     src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
     src/algorithms/ai/AiDetectionRunner.cpp \
     src/algorithms/presence/PatternPresenceHalconApi.cpp \
@@ -141,6 +142,7 @@ HEADERS += \
     src/algorithms/recognition/ColorRecognitionHalconRunner.h \
     src/algorithms/recognition/ColorComparisonHalconRunner.h \
     src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+    src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
     src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
     src/algorithms/ai/AiDetectionRunner.h \
     src/algorithms/presence/PatternPresenceHalconApi.h \
