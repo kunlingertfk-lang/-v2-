@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonObject>
+#include <QStringList>
 #include <iostream>
 #include <opencv2/imgproc.hpp>
 
@@ -26,6 +27,21 @@ QString tempModelDir()
     QDir(path).removeRecursively();
     dir.mkpath(path);
     return path;
+}
+
+QString nonHalconSharedLibraryPath()
+{
+    const QStringList candidates = {
+        QStringLiteral("/lib/x86_64-linux-gnu/libc.so.6"),
+        QStringLiteral("/usr/lib/x86_64-linux-gnu/libc.so.6"),
+        QStringLiteral("/lib64/libc.so.6")
+    };
+
+    for (const QString &candidate : candidates) {
+        if (QFileInfo::exists(candidate))
+            return candidate;
+    }
+    return QString();
 }
 
 cv::Mat makeFeatureImage()
@@ -116,8 +132,22 @@ int main(int argc, char **argv)
     check(!invalidRoi.success, "tiny ROI must fail");
     check(invalidRoi.status == QStringLiteral("invalid_roi"), "tiny ROI status must be invalid_roi");
 
+    const QString nonHalconLibraryPath = nonHalconSharedLibraryPath();
+    check(!nonHalconLibraryPath.isEmpty(),
+          "must find a non-HALCON shared library candidate for symbol-missing coverage");
+    if (!nonHalconLibraryPath.isEmpty()) {
+        RegisteredClassificationFeatureConfig missingSymbolConfig = featureConfig;
+        missingSymbolConfig.halconSoPath = nonHalconLibraryPath;
+
+        const RegisteredClassificationFeatureResult missingSymbols =
+                extractor.extract(makeFeatureImage(), QRectF(0.1, 0.1, 0.7, 0.7), missingSymbolConfig);
+        check(!missingSymbols.success, "non-HALCON shared library must fail feature extraction");
+        check(missingSymbols.status == QStringLiteral("halcon_symbol_missing"),
+              "missing HALCON symbols status must be halcon_symbol_missing");
+    }
+
     if (g_failures > 0)
         return 1;
-    std::cout << "registered_classification_mlp_backend_smoke: metadata checks passed" << std::endl;
+    std::cout << "registered_classification_mlp_backend_smoke: metadata and feature checks passed" << std::endl;
     return 0;
 }
