@@ -29,11 +29,15 @@ SOURCES += \
     registered_classification_mlp_backend_smoke.cpp \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
-    ../src/algorithms/halcon/HalconRuntimePaths.cpp
+    ../src/algorithms/halcon/HalconRuntimePaths.cpp \
+    ../src/toolcore/PositionCorrection.cpp
 
 HEADERS += \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+    ../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
-    ../src/algorithms/halcon/HalconRuntimePaths.h
+    ../src/algorithms/halcon/HalconRuntimePaths.h \
+    ../src/toolcore/PositionCorrection.h

@@ -1,5 +1,6 @@
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "algorithms/recognition/RegisteredClassificationFeatureExtractor.h"
+#include "algorithms/recognition/RegisteredClassificationHalconRunner.h"
 #include "algorithms/recognition/RegisteredClassificationTrainingRunner.h"
 
 #include <QCoreApplication>
@@ -211,8 +212,39 @@ int main(int argc, char **argv)
               "training_report.json must contain ErrorLog");
     }
 
+    RegisteredClassificationHalconConfig inferConfig;
+    inferConfig.modelPath = trainedModelDir;
+    inferConfig.modelName = QStringLiteral("smoke_mlp");
+    inferConfig.modelType = registeredClassificationMlpModelType();
+    inferConfig.detectRegionType = QStringLiteral("rectangle");
+    inferConfig.roiNormalized = QRectF(0.2, 0.2, 0.4, 0.4);
+    inferConfig.topK = 2;
+    inferConfig.judgeMode = QStringLiteral("class_match");
+    inferConfig.expectedLabel = QStringLiteral("Bright");
+    inferConfig.minScore = 50;
+
+    RegisteredClassificationHalconRunner inferRunner;
+    cv::Mat bright = makeFeatureImage();
+    const RegisteredClassificationHalconResult inferResult = inferRunner.run(bright, inferConfig);
+    check(inferResult.success, "inference must succeed");
+    check(inferResult.status == QStringLiteral("ok"), "inference status must be ok");
+    check(!inferResult.predictedLabel.isEmpty(), "inference must produce a label");
+    check(inferResult.score >= 0.0 && inferResult.score <= 100.0, "score must be 0-100");
+    check(inferResult.payload.value(QStringLiteral("algorithm")).toString()
+                  == registeredClassificationMlpModelType(),
+          "payload algorithm must be MLP registered classification");
+    check(inferResult.payload.value(QStringLiteral("featureVersion")).toString()
+                  == registeredClassificationFeatureVersionV1(),
+          "payload featureVersion must be v1");
+
+    inferConfig.modelType = QStringLiteral("halcon_dl_classification");
+    const RegisteredClassificationHalconResult oldDlResult = inferRunner.run(bright, inferConfig);
+    check(!oldDlResult.success, "old DL model type must fail");
+    check(oldDlResult.status == QStringLiteral("unsupported_model_type"),
+          "old DL model type status must be unsupported_model_type");
+
     if (g_failures > 0)
         return 1;
-    std::cout << "registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed" << std::endl;
+    std::cout << "registered_classification_mlp_backend_smoke: metadata, feature, training, and inference checks passed" << std::endl;
     return 0;
 }

@@ -19,7 +19,7 @@ struct RegisteredClassificationHalconConfig
     QStringList halconSoPathCandidates;
     QString modelPath;
     QString modelName;
-    QString modelType = QStringLiteral("halcon_dl_classification");
+    QString modelType = QStringLiteral("halcon_mlp_registered_classification");
     QString detectRegionType = QStringLiteral("full"); // full | rectangle
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     PositionCorrectionConfig positionCorrection;
@@ -27,6 +27,8 @@ struct RegisteredClassificationHalconConfig
     QString judgeMode = QStringLiteral("class_match"); // class_match | min_score
     QString expectedLabel;
     int minScore = 80;
+    int rejectScore = 60;
+    int top2Gap = 0;
 };
 
 // 单个候选类别结果。
@@ -46,6 +48,8 @@ struct RegisteredClassificationHalconResult
     QString predictedLabel;
     int predictedClassId = -1;
     double score = 0.0; // 0-100
+    int rejectScore = 60;
+    int top2Gap = 0;
     QVector<RegisteredClassificationClassScore> topClasses;
     qint64 elapsedMs = 0;
     QVector<ToolOverlay> overlays;
