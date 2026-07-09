@@ -144,7 +144,7 @@ git rev-parse --short HEAD
 ## Review fix: Important finding
 
 - Scope: `src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp`
-- Commit: `7afd349`
+- Commit: `5a4920e`
 
 ### Fix summary
 
