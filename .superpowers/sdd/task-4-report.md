@@ -96,3 +96,62 @@
 ## Concerns
 
 - None at handoff time.
+
+---
+
+## Review fix follow-up (metadata thresholds + smoke coverage)
+
+- Scope for this follow-up:
+  - `src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp`
+  - `smoke/registered_classification_mlp_backend_smoke.cpp`
+  - `.superpowers/sdd/task-4-report.md`
+- Existing unrelated worktree state observed and preserved:
+  - untracked `docs/FID/RegisteredClassification/tempFunc.mc`
+
+### Findings addressed
+
+1. `RegisteredClassificationHalconRunner` now uses metadata thresholds as Task 4 source of truth:
+   - `effectiveRejectScore = qBound(0, metadata.thresholds.rejectScore, 100)`
+   - `effectiveTop2Gap = qMax(0, metadata.thresholds.top2Gap)`
+   - applied to `classification_rejected`, `classification_ambiguous`, result fields, and payload
+2. Smoke now asserts higher-risk inference behavior:
+   - `predictedLabel == "Bright"`
+   - `predictedClassId == 0`
+   - payload `topClasses` exists and first entry matches predicted label/class id
+   - payload `rejectScore` reflects metadata threshold
+   - metadata-driven `classification_ambiguous`
+   - metadata-driven `classification_rejected`
+
+### Commands run for review fix
+
+1. Test-first smoke update and red run:
+   - `cd smoke && /home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc) && ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke`
+
+   Output:
+   - `FAIL: inference must use metadata rejectScore`
+   - `FAIL: payload rejectScore must come from metadata`
+   - `FAIL: metadata top2Gap must trigger classification_ambiguous`
+   - `FAIL: ambiguity result must expose metadata top2Gap`
+   - `FAIL: ambiguity payload top2Gap must come from metadata`
+   - `FAIL: rejection result must expose metadata rejectScore`
+   - `FAIL: rejection payload rejectScore must come from metadata`
+   - `FAIL: metadata rejectScore must trigger classification_rejected`
+
+2. Verification after runner fix:
+   - `cd smoke && /home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc) && ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke`
+
+   Output:
+   - `registered_classification_mlp_backend_smoke: metadata, feature, training, and inference checks passed`
+
+3. Project build verification:
+   - `mkdir -p build/task4 && cd build/task4 && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../../qt_ui_test.pro && make -j$(nproc)`
+
+   Output:
+   - `qmake ../../qt_ui_test.pro` exit code `0`
+   - `make -j$(nproc)` exit code `0`
+
+4. Whitespace verification:
+   - `git diff --check`
+
+   Output:
+   - exit code `0`

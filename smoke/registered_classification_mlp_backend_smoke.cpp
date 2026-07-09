@@ -60,6 +60,14 @@ cv::Mat makeFeatureImage()
     return image;
 }
 
+cv::Mat makeUncertainImage()
+{
+    cv::Mat image(80, 100, CV_8UC3, cv::Scalar(128, 128, 128));
+    cv::rectangle(image, cv::Rect(20, 20, 20, 30), cv::Scalar(220, 220, 220), -1);
+    cv::rectangle(image, cv::Rect(40, 20, 20, 30), cv::Scalar(30, 30, 30), -1);
+    return image;
+}
+
 RegisteredClassificationTrainingRequest makeTrainingRequest(const QString &modelDir)
 {
     RegisteredClassificationTrainingRequest request;
@@ -72,6 +80,9 @@ RegisteredClassificationTrainingRequest makeTrainingRequest(const QString &model
     request.mlp.numHidden = 8;
     request.mlp.maxIterations = 100;
     request.mlp.randSeed = 42;
+    request.thresholds.minScore = 80;
+    request.thresholds.rejectScore = 97;
+    request.thresholds.top2Gap = 0;
     for (int i = 0; i < 4; ++i) {
         cv::Mat bright(80, 100, CV_8UC3, cv::Scalar(30, 30, 30));
         cv::rectangle(bright, cv::Rect(20, 20, 40, 30), cv::Scalar(220, 220, 220), -1);
@@ -229,13 +240,73 @@ int main(int argc, char **argv)
     check(inferResult.success, "inference must succeed");
     check(inferResult.status == QStringLiteral("ok"), "inference status must be ok");
     check(!inferResult.predictedLabel.isEmpty(), "inference must produce a label");
+    check(inferResult.predictedLabel == QStringLiteral("Bright"),
+          "bright sample must map to Bright");
+    check(inferResult.predictedClassId == 0,
+          "bright sample must map to class id 0");
     check(inferResult.score >= 0.0 && inferResult.score <= 100.0, "score must be 0-100");
+    check(inferResult.rejectScore == 97, "inference must use metadata rejectScore");
+    check(inferResult.top2Gap == 0, "inference must use metadata top2Gap");
+    check(!inferResult.topClasses.isEmpty(), "inference must return topClasses");
+    check(inferResult.topClasses.first().label == inferResult.predictedLabel,
+          "topClasses first label must match predicted label");
+    check(inferResult.topClasses.first().classId == inferResult.predictedClassId,
+          "topClasses first class id must match predicted class id");
     check(inferResult.payload.value(QStringLiteral("algorithm")).toString()
                   == registeredClassificationMlpModelType(),
           "payload algorithm must be MLP registered classification");
     check(inferResult.payload.value(QStringLiteral("featureVersion")).toString()
                   == registeredClassificationFeatureVersionV1(),
           "payload featureVersion must be v1");
+    check(inferResult.payload.value(QStringLiteral("rejectScore")).toInt() == 97,
+          "payload rejectScore must come from metadata");
+    const QJsonArray topClassesJson =
+            inferResult.payload.value(QStringLiteral("topClasses")).toArray();
+    check(!topClassesJson.isEmpty(), "payload topClasses must be non-empty");
+    if (!topClassesJson.isEmpty()) {
+        const QJsonObject firstTopClass = topClassesJson.first().toObject();
+        check(firstTopClass.value(QStringLiteral("label")).toString() == inferResult.predictedLabel,
+              "payload topClasses first label must match predicted label");
+        check(firstTopClass.value(QStringLiteral("classId")).toInt() == inferResult.predictedClassId,
+              "payload topClasses first classId must match predicted class id");
+    }
+
+    RegisteredClassificationModelMetadata thresholdMetadata;
+    const RegisteredClassificationModelPackageResult thresholdRead =
+            readRegisteredClassificationMetadata(trainedModelDir, &thresholdMetadata);
+    check(thresholdRead.success, "trained metadata must be readable for threshold mutation");
+    if (thresholdRead.success) {
+        thresholdMetadata.thresholds.top2Gap = 100;
+        const RegisteredClassificationModelPackageResult ambiguousWrite =
+                writeRegisteredClassificationMetadata(trainedModelDir, thresholdMetadata);
+        check(ambiguousWrite.success, "metadata top2Gap rewrite must succeed");
+
+        const RegisteredClassificationHalconResult ambiguousResult =
+                inferRunner.run(bright, inferConfig);
+        check(ambiguousResult.success, "ambiguity inference must succeed");
+        check(ambiguousResult.status == QStringLiteral("classification_ambiguous"),
+              "metadata top2Gap must trigger classification_ambiguous");
+        check(ambiguousResult.top2Gap == 100,
+              "ambiguity result must expose metadata top2Gap");
+        check(ambiguousResult.payload.value(QStringLiteral("top2Gap")).toInt() == 100,
+              "ambiguity payload top2Gap must come from metadata");
+
+        thresholdMetadata.thresholds.top2Gap = 0;
+        thresholdMetadata.thresholds.rejectScore = 100;
+        const RegisteredClassificationModelPackageResult rejectWrite =
+                writeRegisteredClassificationMetadata(trainedModelDir, thresholdMetadata);
+        check(rejectWrite.success, "metadata rejectScore rewrite must succeed");
+
+        const RegisteredClassificationHalconResult rejectedResult =
+                inferRunner.run(makeUncertainImage(), inferConfig);
+        check(rejectedResult.success, "rejection inference must succeed");
+        check(rejectedResult.rejectScore == 100,
+              "rejection result must expose metadata rejectScore");
+        check(rejectedResult.payload.value(QStringLiteral("rejectScore")).toInt() == 100,
+              "rejection payload rejectScore must come from metadata");
+        check(rejectedResult.status == QStringLiteral("classification_rejected"),
+              "metadata rejectScore must trigger classification_rejected");
+    }
 
     inferConfig.modelType = QStringLiteral("halcon_dl_classification");
     const RegisteredClassificationHalconResult oldDlResult = inferRunner.run(bright, inferConfig);

@@ -443,6 +443,9 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
                          timer.elapsed());
     }
 
+    const int effectiveRejectScore = qBound(0, metadata.thresholds.rejectScore, 100);
+    const int effectiveTop2Gap = qMax(0, metadata.thresholds.top2Gap);
+
     const QRect roiPixels = isRectangleRegionType(config.detectRegionType)
             ? normalizedRoiToPixels(config.roiNormalized, image.cols, image.rows)
             : QRect(0, 0, image.cols, image.rows);
@@ -596,8 +599,6 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
     }
 
     const RegisteredClassificationClassScore top = topClasses.first();
-    const int rejectScore = qBound(0, config.rejectScore, 100);
-    const int top2Gap = qMax(0, config.top2Gap);
 
     RegisteredClassificationHalconResult result;
     result.success = true;
@@ -607,17 +608,17 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
     result.predictedLabel = top.label;
     result.predictedClassId = top.classId;
     result.score = top.score;
-    result.rejectScore = rejectScore;
-    result.top2Gap = top2Gap;
+    result.rejectScore = effectiveRejectScore;
+    result.top2Gap = effectiveTop2Gap;
     result.topClasses = topClasses;
     result.elapsedMs = timer.elapsed();
 
-    if (top.score < static_cast<double>(rejectScore)) {
+    if (top.score < static_cast<double>(effectiveRejectScore)) {
         result.status = QStringLiteral("classification_rejected");
         result.message = QStringLiteral("Top-1 score is below rejectScore.");
-    } else if (top2Gap > 0 && topClasses.size() >= 2) {
+    } else if (effectiveTop2Gap > 0 && topClasses.size() >= 2) {
         const double gap = topClasses.at(0).score - topClasses.at(1).score;
-        if (gap < static_cast<double>(top2Gap)) {
+        if (gap < static_cast<double>(effectiveTop2Gap)) {
             result.status = QStringLiteral("classification_ambiguous");
             result.message = QStringLiteral("Top-1 and Top-2 scores are too close.");
         }
