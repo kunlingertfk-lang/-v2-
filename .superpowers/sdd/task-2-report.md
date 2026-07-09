@@ -141,6 +141,32 @@ git rev-parse --short HEAD
 - The brief’s simplified `moments_region_2nd`/`area_center`/`intensity` shape does not match the actual exported HALCON C ABI on this machine. The working implementation uses the tuple-based `T_*` exports where required, and derives `momentPhi` from `M11/M20/M02`.
 - The smoke only checks feature extraction contract and basic error handling; it does not yet validate numerical expectations for every feature component.
 
+## Review fix: Task 2 HALCON symbol-missing regression coverage
+
+### Commit
+
+- `c3f23c7` (`test: cover registered classification halcon symbol missing`)
+
+### Exact commands
+
+```bash
+cd smoke && /home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc) && ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke
+mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)
+```
+
+### Exact outputs
+
+```text
+g++ -c -pipe -O2 -std=gnu++1z -Wall -Wextra -D_REENTRANT -fPIC -DQT_NO_DEBUG -DQT_GUI_LIB -DQT_CORE_LIB -I. -I../src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I../../../../Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I../build/smoke/registered_classification_mlp_backend/moc -I/usr/include/libdrm -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -o ../build/smoke/registered_classification_mlp_backend/obj/registered_classification_mlp_backend_smoke.o registered_classification_mlp_backend_smoke.cpp
+g++ -Wl,-O1 -Wl,-rpath,/home/tt/Qt/5.15.2/gcc_64/lib -o ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke ../build/smoke/registered_classification_mlp_backend/obj/registered_classification_mlp_backend_smoke.o ../build/smoke/registered_classification_mlp_backend/obj/RegisteredClassificationModelPackage.o ../build/smoke/registered_classification_mlp_backend/obj/RegisteredClassificationFeatureExtractor.o ../build/smoke/registered_classification_mlp_backend/obj/HalconRuntimePaths.o   -L/home/tt/.local/opencv-4.8.0/lib -Wl,-rpath,/home/tt/.local/opencv-4.8.0/lib -lopencv_core -lopencv_imgproc -ldl /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Gui.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Core.so -lGL -lpthread
+registered_classification_mlp_backend_smoke: metadata and feature checks passed
+make: 对“first”无需做任何事。
+```
+
+### Notes
+
+- The new smoke case probes `/lib/x86_64-linux-gnu/libc.so.6`, `/usr/lib/x86_64-linux-gnu/libc.so.6`, and `/lib64/libc.so.6` in that order and asserts `halcon_symbol_missing` when a non-HALCON library loads without the required symbols.
+
 ## Review fix: Important finding
 
 - Scope: `src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp`
