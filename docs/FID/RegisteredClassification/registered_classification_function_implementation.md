@@ -667,6 +667,27 @@ git diff --check
 - 注册分类 smoke 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
 - 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
 
+### 2026-07-10 检测区域完成状态同步与特征诊断
+
+#### 已完成
+
+- 点击检测区域“完成”后，`FrameViewHelper` 退出 ROI 绘制，矩形 ROI 按钮同步取消高亮。
+- 修复 exclusive `QButtonGroup` 无法直接取消唯一选中按钮的问题：刷新 ROI 按钮状态时临时关闭互斥，完成后恢复互斥。
+- 当前 ROI 坐标、ROI overlay、最近测试结果和基准图持续测试模式均保持不变。
+- smoke 增加完成按钮回归断言，覆盖绘制关闭、按钮取消高亮和 ROI 保留。
+
+#### 当前模型特征与偏置诊断
+
+当前 `halcon_mlp_roi_stats_v1` 使用固定 28 维 HALCON 特征：ROI 宽高比和面积比例，前景面积比例和重心，二阶矩 `momentRa/momentRb/momentPhi`，灰度均值/最小值/最大值/偏差，以及 16 个压缩灰度直方图 bin。
+
+当前运行模型的训练报告为 `Circle=2`、`Rectangle=3`、`Polay=2`，只有一张训练图，并明确警告 Circle 和 Polay 样本少于 3 个。模型偏向圆形主要是样本少、类别不均衡、训练图单一和 ROI 混入背景/邻近目标造成的训练数据问题，不表示特征或 HALCON MLP 只支持圆形。
+
+#### 验证结果
+
+- 提交：`f5f7e9c`。
+- `registered_classification_dialog_smoke` 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
+- 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
+
 ### 2026-07-10 基准图持续测试与 ROI 自动复测
 
 #### 已实现功能
