@@ -1,4 +1,5 @@
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
+#include "algorithms/recognition/RegisteredClassificationFeatureExtractor.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -12,6 +13,7 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
+#include <opencv2/imgproc.hpp>
 
 namespace {
 
@@ -72,6 +74,61 @@ QJsonObject classStatsWithFirstClassField(const QJsonObject &classStats,
     classes.replace(0, firstClass);
     mutated.insert(QStringLiteral("classes"), classes);
     return mutated;
+}
+
+cv::Mat makePartImage(double angleDegrees, double scale,
+                      const cv::Scalar &foreground = cv::Scalar(40, 190, 230),
+                      const cv::Scalar &background = cv::Scalar(28, 28, 28),
+                      bool circle = false)
+{
+    cv::Mat image(256, 256, CV_8UC3, background);
+    if (circle) {
+        cv::circle(image, cv::Point(128, 128), qRound(50.0 * scale), foreground, cv::FILLED);
+        return image;
+    }
+
+    const cv::RotatedRect part(cv::Point2f(128.0f, 128.0f),
+                               cv::Size2f(static_cast<float>(112.0 * scale),
+                                          static_cast<float>(58.0 * scale)),
+                               static_cast<float>(angleDegrees));
+    cv::Point2f corners[4];
+    part.points(corners);
+    std::vector<cv::Point> polygon;
+    for (const cv::Point2f &corner : corners)
+        polygon.emplace_back(cvRound(corner.x), cvRound(corner.y));
+    cv::fillConvexPoly(image, polygon, foreground);
+    return image;
+}
+
+double vectorNorm(const QVector<double> &values)
+{
+    double squaredNorm = 0.0;
+    for (double value : values)
+        squaredNorm += value * value;
+    return std::sqrt(squaredNorm);
+}
+
+bool allFinite(const QVector<double> &values)
+{
+    for (double value : values) {
+        if (!std::isfinite(value))
+            return false;
+    }
+    return true;
+}
+
+QString existingNonHalconLibrary()
+{
+    const QStringList candidates = {
+        QStringLiteral("/lib/x86_64-linux-gnu/libm.so.6"),
+        QStringLiteral("/usr/lib/x86_64-linux-gnu/libm.so.6"),
+        QStringLiteral("/lib/x86_64-linux-gnu/libc.so.6")
+    };
+    for (const QString &candidate : candidates) {
+        if (QFileInfo::exists(candidate))
+            return candidate;
+    }
+    return QString();
 }
 
 QStringList expectedFeatureNamesV2()
@@ -257,6 +314,95 @@ int main(int argc, char **argv)
     check(registeredClassificationFeatureGroupsContractV2()
                   == expectedFeatureGroupsContract(),
           "public feature-group builder must expose the exact V2 contract");
+
+    RegisteredClassificationFeatureExtractor extractor;
+    RegisteredClassificationFeatureConfig extractorConfig;
+    RegisteredClassificationFeatureRegion region;
+    region.type = QStringLiteral("rectangle");
+    region.rectNormalized = QRectF(0.05, 0.05, 0.90, 0.90);
+
+    const RegisteredClassificationFeatureResult base =
+            extractor.extractV2(makePartImage(0.0, 1.0), region, extractorConfig);
+    const RegisteredClassificationFeatureResult rotated =
+            extractor.extractV2(makePartImage(45.0, 1.0), region, extractorConfig);
+    const RegisteredClassificationFeatureResult scaled =
+            extractor.extractV2(makePartImage(90.0, 0.70), region, extractorConfig);
+    const RegisteredClassificationFeatureResult rotated180 =
+            extractor.extractV2(makePartImage(180.0, 1.0), region, extractorConfig);
+    const RegisteredClassificationFeatureResult scaledUp =
+            extractor.extractV2(makePartImage(0.0, 1.30), region, extractorConfig);
+    check(base.success && rotated.success && scaled.success
+                  && rotated180.success && scaledUp.success,
+          "rotation and scale variants must extract");
+    check(base.feature.size() == 59, "V2 extractor must return 59 values");
+    check(base.featureNames == registeredClassificationFeatureNamesV2(),
+          "V2 extractor must use the exact public feature order");
+    check(allFinite(base.feature), "V2 features must be finite");
+    check(qAbs(vectorNorm(base.feature) - 1.0) < 1e-6,
+          "V2 output must be L2 normalized");
+    check(base.payload.value(QStringLiteral("canonicalWidth")).toInt() == 128
+                  && base.payload.value(QStringLiteral("canonicalHeight")).toInt() == 128,
+          "V2 payload must report the fixed canonical size");
+
+    const RegisteredClassificationFeatureResult light = extractor.extractV2(
+            makePartImage(0.0, 1.0, cv::Scalar(230, 230, 230), cv::Scalar(25, 25, 25)),
+            region, extractorConfig);
+    const RegisteredClassificationFeatureResult dark = extractor.extractV2(
+            makePartImage(0.0, 1.0, cv::Scalar(25, 25, 25), cv::Scalar(230, 230, 230)),
+            region, extractorConfig);
+    check(light.success && light.foregroundPolarity == QStringLiteral("light"),
+          "light foreground polarity must extract");
+    check(dark.success && dark.foregroundPolarity == QStringLiteral("dark"),
+          "dark foreground polarity must extract");
+
+    const RegisteredClassificationFeatureResult sameColorCircle = extractor.extractV2(
+            makePartImage(0.0, 1.0, cv::Scalar(40, 190, 230), cv::Scalar(28, 28, 28), true),
+            region, extractorConfig);
+    const RegisteredClassificationFeatureResult differentColorRectangle = extractor.extractV2(
+            makePartImage(0.0, 1.0, cv::Scalar(220, 70, 40), cv::Scalar(28, 28, 28)),
+            region, extractorConfig);
+    check(sameColorCircle.success && differentColorRectangle.success,
+          "shape and color comparison fixtures must extract");
+    const double rotationDistance = registeredClassificationFeatureDistance(
+            base.feature, rotated.feature);
+    const double shapeDistance = registeredClassificationFeatureDistance(
+            base.feature, sameColorCircle.feature);
+    const double colorDistance = registeredClassificationFeatureDistance(
+            base.feature, differentColorRectangle.feature);
+    check(shapeDistance > rotationDistance,
+          "rectangle-to-circle distance must exceed rectangle rotation distance");
+    check(shapeDistance > 1e-6, "same-color different-shape features must differ");
+    check(colorDistance > 1e-6, "same-shape different-color features must differ");
+
+    cv::Mat polygonFixture(256, 256, CV_8UC3, cv::Scalar(25, 25, 25));
+    cv::circle(polygonFixture, cv::Point(122, 42), 14, cv::Scalar(235, 235, 235), cv::FILLED);
+    RegisteredClassificationFeatureRegion polygonRegion;
+    polygonRegion.type = QStringLiteral("polygon");
+    polygonRegion.polygonNormalized = {
+        QPointF(0.10, 0.10), QPointF(0.10, 0.90), QPointF(0.55, 0.50)
+    };
+    const RegisteredClassificationFeatureResult polygonExcluded =
+            extractor.extractV2(polygonFixture, polygonRegion, extractorConfig);
+    check(!polygonExcluded.success
+                  && polygonExcluded.status == QStringLiteral("foreground_not_found"),
+          "polygon ROI must use the true polygon instead of its bounding rectangle");
+
+    const RegisteredClassificationFeatureResult uniform = extractor.extractV2(
+            cv::Mat(256, 256, CV_8UC3, cv::Scalar(128, 128, 128)),
+            region, extractorConfig);
+    check(!uniform.success && uniform.status == QStringLiteral("foreground_not_found"),
+          "uniform ROI must not fall back to the whole ROI");
+
+    RegisteredClassificationFeatureConfig missingSymbolConfig;
+    missingSymbolConfig.halconSoPath = existingNonHalconLibrary();
+    const RegisteredClassificationFeatureResult missingSymbol = extractor.extractV2(
+            makePartImage(0.0, 1.0), region, missingSymbolConfig);
+    check(!missingSymbolConfig.halconSoPath.isEmpty(),
+          "missing-symbol test requires an existing non-HALCON shared object");
+    check(!missingSymbol.success
+                  && missingSymbol.status == QStringLiteral("halcon_symbol_missing")
+                  && missingSymbol.message.contains(QStringLiteral("SetHcInterfaceStringEncodingIsUtf8")),
+          "missing HALCON symbol must identify the first missing symbol");
 
     QVector<double> unit(59, 1.0);
     check(normalizeRegisteredClassificationFeature(&unit),
