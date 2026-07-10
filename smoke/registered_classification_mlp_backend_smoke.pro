@@ -27,6 +27,7 @@ LIBS += -lopencv_core -lopencv_imgproc -ldl
 
 SOURCES += \
     registered_classification_mlp_backend_smoke.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
@@ -36,6 +37,7 @@ SOURCES += \
     ../src/toolcore/PositionCorrection.cpp
 
 HEADERS += \
+    ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \

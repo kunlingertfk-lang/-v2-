@@ -1,6 +1,8 @@
 #ifndef ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONMODELPACKAGE_H
 #define ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONMODELPACKAGE_H
 
+#include "algorithms/recognition/RegisteredClassificationFeatureSpace.h"
+
 #include <QJsonObject>
 #include <QString>
 #include <QStringList>
@@ -49,12 +51,82 @@ struct RegisteredClassificationModelPackageResult
     QJsonObject payload;
 };
 
+struct RegisteredClassificationKnnParams
+{
+    int numTrees = 4;
+    int numChecks = 0;
+    double epsilon = 0.0;
+    double sampleWeight = 0.70;
+    double centerWeight = 0.30;
+};
+
+struct RegisteredClassificationKnnThresholds
+{
+    int minSimilarity = 80;
+    int minMargin = 8;
+};
+
+struct RegisteredClassificationClassStats
+{
+    int classId = -1;
+    int sampleCount = 0;
+    bool radiusEnabled = false;
+    double radius = 0.0;
+    double meanDistance = 0.0;
+    double stdDevDistance = 0.0;
+    double maxDistance = 0.0;
+};
+
+struct RegisteredClassificationKnnModelMetadata
+{
+    QString modelType;
+    int schemaVersion = 2;
+    QString featureVersion;
+    QString halconVersion;
+    QVector<RegisteredClassificationClassLabel> classLabels;
+    QStringList featureNames;
+    int featureLength = 0;
+    QJsonObject segmentation;
+    QJsonObject canonicalization;
+    QJsonObject featureGroups;
+    RegisteredClassificationKnnParams knn;
+    RegisteredClassificationKnnThresholds thresholds;
+    int trainingSampleCount = 0;
+};
+
+struct RegisteredClassificationClassStatsDocument
+{
+    int schemaVersion = 2;
+    QString featureVersion;
+    QVector<RegisteredClassificationClassStats> classes;
+};
+
+struct RegisteredClassificationModelInspection
+{
+    bool success = false;
+    bool runnable = false;
+    bool legacy = false;
+    bool hasTrainingSession = false;
+    QString status;
+    QString message;
+    QString modelType;
+    QString featureVersion;
+    int classCount = 0;
+    int trainingSampleCount = 0;
+    RegisteredClassificationKnnModelMetadata metadata;
+};
+
 QString registeredClassificationMlpModelType();
+QString registeredClassificationKnnModelType();
+QString registeredClassificationLegacyMlpModelType();
 QString registeredClassificationFeatureVersionV1();
 QStringList registeredClassificationFeatureNamesV1();
 QString registeredClassificationMetadataPath(const QString &modelDir);
 QString registeredClassificationMlpPath(const QString &modelDir);
 QString registeredClassificationTrainingReportPath(const QString &modelDir);
+QString registeredClassificationSampleKnnPath(const QString &modelDir);
+QString registeredClassificationCenterKnnPath(const QString &modelDir);
+QString registeredClassificationClassStatsPath(const QString &modelDir);
 
 RegisteredClassificationModelPackageResult validateRegisteredClassificationMetadata(
         const RegisteredClassificationModelMetadata &metadata);
@@ -64,5 +136,23 @@ RegisteredClassificationModelPackageResult writeRegisteredClassificationMetadata
 RegisteredClassificationModelPackageResult readRegisteredClassificationMetadata(
         const QString &modelDir,
         RegisteredClassificationModelMetadata *metadata);
+RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnMetadata(
+        const RegisteredClassificationKnnModelMetadata &metadata);
+RegisteredClassificationModelPackageResult writeRegisteredClassificationKnnMetadata(
+        const QString &modelDir,
+        const RegisteredClassificationKnnModelMetadata &metadata);
+RegisteredClassificationModelPackageResult readRegisteredClassificationKnnMetadata(
+        const QString &modelDir,
+        RegisteredClassificationKnnModelMetadata *metadata);
+RegisteredClassificationModelPackageResult writeRegisteredClassificationClassStats(
+        const QString &modelDir,
+        const RegisteredClassificationClassStatsDocument &document);
+RegisteredClassificationModelPackageResult readRegisteredClassificationClassStats(
+        const QString &modelDir,
+        RegisteredClassificationClassStatsDocument *document);
+RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnPackage(
+        const QString &modelDir);
+RegisteredClassificationModelInspection inspectRegisteredClassificationModelPackage(
+        const QString &modelDir);
 
 #endif // ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONMODELPACKAGE_H
