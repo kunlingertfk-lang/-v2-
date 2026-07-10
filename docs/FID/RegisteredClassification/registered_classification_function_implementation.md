@@ -156,7 +156,7 @@ ToolConfig
 |       +-- version = 1
 |       +-- modelPath
 |       +-- modelName
-|       +-- modelType = "halcon_dl_classification"
+|       +-- modelType = "halcon_mlp_registered_classification"
 |       +-- detectRegionType = "full" | "rectangle"
 |       +-- roiNormalized
 |       +-- enablePositionCorrection = true
@@ -173,7 +173,7 @@ ToolConfig
 默认值：
 
 - `version=1`
-- `modelType=halcon_dl_classification`
+- `modelType=halcon_mlp_registered_classification`
 - `detectRegionType=full`
 - `roiNormalized=(0, 0, 1, 1)`
 - `enablePositionCorrection=true`
@@ -186,27 +186,18 @@ ToolConfig
 
 ## HALCON 算法方案
 
-第一优先方案是 HALCON DL 分类推理链：
+当前主线是 HALCON 经典 MLP 分类链：
 
-- `T_read_dl_model`：读取 HALCON DL 分类模型。
-- `T_apply_dl_model`：执行分类推理。
-- `T_set_dl_model_param`：设置运行设备、batch 或推理参数。
-- `T_get_dl_model_param`：读取模型输入尺寸、类别名、输出层等参数。
-- `T_create_dict`：创建 DLSample / 参数字典。
-- `T_set_dict_object`：写入图像对象。
-- `T_set_dict_tuple`：写入 tuple 参数。
-- `T_get_dict_tuple`：读取分类结果。
-- `T_clear_dl_model` / `T_clear_handle`：释放模型和字典句柄。
+- `create_class_mlp`：创建 MLP 分类器。
+- `add_sample_class_mlp`：写入 ROI 特征和类别目标。
+- `train_class_mlp`：训练 MLP。
+- `write_class_mlp` / `read_class_mlp`：保存和读取 `model.gmc`。
+- `classify_class_mlp`：执行 TopK 分类推理。
 - `gen_image_interleaved`：将工程侧 `cv::Mat` 桥接为 HALCON image。
-- `gen_rectangle1` / `reduce_domain`：限制检测 ROI。
-- `clear_obj`：释放 HALCON object。
+- `rgb1_to_gray`、`gen_rectangle1`、`reduce_domain`、`threshold`、`area_center`、`moments_region_2nd`、`intensity`、`gray_histo`：提取固定 28 维 `halcon_mlp_roi_stats_v1` ROI 特征。
+- `clear_class_mlp` / `clear_obj`：释放 HALCON 资源。
 
-备选经典分类链仅用于 HALCON 经典分类模型：
-
-- `read_class_knn` / `read_class_svm` / `read_class_mlp`
-- `T_classify_class_knn` / `T_classify_class_svm` / `T_classify_class_mlp`
-
-备选链不能作为 `.scbin` 的替代解析方案，也不能绕过 HALCON 能力确认。
+`halcon_dl_classification` 不再作为兼容分支保留，旧配置必须返回 `unsupported_model_type`。MLP 链不能作为 `.scbin` 替代解析方案，也不能绕过 HALCON 能力确认。
 
 ## 模型格式策略
 
@@ -218,7 +209,7 @@ ToolConfig
 - HALCON runtime 不存在：返回 `halcon_so_not_found`。
 - HALCON 库加载失败：返回 `halcon_load_failed`。
 - HALCON 必要符号缺失：返回 `halcon_symbol_missing`。
-- HALCON 读取模型失败：返回 `model_load_failed`。
+- HALCON 读取或训练模型失败：返回 `model_load_failed`、`mlp_create_failed` 或 `mlp_train_failed`。
 
 可支持的模型后缀必须以本机 HALCON 实测可读为准。实现前应在功能计划中列出已确认后缀和 HALCON 读取接口。
 
@@ -331,6 +322,44 @@ git diff --check
 - 剩余事项。
 
 ## 实现记录
+
+### 2026-07-09 UI 训练闭环：注册训练窗口接入 HALCON MLP 训练
+
+#### 已实现功能
+
+- `RegisteredClassificationTrainingDialog` 将会话内注册图、类别和 ROI 标注转换为 `RegisteredClassificationTrainingRequest`。
+- 训练窗口在至少两个类别且每类有 ROI 样本时启用 `开始训练`，否则保持禁用并提示补齐样本。
+- `开始训练` 选择输出模型目录后调用 `RegisteredClassificationTrainingRunner::train()`，由后端生成 `model.gmc`、`metadata.json`、`training_report.json`。
+- 训练成功后通过 `trainingCompleted` 信号回填主注册分类 Dialog 的 `modelPath` / `modelName`。
+- 主注册分类 Dialog 默认模型类型修正为 `halcon_mlp_registered_classification`，不再从 UI 默认保存旧的 `halcon_dl_classification`。
+
+#### 验证结果
+
+- `registered_classification_dialog_smoke` 覆盖两类样本可训练、UI 会话转换为真实 MLP 训练请求、模型包三文件生成、训练成功回填主 Dialog 模型路径。
+
+#### 剩余事项
+
+- 模型管理窗口尚未同步真实模型包列表和训练结果。
+- 注册训练会话尚未落盘为可复用数据集。
+- 模型导入/导出仍需按模型包目录进一步完善。
+
+### 2026-07-09 后端替换：HALCON MLP 注册分类闭环
+
+#### 已实现功能
+
+- 注册分类后端主线已从 `halcon_dl_classification` 硬替换为 `halcon_mlp_registered_classification`。
+- 模型包目录结构为 `model.gmc`、`metadata.json`、`training_report.json`。
+- 训练阶段将注册图、类别和 ROI 转为固定 28 维 `halcon_mlp_roi_stats_v1` 特征，并通过 HALCON `create_class_mlp` / `add_sample_class_mlp` / `train_class_mlp` 训练。
+- 推理阶段读取 `model.gmc` 和 `metadata.json`，提取同版本 ROI 特征，通过 `classify_class_mlp` 输出 TopK、类别和置信度。
+- 旧配置 `halcon_dl_classification` 返回 `unsupported_model_type`，不再尝试读取 HALCON DL 模型。
+- 模板匹配、形状模型、姿态归一化和位置修正不属于注册分类后端。
+
+#### 验证结果
+
+- `smoke/registered_classification_mlp_backend_smoke` 通过，覆盖 metadata、feature、training、inference 和旧 DL 拒绝。
+- `smoke/registered_classification_adapter_smoke` 通过，覆盖 adapter 到 MLP 后端的错误和成功路径。
+- `smoke/registered_classification_dialog_smoke` 通过，覆盖 UI 测试运行错误码、训练状态预览和既有 ROI 交互。
+- 主工程 shadow build 通过：`mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)`。
 
 ### 2026-07-02 后端阶段：HALCON DL 分类推理闭环
 
@@ -578,7 +607,7 @@ git diff --check
 
 - 外部导入仍依赖手动文件选择，当前 smoke 未覆盖真实文件导入路径。
 - 当前 ROI、类别和缩略图状态只保存在窗口会话内，不保存为真实数据集。
-- 真实 HALCON 训练、模型生成、数据集落盘和模型管理真实能力仍未接入。
+- 该阶段真实 HALCON 训练、模型生成、数据集落盘和模型管理真实能力仍未接入；后续后端训练能力见 2026-07-09 MLP 后端替换记录。
 
 ### 2026-07-07 注册训练窗口三阶段：ROI 预览页和多 ROI 会话标注
 
@@ -608,7 +637,7 @@ git diff --check
 
 - 大图 overlay 的点击选中 ROI 暂未实现，仍作为后续优化；当前只实现预览页卡片选中和右键删除单个 ROI。
 - ROI、类别和预览卡片仍为窗口会话内状态，不落盘、不生成真实数据集。
-- 真实 HALCON 训练、模型生成、数据集落盘和 `.scbin` 支持仍未接入。
+- 该阶段真实 HALCON 训练、模型生成、数据集落盘和 `.scbin` 支持仍未接入；后续后端训练能力见 2026-07-09 MLP 后端替换记录，`.scbin` 仍不支持。
 
 ### 2026-07-07 注册训练窗口四阶段：标签类型行点击切换当前类别
 
