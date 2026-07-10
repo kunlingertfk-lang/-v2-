@@ -97,6 +97,43 @@ RegisteredClassificationModelPackageResult readJsonObject(const QString &path,
     return result(true, QStringLiteral("ok"), QStringLiteral("json read"));
 }
 
+RegisteredClassificationModelPackageResult validateKnnContractJson(const QJsonObject &root)
+{
+    const QJsonValue knnValue = root.value(QStringLiteral("knn"));
+    const QJsonValue thresholdsValue = root.value(QStringLiteral("thresholds"));
+    if (!knnValue.isObject() || !thresholdsValue.isObject()) {
+        return result(false, QStringLiteral("invalid_knn_parameters"),
+                      QStringLiteral("Schema 2 metadata must explicitly persist KNN and threshold objects."));
+    }
+
+    const QJsonObject knn = knnValue.toObject();
+    const QJsonObject thresholds = thresholdsValue.toObject();
+    const bool validKnn = knn.value(QStringLiteral("method")).isString()
+            && knn.value(QStringLiteral("method")).toString() == QStringLiteral("classes_distance")
+            && knn.value(QStringLiteral("normalization")).isBool()
+            && !knn.value(QStringLiteral("normalization")).toBool()
+            && knn.value(QStringLiteral("numTrees")).isDouble()
+            && sameDouble(knn.value(QStringLiteral("numTrees")).toDouble(), 4.0)
+            && knn.value(QStringLiteral("numChecks")).isDouble()
+            && sameDouble(knn.value(QStringLiteral("numChecks")).toDouble(), 0.0)
+            && knn.value(QStringLiteral("epsilon")).isDouble()
+            && sameDouble(knn.value(QStringLiteral("epsilon")).toDouble(), 0.0)
+            && knn.value(QStringLiteral("sampleWeight")).isDouble()
+            && sameDouble(knn.value(QStringLiteral("sampleWeight")).toDouble(), 0.70)
+            && knn.value(QStringLiteral("centerWeight")).isDouble()
+            && sameDouble(knn.value(QStringLiteral("centerWeight")).toDouble(), 0.30)
+            && thresholds.value(QStringLiteral("minSimilarity")).isDouble()
+            && sameDouble(thresholds.value(QStringLiteral("minSimilarity")).toDouble(), 80.0)
+            && thresholds.value(QStringLiteral("minMargin")).isDouble()
+            && sameDouble(thresholds.value(QStringLiteral("minMargin")).toDouble(), 8.0);
+    if (!validKnn) {
+        return result(false, QStringLiteral("invalid_knn_parameters"),
+                      QStringLiteral("Schema 2 metadata must explicitly persist the fixed KNN, "
+                                     "fusion, and rejection contract values with JSON types."));
+    }
+    return result(true, QStringLiteral("ok"), QStringLiteral("KNN JSON contract is valid"));
+}
+
 RegisteredClassificationKnnModelMetadata knnMetadataFromJson(const QJsonObject &root)
 {
     RegisteredClassificationKnnModelMetadata loaded;
@@ -497,10 +534,9 @@ RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnMe
                       QStringLiteral("KNN method must be classes_distance, normalization must be false, "
                                      "and parameters must match the fixed V2 contract."));
     }
-    if (metadata.thresholds.minSimilarity < 0 || metadata.thresholds.minSimilarity > 100
-            || metadata.thresholds.minMargin < 0 || metadata.thresholds.minMargin > 100) {
-        return result(false, QStringLiteral("invalid_knn_thresholds"),
-                      QStringLiteral("KNN thresholds must be in the range 0..100."));
+    if (metadata.thresholds.minSimilarity != 80 || metadata.thresholds.minMargin != 8) {
+        return result(false, QStringLiteral("invalid_knn_parameters"),
+                      QStringLiteral("KNN rejection thresholds must match the fixed V2 contract."));
     }
     return result(true, QStringLiteral("ok"), QStringLiteral("schema 2 metadata is valid"));
 }
@@ -546,6 +582,10 @@ RegisteredClassificationModelPackageResult readRegisteredClassificationKnnMetada
         return result(false, QStringLiteral("legacy_model_requires_retraining"),
                       QStringLiteral("Schema 1 MLP models must be retrained as V2 KNN models."));
     }
+
+    const RegisteredClassificationModelPackageResult contractResult = validateKnnContractJson(root);
+    if (!contractResult.success)
+        return contractResult;
 
     const RegisteredClassificationKnnModelMetadata loaded = knnMetadataFromJson(root);
     const RegisteredClassificationModelPackageResult validation =

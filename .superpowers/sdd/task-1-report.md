@@ -122,3 +122,43 @@ Output: `registered_classification_feature_v2_smoke: feature contract and schema
 ```
 
 Output: `registered_classification_mlp_backend_smoke: metadata, feature, training, and inference checks passed` (exit 0).
+
+## Review Fixes: Second Pass
+
+### RED
+
+Command:
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile && make -C build -f registered_classification_feature_v2.Makefile -j8 && ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+Result: exit 1. The amended smoke removed each fixed schema-2 KNN/fusion/rejection field (`method`, `normalization`, `numTrees`, `numChecks`, `epsilon`, `sampleWeight`, `centerWeight`, `minSimilarity`, and `minMargin`). Seven numeric defaults were still accepted. String JSON values for `numTrees` and `minSimilarity` were also accepted, proving `QJsonValue` conversion defaults were masking contract defects.
+
+### GREEN
+
+Schema-2 reads now verify that the `knn` and `thresholds` objects and every fixed persisted KNN/fusion/rejection field are explicitly present, use the required JSON type, and hold the exact V2 value before deserialization. Contract-field defects return `invalid_knn_parameters`. Schema-1 legacy detection remains before the strict schema-2 gate.
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile && make -C build -f registered_classification_feature_v2.Makefile -j8 && ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+Output: `registered_classification_feature_v2_smoke: feature contract and schema 2 package checks passed` (exit 0).
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_mlp_backend_smoke.pro -o build/registered_classification_mlp_backend.Makefile && make -C build -f registered_classification_mlp_backend.Makefile -j8 && ./build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke
+```
+
+Output: `registered_classification_mlp_backend_smoke: metadata, feature, training, and inference checks passed` (exit 0).
+
+```bash
+git diff --check
+```
+
+Result: exit 0.
+
+Changed files:
+
+- `src/algorithms/recognition/RegisteredClassificationModelPackage.cpp`
+- `smoke/registered_classification_feature_v2_smoke.cpp`
+- `.superpowers/sdd/task-1-report.md`

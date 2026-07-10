@@ -220,6 +220,71 @@ int main(int argc, char **argv)
     check(validateRegisteredClassificationKnnPackage(modelDir).success,
           "complete schema 2 package must validate");
 
+    const auto checkMissingFixedContractField = [&](const QString &section,
+                                                    const QString &field) {
+        QJsonObject missingFieldMetadata = metadataJson;
+        QJsonObject sectionJson = missingFieldMetadata.value(section).toObject();
+        sectionJson.remove(field);
+        missingFieldMetadata.insert(section, sectionJson);
+        check(writeMetadataJson(modelDir, missingFieldMetadata),
+              "missing fixed contract field fixture must write");
+        const RegisteredClassificationModelPackageResult missingFieldPackage =
+                validateRegisteredClassificationKnnPackage(modelDir);
+        check(!missingFieldPackage.success,
+              "missing fixed KNN/fusion/rejection field must invalidate the package");
+        check(missingFieldPackage.status == QStringLiteral("invalid_knn_parameters"),
+              "missing fixed contract field must report actionable parameter status");
+    };
+    checkMissingFixedContractField(QStringLiteral("knn"), QStringLiteral("method"));
+    checkMissingFixedContractField(QStringLiteral("knn"), QStringLiteral("normalization"));
+    checkMissingFixedContractField(QStringLiteral("knn"), QStringLiteral("numTrees"));
+    checkMissingFixedContractField(QStringLiteral("knn"), QStringLiteral("numChecks"));
+    checkMissingFixedContractField(QStringLiteral("knn"), QStringLiteral("epsilon"));
+    checkMissingFixedContractField(QStringLiteral("knn"), QStringLiteral("sampleWeight"));
+    checkMissingFixedContractField(QStringLiteral("knn"), QStringLiteral("centerWeight"));
+    checkMissingFixedContractField(QStringLiteral("thresholds"), QStringLiteral("minSimilarity"));
+    checkMissingFixedContractField(QStringLiteral("thresholds"), QStringLiteral("minMargin"));
+
+    QJsonObject malformedNumberMetadata = metadataJson;
+    QJsonObject malformedNumberKnn = malformedNumberMetadata.value(QStringLiteral("knn")).toObject();
+    malformedNumberKnn.insert(QStringLiteral("numTrees"), QStringLiteral("4"));
+    malformedNumberMetadata.insert(QStringLiteral("knn"), malformedNumberKnn);
+    check(writeMetadataJson(modelDir, malformedNumberMetadata),
+          "malformed KNN number fixture must write");
+    const RegisteredClassificationModelPackageResult malformedNumberPackage =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!malformedNumberPackage.success,
+          "string KNN number must invalidate the package");
+    check(malformedNumberPackage.status == QStringLiteral("invalid_knn_parameters"),
+          "string KNN number must report actionable parameter status");
+
+    QJsonObject malformedBoolMetadata = metadataJson;
+    QJsonObject malformedBoolKnn = malformedBoolMetadata.value(QStringLiteral("knn")).toObject();
+    malformedBoolKnn.insert(QStringLiteral("normalization"), QStringLiteral("false"));
+    malformedBoolMetadata.insert(QStringLiteral("knn"), malformedBoolKnn);
+    check(writeMetadataJson(modelDir, malformedBoolMetadata),
+          "malformed KNN boolean fixture must write");
+    const RegisteredClassificationModelPackageResult malformedBoolPackage =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!malformedBoolPackage.success,
+          "string KNN boolean must invalidate the package");
+    check(malformedBoolPackage.status == QStringLiteral("invalid_knn_parameters"),
+          "string KNN boolean must report actionable parameter status");
+
+    QJsonObject malformedThresholdMetadata = metadataJson;
+    QJsonObject malformedThresholds = malformedThresholdMetadata.value(
+            QStringLiteral("thresholds")).toObject();
+    malformedThresholds.insert(QStringLiteral("minSimilarity"), QStringLiteral("80"));
+    malformedThresholdMetadata.insert(QStringLiteral("thresholds"), malformedThresholds);
+    check(writeMetadataJson(modelDir, malformedThresholdMetadata),
+          "malformed threshold number fixture must write");
+    const RegisteredClassificationModelPackageResult malformedThresholdPackage =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!malformedThresholdPackage.success,
+          "string rejection threshold must invalidate the package");
+    check(malformedThresholdPackage.status == QStringLiteral("invalid_knn_parameters"),
+          "string rejection threshold must report actionable parameter status");
+
     QJsonObject alteredMethodMetadata = metadataJson;
     QJsonObject alteredMethodKnn = alteredMethodMetadata.value(QStringLiteral("knn")).toObject();
     alteredMethodKnn.insert(QStringLiteral("method"), QStringLiteral("nearest_neighbor"));
