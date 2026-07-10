@@ -3,6 +3,7 @@
 #include "PlanDialogUtils.h"
 #include "RegisteredClassificationModelManagementDialog.h"
 #include "RegisteredClassificationTrainingDialog.h"
+#include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
@@ -247,7 +248,7 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
     }
     if (m_modelTypeComboBox) {
         const QString modelType = params.value(QStringLiteral("modelType"))
-                .toString(QStringLiteral("halcon_dl_classification"));
+                .toString(registeredClassificationMlpModelType());
         const int index = m_modelTypeComboBox->findData(modelType);
         m_modelTypeComboBox->setCurrentIndex(index >= 0 ? index : 0);
     }
@@ -416,6 +417,20 @@ void RegisteredClassificationDialog::openRegisterTraining()
 {
     auto *dialog = new RegisteredClassificationTrainingDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dialog, &RegisteredClassificationTrainingDialog::trainingCompleted,
+            this, [this](const QString &modelDir, const QString &modelName) {
+        m_modelPath = modelDir;
+        m_modelName = modelName.trimmed().isEmpty()
+                ? QFileInfo(modelDir).fileName()
+                : modelName;
+        if (m_modelTypeComboBox) {
+            const int index = m_modelTypeComboBox->findData(registeredClassificationMlpModelType());
+            if (index >= 0)
+                m_modelTypeComboBox->setCurrentIndex(index);
+        }
+        updateModelLabels();
+        setViewerStatusText(tr("注册分类模型训练完成：%1").arg(m_modelName));
+    });
     dialog->show();
 }
 
@@ -609,7 +624,8 @@ void RegisteredClassificationDialog::buildUi()
     m_advancedCard = card(scrollContent, tr("参数设置"));
     QVBoxLayout *advancedLayout = qobject_cast<QVBoxLayout *>(m_advancedCard->layout());
     m_modelTypeComboBox = new QComboBox(m_advancedCard);
-    m_modelTypeComboBox->addItem(tr("HALCON DL 分类"), QStringLiteral("halcon_dl_classification"));
+    m_modelTypeComboBox->addItem(tr("HALCON MLP 注册分类"),
+                                 registeredClassificationMlpModelType());
     m_modelTypeComboBox->hide();
     m_topKSpinBox = new QSpinBox(m_advancedCard);
     m_topKSpinBox->setRange(1, 10);
@@ -856,7 +872,7 @@ QJsonObject RegisteredClassificationDialog::registeredClassificationParams() con
             ? m_modelTypeComboBox->currentData().toString()
             : QString();
     if (modelType.trimmed().isEmpty())
-        modelType = QStringLiteral("halcon_dl_classification");
+        modelType = registeredClassificationMlpModelType();
     params.insert(QStringLiteral("modelType"), modelType);
     params.insert(QStringLiteral("detectRegionType"), m_detectRegionType);
     params.insert(QStringLiteral("roiNormalized"), rectToJson(effectiveRoiNormalized()));

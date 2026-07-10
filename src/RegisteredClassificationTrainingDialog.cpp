@@ -1,5 +1,6 @@
 #include "RegisteredClassificationTrainingDialog.h"
 
+#include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
@@ -11,6 +12,8 @@
 #include <QComboBox>
 #include <QColor>
 #include <QContextMenuEvent>
+#include <QDateTime>
+#include <QDir>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -20,6 +23,8 @@
 #include <QGraphicsView>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -45,6 +50,7 @@
 #include <QtGlobal>
 
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <functional>
 
@@ -163,38 +169,9 @@ QToolButton *roiButton(QWidget *parent,
     return button;
 }
 
-struct TrainingRoiMark
-{
-    QString type;
-    QRectF rect;
-    QVector<QPointF> polygon;
-};
-
-struct TrainingImageState
-{
-    QImage image;
-    QString name;
-    QMap<int, QVector<TrainingRoiMark>> marksByClass;
-};
-
-struct TrainingSessionState
-{
-    QVector<TrainingImageState> images;
-    QVector<int> visibleImageIndexes;
-    QStringList classes = QStringList() << QStringLiteral("Classification0");
-    int currentImage = -1;
-    int currentClass = 0;
-    QString thumbnailFilter = QStringLiteral("all");
-    int previewClass = -1;
-    int selectedPreviewImage = -1;
-    int selectedPreviewRoi = -1;
-    int activeEditImage = -1;
-    int activeEditClass = -1;
-    int activeEditRoi = -1;
-    int selectedRoiImage = -1;
-    int selectedRoiClass = -1;
-    int selectedRoiIndex = -1;
-};
+using TrainingRoiMark = RegisteredClassificationTrainingRoiMark;
+using TrainingImageState = RegisteredClassificationTrainingImageState;
+using TrainingSessionState = RegisteredClassificationTrainingSessionState;
 
 class ThumbnailHoverFilter : public QObject
 {
@@ -352,10 +329,34 @@ bool markContainsNormalizedPoint(const TrainingRoiMark &mark, const QPointF &poi
     return mark.rect.normalized().contains(point);
 }
 
+QRectF trainingRoiForRunner(const TrainingRoiMark &mark)
+{
+    if (mark.type == QStringLiteral("full"))
+        return QRectF(0.0, 0.0, 1.0, 1.0);
+    return normalizedBoundingRect(mark).intersected(QRectF(0.0, 0.0, 1.0, 1.0));
+}
+
+cv::Mat qImageToBgrMat(const QImage &image)
+{
+    if (image.isNull())
+        return cv::Mat();
+
+    const QImage rgb = image.convertToFormat(QImage::Format_RGB888);
+    cv::Mat rgbMat(rgb.height(),
+                   rgb.width(),
+                   CV_8UC3,
+                   const_cast<uchar *>(rgb.constBits()),
+                   static_cast<size_t>(rgb.bytesPerLine()));
+    cv::Mat bgr;
+    cv::cvtColor(rgbMat, bgr, cv::COLOR_RGB2BGR);
+    return bgr.clone();
+}
+
 } // namespace
 
 RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(QWidget *parent)
     : QDialog(parent)
+    , m_state(new TrainingSessionState)
 {
     setWindowTitle(tr("注册分类"));
     resize(initialDialogSize(parent, QSize(1120, 720)));
@@ -461,7 +462,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     statusLayout->addSpacing(18);
     statusLayout->addWidget(imageStatusLabel);
     statusLayout->addStretch(1);
-    QLabel *editStatusLabel = new QLabel(tr("占位界面，训练算法未接入"), statusBar);
+    QLabel *editStatusLabel = new QLabel(tr("请添加注册图并标注至少两个类别样本"), statusBar);
     statusLayout->addWidget(editStatusLabel);
     previewLayout->addWidget(statusBar);
 
@@ -585,18 +586,18 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     rightLayout->addWidget(options);
 
     QHBoxLayout *bottom = new QHBoxLayout;
-    QLabel *statusLabel = new QLabel(tr("未注册"), rightPanel);
-    statusLabel->setProperty("role", QStringLiteral("stateLabel"));
-    QPushButton *trainButton = new QPushButton(tr("开始训练"), rightPanel);
-    trainButton->setProperty("actionRole", QStringLiteral("primary"));
-    trainButton->setEnabled(false);
-    bottom->addWidget(statusLabel);
+    m_trainStatusLabel = new QLabel(tr("请至少为两个类别添加 ROI 样本"), rightPanel);
+    m_trainStatusLabel->setProperty("role", QStringLiteral("stateLabel"));
+    m_trainButton = new QPushButton(tr("开始训练"), rightPanel);
+    m_trainButton->setProperty("actionRole", QStringLiteral("primary"));
+    m_trainButton->setEnabled(false);
+    bottom->addWidget(m_trainStatusLabel);
     bottom->addStretch(1);
-    bottom->addWidget(trainButton);
+    bottom->addWidget(m_trainButton);
     rightLayout->addLayout(bottom);
     root->addWidget(rightPanel);
 
-    QSharedPointer<TrainingSessionState> state(new TrainingSessionState);
+    QSharedPointer<TrainingSessionState> state = m_state;
 
     auto currentImageState = [state]() -> TrainingImageState * {
         if (state->currentImage < 0 || state->currentImage >= state->images.size())
@@ -656,10 +657,15 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         return count;
     };
 
-    auto refreshStatus = [state, totalMarkCount, imageStatusLabel]() {
+    auto refreshStatus = [this, state, totalMarkCount, imageStatusLabel]() {
+        const int roiCount = totalMarkCount();
+        setProperty("registeredTrainingClassCount", state->classes.size());
+        setProperty("registeredTrainingImageCount", state->images.size());
+        setProperty("registeredTrainingRoiCount", roiCount);
+        refreshTrainingReadiness();
         imageStatusLabel->setText(QObject::tr("图像 %1 / 标注 %2 / 类别 %3")
                                   .arg(state->images.size())
-                                  .arg(totalMarkCount())
+                                  .arg(roiCount)
                                   .arg(state->classes.size()));
     };
 
@@ -1492,6 +1498,27 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         setRoiMode(polygonButton);
     });
 
+    connect(m_trainButton, &QPushButton::clicked, this, [this]() {
+        const QString suggestedName = QStringLiteral("registered_classification_model_%1")
+                .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_hhmmss")));
+        const QString outputModelDir = QFileDialog::getExistingDirectory(
+                    this,
+                    tr("选择注册分类模型输出目录"),
+                    QDir::home().filePath(suggestedName));
+        if (outputModelDir.trimmed().isEmpty())
+            return;
+        const RegisteredClassificationTrainingResult result = trainToModelDir(outputModelDir);
+        if (result.success) {
+            QMessageBox::information(this,
+                                     tr("注册分类训练"),
+                                     tr("训练完成：%1").arg(result.modelDir));
+        } else {
+            QMessageBox::warning(this,
+                                 tr("注册分类训练"),
+                                 tr("%1 | %2").arg(result.status, result.message));
+        }
+    });
+
     connect(previewHelper, &FrameViewHelper::roiChanged, this, [state, previewHelper, rectButton, storeCurrentMark, showCurrentImage](const QRectF &roi) {
         rectButton->setChecked(true);
         previewHelper->setRoiRectNormalized(roi);
@@ -1567,4 +1594,161 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QScrollArea > QWidget > QWidget{background:#ffffff;}"
         "QTableWidget{background:#ffffff;color:#0f172a;border:2px solid #93c5fd;gridline-color:#bfdbfe;font-size:18px;selection-background-color:#dbeafe;}"
         "QHeaderView::section{background:#dbeafe;color:#08386f;font-weight:800;font-size:18px;border:0;padding:8px;}"));
+}
+
+QJsonObject RegisteredClassificationTrainingDialog::buildTrainingRequestPreviewForTest() const
+{
+    QJsonObject json;
+    QJsonArray classNames;
+    if (m_state) {
+        for (const QString &className : m_state->classes)
+            classNames.append(className);
+    }
+    json.insert(QStringLiteral("classNames"), classNames);
+    json.insert(QStringLiteral("classCount"), m_state ? m_state->classes.size() : 0);
+    json.insert(QStringLiteral("imageCount"), m_state ? m_state->images.size() : 0);
+    json.insert(QStringLiteral("roiCount"), trainingSampleCount());
+    json.insert(QStringLiteral("sampleCount"), trainingSampleCount());
+    json.insert(QStringLiteral("trainable"), hasTrainableSamples());
+    json.insert(QStringLiteral("modelType"), registeredClassificationMlpModelType());
+    return json;
+}
+
+RegisteredClassificationTrainingResult
+RegisteredClassificationTrainingDialog::trainToModelDirForTest(const QString &outputModelDir)
+{
+    return trainToModelDir(outputModelDir);
+}
+
+RegisteredClassificationTrainingRequest RegisteredClassificationTrainingDialog::buildTrainingRequest(
+        const QString &outputModelDir) const
+{
+    RegisteredClassificationTrainingRequest request;
+    request.outputModelDir = outputModelDir;
+    request.mlp.numHidden = 16;
+    request.mlp.maxIterations = 200;
+    request.mlp.randSeed = 42;
+    request.thresholds.minScore = 80;
+    request.thresholds.rejectScore = 60;
+    request.thresholds.top2Gap = 0;
+
+    if (!m_state)
+        return request;
+
+    for (int classIndex = 0; classIndex < m_state->classes.size(); ++classIndex) {
+        RegisteredClassificationClassLabel label;
+        label.id = classIndex;
+        label.name = m_state->classes.value(classIndex).trimmed();
+        if (label.name.isEmpty())
+            label.name = tr("Classification%1").arg(classIndex);
+        request.classLabels.append(label);
+    }
+
+    for (const TrainingImageState &imageState : m_state->images) {
+        const cv::Mat image = qImageToBgrMat(imageState.image);
+        if (image.empty())
+            continue;
+        for (auto it = imageState.marksByClass.cbegin(); it != imageState.marksByClass.cend(); ++it) {
+            const int classIndex = it.key();
+            if (classIndex < 0 || classIndex >= m_state->classes.size())
+                continue;
+            for (const TrainingRoiMark &mark : it.value()) {
+                const QRectF roi = trainingRoiForRunner(mark);
+                if (roi.width() <= 0.0 || roi.height() <= 0.0)
+                    continue;
+                RegisteredClassificationTrainingSample sample;
+                sample.image = image.clone();
+                sample.roiNormalized = roi;
+                sample.classId = classIndex;
+                request.samples.append(sample);
+            }
+        }
+    }
+
+    return request;
+}
+
+bool RegisteredClassificationTrainingDialog::hasTrainableSamples() const
+{
+    if (!m_state || m_state->classes.size() < 2)
+        return false;
+
+    int classesWithSamples = 0;
+    for (int classIndex = 0; classIndex < m_state->classes.size(); ++classIndex) {
+        bool hasSample = false;
+        for (const TrainingImageState &imageState : m_state->images) {
+            if (!imageState.marksByClass.value(classIndex).isEmpty()) {
+                hasSample = true;
+                break;
+            }
+        }
+        if (hasSample)
+            ++classesWithSamples;
+    }
+    return classesWithSamples >= 2;
+}
+
+int RegisteredClassificationTrainingDialog::trainingSampleCount() const
+{
+    if (!m_state)
+        return 0;
+    int count = 0;
+    for (const TrainingImageState &imageState : m_state->images) {
+        for (const QVector<TrainingRoiMark> &marks : imageState.marksByClass)
+            count += marks.size();
+    }
+    return count;
+}
+
+bool RegisteredClassificationTrainingDialog::hasPolygonTrainingMarks() const
+{
+    if (!m_state)
+        return false;
+    for (const TrainingImageState &imageState : m_state->images) {
+        for (const QVector<TrainingRoiMark> &marks : imageState.marksByClass) {
+            for (const TrainingRoiMark &mark : marks) {
+                if (mark.type == QStringLiteral("polygon"))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+void RegisteredClassificationTrainingDialog::refreshTrainingReadiness()
+{
+    const bool trainable = hasTrainableSamples();
+    if (m_trainButton)
+        m_trainButton->setEnabled(trainable);
+    if (m_trainStatusLabel) {
+        m_trainStatusLabel->setText(trainable
+                                    ? tr("可训练：%1 个样本").arg(trainingSampleCount())
+                                    : tr("请至少为两个类别添加 ROI 样本"));
+    }
+}
+
+RegisteredClassificationTrainingResult RegisteredClassificationTrainingDialog::trainToModelDir(
+        const QString &outputModelDir)
+{
+    const bool polygonWarning = hasPolygonTrainingMarks();
+    RegisteredClassificationTrainingRunner runner;
+    RegisteredClassificationTrainingResult result =
+            runner.train(buildTrainingRequest(outputModelDir));
+    if (polygonWarning) {
+        const QString warning = tr("多边形 ROI 已按外接矩形参与首版 HALCON MLP 训练。");
+        result.message = result.message.trimmed().isEmpty()
+                ? warning
+                : QStringLiteral("%1 %2").arg(result.message, warning);
+        result.payload.insert(QStringLiteral("polygonBoundingRectWarning"), warning);
+    }
+    if (m_trainStatusLabel) {
+        m_trainStatusLabel->setText(result.success
+                                    ? tr("训练完成：%1 个样本").arg(result.sampleCount)
+                                    : tr("训练失败：%1").arg(result.status));
+    }
+    if (result.success) {
+        const QString modelName = QFileInfo(result.modelDir).fileName();
+        emit trainingCompleted(result.modelDir, modelName);
+    }
+    return result;
 }

@@ -1,5 +1,7 @@
 #include "RegisteredClassificationDialog.h"
+#include "RegisteredClassificationTrainingDialog.h"
 
+#include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/ReferenceImageProvider.h"
@@ -10,8 +12,11 @@
 #include <QComboBox>
 #include <QContextMenuEvent>
 #include <QDialog>
+#include <QDir>
+#include <QFileInfo>
 #include <QFrame>
 #include <QGraphicsView>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
@@ -412,6 +417,21 @@ int main(int argc, char **argv)
             }
             check(classCountLabel && classCountLabel->text().contains(QStringLiteral("1")),
                   "ROI completion must update class list count");
+            RegisteredClassificationTrainingDialog *typedTrainingDialog =
+                    qobject_cast<RegisteredClassificationTrainingDialog *>(trainingDialog);
+            check(typedTrainingDialog != nullptr,
+                  "training dialog must expose registered classification training API");
+            if (typedTrainingDialog) {
+                const QJsonObject preview = typedTrainingDialog->buildTrainingRequestPreviewForTest();
+                check(preview.value(QStringLiteral("classCount")).toInt() >= 1,
+                      "training preview must include classes");
+                check(!preview.value(QStringLiteral("classNames")).toArray().isEmpty(),
+                      "training preview must expose class names");
+                check(preview.value(QStringLiteral("imageCount")).toInt() >= 1,
+                      "training preview must include images after adding registration image");
+                check(preview.value(QStringLiteral("roiCount")).toInt() >= 1,
+                      "training preview must include ROI count after marking ROI");
+            }
             trainingPreviewHelper->setRoiRectNormalized(QRectF(0.46, 0.18, 0.22, 0.25));
             emit trainingPreviewHelper->roiChanged(QRectF(0.46, 0.18, 0.22, 0.25));
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
@@ -663,10 +683,51 @@ int main(int argc, char **argv)
                         QStringLiteral("registeredTrainingClassRow_1"));
             check(firstClassRow != nullptr, "first class row must expose stable object name");
             check(secondClassRow != nullptr, "second class row must expose stable object name");
+            clickWidgetAndProcess(firstClassRow);
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.08, 0.20, 0.18, 0.18));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.08, 0.20, 0.18, 0.18));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
             clickWidgetAndProcess(secondClassRow);
             trainingPreviewHelper->setRoiRectNormalized(QRectF(0.20, 0.20, 0.18, 0.18));
             emit trainingPreviewHelper->roiChanged(QRectF(0.20, 0.20, 0.18, 0.18));
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            RegisteredClassificationTrainingDialog *typedTrainingDialog =
+                    qobject_cast<RegisteredClassificationTrainingDialog *>(trainingDialog);
+            if (typedTrainingDialog) {
+                const QJsonObject preview = typedTrainingDialog->buildTrainingRequestPreviewForTest();
+                check(preview.value(QStringLiteral("classCount")).toInt() == 2,
+                      "training request preview must include two classes");
+                check(preview.value(QStringLiteral("sampleCount")).toInt() >= 2,
+                      "training request preview must include ROI samples");
+                check(preview.value(QStringLiteral("trainable")).toBool(),
+                      "training request preview must become trainable when two classes have ROI samples");
+                check(preview.value(QStringLiteral("modelType")).toString()
+                          == QStringLiteral("halcon_mlp_registered_classification"),
+                      "training request preview must use HALCON MLP model type");
+                const QString modelDir = QDir::temp().filePath(
+                            QStringLiteral("registered_classification_dialog_smoke_ui_training_model"));
+                QDir(modelDir).removeRecursively();
+                const RegisteredClassificationTrainingResult trainResult =
+                        typedTrainingDialog->trainToModelDirForTest(modelDir);
+                check(trainResult.success,
+                      "training dialog must convert UI session into a successful MLP training request");
+                check(QFileInfo(registeredClassificationMlpPath(modelDir)).exists(),
+                      "training dialog train action must create model.gmc");
+                check(QFileInfo(registeredClassificationMetadataPath(modelDir)).exists(),
+                      "training dialog train action must create metadata.json");
+                check(QFileInfo(registeredClassificationTrainingReportPath(modelDir)).exists(),
+                      "training dialog train action must create training_report.json");
+                check(dialog.toToolConfig()
+                          .params.value(QStringLiteral("registeredClassification")).toObject()
+                          .value(QStringLiteral("modelPath")).toString() == modelDir,
+                      "training completion must fill generated model path back to parent dialog");
+                QPushButton *mainDeleteModelButton = buttonByText(dialog, QStringLiteral("删除模型"));
+                if (mainDeleteModelButton)
+                    clickAndProcess(mainDeleteModelButton);
+            }
+            QPushButton *startTrainingButton = buttonByText(*trainingDialog, QStringLiteral("开始训练"));
+            check(startTrainingButton != nullptr && startTrainingButton->isEnabled(),
+                  "start training button must be enabled when two classes have samples");
             QToolButton *previewSecondClassButton = toolButtonByObjectName(*trainingDialog,
                         QStringLiteral("registeredTrainingPreviewClassButton_1"));
             check(previewSecondClassButton != nullptr, "second class row must keep preview button");
@@ -792,14 +853,14 @@ int main(int argc, char **argv)
     QPushButton *referenceButton = buttonByText(dialog, QStringLiteral("基准图测试"));
     check(referenceButton != nullptr, "reference test button must exist");
     clickAndProcess(referenceButton);
-    check(statusText(dialog).contains(QStringLiteral("no_model")),
-          "reference test must pass reference frame as request.image and reach no_model");
+    check(statusText(dialog).contains(QStringLiteral("model_path_empty")),
+          "reference test must pass reference frame as request.image and reach model_path_empty");
 
     QPushButton *testRunButton = buttonByText(dialog, QStringLiteral("测试运行"));
     check(testRunButton != nullptr, "test run button must exist");
     clickAndProcess(testRunButton);
-    check(statusText(dialog).contains(QStringLiteral("no_model")),
-          "test run must pass current camera frame as request.image and reach no_model");
+    check(statusText(dialog).contains(QStringLiteral("model_path_empty")),
+          "test run must pass current camera frame as request.image and reach model_path_empty");
 
     ReferenceImageProvider::instance().clearReferenceFrame();
     CameraFrameProvider::instance().clearFrame();
