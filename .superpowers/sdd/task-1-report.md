@@ -196,3 +196,92 @@ git diff --check adce046..HEAD
 ```
 
 Result: exit 0 after committing the review fix.
+
+## Review Fixes: Fourth Pass
+
+### RED
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile
+make -C build -f registered_classification_feature_v2.Makefile -j8
+./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+The qmake and make steps exited 0. The amended smoke then exited 1 against the
+previous implementation. Exact representative failures were:
+
+```text
+FAIL: every persisted schema 2 root field must be required
+FAIL: every persisted schema 2 root field must be type checked
+FAIL: schema 2 HALCON version must be a non-empty string
+FAIL: fixed non-KNN contract fields must be explicitly persisted
+FAIL: tiny segmentation float tamper must be rejected exactly
+FAIL: tiny KNN epsilon tamper must be rejected exactly
+FAIL: radius must be disabled below three samples
+FAIL: radius must be enabled at three or more samples
+FAIL: disabled class radius must be exactly zero
+FAIL: class sample totals must not wrap signed int accumulation to a metadata match
+```
+
+This established that root conversion defaults, epsilon-tolerant fixed values,
+missing fixed algorithm contracts, unconstrained radius flags, and signed `int`
+sample accumulation still violated the schema-2 writer contract.
+
+### GREEN
+
+Schema-2 metadata now has public builders and initialized defaults for the exact
+segmentation, canonicalization, and feature-group JSON contracts. The strict
+reader validates every persisted root field and nested class-label/feature-name
+entry before conversion, requires a non-empty runtime HALCON version, and
+requires exact fixed keys, JSON types, and values. Fixed floating values use
+roundtrip-exact equality, including KNN epsilon and all weights.
+
+Class stats now require radius disabled with `radius=0` below three samples and
+enabled with radius in `[0.10, 2.00]` from three samples onward. Cross-file sample
+totals use checked `qint64` accumulation before comparison with metadata.
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile
+make -C build -f registered_classification_feature_v2.Makefile -j8
+./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+All three commands exited 0. Output:
+
+```text
+registered_classification_feature_v2_smoke: feature contract and schema 2 package checks passed
+```
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_mlp_backend_smoke.pro -o build/registered_classification_mlp_backend.Makefile
+make -C build -f registered_classification_mlp_backend.Makefile -j8
+./build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke
+```
+
+All three commands exited 0. Output:
+
+```text
+registered_classification_mlp_backend_smoke: metadata, feature, training, and inference checks passed
+```
+
+A fresh main-project shadow build also exited 0:
+
+```bash
+mkdir -p build/task-1-contract-final
+cd build/task-1-contract-final
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake ../../qt_ui_test.pro
+make -j8
+```
+
+The build linked `build/qt_ui_test/bin/qt_ui_test`.
+
+Changed files for this fourth pass:
+
+- `src/algorithms/recognition/RegisteredClassificationModelPackage.h`
+- `src/algorithms/recognition/RegisteredClassificationModelPackage.cpp`
+- `smoke/registered_classification_feature_v2_smoke.cpp`
+- `.superpowers/sdd/task-1-report.md`
+
+No `.pro` or FeatureSpace production changes were needed. The existing package
+layer still intentionally checks `.gnc` files structurally; this pass did not
+expand into HALCON KNN runtime work.

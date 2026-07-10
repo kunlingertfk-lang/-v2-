@@ -79,6 +79,10 @@ struct RegisteredClassificationClassStats
     double maxDistance = 0.0;
 };
 
+QJsonObject registeredClassificationSegmentationContractV2();
+QJsonObject registeredClassificationCanonicalizationContractV2();
+QJsonObject registeredClassificationFeatureGroupsContractV2();
+
 struct RegisteredClassificationKnnModelMetadata
 {
     QString modelType;
@@ -88,9 +92,9 @@ struct RegisteredClassificationKnnModelMetadata
     QVector<RegisteredClassificationClassLabel> classLabels;
     QStringList featureNames;
     int featureLength = 0;
-    QJsonObject segmentation;
-    QJsonObject canonicalization;
-    QJsonObject featureGroups;
+    QJsonObject segmentation = registeredClassificationSegmentationContractV2();
+    QJsonObject canonicalization = registeredClassificationCanonicalizationContractV2();
+    QJsonObject featureGroups = registeredClassificationFeatureGroupsContractV2();
     RegisteredClassificationKnnParams knn;
     RegisteredClassificationKnnThresholds thresholds;
     int trainingSampleCount = 0;

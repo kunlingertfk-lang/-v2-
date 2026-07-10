@@ -84,9 +84,20 @@ bool isJsonInteger(const QJsonValue &value)
             && number <= static_cast<double>(std::numeric_limits<int>::max());
 }
 
-bool sameDouble(double left, double right)
+bool hasExactKeys(const QJsonObject &object, const QStringList &keys)
 {
-    return std::abs(left - right) < 1e-12;
+    return object.keys() == keys;
+}
+
+bool isExactJsonInteger(const QJsonValue &value, int expected)
+{
+    return isJsonInteger(value) && static_cast<int>(value.toDouble()) == expected;
+}
+
+bool isExactJsonDouble(const QJsonValue &value, double expected)
+{
+    return value.isDouble() && std::isfinite(value.toDouble())
+            && value.toDouble() == expected;
 }
 
 RegisteredClassificationModelPackageResult readJsonObject(const QString &path,
@@ -121,30 +132,98 @@ RegisteredClassificationModelPackageResult validateKnnContractJson(const QJsonOb
 
     const QJsonObject knn = knnValue.toObject();
     const QJsonObject thresholds = thresholdsValue.toObject();
-    const bool validKnn = knn.value(QStringLiteral("method")).isString()
+    const bool validKnn = hasExactKeys(knn, {
+                                  QStringLiteral("centerWeight"),
+                                  QStringLiteral("epsilon"),
+                                  QStringLiteral("method"),
+                                  QStringLiteral("normalization"),
+                                  QStringLiteral("numChecks"),
+                                  QStringLiteral("numTrees"),
+                                  QStringLiteral("sampleWeight")})
+            && hasExactKeys(thresholds, {
+                                QStringLiteral("minMargin"),
+                                QStringLiteral("minSimilarity")})
+            && knn.value(QStringLiteral("method")).isString()
             && knn.value(QStringLiteral("method")).toString() == QStringLiteral("classes_distance")
             && knn.value(QStringLiteral("normalization")).isBool()
             && !knn.value(QStringLiteral("normalization")).toBool()
-            && knn.value(QStringLiteral("numTrees")).isDouble()
-            && sameDouble(knn.value(QStringLiteral("numTrees")).toDouble(), 4.0)
-            && knn.value(QStringLiteral("numChecks")).isDouble()
-            && sameDouble(knn.value(QStringLiteral("numChecks")).toDouble(), 0.0)
-            && knn.value(QStringLiteral("epsilon")).isDouble()
-            && sameDouble(knn.value(QStringLiteral("epsilon")).toDouble(), 0.0)
-            && knn.value(QStringLiteral("sampleWeight")).isDouble()
-            && sameDouble(knn.value(QStringLiteral("sampleWeight")).toDouble(), 0.70)
-            && knn.value(QStringLiteral("centerWeight")).isDouble()
-            && sameDouble(knn.value(QStringLiteral("centerWeight")).toDouble(), 0.30)
-            && thresholds.value(QStringLiteral("minSimilarity")).isDouble()
-            && sameDouble(thresholds.value(QStringLiteral("minSimilarity")).toDouble(), 80.0)
-            && thresholds.value(QStringLiteral("minMargin")).isDouble()
-            && sameDouble(thresholds.value(QStringLiteral("minMargin")).toDouble(), 8.0);
+            && isExactJsonInteger(knn.value(QStringLiteral("numTrees")), 4)
+            && isExactJsonInteger(knn.value(QStringLiteral("numChecks")), 0)
+            && isExactJsonDouble(knn.value(QStringLiteral("epsilon")), 0.0)
+            && isExactJsonDouble(knn.value(QStringLiteral("sampleWeight")), 0.70)
+            && isExactJsonDouble(knn.value(QStringLiteral("centerWeight")), 0.30)
+            && isExactJsonInteger(thresholds.value(QStringLiteral("minSimilarity")), 80)
+            && isExactJsonInteger(thresholds.value(QStringLiteral("minMargin")), 8);
     if (!validKnn) {
         return result(false, QStringLiteral("invalid_knn_parameters"),
                       QStringLiteral("Schema 2 metadata must explicitly persist the fixed KNN, "
                                      "fusion, and rejection contract values with JSON types."));
     }
     return result(true, QStringLiteral("ok"), QStringLiteral("KNN JSON contract is valid"));
+}
+
+RegisteredClassificationModelPackageResult validateKnnMetadataRootJson(const QJsonObject &root)
+{
+    const QJsonValue modelType = root.value(QStringLiteral("modelType"));
+    const QJsonValue schemaVersion = root.value(QStringLiteral("schemaVersion"));
+    const QJsonValue featureVersion = root.value(QStringLiteral("featureVersion"));
+    const QJsonValue halconVersion = root.value(QStringLiteral("halconVersion"));
+    const QJsonValue classLabels = root.value(QStringLiteral("classLabels"));
+    const QJsonValue featureNames = root.value(QStringLiteral("featureNames"));
+    const QJsonValue featureLength = root.value(QStringLiteral("featureLength"));
+    const QJsonValue segmentation = root.value(QStringLiteral("segmentation"));
+    const QJsonValue canonicalization = root.value(QStringLiteral("canonicalization"));
+    const QJsonValue featureGroups = root.value(QStringLiteral("featureGroups"));
+    const QJsonValue trainingSampleCount = root.value(QStringLiteral("trainingSampleCount"));
+
+    if (!modelType.isString() || !isJsonInteger(schemaVersion)
+            || !featureVersion.isString() || !halconVersion.isString()
+            || halconVersion.toString().trimmed().isEmpty()
+            || !classLabels.isArray() || !featureNames.isArray()
+            || !isJsonInteger(featureLength) || !segmentation.isObject()
+            || !canonicalization.isObject() || !featureGroups.isObject()
+            || !trainingSampleCount.isDouble() || !isJsonInteger(trainingSampleCount)) {
+        return result(false, QStringLiteral("invalid_metadata_contract"),
+                      QStringLiteral("Schema 2 metadata root fields are missing, empty, or use incorrect JSON types."));
+    }
+
+    const QJsonArray labels = classLabels.toArray();
+    for (int index = 0; index < labels.size(); ++index) {
+        if (!labels.at(index).isObject()) {
+            return result(false, QStringLiteral("invalid_class_label"),
+                          QStringLiteral("classLabels[%1] must be a JSON object.").arg(index));
+        }
+        const QJsonObject label = labels.at(index).toObject();
+        const QJsonValue id = label.value(QStringLiteral("id"));
+        const QJsonValue name = label.value(QStringLiteral("name"));
+        if (!isJsonInteger(id) || !name.isString() || name.toString().trimmed().isEmpty()) {
+            return result(false, QStringLiteral("invalid_class_label"),
+                          QStringLiteral("classLabels[%1] requires an integer id and non-empty string name.")
+                                  .arg(index));
+        }
+    }
+
+    const QJsonArray names = featureNames.toArray();
+    for (int index = 0; index < names.size(); ++index) {
+        if (!names.at(index).isString()) {
+            return result(false, QStringLiteral("invalid_feature_contract"),
+                          QStringLiteral("featureNames[%1] must be a JSON string.").arg(index));
+        }
+    }
+
+    if (segmentation.toObject() != registeredClassificationSegmentationContractV2()) {
+        return result(false, QStringLiteral("invalid_segmentation_contract"),
+                      QStringLiteral("segmentation must exactly match the fixed V2 contract."));
+    }
+    if (canonicalization.toObject() != registeredClassificationCanonicalizationContractV2()) {
+        return result(false, QStringLiteral("invalid_canonicalization_contract"),
+                      QStringLiteral("canonicalization must exactly match the fixed V2 contract."));
+    }
+    if (featureGroups.toObject() != registeredClassificationFeatureGroupsContractV2()) {
+        return result(false, QStringLiteral("invalid_feature_groups_contract"),
+                      QStringLiteral("featureGroups must exactly match the fixed V2 contract."));
+    }
+    return validateKnnContractJson(root);
 }
 
 RegisteredClassificationKnnModelMetadata knnMetadataFromJson(const QJsonObject &root)
@@ -328,6 +407,14 @@ RegisteredClassificationModelPackageResult validateClassStatsDocument(
             return result(false, QStringLiteral("invalid_class_stats"),
                           QStringLiteral("Class stats distances must be finite and non-negative."));
         }
+        if (stats.sampleCount < 3 && (stats.radiusEnabled || stats.radius != 0.0)) {
+            return result(false, QStringLiteral("invalid_class_stats"),
+                          QStringLiteral("Classes below three samples require radiusEnabled=false and radius=0."));
+        }
+        if (stats.sampleCount >= 3 && !stats.radiusEnabled) {
+            return result(false, QStringLiteral("invalid_class_stats"),
+                          QStringLiteral("Classes with three or more samples require radiusEnabled=true."));
+        }
         if (stats.radiusEnabled && (stats.radius < 0.10 || stats.radius > 2.00)) {
             return result(false, QStringLiteral("invalid_class_stats"),
                           QStringLiteral("Enabled class radius must be within [0.10, 2.00]."));
@@ -390,6 +477,48 @@ QStringList registeredClassificationFeatureNamesV1()
             << QStringLiteral("grayHist13")
             << QStringLiteral("grayHist14")
             << QStringLiteral("grayHist15");
+}
+
+QJsonObject registeredClassificationSegmentationContractV2()
+{
+    return {
+        {QStringLiteral("thresholdMethod"), QStringLiteral("max_separability")},
+        {QStringLiteral("thresholdPolarities"),
+         QJsonArray({QStringLiteral("light"), QStringLiteral("dark")})},
+        {QStringLiteral("morphologyRadiusMinimum"), 1.0},
+        {QStringLiteral("morphologyRadiusRoiScale"), 0.005},
+        {QStringLiteral("candidateAreaRatioMin"), 0.02},
+        {QStringLiteral("candidateAreaRatioMax"), 0.98},
+        {QStringLiteral("borderBandRatio"), 0.01},
+        {QStringLiteral("borderTouchDivisor"), 0.05},
+        {QStringLiteral("objectScoreCenterWeight"), 0.55},
+        {QStringLiteral("objectScoreBorderWeight"), 0.30},
+        {QStringLiteral("objectScoreAreaWeight"), 0.15}
+    };
+}
+
+QJsonObject registeredClassificationCanonicalizationContractV2()
+{
+    return {
+        {QStringLiteral("width"), 128},
+        {QStringLiteral("height"), 128},
+        {QStringLiteral("paddingRatio"), 0.08},
+        {QStringLiteral("nearEqualAxisThreshold"), 0.05},
+        {QStringLiteral("occupancyOrientationGridRows"), 4},
+        {QStringLiteral("occupancyOrientationGridColumns"), 4}
+    };
+}
+
+QJsonObject registeredClassificationFeatureGroupsContractV2()
+{
+    return {
+        {QStringLiteral("names"), QJsonArray({
+             QStringLiteral("shape"), QStringLiteral("occupancy"),
+             QStringLiteral("gray"), QStringLiteral("lab"),
+             QStringLiteral("texture")})},
+        {QStringLiteral("dimensions"), QJsonArray({13, 16, 18, 6, 6})},
+        {QStringLiteral("weights"), QJsonArray({0.35, 0.25, 0.15, 0.15, 0.10})}
+    };
 }
 
 QString registeredClassificationMetadataPath(const QString &modelDir)
@@ -561,6 +690,10 @@ RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnMe
         return result(false, QStringLiteral("unsupported_feature_version"),
                       QStringLiteral("Only halcon_registered_feature_v2 is supported."));
     }
+    if (metadata.halconVersion.trimmed().isEmpty()) {
+        return result(false, QStringLiteral("invalid_halcon_version"),
+                      QStringLiteral("halconVersion must be a non-empty runtime version string."));
+    }
     if (metadata.featureNames != registeredClassificationFeatureNamesV2()) {
         return result(false, QStringLiteral("feature_contract_mismatch"),
                       QStringLiteral("featureNames must exactly match the V2 feature contract."));
@@ -585,12 +718,24 @@ RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnMe
         return result(false, QStringLiteral("invalid_training_sample_count"),
                       QStringLiteral("trainingSampleCount must be positive."));
     }
+    if (metadata.segmentation != registeredClassificationSegmentationContractV2()) {
+        return result(false, QStringLiteral("invalid_segmentation_contract"),
+                      QStringLiteral("segmentation must exactly match the fixed V2 contract."));
+    }
+    if (metadata.canonicalization != registeredClassificationCanonicalizationContractV2()) {
+        return result(false, QStringLiteral("invalid_canonicalization_contract"),
+                      QStringLiteral("canonicalization must exactly match the fixed V2 contract."));
+    }
+    if (metadata.featureGroups != registeredClassificationFeatureGroupsContractV2()) {
+        return result(false, QStringLiteral("invalid_feature_groups_contract"),
+                      QStringLiteral("featureGroups must exactly match the fixed V2 contract."));
+    }
     if (metadata.knn.method != QStringLiteral("classes_distance")
             || metadata.knn.normalization
             || metadata.knn.numTrees != 4 || metadata.knn.numChecks != 0
-            || !sameDouble(metadata.knn.epsilon, 0.0)
-            || !sameDouble(metadata.knn.sampleWeight, 0.70)
-            || !sameDouble(metadata.knn.centerWeight, 0.30)) {
+            || metadata.knn.epsilon != 0.0
+            || metadata.knn.sampleWeight != 0.70
+            || metadata.knn.centerWeight != 0.30) {
         return result(false, QStringLiteral("invalid_knn_parameters"),
                       QStringLiteral("KNN method must be classes_distance, normalization must be false, "
                                      "and parameters must match the fixed V2 contract."));
@@ -644,7 +789,8 @@ RegisteredClassificationModelPackageResult readRegisteredClassificationKnnMetada
                       QStringLiteral("Schema 1 MLP models must be retrained as V2 KNN models."));
     }
 
-    const RegisteredClassificationModelPackageResult contractResult = validateKnnContractJson(root);
+    const RegisteredClassificationModelPackageResult contractResult =
+            validateKnnMetadataRootJson(root);
     if (!contractResult.success)
         return contractResult;
 
@@ -748,15 +894,20 @@ RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnPa
     QSet<int> metadataClassIds;
     for (const RegisteredClassificationClassLabel &label : metadata.classLabels)
         metadataClassIds.insert(label.id);
-    int sampleCount = 0;
+    qint64 sampleCount = 0;
     for (const RegisteredClassificationClassStats &classStats : stats.classes) {
         if (!metadataClassIds.contains(classStats.classId)) {
             return result(false, QStringLiteral("class_stats_mismatch"),
                           QStringLiteral("Class stats include an unknown class id."));
         }
-        sampleCount += classStats.sampleCount;
+        const qint64 classSampleCount = static_cast<qint64>(classStats.sampleCount);
+        if (classSampleCount > std::numeric_limits<qint64>::max() - sampleCount) {
+            return result(false, QStringLiteral("invalid_class_stats_overflow"),
+                          QStringLiteral("Class stats sample total exceeds the supported range."));
+        }
+        sampleCount += classSampleCount;
     }
-    if (sampleCount != metadata.trainingSampleCount) {
+    if (sampleCount != static_cast<qint64>(metadata.trainingSampleCount)) {
         return result(false, QStringLiteral("class_stats_mismatch"),
                       QStringLiteral("Class stats sample count does not match metadata."));
     }

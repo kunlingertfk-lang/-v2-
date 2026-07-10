@@ -10,6 +10,7 @@
 #include <QtMath>
 
 #include <iostream>
+#include <cmath>
 #include <limits>
 
 namespace {
@@ -73,6 +74,113 @@ QJsonObject classStatsWithFirstClassField(const QJsonObject &classStats,
     return mutated;
 }
 
+QStringList expectedFeatureNamesV2()
+{
+    return {
+        QStringLiteral("shapeAspectShortLong"),
+        QStringLiteral("shapeFillRatio"),
+        QStringLiteral("shapeCircularity"),
+        QStringLiteral("shapeCompactnessReciprocal"),
+        QStringLiteral("shapeConvexity"),
+        QStringLiteral("shapeRectangularity"),
+        QStringLiteral("shapeAnisometryReciprocal"),
+        QStringLiteral("shapeBulkiness"),
+        QStringLiteral("shapeStructureFactor"),
+        QStringLiteral("shapeMomentPsi1"),
+        QStringLiteral("shapeMomentPsi2"),
+        QStringLiteral("shapeMomentPsi3"),
+        QStringLiteral("shapeMomentPsi4"),
+        QStringLiteral("occupancyR0C0"),
+        QStringLiteral("occupancyR0C1"),
+        QStringLiteral("occupancyR0C2"),
+        QStringLiteral("occupancyR0C3"),
+        QStringLiteral("occupancyR1C0"),
+        QStringLiteral("occupancyR1C1"),
+        QStringLiteral("occupancyR1C2"),
+        QStringLiteral("occupancyR1C3"),
+        QStringLiteral("occupancyR2C0"),
+        QStringLiteral("occupancyR2C1"),
+        QStringLiteral("occupancyR2C2"),
+        QStringLiteral("occupancyR2C3"),
+        QStringLiteral("occupancyR3C0"),
+        QStringLiteral("occupancyR3C1"),
+        QStringLiteral("occupancyR3C2"),
+        QStringLiteral("occupancyR3C3"),
+        QStringLiteral("grayMean"),
+        QStringLiteral("grayDeviation"),
+        QStringLiteral("grayHist00"),
+        QStringLiteral("grayHist01"),
+        QStringLiteral("grayHist02"),
+        QStringLiteral("grayHist03"),
+        QStringLiteral("grayHist04"),
+        QStringLiteral("grayHist05"),
+        QStringLiteral("grayHist06"),
+        QStringLiteral("grayHist07"),
+        QStringLiteral("grayHist08"),
+        QStringLiteral("grayHist09"),
+        QStringLiteral("grayHist10"),
+        QStringLiteral("grayHist11"),
+        QStringLiteral("grayHist12"),
+        QStringLiteral("grayHist13"),
+        QStringLiteral("grayHist14"),
+        QStringLiteral("grayHist15"),
+        QStringLiteral("labMeanL"),
+        QStringLiteral("labMeanA"),
+        QStringLiteral("labMeanB"),
+        QStringLiteral("labDeviationL"),
+        QStringLiteral("labDeviationA"),
+        QStringLiteral("labDeviationB"),
+        QStringLiteral("textureEntropy"),
+        QStringLiteral("textureAnisotropy"),
+        QStringLiteral("coocEnergy"),
+        QStringLiteral("coocCorrelation"),
+        QStringLiteral("coocHomogeneity"),
+        QStringLiteral("coocContrast")
+    };
+}
+
+QJsonObject expectedSegmentationContract()
+{
+    return {
+        {QStringLiteral("thresholdMethod"), QStringLiteral("max_separability")},
+        {QStringLiteral("thresholdPolarities"),
+         QJsonArray({QStringLiteral("light"), QStringLiteral("dark")})},
+        {QStringLiteral("morphologyRadiusMinimum"), 1.0},
+        {QStringLiteral("morphologyRadiusRoiScale"), 0.005},
+        {QStringLiteral("candidateAreaRatioMin"), 0.02},
+        {QStringLiteral("candidateAreaRatioMax"), 0.98},
+        {QStringLiteral("borderBandRatio"), 0.01},
+        {QStringLiteral("borderTouchDivisor"), 0.05},
+        {QStringLiteral("objectScoreCenterWeight"), 0.55},
+        {QStringLiteral("objectScoreBorderWeight"), 0.30},
+        {QStringLiteral("objectScoreAreaWeight"), 0.15}
+    };
+}
+
+QJsonObject expectedCanonicalizationContract()
+{
+    return {
+        {QStringLiteral("width"), 128},
+        {QStringLiteral("height"), 128},
+        {QStringLiteral("paddingRatio"), 0.08},
+        {QStringLiteral("nearEqualAxisThreshold"), 0.05},
+        {QStringLiteral("occupancyOrientationGridRows"), 4},
+        {QStringLiteral("occupancyOrientationGridColumns"), 4}
+    };
+}
+
+QJsonObject expectedFeatureGroupsContract()
+{
+    return {
+        {QStringLiteral("names"), QJsonArray({
+             QStringLiteral("shape"), QStringLiteral("occupancy"),
+             QStringLiteral("gray"), QStringLiteral("lab"),
+             QStringLiteral("texture")})},
+        {QStringLiteral("dimensions"), QJsonArray({13, 16, 18, 6, 6})},
+        {QStringLiteral("weights"), QJsonArray({0.35, 0.25, 0.15, 0.15, 0.10})}
+    };
+}
+
 RegisteredClassificationKnnModelMetadata validMetadata()
 {
     RegisteredClassificationKnnModelMetadata metadata;
@@ -81,6 +189,7 @@ RegisteredClassificationKnnModelMetadata validMetadata()
     metadata.featureVersion = registeredClassificationFeatureVersionV2();
     metadata.featureNames = registeredClassificationFeatureNamesV2();
     metadata.featureLength = metadata.featureNames.size();
+    metadata.halconVersion = QStringLiteral("24.11-test");
     metadata.classLabels = {{0, QStringLiteral("A")}, {1, QStringLiteral("B")}};
     metadata.trainingSampleCount = 6;
     return metadata;
@@ -105,6 +214,8 @@ RegisteredClassificationClassStatsDocument validClassStats()
     RegisteredClassificationClassStats second;
     second.classId = 1;
     second.sampleCount = 3;
+    second.radiusEnabled = true;
+    second.radius = 0.10;
     document.classes.append(second);
     return document;
 }
@@ -127,16 +238,25 @@ int main(int argc, char **argv)
 
     const QStringList featureNames = registeredClassificationFeatureNamesV2();
     check(featureNames.size() == 59, "V2 feature contract must contain 59 names");
+    check(featureNames == expectedFeatureNamesV2(),
+          "V2 feature names must match the exact 59-name sequence");
     check(QSet<QString>(featureNames.cbegin(), featureNames.cend()).size() == featureNames.size(),
           "V2 feature names must be unique");
     check(registeredClassificationFeatureGroupDimensions() == QVector<int>({13, 16, 18, 6, 6}),
           "V2 feature groups must be 13/16/18/6/6");
 
     const QVector<double> groupWeights = registeredClassificationFeatureGroupWeights();
-    double weightSum = 0.0;
-    for (double weight : groupWeights)
-        weightSum += weight;
-    check(qAbs(weightSum - 1.0) < 1e-9, "V2 feature group weights must sum to one");
+    check(groupWeights == QVector<double>({0.35, 0.25, 0.15, 0.15, 0.10}),
+          "V2 feature weights must match the exact group vector");
+    check(registeredClassificationSegmentationContractV2()
+                  == expectedSegmentationContract(),
+          "public segmentation builder must expose the exact V2 contract");
+    check(registeredClassificationCanonicalizationContractV2()
+                  == expectedCanonicalizationContract(),
+          "public canonicalization builder must expose the exact V2 contract");
+    check(registeredClassificationFeatureGroupsContractV2()
+                  == expectedFeatureGroupsContract(),
+          "public feature-group builder must expose the exact V2 contract");
 
     QVector<double> unit(59, 1.0);
     check(normalizeRegisteredClassificationFeature(&unit),
@@ -161,6 +281,46 @@ int main(int argc, char **argv)
     const RegisteredClassificationRadiusStats disabledRadius =
             registeredClassificationRadiusStats(twoSamples, center);
     check(!disabledRadius.enabled, "radius must be disabled below three samples");
+    check(disabledRadius.radius == 0.0,
+          "disabled feature-space radius must be exactly zero");
+
+    QVector<double> axis0(59, 0.0);
+    QVector<double> axis1(59, 0.0);
+    axis0[0] = 1.0;
+    axis1[1] = 1.0;
+    const QVector<QVector<double>> populationSamples = {axis0, axis0, axis1};
+    const QVector<double> populationCenter =
+            registeredClassificationClassCenter(populationSamples);
+    const RegisteredClassificationRadiusStats populationRadius =
+            registeredClassificationRadiusStats(populationSamples, populationCenter);
+    const double distance0 = registeredClassificationFeatureDistance(axis0, populationCenter);
+    const double distance1 = registeredClassificationFeatureDistance(axis1, populationCenter);
+    const double expectedMean = (distance0 + distance0 + distance1) / 3.0;
+    const double expectedStdDev = std::sqrt(
+            ((distance0 - expectedMean) * (distance0 - expectedMean)
+             + (distance0 - expectedMean) * (distance0 - expectedMean)
+             + (distance1 - expectedMean) * (distance1 - expectedMean)) / 3.0);
+    const double expectedRadius = qBound(
+            0.10, qMax(distance1 * 1.10, expectedMean + 2.5 * expectedStdDev), 2.00);
+    check(populationRadius.enabled, "radius must be enabled at three samples");
+    check(qAbs(populationRadius.meanDistance - expectedMean) < 1e-12,
+          "radius mean must use all population distances");
+    check(qAbs(populationRadius.stdDevDistance - expectedStdDev) < 1e-12,
+          "radius deviation must use population standard deviation");
+    check(qAbs(populationRadius.radius - expectedRadius) < 1e-12,
+          "enabled radius must use the fixed max/formula contract");
+
+    const RegisteredClassificationRadiusStats lowerClampedRadius =
+            registeredClassificationRadiusStats({axis0, axis0, axis0}, axis0);
+    check(lowerClampedRadius.enabled && lowerClampedRadius.radius == 0.10,
+          "enabled radius must clamp to the exact lower bound");
+    QVector<double> negativeAxis0 = axis0;
+    negativeAxis0[0] = -1.0;
+    const RegisteredClassificationRadiusStats upperClampedRadius =
+            registeredClassificationRadiusStats(
+                    {negativeAxis0, negativeAxis0, negativeAxis0}, axis0);
+    check(upperClampedRadius.enabled && upperClampedRadius.radius == 2.00,
+          "enabled radius must clamp to the exact upper bound");
 
     const QString modelDir = smokeModelDir(QStringLiteral("schema_2"));
     const RegisteredClassificationKnnModelMetadata metadata = validMetadata();
@@ -179,12 +339,183 @@ int main(int argc, char **argv)
             ? QJsonDocument::fromJson(metadataFile.readAll()).object()
             : QJsonObject();
     const QJsonObject knnJson = metadataJson.value(QStringLiteral("knn")).toObject();
+    check(metadataJson.value(QStringLiteral("segmentation")).toObject()
+                  == expectedSegmentationContract(),
+          "schema 2 metadata must persist the exact segmentation contract");
+    check(metadataJson.value(QStringLiteral("canonicalization")).toObject()
+                  == expectedCanonicalizationContract(),
+          "schema 2 metadata must persist the exact canonicalization contract");
+    check(metadataJson.value(QStringLiteral("featureGroups")).toObject()
+                  == expectedFeatureGroupsContract(),
+          "schema 2 metadata must persist the exact feature-group contract");
     check(knnJson.value(QStringLiteral("method")).toString()
                   == QStringLiteral("classes_distance"),
           "schema 2 metadata must persist KNN method");
     check(knnJson.contains(QStringLiteral("normalization"))
                   && !knnJson.value(QStringLiteral("normalization")).toBool(true),
           "schema 2 metadata must persist disabled KNN normalization");
+
+    const auto checkInvalidMetadata = [&](const QJsonObject &mutatedMetadata,
+                                          const char *message) {
+        check(writeMetadataJson(modelDir, mutatedMetadata),
+              "mutated metadata fixture must write");
+        RegisteredClassificationKnnModelMetadata rejectedMetadata;
+        const RegisteredClassificationModelPackageResult readResult =
+                readRegisteredClassificationKnnMetadata(modelDir, &rejectedMetadata);
+        check(!readResult.success, message);
+        check(readResult.status.startsWith(QStringLiteral("invalid_")),
+              "malformed schema 2 metadata must report an actionable invalid_* status");
+    };
+
+    const QStringList persistedRootFields = {
+        QStringLiteral("modelType"), QStringLiteral("schemaVersion"),
+        QStringLiteral("featureVersion"), QStringLiteral("halconVersion"),
+        QStringLiteral("classLabels"), QStringLiteral("featureNames"),
+        QStringLiteral("featureLength"), QStringLiteral("segmentation"),
+        QStringLiteral("canonicalization"), QStringLiteral("featureGroups"),
+        QStringLiteral("knn"), QStringLiteral("thresholds"),
+        QStringLiteral("trainingSampleCount")
+    };
+    for (const QString &field : persistedRootFields) {
+        QJsonObject missingRootField = metadataJson;
+        missingRootField.remove(field);
+        checkInvalidMetadata(missingRootField,
+                             "every persisted schema 2 root field must be required");
+    }
+
+    const QVector<QPair<QString, QJsonValue>> wrongRootTypes = {
+        {QStringLiteral("modelType"), true},
+        {QStringLiteral("schemaVersion"), QStringLiteral("2")},
+        {QStringLiteral("featureVersion"), 2},
+        {QStringLiteral("halconVersion"), 24.11},
+        {QStringLiteral("classLabels"), QJsonObject()},
+        {QStringLiteral("featureNames"), QJsonObject()},
+        {QStringLiteral("featureLength"), QStringLiteral("59")},
+        {QStringLiteral("segmentation"), QJsonArray()},
+        {QStringLiteral("canonicalization"), QStringLiteral("fixed")},
+        {QStringLiteral("featureGroups"), QJsonArray()},
+        {QStringLiteral("knn"), QJsonArray()},
+        {QStringLiteral("thresholds"), QJsonArray()},
+        {QStringLiteral("trainingSampleCount"), QStringLiteral("6")}
+    };
+    for (const auto &wrongType : wrongRootTypes) {
+        QJsonObject malformedRoot = metadataJson;
+        malformedRoot.insert(wrongType.first, wrongType.second);
+        checkInvalidMetadata(malformedRoot,
+                             "every persisted schema 2 root field must be type checked");
+    }
+
+    QJsonObject emptyHalconVersion = metadataJson;
+    emptyHalconVersion.insert(QStringLiteral("halconVersion"), QStringLiteral("  "));
+    checkInvalidMetadata(emptyHalconVersion,
+                         "schema 2 HALCON version must be a non-empty string");
+
+    QJsonObject malformedClassLabel = metadataJson;
+    QJsonArray malformedClassLabels = malformedClassLabel.value(
+            QStringLiteral("classLabels")).toArray();
+    malformedClassLabels.replace(0, QStringLiteral("A"));
+    malformedClassLabel.insert(QStringLiteral("classLabels"), malformedClassLabels);
+    checkInvalidMetadata(malformedClassLabel,
+                         "schema 2 class labels must contain JSON objects");
+
+    const auto checkClassLabelField = [&](const QString &field, const QJsonValue &value,
+                                          const char *message) {
+        QJsonObject mutatedMetadata = metadataJson;
+        QJsonArray labels = mutatedMetadata.value(QStringLiteral("classLabels")).toArray();
+        QJsonObject firstLabel = labels.at(0).toObject();
+        firstLabel.insert(field, value);
+        labels.replace(0, firstLabel);
+        mutatedMetadata.insert(QStringLiteral("classLabels"), labels);
+        checkInvalidMetadata(mutatedMetadata, message);
+    };
+    checkClassLabelField(QStringLiteral("id"), QStringLiteral("0"),
+                         "schema 2 class label ids must be integer JSON numbers");
+    checkClassLabelField(QStringLiteral("id"), 0.5,
+                         "schema 2 class label ids must reject fractional numbers");
+    checkClassLabelField(QStringLiteral("name"), 0,
+                         "schema 2 class label names must be JSON strings");
+    checkClassLabelField(QStringLiteral("name"), QStringLiteral("  "),
+                         "schema 2 class label names must be non-empty");
+
+    QJsonObject malformedFeatureName = metadataJson;
+    QJsonArray malformedFeatureNames = malformedFeatureName.value(
+            QStringLiteral("featureNames")).toArray();
+    malformedFeatureNames.replace(0, 7);
+    malformedFeatureName.insert(QStringLiteral("featureNames"), malformedFeatureNames);
+    checkInvalidMetadata(malformedFeatureName,
+                         "schema 2 feature names must all be JSON strings");
+
+    const auto checkFixedObjectTamper = [&](const QString &section,
+                                            const QString &field,
+                                            const QJsonValue &value,
+                                            const char *message) {
+        QJsonObject mutatedMetadata = metadataJson;
+        QJsonObject contract = mutatedMetadata.value(section).toObject();
+        contract.insert(field, value);
+        mutatedMetadata.insert(section, contract);
+        checkInvalidMetadata(mutatedMetadata, message);
+    };
+    const auto checkMissingFixedObjectField = [&](const QString &section,
+                                                  const QString &field) {
+        QJsonObject mutatedMetadata = metadataJson;
+        QJsonObject contract = mutatedMetadata.value(section).toObject();
+        contract.remove(field);
+        mutatedMetadata.insert(section, contract);
+        checkInvalidMetadata(mutatedMetadata,
+                             "fixed non-KNN contract fields must be explicitly persisted");
+    };
+    for (const QString &field : expectedSegmentationContract().keys())
+        checkMissingFixedObjectField(QStringLiteral("segmentation"), field);
+    for (const QString &field : expectedCanonicalizationContract().keys())
+        checkMissingFixedObjectField(QStringLiteral("canonicalization"), field);
+    for (const QString &field : expectedFeatureGroupsContract().keys())
+        checkMissingFixedObjectField(QStringLiteral("featureGroups"), field);
+    checkFixedObjectTamper(QStringLiteral("segmentation"),
+                           QStringLiteral("thresholdPolarities"), QStringLiteral("light,dark"),
+                           "segmentation polarities must retain their JSON array type");
+    checkFixedObjectTamper(QStringLiteral("canonicalization"),
+                           QStringLiteral("width"), QStringLiteral("128"),
+                           "canonical dimensions must retain their integer JSON type");
+    checkFixedObjectTamper(QStringLiteral("featureGroups"),
+                           QStringLiteral("dimensions"), QStringLiteral("13,16,18,6,6"),
+                           "feature-group dimensions must retain their JSON array type");
+    checkFixedObjectTamper(QStringLiteral("segmentation"),
+                           QStringLiteral("morphologyRadiusRoiScale"),
+                           0.005000000000001,
+                           "tiny segmentation float tamper must be rejected exactly");
+    checkFixedObjectTamper(QStringLiteral("segmentation"),
+                           QStringLiteral("objectScoreCenterWeight"),
+                           0.550000000000001,
+                           "tiny object-score weight tamper must be rejected exactly");
+    checkFixedObjectTamper(QStringLiteral("canonicalization"),
+                           QStringLiteral("paddingRatio"),
+                           0.080000000000001,
+                           "tiny canonicalization float tamper must be rejected exactly");
+    QJsonArray tamperedGroupWeights = expectedFeatureGroupsContract().value(
+            QStringLiteral("weights")).toArray();
+    tamperedGroupWeights.replace(0, 0.350000000000001);
+    checkFixedObjectTamper(QStringLiteral("featureGroups"), QStringLiteral("weights"),
+                           tamperedGroupWeights,
+                           "tiny feature-group weight tamper must be rejected exactly");
+    checkFixedObjectTamper(QStringLiteral("knn"), QStringLiteral("epsilon"), 1e-15,
+                           "tiny KNN epsilon tamper must be rejected exactly");
+    checkFixedObjectTamper(QStringLiteral("knn"), QStringLiteral("sampleWeight"),
+                           0.700000000000001,
+                           "tiny KNN sample weight tamper must be rejected exactly");
+    checkFixedObjectTamper(QStringLiteral("knn"), QStringLiteral("centerWeight"),
+                           0.300000000000001,
+                           "tiny KNN center weight tamper must be rejected exactly");
+
+    for (const QString &section : {QStringLiteral("segmentation"),
+                                  QStringLiteral("canonicalization"),
+                                  QStringLiteral("featureGroups"),
+                                  QStringLiteral("knn"),
+                                  QStringLiteral("thresholds")}) {
+        checkFixedObjectTamper(section, QStringLiteral("unexpected"), true,
+                               "fixed schema 2 contract objects must reject extra keys");
+    }
+    check(writeMetadataJson(modelDir, metadataJson),
+          "valid metadata fixture must restore after root contract checks");
 
     RegisteredClassificationKnnModelMetadata badSchema = metadata;
     badSchema.schemaVersion = 1;
@@ -212,6 +543,36 @@ int main(int argc, char **argv)
           "class stats radius enabled flag must round-trip");
     check(qAbs(loadedStats.classes.value(0).radius - 0.35) < 1e-9,
           "class stats radius must round-trip");
+
+    RegisteredClassificationClassStatsDocument tooFewEnabled = stats;
+    tooFewEnabled.classes[0].sampleCount = 2;
+    const RegisteredClassificationModelPackageResult tooFewEnabledResult =
+            writeRegisteredClassificationClassStats(
+                    smokeModelDir(QStringLiteral("too_few_enabled")), tooFewEnabled);
+    check(!tooFewEnabledResult.success
+                  && tooFewEnabledResult.status == QStringLiteral("invalid_class_stats"),
+          "radius must be disabled below three samples");
+
+    RegisteredClassificationClassStatsDocument enoughDisabled = stats;
+    enoughDisabled.classes[0].radiusEnabled = false;
+    enoughDisabled.classes[0].radius = 0.0;
+    const RegisteredClassificationModelPackageResult enoughDisabledResult =
+            writeRegisteredClassificationClassStats(
+                    smokeModelDir(QStringLiteral("enough_disabled")), enoughDisabled);
+    check(!enoughDisabledResult.success
+                  && enoughDisabledResult.status == QStringLiteral("invalid_class_stats"),
+          "radius must be enabled at three or more samples");
+
+    RegisteredClassificationClassStatsDocument incoherentDisabled = stats;
+    incoherentDisabled.classes[0].sampleCount = 2;
+    incoherentDisabled.classes[0].radiusEnabled = false;
+    incoherentDisabled.classes[0].radius = 0.35;
+    const RegisteredClassificationModelPackageResult incoherentDisabledResult =
+            writeRegisteredClassificationClassStats(
+                    smokeModelDir(QStringLiteral("incoherent_disabled")), incoherentDisabled);
+    check(!incoherentDisabledResult.success
+                  && incoherentDisabledResult.status == QStringLiteral("invalid_class_stats"),
+          "disabled class radius must be exactly zero");
 
     RegisteredClassificationClassStatsDocument nanClassStats = stats;
     nanClassStats.classes[0].meanDistance = qQNaN();
@@ -261,6 +622,33 @@ int main(int argc, char **argv)
           "center KNN sentinel fixture must write");
     check(validateRegisteredClassificationKnnPackage(modelDir).success,
           "complete schema 2 package must validate");
+
+    const QString overflowDir = smokeModelDir(QStringLiteral("overflow_sample_total"));
+    RegisteredClassificationKnnModelMetadata overflowMetadata = validMetadata();
+    overflowMetadata.classLabels.append({2, QStringLiteral("C")});
+    overflowMetadata.trainingSampleCount = 6;
+    check(writeRegisteredClassificationKnnMetadata(overflowDir, overflowMetadata).success,
+          "overflow metadata fixture must write");
+    RegisteredClassificationClassStatsDocument overflowStats;
+    overflowStats.featureVersion = registeredClassificationFeatureVersionV2();
+    for (int classId = 0; classId < 3; ++classId) {
+        RegisteredClassificationClassStats classStats;
+        classStats.classId = classId;
+        classStats.sampleCount = classId < 2 ? std::numeric_limits<int>::max() : 8;
+        classStats.radiusEnabled = true;
+        classStats.radius = 0.10;
+        overflowStats.classes.append(classStats);
+    }
+    check(writeRegisteredClassificationClassStats(overflowDir, overflowStats).success,
+          "overflow class stats fixture must write");
+    check(writeSentinelFile(registeredClassificationSampleKnnPath(overflowDir))
+                  && writeSentinelFile(registeredClassificationCenterKnnPath(overflowDir)),
+          "overflow KNN sentinel fixtures must write");
+    const RegisteredClassificationModelPackageResult overflowPackage =
+            validateRegisteredClassificationKnnPackage(overflowDir);
+    check(!overflowPackage.success
+                  && overflowPackage.status == QStringLiteral("class_stats_mismatch"),
+          "class sample totals must not wrap signed int accumulation to a metadata match");
 
     QFile classStatsFile(registeredClassificationClassStatsPath(modelDir));
     check(classStatsFile.open(QIODevice::ReadOnly), "class stats JSON must be readable");
