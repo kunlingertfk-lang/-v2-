@@ -2,6 +2,7 @@
 #define ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONTRAININGRUNNER_H
 
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
+#include "algorithms/recognition/RegisteredClassificationTrainingSession.h"
 
 #include <QJsonObject>
 #include <QRectF>
@@ -25,6 +26,8 @@ struct RegisteredClassificationTrainingRequest
     QString outputModelDir;
     QVector<RegisteredClassificationClassLabel> classLabels;
     QVector<RegisteredClassificationTrainingSample> samples;
+    QJsonObject trainingSessionManifest;
+    QVector<RegisteredClassificationTrainingSessionAsset> trainingSessionAssets;
     RegisteredClassificationMlpParams mlp;
     RegisteredClassificationThresholds thresholds;
 };

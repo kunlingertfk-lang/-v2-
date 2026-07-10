@@ -353,6 +353,93 @@ cv::Mat qImageToBgrMat(const QImage &image)
     return bgr.clone();
 }
 
+QImage bgrMatToQImage(const cv::Mat &image)
+{
+    if (image.empty() || image.type() != CV_8UC3)
+        return QImage();
+    cv::Mat rgb;
+    cv::cvtColor(image, rgb, cv::COLOR_BGR2RGB);
+    return QImage(rgb.data,
+                  rgb.cols,
+                  rgb.rows,
+                  static_cast<int>(rgb.step),
+                  QImage::Format_RGB888).copy();
+}
+
+QJsonObject trainingMarkToJson(const TrainingRoiMark &mark, const int classIndex)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("classId"), classIndex);
+    json.insert(QStringLiteral("type"), mark.type);
+    const QRectF rect = mark.rect.normalized();
+    json.insert(QStringLiteral("rect"), QJsonArray{rect.x(), rect.y(), rect.width(), rect.height()});
+    QJsonArray polygon;
+    for (const QPointF &point : mark.polygon)
+        polygon.append(QJsonArray{point.x(), point.y()});
+    if (!polygon.isEmpty())
+        json.insert(QStringLiteral("polygon"), polygon);
+    return json;
+}
+
+QJsonObject trainingSessionManifestForState(const TrainingSessionState &state)
+{
+    QJsonObject manifest;
+    manifest.insert(QStringLiteral("schemaVersion"), 1);
+    QJsonArray classes;
+    for (const QString &className : state.classes)
+        classes.append(className);
+    manifest.insert(QStringLiteral("classes"), classes);
+
+    QJsonArray images;
+    for (int imageIndex = 0; imageIndex < state.images.size(); ++imageIndex) {
+        const TrainingImageState &imageState = state.images.at(imageIndex);
+        QJsonObject image;
+        image.insert(QStringLiteral("name"), imageState.name);
+        image.insert(QStringLiteral("relativePath"),
+                     QStringLiteral("images/image_%1.png").arg(imageIndex, 4, 10, QLatin1Char('0')));
+        image.insert(QStringLiteral("width"), imageState.image.width());
+        image.insert(QStringLiteral("height"), imageState.image.height());
+        QJsonObject marksByClass;
+        for (auto it = imageState.marksByClass.cbegin(); it != imageState.marksByClass.cend(); ++it) {
+            QJsonArray marks;
+            for (const TrainingRoiMark &mark : it.value())
+                marks.append(trainingMarkToJson(mark, it.key()));
+            marksByClass.insert(QString::number(it.key()), marks);
+        }
+        image.insert(QStringLiteral("marksByClass"), marksByClass);
+        images.append(image);
+    }
+    manifest.insert(QStringLiteral("images"), images);
+    return manifest;
+}
+
+bool trainingMarkFromJson(const QJsonObject &json, TrainingRoiMark *mark)
+{
+    if (!mark)
+        return false;
+    const QString type = json.value(QStringLiteral("type")).toString().trimmed();
+    if (type != QStringLiteral("full") && type != QStringLiteral("rect") &&
+        type != QStringLiteral("polygon"))
+        return false;
+    const QJsonArray rect = json.value(QStringLiteral("rect")).toArray();
+    if (rect.size() != 4)
+        return false;
+    mark->type = type;
+    mark->rect = QRectF(rect.at(0).toDouble(), rect.at(1).toDouble(),
+                        rect.at(2).toDouble(), rect.at(3).toDouble()).normalized();
+    mark->polygon.clear();
+    const QJsonArray polygon = json.value(QStringLiteral("polygon")).toArray();
+    for (const QJsonValue &pointValue : polygon) {
+        const QJsonArray point = pointValue.toArray();
+        if (point.size() != 2)
+            return false;
+        mark->polygon.append(QPointF(point.at(0).toDouble(), point.at(1).toDouble()));
+    }
+    if (type == QStringLiteral("polygon") && mark->polygon.size() < 3)
+        return false;
+    return true;
+}
+
 QString defaultRegisteredClassificationModelDir()
 {
     const QDateTime now = QDateTime::currentDateTime();
@@ -1563,6 +1650,10 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     refreshStatus();
     (*refreshThumbnails)();
     (*refreshClassList)();
+    m_refreshStatus = refreshStatus;
+    m_refreshThumbnails = *refreshThumbnails;
+    m_refreshClassList = *refreshClassList;
+    m_showCurrentImage = *showCurrentImage;
 
     setStyleSheet(QStringLiteral(
         "QDialog{background:#ffffff;color:#0f172a;font-size:18px;}"
@@ -1626,6 +1717,19 @@ QJsonObject RegisteredClassificationTrainingDialog::buildTrainingRequestPreviewF
     json.insert(QStringLiteral("defaultOutputModelDir"), defaultRegisteredClassificationModelDir());
     json.insert(QStringLiteral("updateTargetModelDir"), m_updateTargetModelDir);
     json.insert(QStringLiteral("effectiveOutputModelDir"), outputModelDirForTraining());
+    json.insert(QStringLiteral("restoredSessionStatus"), m_restoredSessionStatus);
+    json.insert(QStringLiteral("restoredSessionMessage"), m_restoredSessionMessage);
+    QJsonArray restoredImageNames;
+    QJsonArray restoredClassNames;
+    if (m_state) {
+        for (const QString &name : m_state->classes)
+            restoredClassNames.append(name);
+        for (const TrainingImageState &image : m_state->images)
+            restoredImageNames.append(image.name);
+    }
+    json.insert(QStringLiteral("restoredImageNames"), restoredImageNames);
+    json.insert(QStringLiteral("restoredClassNames"), restoredClassNames);
+    json.insert(QStringLiteral("restoredRoiCount"), trainingSampleCount());
     return json;
 }
 
@@ -1638,10 +1742,138 @@ RegisteredClassificationTrainingDialog::trainToModelDirForTest(const QString &ou
 void RegisteredClassificationTrainingDialog::setUpdateTargetModelDir(const QString &modelDir)
 {
     m_updateTargetModelDir = QDir::cleanPath(modelDir.trimmed());
-    if (m_trainStatusLabel && !m_updateTargetModelDir.isEmpty()) {
-        m_trainStatusLabel->setText(tr("重新训练：%1")
-                                    .arg(QFileInfo(m_updateTargetModelDir).fileName()));
+    if (m_updateTargetModelDir.isEmpty())
+        return;
+
+    const bool restored = restoreTrainingSessionFromModelDir(m_updateTargetModelDir);
+    if (m_trainStatusLabel) {
+        const QString prefix = tr("重新训练：%1").arg(QFileInfo(m_updateTargetModelDir).fileName());
+        m_trainStatusLabel->setText(restored
+                                    ? tr("%1，已恢复 %2").arg(prefix, m_restoredSessionMessage)
+                                    : tr("%1；%2").arg(prefix, m_restoredSessionMessage));
     }
+}
+
+bool RegisteredClassificationTrainingDialog::restoreTrainingSessionFromModelDir(
+        const QString &modelDir)
+{
+    m_restoredSessionStatus.clear();
+    m_restoredSessionMessage.clear();
+    if (!m_state)
+        return false;
+
+    *m_state = TrainingSessionState();
+    RegisteredClassificationTrainingSessionPayload payload;
+    const RegisteredClassificationTrainingSessionResult readResult =
+            readRegisteredClassificationTrainingSession(
+                    QDir(modelDir).filePath(QStringLiteral("training_session")), &payload);
+    if (!readResult.success) {
+        m_restoredSessionStatus = readResult.status;
+        m_restoredSessionMessage = readResult.status == QStringLiteral("missing_training_session")
+                ? tr("该模型没有历史训练数据，请重新添加注册图和 ROI")
+                : tr("训练上下文恢复失败：%1").arg(readResult.message);
+        if (m_refreshStatus)
+            m_refreshStatus();
+        return false;
+    }
+
+    const QJsonArray classes = payload.manifest.value(QStringLiteral("classes")).toArray();
+    if (classes.isEmpty()) {
+        m_restoredSessionStatus = QStringLiteral("invalid_training_session");
+        m_restoredSessionMessage = tr("训练上下文没有有效类别");
+        if (m_refreshStatus)
+            m_refreshStatus();
+        return false;
+    }
+
+    TrainingSessionState restored;
+    restored.classes.clear();
+    for (const QJsonValue &classValue : classes) {
+        const QString className = classValue.toString().trimmed();
+        if (className.isEmpty()) {
+            m_restoredSessionStatus = QStringLiteral("invalid_training_session");
+            m_restoredSessionMessage = tr("训练上下文包含空类别名称");
+            if (m_refreshStatus)
+                m_refreshStatus();
+            return false;
+        }
+        restored.classes.append(className);
+    }
+
+    const QJsonArray images = payload.manifest.value(QStringLiteral("images")).toArray();
+    for (const QJsonValue &imageValue : images) {
+        const QJsonObject imageJson = imageValue.toObject();
+        const QString relativePath = imageJson.value(QStringLiteral("relativePath")).toString();
+        int assetIndex = -1;
+        for (int index = 0; index < payload.assets.size(); ++index) {
+            if (payload.assets.at(index).relativePath == relativePath) {
+                assetIndex = index;
+                break;
+            }
+        }
+        if (assetIndex < 0) {
+            m_restoredSessionStatus = QStringLiteral("invalid_training_session");
+            m_restoredSessionMessage = tr("训练图资源缺失：%1").arg(relativePath);
+            if (m_refreshStatus)
+                m_refreshStatus();
+            return false;
+        }
+
+        TrainingImageState imageState;
+        imageState.image = bgrMatToQImage(payload.assets.at(assetIndex).image);
+        imageState.name = imageJson.value(QStringLiteral("name")).toString().trimmed();
+        if (imageState.image.isNull() || imageState.name.isEmpty()) {
+            m_restoredSessionStatus = QStringLiteral("invalid_training_session");
+            m_restoredSessionMessage = tr("训练图资源或名称无效：%1").arg(relativePath);
+            if (m_refreshStatus)
+                m_refreshStatus();
+            return false;
+        }
+
+        const QJsonObject marksByClass = imageJson.value(QStringLiteral("marksByClass")).toObject();
+        for (auto marksIt = marksByClass.constBegin(); marksIt != marksByClass.constEnd(); ++marksIt) {
+            bool classOk = false;
+            const int classIndex = marksIt.key().toInt(&classOk);
+            if (!classOk || classIndex < 0 || classIndex >= restored.classes.size()) {
+                m_restoredSessionStatus = QStringLiteral("invalid_training_session");
+                m_restoredSessionMessage = tr("训练上下文包含无效类别索引");
+                if (m_refreshStatus)
+                    m_refreshStatus();
+                return false;
+            }
+            QVector<TrainingRoiMark> marks;
+            for (const QJsonValue &markValue : marksIt.value().toArray()) {
+                TrainingRoiMark mark;
+                if (!trainingMarkFromJson(markValue.toObject(), &mark)) {
+                    m_restoredSessionStatus = QStringLiteral("invalid_training_session");
+                    m_restoredSessionMessage = tr("训练上下文包含无效 ROI");
+                    if (m_refreshStatus)
+                        m_refreshStatus();
+                    return false;
+                }
+                marks.append(mark);
+            }
+            imageState.marksByClass.insert(classIndex, marks);
+        }
+        restored.images.append(imageState);
+    }
+    restored.currentImage = restored.images.isEmpty() ? -1 : 0;
+    restored.currentClass = 0;
+    *m_state = restored;
+    m_restoredSessionStatus = QStringLiteral("restored");
+    m_restoredSessionMessage = tr("%1 张图像、%2 个类别、%3 个 ROI")
+            .arg(restored.images.size())
+            .arg(restored.classes.size())
+            .arg(trainingSampleCount());
+    if (m_refreshStatus)
+        m_refreshStatus();
+    if (m_refreshThumbnails)
+        m_refreshThumbnails();
+    if (m_refreshClassList)
+        m_refreshClassList();
+    if (m_showCurrentImage)
+        m_showCurrentImage(tr("已恢复历史训练上下文"));
+    return true;
 }
 
 RegisteredClassificationTrainingRequest RegisteredClassificationTrainingDialog::buildTrainingRequest(
@@ -1658,6 +1890,15 @@ RegisteredClassificationTrainingRequest RegisteredClassificationTrainingDialog::
 
     if (!m_state)
         return request;
+
+    request.trainingSessionManifest = trainingSessionManifestForState(*m_state);
+    for (int imageIndex = 0; imageIndex < m_state->images.size(); ++imageIndex) {
+        RegisteredClassificationTrainingSessionAsset asset;
+        asset.relativePath = QStringLiteral("images/image_%1.png")
+                .arg(imageIndex, 4, 10, QLatin1Char('0'));
+        asset.image = qImageToBgrMat(m_state->images.at(imageIndex).image);
+        request.trainingSessionAssets.append(asset);
+    }
 
     for (int classIndex = 0; classIndex < m_state->classes.size(); ++classIndex) {
         RegisteredClassificationClassLabel label;

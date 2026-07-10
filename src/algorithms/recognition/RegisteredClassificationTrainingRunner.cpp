@@ -626,6 +626,19 @@ RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::t
     reportFile.write(QJsonDocument(report).toJson(QJsonDocument::Indented));
     reportFile.close();
 
+    if (!request.trainingSessionManifest.isEmpty() || !request.trainingSessionAssets.isEmpty()) {
+        const RegisteredClassificationTrainingSessionResult sessionWrite =
+                writeRegisteredClassificationTrainingSession(
+                        QDir(tmpDirPath).filePath(QStringLiteral("training_session")),
+                        request.trainingSessionManifest,
+                        request.trainingSessionAssets);
+        if (!sessionWrite.success) {
+            cleanupTmp();
+            return resultWithStatus(QStringLiteral("training_session_write_failed"),
+                                    sessionWrite.message);
+        }
+    }
+
     if (!QFileInfo::exists(mlpOutputPath) ||
         !QFileInfo::exists(registeredClassificationMetadataPath(tmpDirPath)) ||
         !QFileInfo::exists(registeredClassificationTrainingReportPath(tmpDirPath))) {

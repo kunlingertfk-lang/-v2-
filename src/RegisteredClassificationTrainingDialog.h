@@ -10,6 +10,8 @@
 #include <QStringList>
 #include <QVector>
 
+#include <functional>
+
 #include "algorithms/recognition/RegisteredClassificationTrainingRunner.h"
 
 class QLabel;
@@ -68,11 +70,18 @@ private:
     bool hasPolygonTrainingMarks() const;
     int trainingSampleCount() const;
     void refreshTrainingReadiness();
+    bool restoreTrainingSessionFromModelDir(const QString &modelDir);
     QString outputModelDirForTraining() const;
     RegisteredClassificationTrainingResult trainToModelDir(const QString &outputModelDir);
 
     QSharedPointer<RegisteredClassificationTrainingSessionState> m_state;
     QString m_updateTargetModelDir;
+    QString m_restoredSessionStatus;
+    QString m_restoredSessionMessage;
+    std::function<void()> m_refreshStatus;
+    std::function<void()> m_refreshThumbnails;
+    std::function<void()> m_refreshClassList;
+    std::function<void(const QString &)> m_showCurrentImage;
     QPushButton *m_trainButton = nullptr;
     QLabel *m_trainStatusLabel = nullptr;
 };

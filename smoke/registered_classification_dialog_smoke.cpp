@@ -795,6 +795,11 @@ int main(int argc, char **argv)
                       "training dialog train action must create metadata.json");
                 check(QFileInfo(registeredClassificationTrainingReportPath(modelDir)).exists(),
                       "training dialog train action must create training_report.json");
+                check(QFileInfo(QDir(modelDir).filePath(QStringLiteral("training_session/session.json"))).exists(),
+                      "training dialog train action must create training session manifest");
+                check(QDir(QDir(modelDir).filePath(QStringLiteral("training_session/images")))
+                              .entryList(QStringList() << QStringLiteral("*.png"), QDir::Files).size() >= 1,
+                      "training dialog train action must copy registration images into training session");
                 check(dialog.toToolConfig()
                           .params.value(QStringLiteral("registeredClassification")).toObject()
                           .value(QStringLiteral("modelPath")).toString() == modelDir,
@@ -921,9 +926,34 @@ int main(int argc, char **argv)
                 }
             }
             check(typedRetrainDialog != nullptr, "retrain must open training dialog for selected model package");
-            if (typedRetrainDialog)
+            if (typedRetrainDialog) {
+                const QJsonObject restoredPreview = typedRetrainDialog->buildTrainingRequestPreviewForTest();
+                check(restoredPreview.value(QStringLiteral("restoredSessionStatus")).toString()
+                          == QStringLiteral("restored"),
+                      "retrain must restore the saved training session");
+                check(restoredPreview.value(QStringLiteral("restoredImageNames")).toArray().size() >= 2,
+                      "retrain must restore registration image names");
+                check(restoredPreview.value(QStringLiteral("restoredClassNames")).toArray().size() == 2,
+                      "retrain must restore class names");
+                check(restoredPreview.value(QStringLiteral("restoredRoiCount")).toInt() >= 2,
+                      "retrain must restore ROI marks");
                 typedRetrainDialog->close();
+            }
         }
+        const QString legacyModelDir = QDir::temp().filePath(
+                    QStringLiteral("registered_classification_legacy_model_without_session"));
+        QDir(legacyModelDir).removeRecursively();
+        QDir().mkpath(legacyModelDir);
+        RegisteredClassificationTrainingDialog legacyRetrainDialog;
+        legacyRetrainDialog.setUpdateTargetModelDir(legacyModelDir);
+        const QJsonObject legacyPreview = legacyRetrainDialog.buildTrainingRequestPreviewForTest();
+        check(legacyPreview.value(QStringLiteral("restoredSessionStatus")).toString()
+                  == QStringLiteral("missing_training_session"),
+              "legacy model without a session must report missing training history");
+        check(legacyPreview.value(QStringLiteral("restoredSessionMessage")).toString()
+                  .contains(QStringLiteral("没有历史训练数据")),
+              "legacy model without a session must expose an actionable message");
+        QDir(legacyModelDir).removeRecursively();
         QPushButton *useModelButton = scannedModelRow
                 ? buttonByText(*scannedModelRow, QStringLiteral("使用模型"))
                 : nullptr;

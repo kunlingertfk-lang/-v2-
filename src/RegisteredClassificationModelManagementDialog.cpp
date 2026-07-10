@@ -40,6 +40,7 @@ struct ModelRecord
     QString dateText;
     RegisteredClassificationModelMetadata metadata;
     QDateTime lastModified;
+    bool hasTrainingSession = false;
 };
 
 QFrame *managementCard(QWidget *parent, const QString &title, QWidget *headerActions = nullptr)
@@ -209,6 +210,8 @@ QVector<ModelRecord> scanModelRecords()
             record.dateText = dateDirInfo.fileName();
             record.metadata = metadata;
             record.lastModified = modelDirInfo.lastModified();
+            record.hasTrainingSession = QFileInfo::exists(
+                        QDir(modelDir).filePath(QStringLiteral("training_session/session.json")));
             records.append(record);
         }
     }
@@ -230,18 +233,23 @@ QFrame *modelRow(QWidget *parent,
     row->setProperty("modelDir", record.modelDir);
     row->setProperty("modelName", record.modelName);
     row->setObjectName(QStringLiteral("registeredClassificationModelRow_%1").arg(index));
-    row->setToolTip(record.modelDir);
+    row->setToolTip(QObject::tr("%1\n重新训练状态：%2")
+                    .arg(record.modelDir,
+                         record.hasTrainingSession ? QObject::tr("可恢复历史数据")
+                                                   : QObject::tr("缺少历史训练数据")));
     QHBoxLayout *layout = new QHBoxLayout(row);
     layout->setContentsMargins(12, 10, 12, 10);
     layout->setSpacing(8);
     QVBoxLayout *texts = new QVBoxLayout;
     QLabel *nameLabel = new QLabel(record.modelName, row);
     nameLabel->setProperty("role", QStringLiteral("itemTitle"));
-    const QString detail = QObject::tr("%1 / 类别 %2 / 样本 %3 / %4")
+    const QString detail = QObject::tr("%1 / 类别 %2 / 样本 %3 / %4 / %5")
             .arg(record.dateText)
             .arg(record.metadata.classLabels.size())
             .arg(record.metadata.trainingSampleCount)
-            .arg(record.metadata.featureVersion);
+            .arg(record.metadata.featureVersion)
+            .arg(record.hasTrainingSession ? QObject::tr("可重新训练")
+                                           : QObject::tr("缺少历史训练数据"));
     QLabel *detailLabel = new QLabel(detail, row);
     detailLabel->setProperty("role", QStringLiteral("itemSubtle"));
     texts->addWidget(nameLabel);
