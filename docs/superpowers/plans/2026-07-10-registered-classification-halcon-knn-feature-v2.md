@@ -119,7 +119,7 @@ check(writeRegisteredClassificationKnnMetadata(modelDir, metadata).success,
 
 ```bash
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile
-make -f build/registered_classification_feature_v2.Makefile -j8
+make -C build -f registered_classification_feature_v2.Makefile -j8
 ```
 
 Expected: 编译失败，错误包含 `registeredClassificationKnnModelType was not declared` 或 `RegisteredClassificationKnnModelMetadata does not name a type`。
@@ -226,7 +226,7 @@ struct RegisteredClassificationModelInspection {
 
 ```bash
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile
-make -f build/registered_classification_feature_v2.Makefile -j8
+make -C build -f registered_classification_feature_v2.Makefile -j8
 ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
 ```
 
@@ -286,7 +286,7 @@ check(qAbs(vectorNorm(base.feature) - 1.0) < 1e-6,
 - [ ] **Step 2: 运行测试确认 `extractV2` 不存在**
 
 ```bash
-make -f build/registered_classification_feature_v2.Makefile -j8
+make -C build -f registered_classification_feature_v2.Makefile -j8
 ```
 
 Expected: 编译失败，错误包含 `RegisteredClassificationFeatureRegion was not declared` 或 `has no member named extractV2`。
@@ -352,7 +352,7 @@ const double objectScore = 0.55 * centerScore
 
 ```bash
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile
-make -f build/registered_classification_feature_v2.Makefile -j8
+make -C build -f registered_classification_feature_v2.Makefile -j8
 ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
 ```
 
@@ -412,7 +412,7 @@ check(!QFileInfo(QDir(modelDir).filePath(QStringLiteral("model.gmc"))).exists(),
 
 ```bash
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_knn_backend_smoke.pro -o build/registered_classification_knn_backend.Makefile
-make -f build/registered_classification_knn_backend.Makefile -j8
+make -C build -f registered_classification_knn_backend.Makefile -j8
 ```
 
 Expected: 编译或断言失败，指出缺少 `.gnc` path API、KNN runtime 或仍生成 `model.gmc`。
@@ -548,10 +548,10 @@ RegisteredClassificationFeatureResult extract(
 - [ ] **Step 8: 构建并运行 feature/backend smoke**
 
 ```bash
-make -f build/registered_classification_feature_v2.Makefile -j8
+make -C build -f registered_classification_feature_v2.Makefile -j8
 ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_knn_backend_smoke.pro -o build/registered_classification_knn_backend.Makefile
-make -f build/registered_classification_knn_backend.Makefile -j8
+make -C build -f registered_classification_knn_backend.Makefile -j8
 ./build/smoke/registered_classification_knn_backend/bin/registered_classification_knn_backend_smoke
 ```
 
@@ -617,7 +617,7 @@ git commit -m "feat: replace registered classification MLP with HALCON KNN"
 
 ```bash
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_adapter_smoke.pro -o build/registered_classification_adapter.Makefile
-make -f build/registered_classification_adapter.Makefile -j8
+make -C build -f registered_classification_adapter.Makefile -j8
 ./build/smoke/registered_classification_adapter/bin/registered_classification_adapter_smoke
 ```
 
@@ -683,10 +683,10 @@ sample.classId = classIndex;
 
 ```bash
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_adapter_smoke.pro -o build/registered_classification_adapter.Makefile
-make -f build/registered_classification_adapter.Makefile -j8
+make -C build -f registered_classification_adapter.Makefile -j8
 ./build/smoke/registered_classification_adapter/bin/registered_classification_adapter_smoke
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_dialog_smoke.pro -o build/registered_classification_dialog.Makefile
-make -f build/registered_classification_dialog.Makefile -j8
+make -C build -f registered_classification_dialog.Makefile -j8
 QT_QPA_PLATFORM=offscreen ./build/smoke/registered_classification_dialog/bin/registered_classification_dialog_smoke
 ```
 
@@ -731,7 +731,7 @@ git commit -m "feat: connect registered classification KNN configuration"
 - [ ] **Step 2: 运行 Dialog smoke 确认 legacy 当前被过滤**
 
 ```bash
-make -f build/registered_classification_dialog.Makefile -j8
+make -C build -f registered_classification_dialog.Makefile -j8
 QT_QPA_PLATFORM=offscreen ./build/smoke/registered_classification_dialog/bin/registered_classification_dialog_smoke
 ```
 
@@ -824,19 +824,19 @@ git commit -m "feat: migrate managed registered classification models to KNN"
 
 ```bash
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile
-make -f build/registered_classification_feature_v2.Makefile -j8
+make -C build -f registered_classification_feature_v2.Makefile -j8
 ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
 
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_knn_backend_smoke.pro -o build/registered_classification_knn_backend.Makefile
-make -f build/registered_classification_knn_backend.Makefile -j8
+make -C build -f registered_classification_knn_backend.Makefile -j8
 ./build/smoke/registered_classification_knn_backend/bin/registered_classification_knn_backend_smoke
 
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_adapter_smoke.pro -o build/registered_classification_adapter.Makefile
-make -f build/registered_classification_adapter.Makefile -j8
+make -C build -f registered_classification_adapter.Makefile -j8
 ./build/smoke/registered_classification_adapter/bin/registered_classification_adapter_smoke
 
 /home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_dialog_smoke.pro -o build/registered_classification_dialog.Makefile
-make -f build/registered_classification_dialog.Makefile -j8
+make -C build -f registered_classification_dialog.Makefile -j8
 QT_QPA_PLATFORM=offscreen ./build/smoke/registered_classification_dialog/bin/registered_classification_dialog_smoke
 ```
 
