@@ -704,6 +704,9 @@ int main(int argc, char **argv)
                 check(preview.value(QStringLiteral("modelType")).toString()
                           == QStringLiteral("halcon_mlp_registered_classification"),
                       "training request preview must use HALCON MLP model type");
+                check(preview.value(QStringLiteral("defaultOutputModelDir")).toString()
+                          .contains(QStringLiteral("ModelFiles/RegisteredClass")),
+                      "training default output must be under ModelFiles/RegisteredClass");
                 const QString modelDir = QDir::temp().filePath(
                             QStringLiteral("registered_classification_dialog_smoke_ui_training_model"));
                 QDir(modelDir).removeRecursively();

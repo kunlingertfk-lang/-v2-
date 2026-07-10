@@ -12,6 +12,7 @@
 #include <QComboBox>
 #include <QColor>
 #include <QContextMenuEvent>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QEvent>
@@ -350,6 +351,24 @@ cv::Mat qImageToBgrMat(const QImage &image)
     cv::Mat bgr;
     cv::cvtColor(rgbMat, bgr, cv::COLOR_RGB2BGR);
     return bgr.clone();
+}
+
+QString defaultRegisteredClassificationModelDir()
+{
+    const QDateTime now = QDateTime::currentDateTime();
+    const QString dateDir = now.toString(QStringLiteral("yyyyMMdd"));
+    const QString baseModelDirName = QStringLiteral("model_%1")
+            .arg(now.toString(QStringLiteral("HHmmss_zzz")));
+    const QDir dateRoot(QDir(QCoreApplication::applicationDirPath()).filePath(
+                            QStringLiteral("ModelFiles/RegisteredClass/%1").arg(dateDir)));
+    QString candidate = dateRoot.filePath(baseModelDirName);
+    int suffix = 1;
+    while (QFileInfo::exists(candidate)) {
+        candidate = dateRoot.filePath(QStringLiteral("%1_%2")
+                                      .arg(baseModelDirName)
+                                      .arg(suffix++));
+    }
+    return candidate;
 }
 
 } // namespace
@@ -1499,14 +1518,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     });
 
     connect(m_trainButton, &QPushButton::clicked, this, [this]() {
-        const QString suggestedName = QStringLiteral("registered_classification_model_%1")
-                .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_hhmmss")));
-        const QString outputModelDir = QFileDialog::getExistingDirectory(
-                    this,
-                    tr("选择注册分类模型输出目录"),
-                    QDir::home().filePath(suggestedName));
-        if (outputModelDir.trimmed().isEmpty())
-            return;
+        const QString outputModelDir = defaultRegisteredClassificationModelDir();
         const RegisteredClassificationTrainingResult result = trainToModelDir(outputModelDir);
         if (result.success) {
             QMessageBox::information(this,
@@ -1611,6 +1623,7 @@ QJsonObject RegisteredClassificationTrainingDialog::buildTrainingRequestPreviewF
     json.insert(QStringLiteral("sampleCount"), trainingSampleCount());
     json.insert(QStringLiteral("trainable"), hasTrainableSamples());
     json.insert(QStringLiteral("modelType"), registeredClassificationMlpModelType());
+    json.insert(QStringLiteral("defaultOutputModelDir"), defaultRegisteredClassificationModelDir());
     return json;
 }
 

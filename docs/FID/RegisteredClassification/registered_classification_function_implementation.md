@@ -329,7 +329,7 @@ git diff --check
 
 - `RegisteredClassificationTrainingDialog` 将会话内注册图、类别和 ROI 标注转换为 `RegisteredClassificationTrainingRequest`。
 - 训练窗口在至少两个类别且每类有 ROI 样本时启用 `开始训练`，否则保持禁用并提示补齐样本。
-- `开始训练` 选择输出模型目录后调用 `RegisteredClassificationTrainingRunner::train()`，由后端生成 `model.gmc`、`metadata.json`、`training_report.json`。
+- `开始训练` 自动写入运行目录下 `ModelFiles/RegisteredClass/yyyyMMdd/model_HHmmss_zzz/`，同名目录已存在时自动追加序号，随后调用 `RegisteredClassificationTrainingRunner::train()` 生成 `model.gmc`、`metadata.json`、`training_report.json`。
 - 训练成功后通过 `trainingCompleted` 信号回填主注册分类 Dialog 的 `modelPath` / `modelName`。
 - 主注册分类 Dialog 默认模型类型修正为 `halcon_mlp_registered_classification`，不再从 UI 默认保存旧的 `halcon_dl_classification`。
 
