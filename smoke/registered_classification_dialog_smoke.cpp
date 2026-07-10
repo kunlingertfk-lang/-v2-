@@ -190,6 +190,7 @@ int main(int argc, char **argv)
     RegisteredClassificationDialog dialog;
     dialog.show();
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    QString managementModelDir;
 
     QCheckBox *positionSwitch = dialog.findChild<QCheckBox *>(QStringLiteral("positionCorrectionSwitch"));
     check(positionSwitch != nullptr, "position correction switch must exist");
@@ -724,6 +725,13 @@ int main(int argc, char **argv)
                           .params.value(QStringLiteral("registeredClassification")).toObject()
                           .value(QStringLiteral("modelPath")).toString() == modelDir,
                       "training completion must fill generated model path back to parent dialog");
+                managementModelDir = QDir(QCoreApplication::applicationDirPath()).filePath(
+                            QStringLiteral("ModelFiles/RegisteredClass/20990101/model_smoke_management"));
+                QDir(managementModelDir).removeRecursively();
+                const RegisteredClassificationTrainingResult managementTrainResult =
+                        typedTrainingDialog->trainToModelDirForTest(managementModelDir);
+                check(managementTrainResult.success,
+                      "training dialog must create a runtime model package for model management");
                 QPushButton *mainDeleteModelButton = buttonByText(dialog, QStringLiteral("删除模型"));
                 if (mainDeleteModelButton)
                     clickAndProcess(mainDeleteModelButton);
@@ -806,6 +814,57 @@ int main(int argc, char **argv)
               "model row export icon must have export tooltip");
         check(deleteButton && deleteButton->toolTip() == QStringLiteral("删除"),
               "model row delete icon must have delete tooltip");
+        QFrame *scannedModelRow = nullptr;
+        const QList<QFrame *> modelRows = managementDialog->findChildren<QFrame *>();
+        for (QFrame *row : modelRows) {
+            if (row && row->property("modelDir").toString() == managementModelDir) {
+                scannedModelRow = row;
+                break;
+            }
+        }
+        check(scannedModelRow != nullptr, "model management must list scanned model packages");
+        if (scannedModelRow) {
+            check(scannedModelRow->property("modelDir").toString() == managementModelDir,
+                  "model management row must store model package directory");
+        }
+        QPushButton *retrainButton = scannedModelRow
+                ? buttonByText(*scannedModelRow, QStringLiteral("重新训练"))
+                : nullptr;
+        check(retrainButton != nullptr, "model management must expose retrain action");
+        if (retrainButton && scannedModelRow) {
+            clickAndProcess(retrainButton);
+            RegisteredClassificationTrainingDialog *typedRetrainDialog = nullptr;
+            const QList<RegisteredClassificationTrainingDialog *> retrainDialogs =
+                    dialog.findChildren<RegisteredClassificationTrainingDialog *>();
+            for (RegisteredClassificationTrainingDialog *candidate : retrainDialogs) {
+                if (!candidate)
+                    continue;
+                const QJsonObject preview = candidate->buildTrainingRequestPreviewForTest();
+                if (preview.value(QStringLiteral("updateTargetModelDir")).toString()
+                        == managementModelDir) {
+                    typedRetrainDialog = candidate;
+                    break;
+                }
+            }
+            check(typedRetrainDialog != nullptr, "retrain must open training dialog for selected model package");
+            if (typedRetrainDialog)
+                typedRetrainDialog->close();
+        }
+        QPushButton *useModelButton = scannedModelRow
+                ? buttonByText(*scannedModelRow, QStringLiteral("使用模型"))
+                : nullptr;
+        check(useModelButton != nullptr, "model management must expose use-model action");
+        if (useModelButton) {
+            clickAndProcess(useModelButton);
+            const QString selectedPath = dialog.toToolConfig()
+                    .params.value(QStringLiteral("registeredClassification")).toObject()
+                    .value(QStringLiteral("modelPath")).toString();
+            check(selectedPath == managementModelDir,
+                  "using a managed model must fill model package directory back to parent dialog");
+            QPushButton *mainDeleteModelButton = buttonByText(dialog, QStringLiteral("删除模型"));
+            if (mainDeleteModelButton)
+                clickAndProcess(mainDeleteModelButton);
+        }
         QPushButton *createDatasetButton = buttonByText(*managementDialog, QStringLiteral("创建数据集"));
         QPushButton *importDatasetButton = buttonByText(*managementDialog, QStringLiteral("导入"));
         QLabel *datasetTitle = labelByText(*managementDialog, QStringLiteral("数据集列表"));

@@ -56,6 +56,7 @@ public:
     explicit RegisteredClassificationTrainingDialog(QWidget *parent = nullptr);
     QJsonObject buildTrainingRequestPreviewForTest() const;
     RegisteredClassificationTrainingResult trainToModelDirForTest(const QString &outputModelDir);
+    void setUpdateTargetModelDir(const QString &modelDir);
 
 signals:
     void trainingCompleted(const QString &modelDir, const QString &modelName);
@@ -67,9 +68,11 @@ private:
     bool hasPolygonTrainingMarks() const;
     int trainingSampleCount() const;
     void refreshTrainingReadiness();
+    QString outputModelDirForTraining() const;
     RegisteredClassificationTrainingResult trainToModelDir(const QString &outputModelDir);
 
     QSharedPointer<RegisteredClassificationTrainingSessionState> m_state;
+    QString m_updateTargetModelDir;
     QPushButton *m_trainButton = nullptr;
     QLabel *m_trainStatusLabel = nullptr;
 };

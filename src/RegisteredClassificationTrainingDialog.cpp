@@ -1518,7 +1518,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     });
 
     connect(m_trainButton, &QPushButton::clicked, this, [this]() {
-        const QString outputModelDir = defaultRegisteredClassificationModelDir();
+        const QString outputModelDir = outputModelDirForTraining();
         const RegisteredClassificationTrainingResult result = trainToModelDir(outputModelDir);
         if (result.success) {
             QMessageBox::information(this,
@@ -1624,6 +1624,8 @@ QJsonObject RegisteredClassificationTrainingDialog::buildTrainingRequestPreviewF
     json.insert(QStringLiteral("trainable"), hasTrainableSamples());
     json.insert(QStringLiteral("modelType"), registeredClassificationMlpModelType());
     json.insert(QStringLiteral("defaultOutputModelDir"), defaultRegisteredClassificationModelDir());
+    json.insert(QStringLiteral("updateTargetModelDir"), m_updateTargetModelDir);
+    json.insert(QStringLiteral("effectiveOutputModelDir"), outputModelDirForTraining());
     return json;
 }
 
@@ -1631,6 +1633,15 @@ RegisteredClassificationTrainingResult
 RegisteredClassificationTrainingDialog::trainToModelDirForTest(const QString &outputModelDir)
 {
     return trainToModelDir(outputModelDir);
+}
+
+void RegisteredClassificationTrainingDialog::setUpdateTargetModelDir(const QString &modelDir)
+{
+    m_updateTargetModelDir = QDir::cleanPath(modelDir.trimmed());
+    if (m_trainStatusLabel && !m_updateTargetModelDir.isEmpty()) {
+        m_trainStatusLabel->setText(tr("重新训练：%1")
+                                    .arg(QFileInfo(m_updateTargetModelDir).fileName()));
+    }
 }
 
 RegisteredClassificationTrainingRequest RegisteredClassificationTrainingDialog::buildTrainingRequest(
@@ -1738,6 +1749,13 @@ void RegisteredClassificationTrainingDialog::refreshTrainingReadiness()
                                     ? tr("可训练：%1 个样本").arg(trainingSampleCount())
                                     : tr("请至少为两个类别添加 ROI 样本"));
     }
+}
+
+QString RegisteredClassificationTrainingDialog::outputModelDirForTraining() const
+{
+    return m_updateTargetModelDir.trimmed().isEmpty()
+            ? defaultRegisteredClassificationModelDir()
+            : m_updateTargetModelDir;
 }
 
 RegisteredClassificationTrainingResult RegisteredClassificationTrainingDialog::trainToModelDir(

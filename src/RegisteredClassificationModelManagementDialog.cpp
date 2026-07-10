@@ -1,10 +1,17 @@
 #include "RegisteredClassificationModelManagementDialog.h"
 
 #include "RegisteredClassificationTrainingDialog.h"
+#include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 
+#include <algorithm>
 #include <QColor>
 #include <QComboBox>
+#include <QCoreApplication>
+#include <QDateTime>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QFileInfo>
+#include <QFileInfoList>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -15,13 +22,25 @@
 #include <QPolygonF>
 #include <QPixmap>
 #include <QPushButton>
+#include <QSharedPointer>
 #include <QSize>
 #include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QtGlobal>
 
+#include <functional>
+
 namespace {
+
+struct ModelRecord
+{
+    QString modelDir;
+    QString modelName;
+    QString dateText;
+    RegisteredClassificationModelMetadata metadata;
+    QDateTime lastModified;
+};
 
 QFrame *managementCard(QWidget *parent, const QString &title, QWidget *headerActions = nullptr)
 {
@@ -149,21 +168,104 @@ QFrame *datasetTile(QWidget *parent, const QString &name, const QString &detail)
     return tile;
 }
 
-QFrame *modelRow(QWidget *parent, const QString &name, const QString &detail)
+QString registeredClassificationModelRoot()
+{
+    return QDir(QCoreApplication::applicationDirPath()).filePath(
+                QStringLiteral("ModelFiles/RegisteredClass"));
+}
+
+QVector<ModelRecord> scanModelRecords()
+{
+    QVector<ModelRecord> records;
+    const QDir root(registeredClassificationModelRoot());
+    if (!root.exists())
+        return records;
+
+    const QFileInfoList dateDirs = root.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot,
+                                                      QDir::Name);
+    for (const QFileInfo &dateDirInfo : dateDirs) {
+        const QDir dateDir(dateDirInfo.absoluteFilePath());
+        const QFileInfoList modelDirs = dateDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot,
+                                                              QDir::Time | QDir::Reversed);
+        for (const QFileInfo &modelDirInfo : modelDirs) {
+            const QString modelDir = modelDirInfo.absoluteFilePath();
+            if (!QFileInfo::exists(registeredClassificationMetadataPath(modelDir)) ||
+                !QFileInfo::exists(registeredClassificationMlpPath(modelDir))) {
+                continue;
+            }
+
+            RegisteredClassificationModelMetadata metadata;
+            const RegisteredClassificationModelPackageResult readResult =
+                    readRegisteredClassificationMetadata(modelDir, &metadata);
+            if (!readResult.success ||
+                metadata.modelType != registeredClassificationMlpModelType() ||
+                metadata.featureVersion != registeredClassificationFeatureVersionV1()) {
+                continue;
+            }
+
+            ModelRecord record;
+            record.modelDir = modelDir;
+            record.modelName = modelDirInfo.fileName();
+            record.dateText = dateDirInfo.fileName();
+            record.metadata = metadata;
+            record.lastModified = modelDirInfo.lastModified();
+            records.append(record);
+        }
+    }
+
+    std::sort(records.begin(), records.end(), [](const ModelRecord &left, const ModelRecord &right) {
+        return left.lastModified > right.lastModified;
+    });
+    return records;
+}
+
+QFrame *modelRow(QWidget *parent,
+                 const ModelRecord &record,
+                 int index,
+                 const std::function<void(const ModelRecord &)> &useModel,
+                 const std::function<void(const ModelRecord &)> &retrainModel)
 {
     QFrame *row = new QFrame(parent);
     row->setProperty("panelRole", QStringLiteral("modelRow"));
+    row->setProperty("modelDir", record.modelDir);
+    row->setProperty("modelName", record.modelName);
+    row->setObjectName(QStringLiteral("registeredClassificationModelRow_%1").arg(index));
+    row->setToolTip(record.modelDir);
     QHBoxLayout *layout = new QHBoxLayout(row);
     layout->setContentsMargins(12, 10, 12, 10);
     layout->setSpacing(8);
     QVBoxLayout *texts = new QVBoxLayout;
-    QLabel *nameLabel = new QLabel(name, row);
+    QLabel *nameLabel = new QLabel(record.modelName, row);
     nameLabel->setProperty("role", QStringLiteral("itemTitle"));
+    const QString detail = QObject::tr("%1 / 类别 %2 / 样本 %3 / %4")
+            .arg(record.dateText)
+            .arg(record.metadata.classLabels.size())
+            .arg(record.metadata.trainingSampleCount)
+            .arg(record.metadata.featureVersion);
     QLabel *detailLabel = new QLabel(detail, row);
     detailLabel->setProperty("role", QStringLiteral("itemSubtle"));
     texts->addWidget(nameLabel);
     texts->addWidget(detailLabel);
     layout->addLayout(texts, 1);
+
+    QPushButton *useButton = new QPushButton(QObject::tr("使用模型"), row);
+    useButton->setObjectName(QStringLiteral("useModelButton"));
+    useButton->setProperty("actionRole", QStringLiteral("primary"));
+    useButton->setMinimumHeight(44);
+    layout->addWidget(useButton);
+    QObject::connect(useButton, &QPushButton::clicked, row, [record, useModel]() {
+        useModel(record);
+    });
+
+    QPushButton *retrainButton = new QPushButton(QObject::tr("重新训练"), row);
+    retrainButton->setObjectName(QStringLiteral("retrainModelButton"));
+    retrainButton->setProperty("actionRole", QStringLiteral("secondary"));
+    retrainButton->setMinimumHeight(44);
+    layout->addWidget(retrainButton);
+    QObject::connect(retrainButton, &QPushButton::clicked, row, [record, retrainModel]() {
+        retrainModel(record);
+    });
+
     struct RowAction
     {
         QString objectName;
@@ -353,8 +455,10 @@ RegisteredClassificationModelManagementDialog::RegisteredClassificationModelMana
     filterLayout->addWidget(typeCombo);
     filterLayout->addWidget(searchEdit, 1);
     modelLayout->addLayout(filterLayout);
-    modelLayout->addWidget(modelRow(modelCard, tr("RegisteredClassification_Default"), tr("未训练 / 占位模型")));
-    modelLayout->addWidget(modelRow(modelCard, tr("Classification0_Model"), tr("待生成 / 占位模型")));
+    QVBoxLayout *modelListLayout = new QVBoxLayout;
+    modelListLayout->setContentsMargins(0, 0, 0, 0);
+    modelListLayout->setSpacing(10);
+    modelLayout->addLayout(modelListLayout);
     modelLayout->addStretch(1);
     body->addWidget(modelCard, 1);
 
@@ -362,7 +466,61 @@ RegisteredClassificationModelManagementDialog::RegisteredClassificationModelMana
     tipLabel->setProperty("role", QStringLiteral("tipLabel"));
     root->addWidget(tipLabel);
 
-    connect(createDatasetButton, &QPushButton::clicked, this, [this]() {
+    auto clearModelList = [modelListLayout]() {
+        while (QLayoutItem *item = modelListLayout->takeAt(0)) {
+            if (QWidget *widget = item->widget())
+                widget->deleteLater();
+            delete item;
+        }
+    };
+
+    QSharedPointer<std::function<void(const QString &)>> refreshModelList(
+                new std::function<void(const QString &)>);
+    auto openTrainingForRecord = [this, refreshModelList](const ModelRecord &record) {
+        QWidget *trainingParent = parentWidget() ? parentWidget() : this;
+        auto *trainingDialog = new RegisteredClassificationTrainingDialog(trainingParent);
+        trainingDialog->setObjectName(QStringLiteral("registeredClassificationRetrainDialog"));
+        trainingDialog->setProperty("updateTargetModelDir", record.modelDir);
+        trainingDialog->setAttribute(Qt::WA_DeleteOnClose);
+        trainingDialog->setUpdateTargetModelDir(record.modelDir);
+        connect(trainingDialog, &RegisteredClassificationTrainingDialog::trainingCompleted,
+                this, [this, refreshModelList, record](const QString &modelDir, const QString &modelName) {
+            if (*refreshModelList)
+                (*refreshModelList)(modelDir);
+            emit modelSelected(modelDir, modelName.trimmed().isEmpty() ? record.modelName : modelName);
+        });
+        trainingDialog->show();
+    };
+
+    *refreshModelList = [this, modelCard, modelListLayout, clearModelList, openTrainingForRecord](const QString &selectedModelDir) {
+        clearModelList();
+        const QVector<ModelRecord> records = scanModelRecords();
+        if (records.isEmpty()) {
+            QLabel *emptyLabel = new QLabel(tr("暂无已训练模型"), modelCard);
+            emptyLabel->setProperty("role", QStringLiteral("itemSubtle"));
+            modelListLayout->addWidget(emptyLabel);
+            return;
+        }
+
+        for (int index = 0; index < records.size(); ++index) {
+            const ModelRecord record = records.at(index);
+            QFrame *row = modelRow(
+                        modelCard,
+                        record,
+                        index,
+                        [this](const ModelRecord &selected) {
+                emit modelSelected(selected.modelDir, selected.modelName);
+            },
+                        [openTrainingForRecord](const ModelRecord &selected) {
+                openTrainingForRecord(selected);
+            });
+            if (record.modelDir == selectedModelDir)
+                row->setProperty("selected", true);
+            modelListLayout->addWidget(row);
+        }
+    };
+
+    connect(createDatasetButton, &QPushButton::clicked, this, [this, refreshModelList]() {
         CreateDatasetDialog dialog(this);
         if (dialog.exec() != QDialog::Accepted)
             return;
@@ -370,9 +528,16 @@ RegisteredClassificationModelManagementDialog::RegisteredClassificationModelMana
         QWidget *trainingParent = parentWidget() ? parentWidget() : this;
         auto *trainingDialog = new RegisteredClassificationTrainingDialog(trainingParent);
         trainingDialog->setAttribute(Qt::WA_DeleteOnClose);
+        connect(trainingDialog, &RegisteredClassificationTrainingDialog::trainingCompleted,
+                this, [this, refreshModelList](const QString &modelDir, const QString &modelName) {
+            if (*refreshModelList)
+                (*refreshModelList)(modelDir);
+            emit modelSelected(modelDir, modelName);
+        });
         trainingDialog->show();
-        close();
     });
+
+    (*refreshModelList)(QString());
 
     setStyleSheet(QStringLiteral(
         "QDialog{background:#ffffff;color:#0f172a;font-size:18px;}"

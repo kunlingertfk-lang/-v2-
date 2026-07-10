@@ -484,6 +484,20 @@ void RegisteredClassificationDialog::openModelManagement()
 {
     auto *dialog = new RegisteredClassificationModelManagementDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dialog, &RegisteredClassificationModelManagementDialog::modelSelected,
+            this, [this](const QString &modelDir, const QString &modelName) {
+        m_modelPath = modelDir;
+        m_modelName = modelName.trimmed().isEmpty()
+                ? QFileInfo(modelDir).fileName()
+                : modelName;
+        if (m_modelTypeComboBox) {
+            const int index = m_modelTypeComboBox->findData(registeredClassificationMlpModelType());
+            if (index >= 0)
+                m_modelTypeComboBox->setCurrentIndex(index);
+        }
+        updateModelLabels();
+        setViewerStatusText(tr("已选择注册分类模型：%1").arg(m_modelName));
+    });
     dialog->show();
 }
 

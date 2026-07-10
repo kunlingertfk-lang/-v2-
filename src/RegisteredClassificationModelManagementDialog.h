@@ -2,6 +2,7 @@
 #define REGISTEREDCLASSIFICATIONMODELMANAGEMENTDIALOG_H
 
 #include <QDialog>
+#include <QString>
 
 class RegisteredClassificationModelManagementDialog : public QDialog
 {
@@ -9,6 +10,9 @@ class RegisteredClassificationModelManagementDialog : public QDialog
 
 public:
     explicit RegisteredClassificationModelManagementDialog(QWidget *parent = nullptr);
+
+signals:
+    void modelSelected(const QString &modelDir, const QString &modelName);
 };
 
 #endif // REGISTEREDCLASSIFICATIONMODELMANAGEMENTDIALOG_H
