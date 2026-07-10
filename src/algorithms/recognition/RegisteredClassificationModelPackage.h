@@ -53,6 +53,8 @@ struct RegisteredClassificationModelPackageResult
 
 struct RegisteredClassificationKnnParams
 {
+    QString method = QStringLiteral("classes_distance");
+    bool normalization = false;
     int numTrees = 4;
     int numChecks = 0;
     double epsilon = 0.0;

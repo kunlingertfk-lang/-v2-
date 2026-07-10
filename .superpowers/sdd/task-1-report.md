@@ -94,3 +94,31 @@ registered_classification_mlp_backend_smoke: metadata, feature, training, and in
 ## Concerns
 
 None within Task 1. The `.gnc` checks are intentionally structural in this Qt-Core-only contract layer; HALCON binary read/write validation belongs to the later KNN runtime task.
+
+## Review Fixes
+
+### RED
+
+Command:
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile && make -C build -f registered_classification_feature_v2.Makefile -j8 && ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+Result: exit 1. The amended smoke failed because `metadata.json` omitted `knn.method` and `knn.normalization`; it also accepted zero-byte `model.gnc`/`class_centers.gnc` and marked the inspected package runnable. Altering either fixed KNN value was accepted as well.
+
+### GREEN
+
+The KNN contract now stores `method="classes_distance"` and `normalization=false` in `RegisteredClassificationKnnParams` and metadata JSON. Missing or altered values fail with `invalid_knn_parameters` and an actionable fixed-contract message. Package validation requires both `.gnc` paths to be regular, non-empty files; this remains structural only and does not HALCON-parse the binaries.
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile && make -C build -f registered_classification_feature_v2.Makefile -j8 && ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+Output: `registered_classification_feature_v2_smoke: feature contract and schema 2 package checks passed` (exit 0).
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_mlp_backend_smoke.pro -o build/registered_classification_mlp_backend.Makefile && make -C build -f registered_classification_mlp_backend.Makefile -j8 && ./build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke
+```
+
+Output: `registered_classification_mlp_backend_smoke: metadata, feature, training, and inference checks passed` (exit 0).

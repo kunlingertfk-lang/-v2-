@@ -37,6 +37,20 @@ bool createEmptyFile(const QString &path)
     return file.open(QIODevice::WriteOnly | QIODevice::Truncate);
 }
 
+bool writeSentinelFile(const QString &path)
+{
+    QFile file(path);
+    return file.open(QIODevice::WriteOnly | QIODevice::Truncate)
+            && file.write("gnc-sentinel") > 0;
+}
+
+bool writeMetadataJson(const QString &modelDir, const QJsonObject &metadata)
+{
+    QFile file(registeredClassificationMetadataPath(modelDir));
+    return file.open(QIODevice::WriteOnly | QIODevice::Truncate)
+            && file.write(QJsonDocument(metadata).toJson(QJsonDocument::Compact)) > 0;
+}
+
 RegisteredClassificationKnnModelMetadata validMetadata()
 {
     RegisteredClassificationKnnModelMetadata metadata;
@@ -137,6 +151,19 @@ int main(int argc, char **argv)
     check(loadedMetadata.featureNames == metadata.featureNames,
           "schema 2 feature names must round-trip");
 
+    QFile metadataFile(registeredClassificationMetadataPath(modelDir));
+    check(metadataFile.open(QIODevice::ReadOnly), "schema 2 metadata JSON must be readable");
+    const QJsonObject metadataJson = metadataFile.isOpen()
+            ? QJsonDocument::fromJson(metadataFile.readAll()).object()
+            : QJsonObject();
+    const QJsonObject knnJson = metadataJson.value(QStringLiteral("knn")).toObject();
+    check(knnJson.value(QStringLiteral("method")).toString()
+                  == QStringLiteral("classes_distance"),
+          "schema 2 metadata must persist KNN method");
+    check(knnJson.contains(QStringLiteral("normalization"))
+                  && !knnJson.value(QStringLiteral("normalization")).toBool(true),
+          "schema 2 metadata must persist disabled KNN normalization");
+
     RegisteredClassificationKnnModelMetadata badSchema = metadata;
     badSchema.schemaVersion = 1;
     check(!writeRegisteredClassificationKnnMetadata(
@@ -175,8 +202,49 @@ int main(int argc, char **argv)
           "sample KNN file fixture must write");
     check(createEmptyFile(registeredClassificationCenterKnnPath(modelDir)),
           "center KNN file fixture must write");
+    const RegisteredClassificationModelPackageResult zeroBytePackage =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!zeroBytePackage.success,
+          "zero-byte KNN files must leave the schema 2 package incomplete");
+    check(zeroBytePackage.status == QStringLiteral("model_package_incomplete"),
+          "zero-byte KNN files must report an incomplete package");
+    const RegisteredClassificationModelInspection zeroByteInspection =
+            inspectRegisteredClassificationModelPackage(modelDir);
+    check(!zeroByteInspection.runnable,
+          "zero-byte KNN files must not be inspected as runnable");
+
+    check(writeSentinelFile(registeredClassificationSampleKnnPath(modelDir)),
+          "sample KNN sentinel fixture must write");
+    check(writeSentinelFile(registeredClassificationCenterKnnPath(modelDir)),
+          "center KNN sentinel fixture must write");
     check(validateRegisteredClassificationKnnPackage(modelDir).success,
           "complete schema 2 package must validate");
+
+    QJsonObject alteredMethodMetadata = metadataJson;
+    QJsonObject alteredMethodKnn = alteredMethodMetadata.value(QStringLiteral("knn")).toObject();
+    alteredMethodKnn.insert(QStringLiteral("method"), QStringLiteral("nearest_neighbor"));
+    alteredMethodMetadata.insert(QStringLiteral("knn"), alteredMethodKnn);
+    check(writeMetadataJson(modelDir, alteredMethodMetadata),
+          "altered KNN method fixture must write");
+    const RegisteredClassificationModelPackageResult alteredMethodPackage =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!alteredMethodPackage.success,
+          "altered KNN method must invalidate the package");
+    check(alteredMethodPackage.status == QStringLiteral("invalid_knn_parameters"),
+          "altered KNN method must report actionable parameter status");
+
+    QJsonObject alteredNormalizationMetadata = metadataJson;
+    QJsonObject alteredNormalizationKnn = alteredNormalizationMetadata.value(QStringLiteral("knn")).toObject();
+    alteredNormalizationKnn.insert(QStringLiteral("normalization"), true);
+    alteredNormalizationMetadata.insert(QStringLiteral("knn"), alteredNormalizationKnn);
+    check(writeMetadataJson(modelDir, alteredNormalizationMetadata),
+          "altered KNN normalization fixture must write");
+    const RegisteredClassificationModelPackageResult alteredNormalizationPackage =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!alteredNormalizationPackage.success,
+          "altered KNN normalization must invalidate the package");
+    check(alteredNormalizationPackage.status == QStringLiteral("invalid_knn_parameters"),
+          "altered KNN normalization must report actionable parameter status");
 
     const QString legacyDir = smokeModelDir(QStringLiteral("legacy"));
     RegisteredClassificationModelMetadata legacyMetadata;

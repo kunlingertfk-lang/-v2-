@@ -113,6 +113,8 @@ RegisteredClassificationKnnModelMetadata knnMetadataFromJson(const QJsonObject &
     loaded.trainingSampleCount = root.value(QStringLiteral("trainingSampleCount")).toInt(0);
 
     const QJsonObject knn = root.value(QStringLiteral("knn")).toObject();
+    loaded.knn.method = knn.value(QStringLiteral("method")).toString();
+    loaded.knn.normalization = knn.value(QStringLiteral("normalization")).toBool(true);
     loaded.knn.numTrees = knn.value(QStringLiteral("numTrees")).toInt(4);
     loaded.knn.numChecks = knn.value(QStringLiteral("numChecks")).toInt(0);
     loaded.knn.epsilon = knn.value(QStringLiteral("epsilon")).toDouble(0.0);
@@ -141,6 +143,8 @@ QJsonObject knnMetadataToJson(const RegisteredClassificationKnnModelMetadata &me
     root.insert(QStringLiteral("trainingSampleCount"), metadata.trainingSampleCount);
 
     QJsonObject knn;
+    knn.insert(QStringLiteral("method"), metadata.knn.method);
+    knn.insert(QStringLiteral("normalization"), metadata.knn.normalization);
     knn.insert(QStringLiteral("numTrees"), metadata.knn.numTrees);
     knn.insert(QStringLiteral("numChecks"), metadata.knn.numChecks);
     knn.insert(QStringLiteral("epsilon"), metadata.knn.epsilon);
@@ -483,12 +487,15 @@ RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnMe
         return result(false, QStringLiteral("invalid_training_sample_count"),
                       QStringLiteral("trainingSampleCount must be positive."));
     }
-    if (metadata.knn.numTrees != 4 || metadata.knn.numChecks != 0
+    if (metadata.knn.method != QStringLiteral("classes_distance")
+            || metadata.knn.normalization
+            || metadata.knn.numTrees != 4 || metadata.knn.numChecks != 0
             || !sameDouble(metadata.knn.epsilon, 0.0)
             || !sameDouble(metadata.knn.sampleWeight, 0.70)
             || !sameDouble(metadata.knn.centerWeight, 0.30)) {
         return result(false, QStringLiteral("invalid_knn_parameters"),
-                      QStringLiteral("KNN parameters must match the fixed V2 contract."));
+                      QStringLiteral("KNN method must be classes_distance, normalization must be false, "
+                                     "and parameters must match the fixed V2 contract."));
     }
     if (metadata.thresholds.minSimilarity < 0 || metadata.thresholds.minSimilarity > 100
             || metadata.thresholds.minMargin < 0 || metadata.thresholds.minMargin > 100) {
@@ -602,18 +609,24 @@ RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnPa
     if (!metadataResult.success)
         return metadataResult;
 
-    const QStringList requiredFiles = {
+    const QStringList requiredKnnFiles = {
         registeredClassificationSampleKnnPath(modelDir),
-        registeredClassificationCenterKnnPath(modelDir),
-        registeredClassificationClassStatsPath(modelDir)
+        registeredClassificationCenterKnnPath(modelDir)
     };
-    for (const QString &path : requiredFiles) {
+    for (const QString &path : requiredKnnFiles) {
         const QFileInfo info(path);
-        if (!info.exists() || !info.isFile()) {
+        if (!info.exists() || !info.isFile() || info.size() <= 0) {
             return result(false, QStringLiteral("model_package_incomplete"),
-                          QStringLiteral("Required model package file is missing: %1.")
+                          QStringLiteral("Required KNN model file is missing, not regular, or empty: %1.")
                                   .arg(info.fileName()));
         }
+    }
+
+    const QFileInfo classStatsInfo(registeredClassificationClassStatsPath(modelDir));
+    if (!classStatsInfo.exists() || !classStatsInfo.isFile()) {
+        return result(false, QStringLiteral("model_package_incomplete"),
+                      QStringLiteral("Required model package file is missing: %1.")
+                              .arg(classStatsInfo.fileName()));
     }
 
     RegisteredClassificationClassStatsDocument stats;
