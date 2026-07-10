@@ -41,3 +41,4 @@ moc_predefs.h
 # Claude Code / superpowers 会话与产物不入库
 .claude/
 .superpowers/
+.worktrees/
