@@ -2,6 +2,7 @@
 #include "RegisteredClassificationTrainingDialog.h"
 
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
+#include "algorithms/recognition/RegisteredClassificationTrainingSession.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/ReferenceImageProvider.h"
@@ -41,6 +42,78 @@ void check(bool condition, const char *message)
         std::cerr << "FAIL: " << message << std::endl;
         ++g_failures;
     }
+}
+
+void testTrainingSessionCodec()
+{
+    const QString sessionRoot = QDir::temp().filePath(
+                QStringLiteral("registered_classification_training_session_smoke"));
+    QDir(sessionRoot).removeRecursively();
+
+    QJsonObject rectangleMark;
+    rectangleMark.insert(QStringLiteral("classId"), 0);
+    rectangleMark.insert(QStringLiteral("type"), QStringLiteral("rect"));
+    rectangleMark.insert(QStringLiteral("rect"), QJsonArray{0.1, 0.2, 0.3, 0.4});
+    QJsonObject polygonMark;
+    polygonMark.insert(QStringLiteral("classId"), 1);
+    polygonMark.insert(QStringLiteral("type"), QStringLiteral("polygon"));
+    polygonMark.insert(QStringLiteral("polygon"), QJsonArray{
+                          QJsonArray{0.2, 0.2}, QJsonArray{0.8, 0.2}, QJsonArray{0.5, 0.8}});
+    QJsonObject firstImage;
+    firstImage.insert(QStringLiteral("name"), QStringLiteral("front sample"));
+    firstImage.insert(QStringLiteral("relativePath"), QStringLiteral("images/image_0001.png"));
+    firstImage.insert(QStringLiteral("width"), 8);
+    firstImage.insert(QStringLiteral("height"), 6);
+    firstImage.insert(QStringLiteral("marksByClass"), QJsonArray{rectangleMark});
+    QJsonObject secondImage;
+    secondImage.insert(QStringLiteral("name"), QStringLiteral("back sample"));
+    secondImage.insert(QStringLiteral("relativePath"), QStringLiteral("images/image_0002.png"));
+    secondImage.insert(QStringLiteral("width"), 8);
+    secondImage.insert(QStringLiteral("height"), 6);
+    secondImage.insert(QStringLiteral("marksByClass"), QJsonArray{polygonMark});
+    QJsonObject manifest;
+    manifest.insert(QStringLiteral("schemaVersion"), 1);
+    manifest.insert(QStringLiteral("classes"), QJsonArray{QStringLiteral("front"), QStringLiteral("back")});
+    manifest.insert(QStringLiteral("images"), QJsonArray{firstImage, secondImage});
+
+    QVector<RegisteredClassificationTrainingSessionAsset> assets;
+    for (const QString &relativePath : {QStringLiteral("images/image_0001.png"),
+                                        QStringLiteral("images/image_0002.png")}) {
+        cv::Mat image(6, 8, CV_8UC3, cv::Scalar(12, 34, 56));
+        RegisteredClassificationTrainingSessionAsset asset;
+        asset.relativePath = relativePath;
+        asset.image = image.clone();
+        assets.append(asset);
+    }
+
+    const RegisteredClassificationTrainingSessionResult writeResult =
+            writeRegisteredClassificationTrainingSession(sessionRoot, manifest, assets);
+    check(writeResult.success, "training session codec must write a valid session");
+
+    RegisteredClassificationTrainingSessionPayload payload;
+    const RegisteredClassificationTrainingSessionResult readResult =
+            readRegisteredClassificationTrainingSession(sessionRoot, &payload);
+    check(readResult.success, "training session codec must read a valid session");
+    check(payload.manifest.value(QStringLiteral("classes")) == manifest.value(QStringLiteral("classes")),
+          "training session round trip must preserve class names");
+    check(payload.manifest.value(QStringLiteral("images")) == manifest.value(QStringLiteral("images")),
+          "training session round trip must preserve image names and ROI marks");
+    check(payload.assets.size() == 2 && payload.assets.at(0).image.size() == cv::Size(8, 6),
+          "training session round trip must preserve image dimensions");
+
+    RegisteredClassificationTrainingSessionAsset invalidAsset;
+    invalidAsset.relativePath = QStringLiteral("../outside.png");
+    invalidAsset.image = cv::Mat(2, 2, CV_8UC3, cv::Scalar(0, 0, 0)).clone();
+    QJsonObject invalidManifest = manifest;
+    invalidManifest.insert(QStringLiteral("images"), QJsonArray{firstImage});
+    const RegisteredClassificationTrainingSessionResult invalidResult =
+            writeRegisteredClassificationTrainingSession(
+                    QDir::temp().filePath(QStringLiteral("registered_classification_training_session_invalid")),
+                    invalidManifest,
+                    {invalidAsset});
+    check(!invalidResult.success && invalidResult.status == QStringLiteral("invalid_session_path"),
+          "training session codec must reject paths outside the session directory");
+    QDir(sessionRoot).removeRecursively();
 }
 
 QPushButton *buttonByText(QWidget &root, const QString &text)
@@ -182,6 +255,7 @@ int main(int argc, char **argv)
 {
     qputenv("QT_QPA_PLATFORM", QByteArray("offscreen"));
     QApplication app(argc, argv);
+    testTrainingSessionCodec();
 
     const cv::Mat frame = cv::Mat::zeros(64, 64, CV_8UC3);
     ReferenceImageProvider::instance().setReferenceFrame(frame);
