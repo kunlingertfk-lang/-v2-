@@ -15,6 +15,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDebug>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -27,7 +28,6 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QRegularExpression>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QSignalBlocker>
@@ -163,6 +163,47 @@ void setComboBoxText(QComboBox *comboBox, const QString &text)
         if (allIndex >= 0)
             comboBox->setCurrentIndex(allIndex);
     }
+}
+
+bool copyDirectoryRecursively(const QString &sourcePath,
+                              const QString &targetPath,
+                              QString *errorMessage)
+{
+    const QDir sourceDir(sourcePath);
+    if (!sourceDir.exists()) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("源模型目录不存在。");
+        return false;
+    }
+
+    QDir targetDir(targetPath);
+    if (!targetDir.exists() && !QDir().mkpath(targetPath)) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("目标模型目录创建失败。");
+        return false;
+    }
+
+    const QFileInfoList entries = sourceDir.entryInfoList(
+                QDir::NoDotAndDotDot | QDir::AllEntries);
+    for (const QFileInfo &entry : entries) {
+        const QString targetEntryPath = targetDir.filePath(entry.fileName());
+        if (entry.isDir()) {
+            if (!copyDirectoryRecursively(entry.absoluteFilePath(), targetEntryPath, errorMessage))
+                return false;
+            continue;
+        }
+        if (QFile::exists(targetEntryPath) && !QFile::remove(targetEntryPath)) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("目标模型文件覆盖失败：%1").arg(entry.fileName());
+            return false;
+        }
+        if (!QFile::copy(entry.absoluteFilePath(), targetEntryPath)) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("模型文件复制失败：%1").arg(entry.fileName());
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace
@@ -359,11 +400,10 @@ void RegisteredClassificationDialog::runTest()
 
 void RegisteredClassificationDialog::importModel()
 {
-    const QString path = QFileDialog::getOpenFileName(
+    const QString path = QFileDialog::getExistingDirectory(
                 this,
-                tr("导入注册分类模型"),
-                QString(),
-                tr("模型文件 (*.*)"));
+                tr("导入注册分类模型包目录"),
+                QString());
     if (path.trimmed().isEmpty())
         return;
 
@@ -373,9 +413,9 @@ void RegisteredClassificationDialog::importModel()
         return;
     }
 
-    const QFileInfo info(path);
+    const QFileInfo info(QDir::cleanPath(path));
     m_modelPath = info.absoluteFilePath();
-    m_modelName = info.completeBaseName();
+    m_modelName = info.fileName();
     updateModelLabels();
     setViewerStatusText(tr("模型已导入：%1").arg(m_modelName));
 }
@@ -387,22 +427,28 @@ void RegisteredClassificationDialog::exportModel()
         return;
     }
 
-    const QFileInfo sourceInfo(m_modelPath);
-    const QString target = QFileDialog::getSaveFileName(
+    const QFileInfo sourceInfo(QDir::cleanPath(m_modelPath));
+    const QString targetParent = QFileDialog::getExistingDirectory(
                 this,
-                tr("导出注册分类模型"),
-                sourceInfo.fileName(),
-                tr("模型文件 (*.*)"));
-    if (target.trimmed().isEmpty())
+                tr("选择注册分类模型包导出目录"),
+                QString());
+    if (targetParent.trimmed().isEmpty())
         return;
 
-    if (QFile::exists(target))
-        QFile::remove(target);
-    if (!QFile::copy(m_modelPath, target)) {
-        QMessageBox::warning(this, tr("导出模型"), tr("模型文件导出失败。"));
+    const QString target = QDir(targetParent).filePath(sourceInfo.fileName());
+    if (QFileInfo::exists(target)) {
+        QMessageBox::warning(this,
+                             tr("导出模型"),
+                             tr("目标目录已存在：%1").arg(target));
         return;
     }
-    setViewerStatusText(tr("模型已导出：%1").arg(QFileInfo(target).fileName()));
+
+    QString errorMessage;
+    if (!copyDirectoryRecursively(m_modelPath, target, &errorMessage)) {
+        QMessageBox::warning(this, tr("导出模型"), errorMessage);
+        return;
+    }
+    setViewerStatusText(tr("模型已导出：%1").arg(target));
 }
 
 void RegisteredClassificationDialog::deleteModel()
@@ -910,24 +956,26 @@ QRectF RegisteredClassificationDialog::effectiveRoiNormalized() const
 bool RegisteredClassificationDialog::validateImportedModelPath(const QString &path,
                                                                QString *errorMessage) const
 {
-    const QFileInfo info(path);
-    if (!info.exists() || !info.isFile()) {
+    const QFileInfo info(QDir::cleanPath(path));
+    if (!info.exists() || !info.isDir()) {
         if (errorMessage)
-            *errorMessage = tr("模型文件不存在。");
+            *errorMessage = tr("请选择注册分类模型包目录。");
         return false;
     }
 
-    const QString suffix = info.suffix().trimmed().toLower();
-    if (suffix == QStringLiteral("scbin")) {
+    if (!QFileInfo::exists(registeredClassificationMetadataPath(info.absoluteFilePath())) ||
+        !QFileInfo::exists(registeredClassificationMlpPath(info.absoluteFilePath()))) {
         if (errorMessage)
-            *errorMessage = tr(".scbin 为海康专有模型格式，HALCON 第一版不解析。");
+            *errorMessage = tr("模型包目录必须包含 metadata.json 和 model.gmc。");
         return false;
     }
 
-    static const QRegularExpression namePattern(QStringLiteral("^[A-Za-z0-9_]+$"));
-    if (!namePattern.match(info.completeBaseName()).hasMatch()) {
+    RegisteredClassificationModelMetadata metadata;
+    const RegisteredClassificationModelPackageResult readResult =
+            readRegisteredClassificationMetadata(info.absoluteFilePath(), &metadata);
+    if (!readResult.success) {
         if (errorMessage)
-            *errorMessage = tr("模型文件名称只支持英文大小写字母、数字和下划线。");
+            *errorMessage = readResult.message;
         return false;
     }
 
