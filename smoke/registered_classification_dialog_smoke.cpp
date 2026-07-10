@@ -1019,8 +1019,66 @@ int main(int argc, char **argv)
     QPushButton *referenceButton = buttonByText(dialog, QStringLiteral("基准图测试"));
     check(referenceButton != nullptr, "reference test button must exist");
     clickAndProcess(referenceButton);
+    check(referenceButton && referenceButton->isChecked(),
+          "reference test button must remain highlighted in continuous test mode");
     check(statusText(dialog).contains(QStringLiteral("model_path_empty")),
           "reference test must pass reference frame as request.image and reach model_path_empty");
+
+    QToolButton *mainRectRoiButton = dialog.findChild<QToolButton *>(
+                QStringLiteral("registeredClassificationRectRegionButton"));
+    QPushButton *mainRoiFinishButton = dialog.findChild<QPushButton *>(
+                QStringLiteral("registeredClassificationRoiFinishButton"));
+    FrameViewHelper *mainPreviewHelper = dialog.findChild<FrameViewHelper *>();
+    check(mainRectRoiButton != nullptr, "main dialog must expose stable rectangle ROI button");
+    check(mainRoiFinishButton != nullptr, "main dialog must expose stable ROI finish button");
+    check(mainPreviewHelper != nullptr, "main dialog must expose preview helper");
+    if (mainRectRoiButton && mainPreviewHelper) {
+        clickAndProcess(mainRectRoiButton);
+        check(mainRectRoiButton->isChecked(),
+              "rectangle ROI button must remain highlighted while editing");
+        check(mainPreviewHelper->isRoiDrawingEnabled(),
+              "rectangle ROI helper must remain enabled while editing");
+
+        const QRectF firstRoi(0.12, 0.16, 0.28, 0.24);
+        emit mainPreviewHelper->roiChanged(firstRoi);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        check(referenceButton->isChecked(),
+              "continuous test mode must remain enabled after first ROI test");
+        check(qAbs(dialog.referencePreviewSnapshot().roiNormalized.x() - firstRoi.x()) < 0.0001,
+              "first ROI completion must automatically trigger reference testing");
+
+        const QRectF secondRoi(0.46, 0.34, 0.22, 0.26);
+        emit mainPreviewHelper->roiChanged(secondRoi);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        check(qAbs(dialog.referencePreviewSnapshot().roiNormalized.x() - secondRoi.x()) < 0.0001,
+              "second ROI completion must automatically retrigger reference testing");
+        check(mainRectRoiButton->isChecked(),
+              "rectangle ROI button must stay highlighted after repeated ROI testing");
+
+        if (mainRoiFinishButton) {
+            clickAndProcess(mainRoiFinishButton);
+            check(!mainPreviewHelper->isRoiDrawingEnabled(),
+                  "ROI finish must leave rectangle drawing mode");
+            check(referenceButton->isChecked(),
+                  "ROI finish must keep continuous reference test mode enabled");
+            check(qAbs(dialog.referencePreviewSnapshot().roiNormalized.x() - secondRoi.x()) < 0.0001,
+                  "ROI finish must preserve the latest ROI");
+        }
+    }
+
+    clickAndProcess(referenceButton);
+    check(!referenceButton->isChecked(),
+          "clicking reference test again must exit continuous test mode");
+    check(qAbs(dialog.referencePreviewSnapshot().roiNormalized.x() - 0.46) < 0.0001,
+          "exiting continuous test mode must preserve the latest ROI");
+
+    ReferenceImageProvider::instance().clearReferenceFrame();
+    clickAndProcess(referenceButton);
+    check(!referenceButton->isChecked(),
+          "reference test without a reference image must not enter continuous mode");
+    check(statusText(dialog).contains(QStringLiteral("no_reference_image")),
+          "reference test without a reference image must show no_reference_image");
+    ReferenceImageProvider::instance().setReferenceFrame(frame);
 
     QPushButton *testRunButton = buttonByText(dialog, QStringLiteral("测试运行"));
     check(testRunButton != nullptr, "test run button must exist");

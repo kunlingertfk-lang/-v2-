@@ -42,6 +42,7 @@ protected:
 private slots:
     void finishConfiguration();
     void runReferenceTest();
+    void executeReferenceTest();
     void runTest();
     void importModel();
     void exportModel();
@@ -77,6 +78,8 @@ private:
     QString m_toolId;
     bool m_enabled = true;
     bool m_allParamsMode = false;
+    bool m_referenceTestMode = false;
+    bool m_roiEditing = false;
     QString m_modelPath;
     QString m_modelName;
     QString m_detectRegionType = QStringLiteral("full");

@@ -349,6 +349,28 @@ void RegisteredClassificationDialog::runReferenceTest()
 {
     const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
     if (frame.empty()) {
+        m_referenceTestMode = false;
+        refreshUiState();
+        setViewerStatusText(tr("注册分类: no_reference_image | 请先设置基准图"));
+        if (m_previewHelper)
+            m_previewHelper->clearToolOverlays();
+        return;
+    }
+
+    m_referenceTestMode = !m_referenceTestMode;
+    refreshUiState();
+    if (m_referenceTestMode)
+        executeReferenceTest();
+    else
+        setViewerStatusText(roiStatusText());
+}
+
+void RegisteredClassificationDialog::executeReferenceTest()
+{
+    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+    if (frame.empty()) {
+        m_referenceTestMode = false;
+        refreshUiState();
         setViewerStatusText(tr("注册分类: no_reference_image | 请先设置基准图"));
         if (m_previewHelper)
             m_previewHelper->clearToolOverlays();
@@ -370,6 +392,8 @@ void RegisteredClassificationDialog::runReferenceTest()
     m_referencePreviewSnapshot =
             makeReferenceToolPreviewSnapshot(request.config, result, effectiveRoiNormalized());
     displayResult(result);
+    if (m_referenceTestMode)
+        setViewerStatusText(resultStatusText(result) + tr(" | 基准图持续测试已启用"));
 }
 
 void RegisteredClassificationDialog::runTest()
@@ -505,15 +529,19 @@ void RegisteredClassificationDialog::startGlobalDetection()
 {
     m_detectRegionType = QStringLiteral("full");
     m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    m_roiEditing = false;
     if (m_previewHelper)
         m_previewHelper->setRoiDrawingEnabled(false);
     refreshUiState();
     refreshRoiOverlay();
+    if (m_referenceTestMode)
+        executeReferenceTest();
 }
 
 void RegisteredClassificationDialog::startRectangleRoiEditing()
 {
     m_detectRegionType = QStringLiteral("rectangle");
+    m_roiEditing = true;
     if (m_previewHelper) {
         m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
         m_previewHelper->setRoiDrawingEnabled(true);
@@ -524,10 +552,12 @@ void RegisteredClassificationDialog::startRectangleRoiEditing()
 
 void RegisteredClassificationDialog::finishRoiEditing()
 {
+    m_roiEditing = false;
     if (m_previewHelper)
         m_previewHelper->setRoiDrawingEnabled(false);
     refreshRoiOverlay();
-    setViewerStatusText(roiStatusText());
+    setViewerStatusText(roiStatusText()
+                        + (m_referenceTestMode ? tr(" | 基准图持续测试已启用") : QString()));
 }
 
 void RegisteredClassificationDialog::handleRoiChanged(const QRectF &roi)
@@ -535,7 +565,10 @@ void RegisteredClassificationDialog::handleRoiChanged(const QRectF &roi)
     m_roiNormalized = normalizedRoiOrDefault(roi);
     m_detectRegionType = QStringLiteral("rectangle");
     refreshUiState();
-    setViewerStatusText(roiStatusText());
+    if (m_referenceTestMode)
+        executeReferenceTest();
+    else
+        setViewerStatusText(roiStatusText());
 }
 
 void RegisteredClassificationDialog::handleRoiSelectionRejected()
@@ -617,10 +650,12 @@ void RegisteredClassificationDialog::buildUi()
     QHBoxLayout *regionLayout = new QHBoxLayout(regionButtons);
     regionLayout->setContentsMargins(0, 0, 0, 0);
     m_globalRegionButton = new QToolButton(regionButtons);
+    m_globalRegionButton->setObjectName(QStringLiteral("registeredClassificationGlobalRegionButton"));
     m_globalRegionButton->setText(QStringLiteral("▣"));
     m_globalRegionButton->setToolTip(tr("全屏检测"));
     m_globalRegionButton->setCheckable(true);
     m_rectRegionButton = new QToolButton(regionButtons);
+    m_rectRegionButton->setObjectName(QStringLiteral("registeredClassificationRectRegionButton"));
     m_rectRegionButton->setText(QStringLiteral("□"));
     m_rectRegionButton->setToolTip(tr("矩形检测区域"));
     m_rectRegionButton->setCheckable(true);
@@ -628,6 +663,7 @@ void RegisteredClassificationDialog::buildUi()
     m_regionGroup->addButton(m_globalRegionButton, 0);
     m_regionGroup->addButton(m_rectRegionButton, 1);
     m_roiFinishButton = new QPushButton(tr("完成"), regionButtons);
+    m_roiFinishButton->setObjectName(QStringLiteral("registeredClassificationRoiFinishButton"));
     regionLayout->addWidget(new QLabel(tr("检测区"), regionButtons));
     regionLayout->addStretch(1);
     regionLayout->addWidget(m_globalRegionButton);
@@ -721,6 +757,7 @@ void RegisteredClassificationDialog::buildUi()
     m_referenceTestButton = new QPushButton(tr("基准图测试"), leftPanel);
     m_testRunButton = new QPushButton(tr("测试运行"), leftPanel);
     m_finishButton = new QPushButton(tr("完成"), leftPanel);
+    m_referenceTestButton->setCheckable(true);
     applyActionButtonMetrics(m_referenceTestButton);
     applyActionButtonMetrics(m_testRunButton);
     applyActionButtonMetrics(m_finishButton);
@@ -812,8 +849,9 @@ void RegisteredClassificationDialog::refreshUiState()
     m_allButton->setChecked(m_allParamsMode);
     if (m_advancedCard)
         m_advancedCard->setVisible(m_allParamsMode);
-    m_globalRegionButton->setChecked(m_detectRegionType == QStringLiteral("full"));
-    m_rectRegionButton->setChecked(m_detectRegionType == QStringLiteral("rectangle"));
+    m_referenceTestButton->setChecked(m_referenceTestMode);
+    m_globalRegionButton->setChecked(m_detectRegionType == QStringLiteral("full") && !m_roiEditing);
+    m_rectRegionButton->setChecked(m_roiEditing);
     m_positionCorrectionCheckBox->setChecked(m_positionCorrectionEnabled);
     m_positionCorrectionCheckBox->setEnabled(false);
     if (m_positionSourceRow)
