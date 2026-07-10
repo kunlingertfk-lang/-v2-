@@ -667,6 +667,28 @@ git diff --check
 - 注册分类 smoke 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
 - 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
 
+### 2026-07-10 基准图持续测试与 ROI 自动复测
+
+#### 已实现功能
+
+- `基准图测试` 改为可切换的持续测试模式，点击后立即执行一次测试并保持按钮高亮。
+- 持续测试模式开启时，检测区域矩形 ROI 每次完成有效绘制都会自动触发一次基准图测试。
+- ROI 可以反复绘制和修改，不需要重复点击“基准图测试”；测试模式保持开启直到再次点击测试按钮退出。
+- 矩形 ROI 图标在编辑期间保持高亮；点击“完成”只退出 ROI 编辑，保留 ROI、结果和持续测试模式。
+- 无基准图时不进入持续测试模式，显示 `no_reference_image`；无效 ROI 不触发测试且保留原状态。
+- “测试运行”仍保持当前相机帧一次性测试语义，不受基准图持续测试模式影响。
+
+#### 本次更改
+
+- 修改 `src/RegisteredClassificationDialog.{h,cpp}`，增加持续测试和 ROI 编辑状态、稳定控件对象名，并拆分测试模式切换与单次执行路径。
+- 修改 `smoke/registered_classification_dialog_smoke.cpp`，覆盖按钮高亮、连续两次 ROI 自动复测、完成后状态保留和无基准图保护。
+
+#### 验证结果
+
+- 提交：`5cd156e`。
+- `registered_classification_dialog_smoke` 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
+- 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
+
 ### 2026-07-07 注册训练窗口四阶段：标签类型行点击切换当前类别
 
 #### 已实现功能
