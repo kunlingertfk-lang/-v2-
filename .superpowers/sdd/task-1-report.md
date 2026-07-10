@@ -162,3 +162,37 @@ Changed files:
 - `src/algorithms/recognition/RegisteredClassificationModelPackage.cpp`
 - `smoke/registered_classification_feature_v2_smoke.cpp`
 - `.superpowers/sdd/task-1-report.md`
+
+## Review Fixes: Third Pass
+
+### RED
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile && make -C build -f registered_classification_feature_v2.Makefile -j8 && ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+Result: exit 1. The new class-stats mutation matrix removed every required top-level and per-class field and substituted representative incorrect JSON types. Missing fields and values such as string `radiusEnabled`, string `meanDistance`, object `stdDevDistance`, and array `maxDistance` were accepted or reported a downstream status, showing that `classStatsFromJson` conversion defaults were hiding malformed persisted values.
+
+### GREEN
+
+`classStatsFromJson` now validates the complete persisted schema before conversion: all required fields must exist with their writer-emitted JSON types; integer fields must be finite, integral, and within `int` range; each class entry must be an object; and every distance must be finite and non-negative. Semantic validation continues to reject invalid counts, duplicate IDs, and enabled radii outside `[0.10, 2.00]`. Malformed class-stat contracts return `invalid_class_stats`, while numeric-but-unsupported schema and string-but-unsupported feature values retain `unsupported_schema_version` and `unsupported_feature_version`.
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile && make -C build -f registered_classification_feature_v2.Makefile -j8 && ./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
+
+Output: `registered_classification_feature_v2_smoke: feature contract and schema 2 package checks passed` (exit 0).
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_mlp_backend_smoke.pro -o build/registered_classification_mlp_backend.Makefile && make -C build -f registered_classification_mlp_backend.Makefile -j8 && ./build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke
+```
+
+Output: `registered_classification_mlp_backend_smoke: metadata, feature, training, and inference checks passed` (exit 0).
+
+`git diff --check` exited 0 before commit.
+
+```bash
+git diff --check adce046..HEAD
+```
+
+Result: exit 0 after committing the review fix.

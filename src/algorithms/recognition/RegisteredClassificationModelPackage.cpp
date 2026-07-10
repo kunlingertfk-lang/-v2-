@@ -9,6 +9,7 @@
 #include <QSet>
 
 #include <cmath>
+#include <limits>
 
 namespace {
 
@@ -69,6 +70,18 @@ QStringList stringListFromJson(const QJsonArray &array)
 bool isFiniteNonNegative(double value)
 {
     return std::isfinite(value) && value >= 0.0;
+}
+
+bool isJsonInteger(const QJsonValue &value)
+{
+    if (!value.isDouble())
+        return false;
+
+    const double number = value.toDouble();
+    return std::isfinite(number)
+            && std::floor(number) == number
+            && number >= static_cast<double>(std::numeric_limits<int>::min())
+            && number <= static_cast<double>(std::numeric_limits<int>::max());
 }
 
 bool sameDouble(double left, double right)
@@ -196,25 +209,73 @@ QJsonObject knnMetadataToJson(const RegisteredClassificationKnnModelMetadata &me
     return root;
 }
 
-RegisteredClassificationClassStatsDocument classStatsFromJson(const QJsonObject &root)
+RegisteredClassificationModelPackageResult classStatsFromJson(
+        const QJsonObject &root,
+        RegisteredClassificationClassStatsDocument *document)
 {
-    RegisteredClassificationClassStatsDocument document;
-    document.schemaVersion = root.value(QStringLiteral("schemaVersion")).toInt(0);
-    document.featureVersion = root.value(QStringLiteral("featureVersion")).toString();
-    const QJsonArray classes = root.value(QStringLiteral("classes")).toArray();
-    for (const QJsonValue &value : classes) {
-        const QJsonObject object = value.toObject();
-        RegisteredClassificationClassStats stats;
-        stats.classId = object.value(QStringLiteral("classId")).toInt(-1);
-        stats.sampleCount = object.value(QStringLiteral("sampleCount")).toInt(0);
-        stats.radiusEnabled = object.value(QStringLiteral("radiusEnabled")).toBool(false);
-        stats.radius = object.value(QStringLiteral("radius")).toDouble(0.0);
-        stats.meanDistance = object.value(QStringLiteral("meanDistance")).toDouble(0.0);
-        stats.stdDevDistance = object.value(QStringLiteral("stdDevDistance")).toDouble(0.0);
-        stats.maxDistance = object.value(QStringLiteral("maxDistance")).toDouble(0.0);
-        document.classes.append(stats);
+    if (!document) {
+        return result(false, QStringLiteral("invalid_argument"),
+                      QStringLiteral("class stats output is null."));
     }
-    return document;
+
+    const QJsonValue schemaVersion = root.value(QStringLiteral("schemaVersion"));
+    if (!isJsonInteger(schemaVersion)) {
+        return result(false, QStringLiteral("invalid_class_stats"),
+                      QStringLiteral("Class stats schemaVersion must be an integer JSON number."));
+    }
+    const QJsonValue featureVersion = root.value(QStringLiteral("featureVersion"));
+    if (!featureVersion.isString()) {
+        return result(false, QStringLiteral("invalid_class_stats"),
+                      QStringLiteral("Class stats featureVersion must be a JSON string."));
+    }
+    const QJsonValue classesValue = root.value(QStringLiteral("classes"));
+    if (!classesValue.isArray()) {
+        return result(false, QStringLiteral("invalid_class_stats"),
+                      QStringLiteral("Class stats classes must be a JSON array."));
+    }
+
+    RegisteredClassificationClassStatsDocument loaded;
+    loaded.schemaVersion = static_cast<int>(schemaVersion.toDouble());
+    loaded.featureVersion = featureVersion.toString();
+    const QJsonArray classes = classesValue.toArray();
+    for (const QJsonValue &value : classes) {
+        const int classIndex = loaded.classes.size();
+        if (!value.isObject()) {
+            return result(false, QStringLiteral("invalid_class_stats"),
+                          QStringLiteral("Class stats entry %1 must be a JSON object.")
+                                  .arg(classIndex));
+        }
+        const QJsonObject object = value.toObject();
+        const QJsonValue classId = object.value(QStringLiteral("classId"));
+        const QJsonValue sampleCount = object.value(QStringLiteral("sampleCount"));
+        const QJsonValue radiusEnabled = object.value(QStringLiteral("radiusEnabled"));
+        const QJsonValue radius = object.value(QStringLiteral("radius"));
+        const QJsonValue meanDistance = object.value(QStringLiteral("meanDistance"));
+        const QJsonValue stdDevDistance = object.value(QStringLiteral("stdDevDistance"));
+        const QJsonValue maxDistance = object.value(QStringLiteral("maxDistance"));
+        if (!isJsonInteger(classId) || !isJsonInteger(sampleCount)
+                || !radiusEnabled.isBool()
+                || !radius.isDouble() || !isFiniteNonNegative(radius.toDouble())
+                || !meanDistance.isDouble() || !isFiniteNonNegative(meanDistance.toDouble())
+                || !stdDevDistance.isDouble() || !isFiniteNonNegative(stdDevDistance.toDouble())
+                || !maxDistance.isDouble() || !isFiniteNonNegative(maxDistance.toDouble())) {
+            return result(false, QStringLiteral("invalid_class_stats"),
+                          QStringLiteral("Class stats entry %1 has missing or invalid contract fields.")
+                                  .arg(classIndex));
+        }
+
+        RegisteredClassificationClassStats stats;
+        stats.classId = static_cast<int>(classId.toDouble());
+        stats.sampleCount = static_cast<int>(sampleCount.toDouble());
+        stats.radiusEnabled = radiusEnabled == QJsonValue(true);
+        stats.radius = radius.toDouble();
+        stats.meanDistance = meanDistance.toDouble();
+        stats.stdDevDistance = stdDevDistance.toDouble();
+        stats.maxDistance = maxDistance.toDouble();
+        loaded.classes.append(stats);
+    }
+    *document = loaded;
+    return result(true, QStringLiteral("ok"), QStringLiteral("class stats JSON contract is valid"));
 }
 
 QJsonObject classStatsToJson(const RegisteredClassificationClassStatsDocument &document)
@@ -631,7 +692,11 @@ RegisteredClassificationModelPackageResult readRegisteredClassificationClassStat
             readJsonObject(registeredClassificationClassStatsPath(modelDir), &root);
     if (!readResult.success)
         return readResult;
-    const RegisteredClassificationClassStatsDocument loaded = classStatsFromJson(root);
+    RegisteredClassificationClassStatsDocument loaded;
+    const RegisteredClassificationModelPackageResult parseResult =
+            classStatsFromJson(root, &loaded);
+    if (!parseResult.success)
+        return parseResult;
     const RegisteredClassificationModelPackageResult validation =
             validateClassStatsDocument(loaded);
     if (!validation.success)

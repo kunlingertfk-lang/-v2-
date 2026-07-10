@@ -4,11 +4,13 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QSet>
 #include <QtMath>
 
 #include <iostream>
+#include <limits>
 
 namespace {
 
@@ -49,6 +51,26 @@ bool writeMetadataJson(const QString &modelDir, const QJsonObject &metadata)
     QFile file(registeredClassificationMetadataPath(modelDir));
     return file.open(QIODevice::WriteOnly | QIODevice::Truncate)
             && file.write(QJsonDocument(metadata).toJson(QJsonDocument::Compact)) > 0;
+}
+
+bool writeClassStatsJson(const QString &modelDir, const QJsonObject &classStats)
+{
+    QFile file(registeredClassificationClassStatsPath(modelDir));
+    return file.open(QIODevice::WriteOnly | QIODevice::Truncate)
+            && file.write(QJsonDocument(classStats).toJson(QJsonDocument::Compact)) > 0;
+}
+
+QJsonObject classStatsWithFirstClassField(const QJsonObject &classStats,
+                                          const QString &field,
+                                          const QJsonValue &value)
+{
+    QJsonObject mutated = classStats;
+    QJsonArray classes = mutated.value(QStringLiteral("classes")).toArray();
+    QJsonObject firstClass = classes.at(0).toObject();
+    firstClass.insert(field, value);
+    classes.replace(0, firstClass);
+    mutated.insert(QStringLiteral("classes"), classes);
+    return mutated;
 }
 
 RegisteredClassificationKnnModelMetadata validMetadata()
@@ -191,6 +213,26 @@ int main(int argc, char **argv)
     check(qAbs(loadedStats.classes.value(0).radius - 0.35) < 1e-9,
           "class stats radius must round-trip");
 
+    RegisteredClassificationClassStatsDocument nanClassStats = stats;
+    nanClassStats.classes[0].meanDistance = qQNaN();
+    const RegisteredClassificationModelPackageResult nanClassStatsResult =
+            writeRegisteredClassificationClassStats(
+                    smokeModelDir(QStringLiteral("nan_class_stats")), nanClassStats);
+    check(!nanClassStatsResult.success,
+          "non-finite class stats values must be rejected by the validator");
+    check(nanClassStatsResult.status == QStringLiteral("invalid_class_stats"),
+          "non-finite class stats values must report invalid class stats");
+
+    RegisteredClassificationClassStatsDocument infiniteClassStats = stats;
+    infiniteClassStats.classes[0].maxDistance = std::numeric_limits<double>::infinity();
+    const RegisteredClassificationModelPackageResult infiniteClassStatsResult =
+            writeRegisteredClassificationClassStats(
+                    smokeModelDir(QStringLiteral("infinite_class_stats")), infiniteClassStats);
+    check(!infiniteClassStatsResult.success,
+          "infinite class stats values must be rejected by the validator");
+    check(infiniteClassStatsResult.status == QStringLiteral("invalid_class_stats"),
+          "infinite class stats values must report invalid class stats");
+
     const RegisteredClassificationModelPackageResult incompletePackage =
             validateRegisteredClassificationKnnPackage(modelDir);
     check(!incompletePackage.success,
@@ -219,6 +261,152 @@ int main(int argc, char **argv)
           "center KNN sentinel fixture must write");
     check(validateRegisteredClassificationKnnPackage(modelDir).success,
           "complete schema 2 package must validate");
+
+    QFile classStatsFile(registeredClassificationClassStatsPath(modelDir));
+    check(classStatsFile.open(QIODevice::ReadOnly), "class stats JSON must be readable");
+    const QJsonObject classStatsJson = classStatsFile.isOpen()
+            ? QJsonDocument::fromJson(classStatsFile.readAll()).object()
+            : QJsonObject();
+
+    const auto checkInvalidClassStats = [&](const QJsonObject &mutatedClassStats,
+                                            const char *message) {
+        check(writeClassStatsJson(modelDir, mutatedClassStats),
+              "mutated class stats fixture must write");
+        const RegisteredClassificationModelPackageResult packageResult =
+                validateRegisteredClassificationKnnPackage(modelDir);
+        check(!packageResult.success, message);
+        check(packageResult.status == QStringLiteral("invalid_class_stats"),
+              "malformed class stats must report actionable contract status");
+    };
+    const auto checkMissingClassStatsField = [&](const QString &field) {
+        QJsonObject missingFieldClassStats = classStatsJson;
+        missingFieldClassStats.remove(field);
+        checkInvalidClassStats(missingFieldClassStats,
+                               "missing top-level class stats field must invalidate the package");
+    };
+    checkMissingClassStatsField(QStringLiteral("schemaVersion"));
+    checkMissingClassStatsField(QStringLiteral("featureVersion"));
+    checkMissingClassStatsField(QStringLiteral("classes"));
+
+    QJsonObject wrongSchemaType = classStatsJson;
+    wrongSchemaType.insert(QStringLiteral("schemaVersion"), QStringLiteral("2"));
+    checkInvalidClassStats(wrongSchemaType,
+                           "string class stats schema version must invalidate the package");
+    QJsonObject wrongFeatureType = classStatsJson;
+    wrongFeatureType.insert(QStringLiteral("featureVersion"), 2);
+    checkInvalidClassStats(wrongFeatureType,
+                           "numeric class stats feature version must invalidate the package");
+    QJsonObject wrongClassesType = classStatsJson;
+    wrongClassesType.insert(QStringLiteral("classes"), QJsonObject());
+    checkInvalidClassStats(wrongClassesType,
+                           "object class stats classes field must invalidate the package");
+
+    const auto checkMissingPerClassField = [&](const QString &field) {
+        QJsonObject missingFieldClassStats = classStatsJson;
+        QJsonArray classes = missingFieldClassStats.value(QStringLiteral("classes")).toArray();
+        QJsonObject firstClass = classes.at(0).toObject();
+        firstClass.remove(field);
+        classes.replace(0, firstClass);
+        missingFieldClassStats.insert(QStringLiteral("classes"), classes);
+        checkInvalidClassStats(missingFieldClassStats,
+                               "missing per-class stats field must invalidate the package");
+    };
+    checkMissingPerClassField(QStringLiteral("classId"));
+    checkMissingPerClassField(QStringLiteral("sampleCount"));
+    checkMissingPerClassField(QStringLiteral("radiusEnabled"));
+    checkMissingPerClassField(QStringLiteral("radius"));
+    checkMissingPerClassField(QStringLiteral("meanDistance"));
+    checkMissingPerClassField(QStringLiteral("stdDevDistance"));
+    checkMissingPerClassField(QStringLiteral("maxDistance"));
+
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("classId"), QStringLiteral("0")),
+                           "string class id must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("sampleCount"), true),
+                           "boolean sample count must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("radiusEnabled"), QStringLiteral("true")),
+                           "string radius enabled flag must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("radius"), false),
+                           "boolean radius must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("meanDistance"), QStringLiteral("0.2")),
+                           "string mean distance must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("stdDevDistance"), QJsonObject()),
+                           "object standard deviation must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("maxDistance"), QJsonArray()),
+                           "array max distance must invalidate the package");
+
+    QJsonObject nonObjectClass = classStatsJson;
+    QJsonArray nonObjectClasses = nonObjectClass.value(QStringLiteral("classes")).toArray();
+    nonObjectClasses.replace(0, QStringLiteral("not an object"));
+    nonObjectClass.insert(QStringLiteral("classes"), nonObjectClasses);
+    checkInvalidClassStats(nonObjectClass,
+                           "non-object class stats entry must invalidate the package");
+
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("classId"), 0.5),
+                           "non-integral class id must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("sampleCount"), 3.5),
+                           "non-integral sample count must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("sampleCount"), 0),
+                           "zero sample count must invalidate the package");
+    const QStringList distanceFields = {
+        QStringLiteral("radius"),
+        QStringLiteral("meanDistance"),
+        QStringLiteral("stdDevDistance"),
+        QStringLiteral("maxDistance")
+    };
+    for (const QString &field : distanceFields) {
+        checkInvalidClassStats(classStatsWithFirstClassField(classStatsJson, field, -0.01),
+                               "negative class stats distance must invalidate the package");
+    }
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("radius"), 0.09),
+                           "enabled radius below minimum must invalidate the package");
+    checkInvalidClassStats(classStatsWithFirstClassField(
+                               classStatsJson, QStringLiteral("radius"), 2.01),
+                           "enabled radius above maximum must invalidate the package");
+
+    QJsonObject duplicateClassIds = classStatsJson;
+    QJsonArray duplicateClasses = duplicateClassIds.value(QStringLiteral("classes")).toArray();
+    QJsonObject secondClass = duplicateClasses.at(1).toObject();
+    secondClass.insert(QStringLiteral("classId"), 0);
+    duplicateClasses.replace(1, secondClass);
+    duplicateClassIds.insert(QStringLiteral("classes"), duplicateClasses);
+    checkInvalidClassStats(duplicateClassIds,
+                           "duplicate class ids must invalidate the package");
+
+    QJsonObject unsupportedSchema = classStatsJson;
+    unsupportedSchema.insert(QStringLiteral("schemaVersion"), 3);
+    check(writeClassStatsJson(modelDir, unsupportedSchema),
+          "unsupported class stats schema fixture must write");
+    const RegisteredClassificationModelPackageResult unsupportedSchemaResult =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!unsupportedSchemaResult.success,
+          "unsupported class stats schema must invalidate the package");
+    check(unsupportedSchemaResult.status == QStringLiteral("unsupported_schema_version"),
+          "unsupported class stats schema must retain its existing status");
+
+    QJsonObject unsupportedFeature = classStatsJson;
+    unsupportedFeature.insert(QStringLiteral("featureVersion"), QStringLiteral("other_feature"));
+    check(writeClassStatsJson(modelDir, unsupportedFeature),
+          "unsupported class stats feature fixture must write");
+    const RegisteredClassificationModelPackageResult unsupportedFeatureResult =
+            validateRegisteredClassificationKnnPackage(modelDir);
+    check(!unsupportedFeatureResult.success,
+          "unsupported class stats feature must invalidate the package");
+    check(unsupportedFeatureResult.status == QStringLiteral("unsupported_feature_version"),
+          "unsupported class stats feature must retain its existing status");
+
+    check(writeClassStatsJson(modelDir, classStatsJson),
+          "valid class stats fixture must restore after mutation checks");
 
     const auto checkMissingFixedContractField = [&](const QString &section,
                                                     const QString &field) {
