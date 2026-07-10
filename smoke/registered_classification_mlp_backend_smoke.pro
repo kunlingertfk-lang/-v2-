@@ -31,6 +31,7 @@ SOURCES += \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
     ../src/toolcore/PositionCorrection.cpp
 
@@ -39,5 +40,6 @@ HEADERS += \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
+    ../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
     ../src/algorithms/halcon/HalconRuntimePaths.h \
     ../src/toolcore/PositionCorrection.h

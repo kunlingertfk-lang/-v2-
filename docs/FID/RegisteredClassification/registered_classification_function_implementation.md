@@ -639,6 +639,34 @@ git diff --check
 - ROI、类别和预览卡片仍为窗口会话内状态，不落盘、不生成真实数据集。
 - 该阶段真实 HALCON 训练、模型生成、数据集落盘和 `.scbin` 支持仍未接入；后续后端训练能力见 2026-07-09 MLP 后端替换记录，`.scbin` 仍不支持。
 
+> 上述“只保存在窗口会话内”的描述属于 2026-07-07 历史阶段。自 2026-07-10 起，训练成功时会将当前会话复制到模型包的 `training_session/session.json` 和 `training_session/images/*.png`；独立数据集管理仍不在范围内。
+
+### 2026-07-10 注册分类训练上下文持久化与重新训练恢复
+
+#### 已实现功能
+
+- 新模型包在 `model.gmc`、`metadata.json`、`training_report.json` 之外增加 `training_session/session.json` 和 PNG 注册图副本。
+- `session.json` 保存 schema 版本、类别顺序、注册图名称、图像尺寸、相对图片路径、类别 ROI、矩形/全屏/多边形 ROI 类型和坐标。
+- 训练窗口将当前会话转换为训练请求；HALCON MLP 训练和训练上下文写入同一个临时模型目录，全部成功后才替换目标模型目录。
+- 重新训练使用选中模型原目录，启动训练窗口时恢复图片、命名、类别名称和 ROI，恢复后继续沿用原目录更新模型。
+- 模型上下文缺失、JSON 损坏、图片缺失或路径越界时不会覆盖原模型；窗口显示明确原因。
+- 没有训练上下文的旧模型仍可用于推理，重新训练时显示“该模型没有历史训练数据，请重新添加注册图和 ROI”，允许用户补充数据后生成新的上下文。
+- 模型管理列表显示“可重新训练”或“缺少历史训练数据”状态，但不因缺少上下文而隐藏或禁止使用旧模型。
+
+#### 本次更改
+
+- 新增 `src/algorithms/recognition/RegisteredClassificationTrainingSession.{h,cpp}`，负责训练上下文 JSON/PNG 编解码和路径校验。
+- 扩展 `RegisteredClassificationTrainingRequest`，由 `RegisteredClassificationTrainingRunner` 在临时目录中原子写入训练上下文。
+- 更新 `RegisteredClassificationTrainingDialog` 和 `RegisteredClassificationModelManagementDialog`，实现恢复、状态提示和重新训练回填。
+- 更新 `smoke/registered_classification_dialog_smoke.cpp`，覆盖上下文往返、模型包文件、重新训练恢复和旧模型兼容提示。
+
+#### 验证结果
+
+- 提交 `c9fc0bc`：训练上下文 codec、PNG 资源和 qmake 工程接入。
+- 提交 `7ea83b0`：训练包原子写入、训练窗口恢复和模型管理状态。
+- 注册分类 smoke 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
+- 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
+
 ### 2026-07-07 注册训练窗口四阶段：标签类型行点击切换当前类别
 
 #### 已实现功能
