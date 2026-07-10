@@ -555,6 +555,7 @@ void RegisteredClassificationDialog::finishRoiEditing()
     m_roiEditing = false;
     if (m_previewHelper)
         m_previewHelper->setRoiDrawingEnabled(false);
+    refreshUiState();
     refreshRoiOverlay();
     setViewerStatusText(roiStatusText()
                         + (m_referenceTestMode ? tr(" | 基准图持续测试已启用") : QString()));
@@ -850,8 +851,10 @@ void RegisteredClassificationDialog::refreshUiState()
     if (m_advancedCard)
         m_advancedCard->setVisible(m_allParamsMode);
     m_referenceTestButton->setChecked(m_referenceTestMode);
+    m_regionGroup->setExclusive(false);
     m_globalRegionButton->setChecked(m_detectRegionType == QStringLiteral("full") && !m_roiEditing);
     m_rectRegionButton->setChecked(m_roiEditing);
+    m_regionGroup->setExclusive(true);
     m_positionCorrectionCheckBox->setChecked(m_positionCorrectionEnabled);
     m_positionCorrectionCheckBox->setEnabled(false);
     if (m_positionSourceRow)

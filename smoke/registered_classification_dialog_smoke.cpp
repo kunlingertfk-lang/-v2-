@@ -1059,6 +1059,8 @@ int main(int argc, char **argv)
             clickAndProcess(mainRoiFinishButton);
             check(!mainPreviewHelper->isRoiDrawingEnabled(),
                   "ROI finish must leave rectangle drawing mode");
+            check(!mainRectRoiButton->isChecked(),
+                  "ROI finish must clear rectangle ROI button highlight");
             check(referenceButton->isChecked(),
                   "ROI finish must keep continuous reference test mode enabled");
             check(qAbs(dialog.referencePreviewSnapshot().roiNormalized.x() - secondRoi.x()) < 0.0001,
