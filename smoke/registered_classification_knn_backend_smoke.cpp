@@ -165,10 +165,31 @@ int main(int argc, char **argv)
                   && trainingReportDocument.isObject(),
           "persisted training report must parse as a JSON object");
     const QJsonObject trainingReport = trainingReportDocument.object();
+    const QJsonObject validSamplesByClass = trainingReport.value(
+                QStringLiteral("validSamplesByClass")).toObject();
+    const QJsonObject invalidSamplesByClass = trainingReport.value(
+                QStringLiteral("invalidSamplesByClass")).toObject();
+    const QJsonObject reportClassStats = trainingReport.value(
+                QStringLiteral("classStats")).toObject();
     check(trainingReport.value(QStringLiteral("sampleCount")).toInt(-1) == 6
-                  && trainingReport.value(QStringLiteral("validSamplesByClass")).isObject()
-                  && trainingReport.value(QStringLiteral("invalidSamplesByClass")).isObject()
-                  && trainingReport.value(QStringLiteral("classStats")).isObject()
+                  && validSamplesByClass.value(QStringLiteral("Bright")).toInt(-1) == 3
+                  && validSamplesByClass.value(QStringLiteral("Dark")).toInt(-1) == 3
+                  && invalidSamplesByClass.value(QStringLiteral("Bright")).toInt(-1) == 0
+                  && invalidSamplesByClass.value(QStringLiteral("Dark")).toInt(-1) == 0
+                  && reportClassStats.value(QStringLiteral("0")).toObject()
+                     .value(QStringLiteral("sampleCount")).toInt(-1) == 3
+                  && reportClassStats.value(QStringLiteral("0")).toObject()
+                     .value(QStringLiteral("radiusEnabled")).toBool(false)
+                  && reportClassStats.value(QStringLiteral("1")).toObject()
+                     .value(QStringLiteral("sampleCount")).toInt(-1) == 3
+                  && reportClassStats.value(QStringLiteral("1")).toObject()
+                     .value(QStringLiteral("radiusEnabled")).toBool(false)
+                  && trainingReport.value(QStringLiteral("sampleKnnBuildMs")).isDouble()
+                  && trainingReport.value(QStringLiteral("sampleKnnBuildMs")).toDouble(-1.0) >= 0.0
+                  && trainingReport.value(QStringLiteral("centerKnnBuildMs")).isDouble()
+                  && trainingReport.value(QStringLiteral("centerKnnBuildMs")).toDouble(-1.0) >= 0.0
+                  && trainingReport.value(QStringLiteral("elapsedMs")).isDouble()
+                  && trainingReport.value(QStringLiteral("elapsedMs")).toDouble(-1.0) >= 0.0
                   && trainingReport.value(QStringLiteral("warnings")).isArray(),
           "persisted training report must retain the complete training diagnostics");
     check(!QFileInfo(QDir(trainedModelDir).filePath(QStringLiteral("model.gmc"))).exists(),
