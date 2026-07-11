@@ -14,6 +14,7 @@
 #include <QContextMenuEvent>
 #include <QDialog>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QFrame>
 #include <QGraphicsView>
@@ -26,11 +27,13 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QToolButton>
 #include <QTimer>
 #include <iostream>
 
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 namespace {
 
@@ -257,7 +260,8 @@ int main(int argc, char **argv)
     QApplication app(argc, argv);
     testTrainingSessionCodec();
 
-    const cv::Mat frame = cv::Mat::zeros(64, 64, CV_8UC3);
+    cv::Mat frame(64, 64, CV_8UC3, cv::Scalar(30, 30, 30));
+    cv::rectangle(frame, cv::Rect(10, 10, 22, 22), cv::Scalar(225, 225, 225), -1);
     ReferenceImageProvider::instance().setReferenceFrame(frame);
     CameraFrameProvider::instance().setCurrentFrame(frame);
 
@@ -303,8 +307,34 @@ int main(int argc, char **argv)
 
     const QJsonObject rcParams = dialog.toToolConfig()
             .params.value(QStringLiteral("registeredClassification")).toObject();
-    check(rcParams.value(QStringLiteral("minSimilarity")).toInt(-1) == 68,
-          "default config must save minSimilarity=68");
+    check(rcParams.value(QStringLiteral("version")).toInt(-1) == 2,
+          "default config must save schema version 2");
+    check(rcParams.value(QStringLiteral("modelType")).toString()
+                  == registeredClassificationKnnModelType(),
+          "default config must save HALCON KNN model type");
+    check(rcParams.value(QStringLiteral("minSimilarity")).toInt(-1) == 80,
+          "default config must save minSimilarity=80");
+    check(rcParams.value(QStringLiteral("minMargin")).toInt(-1) == 8,
+          "default config must save minMargin=8");
+    check(dialog.findChild<QSpinBox *>(QStringLiteral("registeredClassificationMinMarginSpinBox"))
+                  != nullptr,
+          "all params must expose the stable min margin spin box object name");
+    {
+        ToolConfig roundTrip = dialog.toToolConfig();
+        QJsonObject roundTripParams = roundTrip.params
+                .value(QStringLiteral("registeredClassification")).toObject();
+        roundTripParams.insert(QStringLiteral("version"), 2);
+        roundTripParams.insert(QStringLiteral("modelType"), registeredClassificationKnnModelType());
+        roundTripParams.insert(QStringLiteral("minSimilarity"), 91);
+        roundTripParams.insert(QStringLiteral("minMargin"), 13);
+        roundTrip.params.insert(QStringLiteral("registeredClassification"), roundTripParams);
+        dialog.loadFromConfig(roundTrip);
+        const QJsonObject loadedParams = dialog.toToolConfig()
+                .params.value(QStringLiteral("registeredClassification")).toObject();
+        check(loadedParams.value(QStringLiteral("minSimilarity")).toInt(-1) == 91 &&
+              loadedParams.value(QStringLiteral("minMargin")).toInt(-1) == 13,
+              "V2 threshold values must round-trip through loadFromConfig");
+    }
     check(dialog.toToolConfig().judgeRule.value(QStringLiteral("judgeType")).toString()
           == QStringLiteral("all_ok"),
           "default judgeRule must save judgeType=all_ok");
@@ -744,6 +774,52 @@ int main(int argc, char **argv)
             clickAndProcess(clearAllMarksButton);
             check(!anyThumbnailCaptionContains(*trainingDialog, QStringLiteral("已标注")),
                   "clear all marks must clear thumbnail annotation state");
+            QToolButton *fullRoiButton = trainingDialog->findChild<QToolButton *>(
+                        QStringLiteral("trainingFullRoiButton"));
+            check(fullRoiButton != nullptr, "training dialog must expose full ROI button");
+            if (fullRoiButton && trainingPreviewHelper) {
+                clickAndProcess(fullRoiButton);
+                check(fullRoiButton->isChecked(), "full ROI button must select full region mode");
+                QToolButton *rectButtonForMixedRegions = trainingDialog->findChild<QToolButton *>(
+                            QStringLiteral("trainingRectRoiButton"));
+                if (rectButtonForMixedRegions) {
+                    clickAndProcess(rectButtonForMixedRegions);
+                    const QRectF mixedRect(0.05, 0.12, 0.28, 0.32);
+                    trainingPreviewHelper->setRoiRectNormalized(mixedRect);
+                    emit trainingPreviewHelper->roiChanged(mixedRect);
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                }
+                clickAndProcess(polygonRoiButton);
+                const QVector<QPointF> mixedPolygon = QVector<QPointF>()
+                        << QPointF(0.58, 0.12) << QPointF(0.88, 0.16) << QPointF(0.72, 0.46);
+                trainingPreviewHelper->setPolygonRoiNormalized(mixedPolygon);
+                emit trainingPreviewHelper->polygonChanged(mixedPolygon);
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                const QJsonObject mixedPreview =
+                        qobject_cast<RegisteredClassificationTrainingDialog *>(trainingDialog)
+                        ? qobject_cast<RegisteredClassificationTrainingDialog *>(trainingDialog)
+                                  ->buildTrainingRequestPreviewForTest()
+                        : QJsonObject();
+                const QJsonArray mixedRegions = mixedPreview.value(QStringLiteral("sampleRegions")).toArray();
+                check(mixedRegions.size() >= 3,
+                      "training request preview must retain full, rectangle, and polygon samples");
+                bool foundFull = false;
+                bool foundRectangle = false;
+                bool foundPolygon = false;
+                for (const QJsonValue &regionValue : mixedRegions) {
+                    const QJsonObject region = regionValue.toObject();
+                    const QString type = region.value(QStringLiteral("type")).toString();
+                    foundFull = foundFull || type == QStringLiteral("full");
+                    foundRectangle = foundRectangle ||
+                            (type == QStringLiteral("rectangle") &&
+                             qAbs(region.value(QStringLiteral("x")).toDouble() - 0.05) < 0.0001);
+                    foundPolygon = foundPolygon ||
+                            (type == QStringLiteral("polygon") &&
+                             region.value(QStringLiteral("polygon")).toArray().size() == 3);
+                }
+                check(foundFull && foundRectangle && foundPolygon,
+                      "training request must preserve region type and geometry losslessly");
+            }
         }
         if (createClassButton && classCountLabel) {
             clickAndProcess(createClassButton);
@@ -763,8 +839,8 @@ int main(int argc, char **argv)
             emit trainingPreviewHelper->roiChanged(QRectF(0.08, 0.20, 0.18, 0.18));
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
             clickWidgetAndProcess(secondClassRow);
-            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.20, 0.20, 0.18, 0.18));
-            emit trainingPreviewHelper->roiChanged(QRectF(0.20, 0.20, 0.18, 0.18));
+            trainingPreviewHelper->setRoiRectNormalized(QRectF(0.10, 0.10, 0.45, 0.45));
+            emit trainingPreviewHelper->roiChanged(QRectF(0.10, 0.10, 0.45, 0.45));
             QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
             RegisteredClassificationTrainingDialog *typedTrainingDialog =
                     qobject_cast<RegisteredClassificationTrainingDialog *>(trainingDialog);
@@ -777,8 +853,8 @@ int main(int argc, char **argv)
                 check(preview.value(QStringLiteral("trainable")).toBool(),
                       "training request preview must become trainable when two classes have ROI samples");
                 check(preview.value(QStringLiteral("modelType")).toString()
-                          == QStringLiteral("halcon_mlp_registered_classification"),
-                      "training request preview must use HALCON MLP model type");
+                        == registeredClassificationKnnModelType(),
+                      "training request preview must use HALCON KNN model type");
                 check(preview.value(QStringLiteral("defaultOutputModelDir")).toString()
                           .contains(QStringLiteral("ModelFiles/RegisteredClass")),
                       "training default output must be under ModelFiles/RegisteredClass");
@@ -788,9 +864,25 @@ int main(int argc, char **argv)
                 const RegisteredClassificationTrainingResult trainResult =
                         typedTrainingDialog->trainToModelDirForTest(modelDir);
                 check(trainResult.success,
-                      "training dialog must convert UI session into a successful MLP training request");
-                check(QFileInfo(registeredClassificationMlpPath(modelDir)).exists(),
-                      "training dialog train action must create model.gmc");
+                      "training dialog must convert UI session into a successful KNN training request");
+                bool featureModelReadyStatus = false;
+                for (QLabel *label : typedTrainingDialog->findChildren<QLabel *>()) {
+                    if (label && label->text().contains(QStringLiteral("特征模型生成完成"))) {
+                        featureModelReadyStatus = true;
+                        break;
+                    }
+                }
+                check(featureModelReadyStatus,
+                      "training dialog must show the feature model completion status");
+                check(trainResult.message.contains(QStringLiteral("MLP")) == false &&
+                      !trainResult.payload.contains(QStringLiteral("polygonBoundingRectWarning")),
+                      "KNN training must remove MLP and polygon bounding warnings");
+                check(QFileInfo(registeredClassificationSampleKnnPath(modelDir)).exists(),
+                      "training dialog train action must create model.gnc");
+                check(QFileInfo(registeredClassificationCenterKnnPath(modelDir)).exists(),
+                      "training dialog train action must create class_centers.gnc");
+                check(QFileInfo(registeredClassificationClassStatsPath(modelDir)).exists(),
+                      "training dialog train action must create class_stats.json");
                 check(QFileInfo(registeredClassificationMetadataPath(modelDir)).exists(),
                       "training dialog train action must create metadata.json");
                 check(QFileInfo(registeredClassificationTrainingReportPath(modelDir)).exists(),
@@ -804,6 +896,24 @@ int main(int argc, char **argv)
                           .params.value(QStringLiteral("registeredClassification")).toObject()
                           .value(QStringLiteral("modelPath")).toString() == modelDir,
                       "training completion must fill generated model path back to parent dialog");
+                QString importError;
+                check(dialog.validateModelPackageForTest(modelDir, &importError),
+                      "complete V2 package must be accepted by model import validation");
+                const QString incompleteModelDir = QDir::temp().filePath(
+                            QStringLiteral("registered_classification_dialog_smoke_incomplete_model"));
+                QDir(incompleteModelDir).removeRecursively();
+                QDir().mkpath(incompleteModelDir);
+                for (const QString &fileName : {QStringLiteral("metadata.json"),
+                                                QStringLiteral("model.gnc"),
+                                                QStringLiteral("class_stats.json")}) {
+                    QFile::copy(QDir(modelDir).filePath(fileName),
+                                QDir(incompleteModelDir).filePath(fileName));
+                }
+                importError.clear();
+                check(!dialog.validateModelPackageForTest(incompleteModelDir, &importError) &&
+                      importError.contains(QStringLiteral("class_centers.gnc")),
+                      "V2 model import must reject a package missing class_centers.gnc");
+                QDir(incompleteModelDir).removeRecursively();
                 managementModelDir = QDir(QCoreApplication::applicationDirPath()).filePath(
                             QStringLiteral("ModelFiles/RegisteredClass/20990101/model_smoke_management"));
                 QDir(managementModelDir).removeRecursively();

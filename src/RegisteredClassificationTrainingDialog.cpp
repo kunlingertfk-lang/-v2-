@@ -330,13 +330,6 @@ bool markContainsNormalizedPoint(const TrainingRoiMark &mark, const QPointF &poi
     return mark.rect.normalized().contains(point);
 }
 
-QRectF trainingRoiForRunner(const TrainingRoiMark &mark)
-{
-    if (mark.type == QStringLiteral("full"))
-        return QRectF(0.0, 0.0, 1.0, 1.0);
-    return normalizedBoundingRect(mark).intersected(QRectF(0.0, 0.0, 1.0, 1.0));
-}
-
 cv::Mat qImageToBgrMat(const QImage &image)
 {
     if (image.isNull())
@@ -1713,7 +1706,23 @@ QJsonObject RegisteredClassificationTrainingDialog::buildTrainingRequestPreviewF
     json.insert(QStringLiteral("roiCount"), trainingSampleCount());
     json.insert(QStringLiteral("sampleCount"), trainingSampleCount());
     json.insert(QStringLiteral("trainable"), hasTrainableSamples());
-    json.insert(QStringLiteral("modelType"), registeredClassificationMlpModelType());
+    json.insert(QStringLiteral("modelType"), registeredClassificationKnnModelType());
+    QJsonArray sampleRegions;
+    const RegisteredClassificationTrainingRequest request = buildTrainingRequest(QString());
+    for (const RegisteredClassificationTrainingSample &sample : request.samples) {
+        QJsonObject region;
+        region.insert(QStringLiteral("type"), sample.region.type);
+        region.insert(QStringLiteral("x"), sample.region.rectNormalized.x());
+        region.insert(QStringLiteral("y"), sample.region.rectNormalized.y());
+        region.insert(QStringLiteral("width"), sample.region.rectNormalized.width());
+        region.insert(QStringLiteral("height"), sample.region.rectNormalized.height());
+        QJsonArray polygon;
+        for (const QPointF &point : sample.region.polygonNormalized)
+            polygon.append(QJsonArray{point.x(), point.y()});
+        region.insert(QStringLiteral("polygon"), polygon);
+        sampleRegions.append(region);
+    }
+    json.insert(QStringLiteral("sampleRegions"), sampleRegions);
     json.insert(QStringLiteral("defaultOutputModelDir"), defaultRegisteredClassificationModelDir());
     json.insert(QStringLiteral("updateTargetModelDir"), m_updateTargetModelDir);
     json.insert(QStringLiteral("effectiveOutputModelDir"), outputModelDirForTraining());
@@ -1881,12 +1890,8 @@ RegisteredClassificationTrainingRequest RegisteredClassificationTrainingDialog::
 {
     RegisteredClassificationTrainingRequest request;
     request.outputModelDir = outputModelDir;
-    request.mlp.numHidden = 16;
-    request.mlp.maxIterations = 200;
-    request.mlp.randSeed = 42;
-    request.thresholds.minScore = 80;
-    request.thresholds.rejectScore = 60;
-    request.thresholds.top2Gap = 0;
+    request.thresholds.minSimilarity = 80;
+    request.thresholds.minMargin = 8;
 
     if (!m_state)
         return request;
@@ -1918,12 +1923,21 @@ RegisteredClassificationTrainingRequest RegisteredClassificationTrainingDialog::
             if (classIndex < 0 || classIndex >= m_state->classes.size())
                 continue;
             for (const TrainingRoiMark &mark : it.value()) {
-                const QRectF roi = trainingRoiForRunner(mark);
-                if (roi.width() <= 0.0 || roi.height() <= 0.0)
+                if (mark.type == QStringLiteral("polygon") && mark.polygon.size() < 3)
                     continue;
                 RegisteredClassificationTrainingSample sample;
                 sample.image = image.clone();
-                sample.roiNormalized = roi;
+                sample.region.type = mark.type == QStringLiteral("rect")
+                        ? QStringLiteral("rectangle")
+                        : mark.type;
+                sample.region.rectNormalized = mark.type == QStringLiteral("full")
+                        ? QRectF(0.0, 0.0, 1.0, 1.0)
+                        : mark.rect.normalized().intersected(QRectF(0.0, 0.0, 1.0, 1.0));
+                sample.region.polygonNormalized = mark.polygon;
+                if (sample.region.type == QStringLiteral("rectangle") &&
+                    (sample.region.rectNormalized.width() <= 0.0 ||
+                     sample.region.rectNormalized.height() <= 0.0))
+                    continue;
                 sample.classId = classIndex;
                 request.samples.append(sample);
             }
@@ -1965,21 +1979,6 @@ int RegisteredClassificationTrainingDialog::trainingSampleCount() const
     return count;
 }
 
-bool RegisteredClassificationTrainingDialog::hasPolygonTrainingMarks() const
-{
-    if (!m_state)
-        return false;
-    for (const TrainingImageState &imageState : m_state->images) {
-        for (const QVector<TrainingRoiMark> &marks : imageState.marksByClass) {
-            for (const TrainingRoiMark &mark : marks) {
-                if (mark.type == QStringLiteral("polygon"))
-                    return true;
-            }
-        }
-    }
-    return false;
-}
-
 void RegisteredClassificationTrainingDialog::refreshTrainingReadiness()
 {
     const bool trainable = hasTrainableSamples();
@@ -2002,20 +2001,12 @@ QString RegisteredClassificationTrainingDialog::outputModelDirForTraining() cons
 RegisteredClassificationTrainingResult RegisteredClassificationTrainingDialog::trainToModelDir(
         const QString &outputModelDir)
 {
-    const bool polygonWarning = hasPolygonTrainingMarks();
     RegisteredClassificationTrainingRunner runner;
     RegisteredClassificationTrainingResult result =
             runner.train(buildTrainingRequest(outputModelDir));
-    if (polygonWarning) {
-        const QString warning = tr("多边形 ROI 已按外接矩形参与首版 HALCON MLP 训练。");
-        result.message = result.message.trimmed().isEmpty()
-                ? warning
-                : QStringLiteral("%1 %2").arg(result.message, warning);
-        result.payload.insert(QStringLiteral("polygonBoundingRectWarning"), warning);
-    }
     if (m_trainStatusLabel) {
         m_trainStatusLabel->setText(result.success
-                                    ? tr("训练完成：%1 个样本").arg(result.sampleCount)
+                                    ? tr("特征模型生成完成：%1 个样本").arg(result.sampleCount)
                                     : tr("训练失败：%1").arg(result.status));
     }
     if (result.success) {

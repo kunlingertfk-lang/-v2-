@@ -285,11 +285,15 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
         m_topKSpinBox->setValue(qBound(1, params.value(QStringLiteral("topK")).toInt(1), 10));
     if (m_minSimilaritySpinBox) {
         m_minSimilaritySpinBox->setValue(
-                    qBound(0, params.value(QStringLiteral("minSimilarity")).toInt(68), 100));
+                    qBound(0, params.value(QStringLiteral("minSimilarity")).toInt(80), 100));
+    }
+    if (m_minMarginSpinBox) {
+        m_minMarginSpinBox->setValue(
+                    qBound(0, params.value(QStringLiteral("minMargin")).toInt(8), 100));
     }
     if (m_modelTypeComboBox) {
         const QString modelType = params.value(QStringLiteral("modelType"))
-                .toString(registeredClassificationMlpModelType());
+                .toString(registeredClassificationKnnModelType());
         const int index = m_modelTypeComboBox->findData(modelType);
         m_modelTypeComboBox->setCurrentIndex(index >= 0 ? index : 0);
     }
@@ -494,7 +498,7 @@ void RegisteredClassificationDialog::openRegisterTraining()
                 ? QFileInfo(modelDir).fileName()
                 : modelName;
         if (m_modelTypeComboBox) {
-            const int index = m_modelTypeComboBox->findData(registeredClassificationMlpModelType());
+            const int index = m_modelTypeComboBox->findData(registeredClassificationKnnModelType());
             if (index >= 0)
                 m_modelTypeComboBox->setCurrentIndex(index);
         }
@@ -515,7 +519,7 @@ void RegisteredClassificationDialog::openModelManagement()
                 ? QFileInfo(modelDir).fileName()
                 : modelName;
         if (m_modelTypeComboBox) {
-            const int index = m_modelTypeComboBox->findData(registeredClassificationMlpModelType());
+            const int index = m_modelTypeComboBox->findData(registeredClassificationKnnModelType());
             if (index >= 0)
                 m_modelTypeComboBox->setCurrentIndex(index);
         }
@@ -721,17 +725,23 @@ void RegisteredClassificationDialog::buildUi()
     m_advancedCard = card(scrollContent, tr("参数设置"));
     QVBoxLayout *advancedLayout = qobject_cast<QVBoxLayout *>(m_advancedCard->layout());
     m_modelTypeComboBox = new QComboBox(m_advancedCard);
-    m_modelTypeComboBox->addItem(tr("HALCON MLP 注册分类"),
-                                 registeredClassificationMlpModelType());
+    m_modelTypeComboBox->addItem(tr("HALCON KNN 注册分类"),
+                                 registeredClassificationKnnModelType());
     m_modelTypeComboBox->hide();
     m_topKSpinBox = new QSpinBox(m_advancedCard);
     m_topKSpinBox->setRange(1, 10);
     m_topKSpinBox->setValue(1);
     m_minSimilaritySpinBox = new QSpinBox(m_advancedCard);
     m_minSimilaritySpinBox->setRange(0, 100);
-    m_minSimilaritySpinBox->setValue(68);
+    m_minSimilaritySpinBox->setValue(80);
+    m_minMarginSpinBox = new QSpinBox(m_advancedCard);
+    m_minMarginSpinBox->setObjectName(
+                QStringLiteral("registeredClassificationMinMarginSpinBox"));
+    m_minMarginSpinBox->setRange(0, 100);
+    m_minMarginSpinBox->setValue(8);
     advancedLayout->addLayout(row(tr("前K个类别"), m_topKSpinBox));
     advancedLayout->addLayout(row(tr("最小相似度"), m_minSimilaritySpinBox));
+    advancedLayout->addLayout(row(tr("最小类别差值"), m_minMarginSpinBox));
     paramsLayout->addWidget(m_advancedCard);
 
     QFrame *judgeCard = card(scrollContent, tr("结果判断"));
@@ -965,7 +975,7 @@ void RegisteredClassificationDialog::updateModelLabels()
 QJsonObject RegisteredClassificationDialog::registeredClassificationParams() const
 {
     QJsonObject params;
-    params.insert(QStringLiteral("version"), 1);
+    params.insert(QStringLiteral("version"), 2);
     params.insert(QStringLiteral("paramMode"), m_allParamsMode ? QStringLiteral("all") : QStringLiteral("basic"));
     params.insert(QStringLiteral("modelPath"), m_modelPath);
     params.insert(QStringLiteral("modelName"), m_modelName);
@@ -973,7 +983,7 @@ QJsonObject RegisteredClassificationDialog::registeredClassificationParams() con
             ? m_modelTypeComboBox->currentData().toString()
             : QString();
     if (modelType.trimmed().isEmpty())
-        modelType = registeredClassificationMlpModelType();
+        modelType = registeredClassificationKnnModelType();
     params.insert(QStringLiteral("modelType"), modelType);
     params.insert(QStringLiteral("detectRegionType"), m_detectRegionType);
     params.insert(QStringLiteral("roiNormalized"), rectToJson(effectiveRoiNormalized()));
@@ -983,6 +993,7 @@ QJsonObject RegisteredClassificationDialog::registeredClassificationParams() con
                                     &params);
     params.insert(QStringLiteral("topK"), m_topKSpinBox->value());
     params.insert(QStringLiteral("minSimilarity"), m_minSimilaritySpinBox->value());
+    params.insert(QStringLiteral("minMargin"), m_minMarginSpinBox->value());
     return params;
 }
 
@@ -1018,23 +1029,21 @@ bool RegisteredClassificationDialog::validateImportedModelPath(const QString &pa
         return false;
     }
 
-    if (!QFileInfo::exists(registeredClassificationMetadataPath(info.absoluteFilePath())) ||
-        !QFileInfo::exists(registeredClassificationMlpPath(info.absoluteFilePath()))) {
+    const RegisteredClassificationModelPackageResult packageResult =
+            validateRegisteredClassificationKnnPackage(info.absoluteFilePath());
+    if (!packageResult.success) {
         if (errorMessage)
-            *errorMessage = tr("模型包目录必须包含 metadata.json 和 model.gmc。");
-        return false;
-    }
-
-    RegisteredClassificationModelMetadata metadata;
-    const RegisteredClassificationModelPackageResult readResult =
-            readRegisteredClassificationMetadata(info.absoluteFilePath(), &metadata);
-    if (!readResult.success) {
-        if (errorMessage)
-            *errorMessage = readResult.message;
+            *errorMessage = packageResult.message;
         return false;
     }
 
     return true;
+}
+
+bool RegisteredClassificationDialog::validateModelPackageForTest(const QString &path,
+                                                                 QString *errorMessage) const
+{
+    return validateImportedModelPath(path, errorMessage);
 }
 
 QString RegisteredClassificationDialog::judgeMode() const

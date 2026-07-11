@@ -67,7 +67,6 @@ private:
     RegisteredClassificationTrainingRequest buildTrainingRequest(
             const QString &outputModelDir) const;
     bool hasTrainableSamples() const;
-    bool hasPolygonTrainingMarks() const;
     int trainingSampleCount() const;
     void refreshTrainingReadiness();
     bool restoreTrainingSessionFromModelDir(const QString &modelDir);

@@ -34,6 +34,7 @@ public:
     ToolConfig toolConfig() const;
     ToolPreviewSnapshot referencePreviewSnapshot() const;
     void loadFromConfig(const ToolConfig &config);
+    bool validateModelPackageForTest(const QString &path, QString *errorMessage) const;
     QString summaryText() const;
 
 protected:
@@ -115,6 +116,7 @@ private:
     QPushButton *m_modelManagementButton = nullptr;
     QSpinBox *m_topKSpinBox = nullptr;
     QSpinBox *m_minSimilaritySpinBox = nullptr;
+    QSpinBox *m_minMarginSpinBox = nullptr;
     QComboBox *m_modelTypeComboBox = nullptr;
     QComboBox *m_resultBasisComboBox = nullptr;
     QComboBox *m_judgeTypeComboBox = nullptr;

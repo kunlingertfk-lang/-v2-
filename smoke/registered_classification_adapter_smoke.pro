@@ -30,6 +30,7 @@ SOURCES += \
     ../src/tooladapters/RegisteredClassificationAdapter.cpp \
     ../src/toolcore/PositionCorrection.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     ../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
@@ -40,6 +41,7 @@ SOURCES += \
 HEADERS += \
     ../src/tooladapters/RegisteredClassificationAdapter.h \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+    ../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     ../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \

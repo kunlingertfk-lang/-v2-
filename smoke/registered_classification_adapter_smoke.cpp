@@ -31,7 +31,9 @@ ToolConfig makeConfig(const QString &modelPath,
                       const QString &halconSoPath,
                       const QString &judgeMode,
                       const QString &expectedLabel,
-                      int minScore)
+                      int minScore,
+                      int minSimilarity = 80,
+                      int minMargin = 8)
 {
     ToolConfig config;
     config.toolId = QStringLiteral("registered_classification_smoke");
@@ -41,7 +43,7 @@ ToolConfig makeConfig(const QString &modelPath,
     config.roiNormalized = roi;
 
     QJsonObject nested;
-    nested.insert(QStringLiteral("version"), 1);
+    nested.insert(QStringLiteral("version"), 2);
     nested.insert(QStringLiteral("modelName"), modelName);
     nested.insert(QStringLiteral("modelPath"), modelPath);
     nested.insert(QStringLiteral("modelType"), modelType);
@@ -55,6 +57,8 @@ ToolConfig makeConfig(const QString &modelPath,
     nested.insert(QStringLiteral("positionCorrectionSource"),
                   QStringLiteral("1 基准图.位置修正信息"));
     nested.insert(QStringLiteral("topK"), 1);
+    nested.insert(QStringLiteral("minSimilarity"), minSimilarity);
+    nested.insert(QStringLiteral("minMargin"), minMargin);
     if (!halconSoPath.isNull())
         nested.insert(QStringLiteral("halconSoPath"), halconSoPath);
     config.params.insert(QStringLiteral("registeredClassification"), nested);
@@ -106,15 +110,19 @@ RegisteredClassificationTrainingRequest makeTrainingRequest(const QString &model
         {0, QStringLiteral("OK")},
         {1, QStringLiteral("NG")}
     };
-    request.mlp.numHidden = 8;
-    request.mlp.maxIterations = 100;
-    request.mlp.randSeed = 42;
-    request.thresholds.minScore = 80;
-    request.thresholds.rejectScore = 60;
-    request.thresholds.top2Gap = 0;
     for (int i = 0; i < 4; ++i) {
-        request.samples.append({makeBrightTrainingImage(), QRectF(0.2, 0.2, 0.4, 0.4), 0});
-        request.samples.append({makeDarkTrainingImage(), QRectF(0.2, 0.2, 0.4, 0.4), 1});
+        RegisteredClassificationTrainingSample bright;
+        bright.image = makeBrightTrainingImage();
+        bright.region.type = QStringLiteral("rectangle");
+        bright.region.rectNormalized = QRectF(0.2, 0.2, 0.4, 0.4);
+        bright.classId = 0;
+        request.samples.append(bright);
+        RegisteredClassificationTrainingSample dark;
+        dark.image = makeDarkTrainingImage();
+        dark.region.type = QStringLiteral("rectangle");
+        dark.region.rectNormalized = QRectF(0.2, 0.2, 0.4, 0.4);
+        dark.classId = 1;
+        request.samples.append(dark);
     }
     return request;
 }
@@ -135,17 +143,19 @@ int main(int argc, char **argv)
     RegisteredClassificationTrainingRunner trainer;
     const RegisteredClassificationTrainingResult trainResult =
             trainer.train(makeTrainingRequest(trainedModelDir));
-    check(trainResult.success, "MLP training fixture must succeed");
+    check(trainResult.success, "KNN training fixture must succeed");
     check(QFileInfo(registeredClassificationMetadataPath(trainedModelDir)).exists(),
           "fixture metadata.json must exist");
-    check(QFileInfo(registeredClassificationMlpPath(trainedModelDir)).exists(),
-          "fixture model.gmc must exist");
+    check(QFileInfo(registeredClassificationSampleKnnPath(trainedModelDir)).exists(),
+          "fixture model.gnc must exist");
+    check(QFileInfo(registeredClassificationCenterKnnPath(trainedModelDir)).exists(),
+          "fixture class_centers.gnc must exist");
 
     // 1. 空图像 -> image_empty
     {
         ToolConfig config = makeConfig(QStringLiteral("/tmp/DemoModel.hdl"),
                                        QStringLiteral("DemoModel"),
-                                       QStringLiteral("halcon_mlp_registered_classification"),
+                                       registeredClassificationKnnModelType(),
                                        QStringLiteral("full"),
                                        QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
@@ -158,7 +168,7 @@ int main(int argc, char **argv)
     // 2. 无 modelPath -> model_path_empty
     {
         ToolConfig config = makeConfig(QString(), QString(),
-                                       QStringLiteral("halcon_mlp_registered_classification"),
+                                       registeredClassificationKnnModelType(),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
@@ -167,24 +177,24 @@ int main(int argc, char **argv)
               "missing model path must yield model_path_empty");
     }
 
-    // 3. 旧 DL modelType -> unsupported_model_type
+    // 3. schema 1 modelType -> retraining is required
     {
         ToolConfig config = makeConfig(QStringLiteral("/tmp/LegacyModel.hdl"),
                                        QStringLiteral("LegacyModel"),
-                                       QStringLiteral("halcon_dl_classification"),
+                                       registeredClassificationLegacyMlpModelType(),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
         const ToolResult result = adapter.run(requestWithImage(config, dummyImage));
-        check(result.status == QStringLiteral("unsupported_model_type"),
-              "old DL model type must yield unsupported_model_type");
+        check(result.status == QStringLiteral("legacy_model_requires_retraining"),
+              "schema 1 model type must require retraining");
     }
 
     // 4. 模型目录不存在 -> model_file_not_found
     {
         ToolConfig config = makeConfig(QStringLiteral("/tmp/__nonexistent_model__"),
                                        QStringLiteral("NonExist"),
-                                       QStringLiteral("halcon_mlp_registered_classification"),
+                                       registeredClassificationKnnModelType(),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
@@ -199,7 +209,7 @@ int main(int argc, char **argv)
     {
         ToolConfig config = makeConfig(trainedModelDir,
                                        QStringLiteral("FixtureModel"),
-                                       QStringLiteral("halcon_mlp_registered_classification"),
+                                       registeredClassificationKnnModelType(),
                                        QStringLiteral("rectangle"), QRectF(0, 0, 0.05, 0.05),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
@@ -209,24 +219,11 @@ int main(int argc, char **argv)
               "invalid rectangle ROI must yield invalid_roi");
     }
 
-    // 6. class_match 缺 expectedLabel -> missing_expected_label
-    {
-        ToolConfig config = makeConfig(trainedModelDir,
-                                       QStringLiteral("FixtureModel"),
-                                       QStringLiteral("halcon_mlp_registered_classification"),
-                                       QStringLiteral("full"), QRectF(0, 0, 1, 1),
-                                       QString(), QStringLiteral("class_match"),
-                                       QString(), 80);
-        const ToolResult result = adapter.run(requestWithImage(config, dummyImage));
-        check(result.status == QStringLiteral("missing_expected_label"),
-              "class_match without expected label must yield missing_expected_label");
-    }
-
-    // 7. 位置修正占位 payload 必须存在且未应用（用一个返回错误的场景验证 payload 字段）。
+    // 6. 位置修正占位 payload 必须存在且未应用（用一个返回错误的场景验证 payload 字段）。
     {
         ToolConfig config = makeConfig(QStringLiteral("/tmp/DemoModel.hdl"),
                                        QStringLiteral("DemoModel"),
-                                       QStringLiteral("halcon_mlp_registered_classification"),
+                                       registeredClassificationKnnModelType(),
                                        QStringLiteral("full"), QRectF(0, 0, 1, 1),
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
@@ -240,6 +237,48 @@ int main(int argc, char **argv)
               "position correction reason must be not implemented");
         check(result.payload.value(QStringLiteral("errorCode")).toString() == result.status,
               "payload errorCode must match status");
+    }
+
+    // 7. V2 thresholds must reach the KNN runner and force an ambiguous UNKNOWN.
+    {
+        ToolConfig config = makeConfig(trainedModelDir,
+                                       QStringLiteral("FixtureModel"),
+                                       registeredClassificationKnnModelType(),
+                                       QStringLiteral("full"), QRectF(0, 0, 1, 1),
+                                       QString(), QStringLiteral("class_match"),
+                                       QStringLiteral("OK"), 80, 80, 100);
+        const ToolResult result = adapter.run(requestWithImage(config, makeBrightTrainingImage()));
+        check(result.success && !result.ok,
+              "ambiguous V2 result must be a successful NG execution");
+        check(result.status == QStringLiteral("classification_rejected_ambiguous"),
+              "minMargin=100 must produce an ambiguous rejection");
+        check(result.text == QStringLiteral("UNKNOWN"),
+              "ambiguous rejection must expose UNKNOWN text");
+        check(result.payload.value(QStringLiteral("algorithm")).toString()
+                      == registeredClassificationKnnModelType(),
+              "adapter payload must identify the V2 KNN model type");
+        check(result.payload.value(QStringLiteral("featureVersion")).toString()
+                      == registeredClassificationFeatureVersionV2(),
+              "adapter payload must identify the V2 feature version");
+        check(result.payload.value(QStringLiteral("minSimilarity")).toInt(-1) == 80,
+              "adapter payload must receive minSimilarity=80");
+        check(result.payload.value(QStringLiteral("minMargin")).toInt(-1) == 100,
+              "adapter payload must receive minMargin=100");
+    }
+
+    // 8. UNKNOWN remains NG when the judge basis is min_score.
+    {
+        ToolConfig config = makeConfig(trainedModelDir,
+                                       QStringLiteral("FixtureModel"),
+                                       registeredClassificationKnnModelType(),
+                                       QStringLiteral("full"), QRectF(0, 0, 1, 1),
+                                       QString(), QStringLiteral("min_score"),
+                                       QString(), 0, 80, 100);
+        const ToolResult result = adapter.run(requestWithImage(config, makeBrightTrainingImage()));
+        check(result.status == QStringLiteral("classification_rejected_ambiguous"),
+              "min_score must preserve the UNKNOWN rejection status");
+        check(result.success && !result.ok && result.text == QStringLiteral("UNKNOWN"),
+              "UNKNOWN must remain NG under min_score");
     }
 
     if (g_failures > 0) {

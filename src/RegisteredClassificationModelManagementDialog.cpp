@@ -38,7 +38,7 @@ struct ModelRecord
     QString modelDir;
     QString modelName;
     QString dateText;
-    RegisteredClassificationModelMetadata metadata;
+    RegisteredClassificationKnnModelMetadata metadata;
     QDateTime lastModified;
     bool hasTrainingSession = false;
 };
@@ -190,17 +190,11 @@ QVector<ModelRecord> scanModelRecords()
                                                               QDir::Time | QDir::Reversed);
         for (const QFileInfo &modelDirInfo : modelDirs) {
             const QString modelDir = modelDirInfo.absoluteFilePath();
-            if (!QFileInfo::exists(registeredClassificationMetadataPath(modelDir)) ||
-                !QFileInfo::exists(registeredClassificationMlpPath(modelDir))) {
-                continue;
-            }
-
-            RegisteredClassificationModelMetadata metadata;
+            RegisteredClassificationKnnModelMetadata metadata;
             const RegisteredClassificationModelPackageResult readResult =
-                    readRegisteredClassificationMetadata(modelDir, &metadata);
+                    readRegisteredClassificationKnnMetadata(modelDir, &metadata);
             if (!readResult.success ||
-                metadata.modelType != registeredClassificationMlpModelType() ||
-                metadata.featureVersion != registeredClassificationFeatureVersionV1()) {
+                !validateRegisteredClassificationKnnPackage(modelDir).success) {
                 continue;
             }
 

@@ -1,6 +1,7 @@
 #include "tooladapters/RegisteredClassificationAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "toolcore/PositionCorrection.h"
 
 #include <QJsonArray>
@@ -63,7 +64,7 @@ RegisteredClassificationHalconConfig toRunnerConfig(const ToolConfig &config)
     runnerConfig.modelName = stringParam(params, QStringLiteral("modelName"));
     runnerConfig.modelType = stringParam(params,
                                          QStringLiteral("modelType"),
-                                         QStringLiteral("halcon_mlp_registered_classification"));
+                                         registeredClassificationKnnModelType());
     runnerConfig.detectRegionType = stringParam(params,
                                                  QStringLiteral("detectRegionType"),
                                                  runnerConfig.detectRegionType);
@@ -76,6 +77,10 @@ RegisteredClassificationHalconConfig toRunnerConfig(const ToolConfig &config)
     runnerConfig.topK = qMax(1, intParam(params,
                                          QStringLiteral("topK"),
                                          runnerConfig.topK));
+    runnerConfig.minSimilarity = qBound(
+                0, intParam(params, QStringLiteral("minSimilarity"), 80), 100);
+    runnerConfig.minMargin = qBound(
+                0, intParam(params, QStringLiteral("minMargin"), 8), 100);
     runnerConfig.judgeMode = stringParam(judgeRule,
                                          QStringLiteral("mode"),
                                          runnerConfig.judgeMode);

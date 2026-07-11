@@ -27,9 +27,6 @@ struct RegisteredClassificationHalconConfig
     int minScore = 80;
     int minSimilarity = 80;
     int minMargin = 8;
-    // Kept only for source compatibility with existing UI/adapter configuration parsing.
-    int rejectScore = 60;
-    int top2Gap = 0;
 };
 
 struct RegisteredClassificationClassScore
@@ -60,8 +57,6 @@ struct RegisteredClassificationHalconResult
     bool radiusEnabled = false;
     bool rejected = false;
     QString rejectionReason;
-    int rejectScore = 0;
-    int top2Gap = 0;
     QVector<RegisteredClassificationClassScore> topClasses;
     qint64 elapsedMs = 0;
     QVector<ToolOverlay> overlays;

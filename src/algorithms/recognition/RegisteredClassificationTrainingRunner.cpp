@@ -81,17 +81,6 @@ bool swapModelDirectory(const QString &temporaryPath, const QString &targetPath,
     return true;
 }
 
-RegisteredClassificationFeatureRegion v2Region(const RegisteredClassificationTrainingSample &sample)
-{
-    if (sample.roiNormalized != QRectF(0.0, 0.0, 1.0, 1.0)) {
-        RegisteredClassificationFeatureRegion region;
-        region.type = QStringLiteral("rectangle");
-        region.rectNormalized = sample.roiNormalized;
-        return region;
-    }
-    return sample.region;
-}
-
 } // namespace
 
 RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::train(
@@ -126,7 +115,8 @@ RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::t
             warnings.append(QStringLiteral("sample[%1] skipped: invalid_class_id").arg(index));
             continue;
         }
-        const RegisteredClassificationFeatureResult feature = extractor.extract(sample.image, v2Region(sample), featureConfig);
+        const RegisteredClassificationFeatureResult feature = extractor.extract(
+                    sample.image, sample.region, featureConfig);
         const RegisteredClassificationClassLabel label = labelsById.value(sample.classId);
         if (!feature.success || feature.feature.size() != registeredClassificationFeatureNamesV2().size()) {
             ++invalidByClass[label.name];
