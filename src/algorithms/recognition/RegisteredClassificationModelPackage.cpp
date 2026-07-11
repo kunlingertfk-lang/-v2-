@@ -921,6 +921,19 @@ RegisteredClassificationModelInspection inspectRegisteredClassificationModelPack
     inspection.hasTrainingSession = QFileInfo(
             QDir(modelDir).filePath(QStringLiteral("training_session/session.json"))).exists();
 
+    const QFileInfo metadataInfo(registeredClassificationMetadataPath(modelDir));
+    const QFileInfo legacyModelInfo(registeredClassificationMlpPath(modelDir));
+    if (!metadataInfo.isFile() && legacyModelInfo.isFile()) {
+        inspection.success = true;
+        inspection.runnable = false;
+        inspection.legacy = true;
+        inspection.modelType = registeredClassificationLegacyMlpModelType();
+        inspection.featureVersion = registeredClassificationFeatureVersionV1();
+        inspection.status = QStringLiteral("legacy_model_requires_retraining");
+        inspection.message = QStringLiteral("Legacy model.gmc requires V2 KNN retraining.");
+        return inspection;
+    }
+
     QJsonObject root;
     const RegisteredClassificationModelPackageResult readResult =
             readJsonObject(registeredClassificationMetadataPath(modelDir), &root);

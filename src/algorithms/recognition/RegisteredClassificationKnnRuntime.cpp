@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <dlfcn.h>
+#include <limits>
 
 namespace {
 
@@ -439,17 +440,29 @@ RegisteredClassificationKnnRuntimeResult RegisteredClassificationKnnRuntime::cla
     QSet<int> centerIds;
     RegisteredClassificationKnnRuntimeResult result;
     for (int index = 0; index < sampleClasses.size(); ++index) {
-        const int id = static_cast<int>(sampleClasses.intAt(index));
+        const Hlong rawId = sampleClasses.intAt(index);
         const double distance = sampleRatings.doubleAt(index);
-        if (id < 0 || !std::isfinite(distance) || sampleIds.contains(id))
+        if (rawId < 0 || rawId > static_cast<Hlong>(std::numeric_limits<int>::max())
+                || !std::isfinite(distance) || distance < 0.0) {
+            return errorResult(QStringLiteral("knn_model_mismatch"),
+                               QStringLiteral("Sample KNN output has an invalid class id or distance."));
+        }
+        const int id = static_cast<int>(rawId);
+        if (sampleIds.contains(id))
             return errorResult(QStringLiteral("knn_model_mismatch"), QStringLiteral("Sample KNN output has duplicate or invalid classes."));
         sampleIds.insert(id);
         result.sampleDistances.append({id, distance});
     }
     for (int index = 0; index < centerClasses.size(); ++index) {
-        const int id = static_cast<int>(centerClasses.intAt(index));
+        const Hlong rawId = centerClasses.intAt(index);
         const double distance = centerRatings.doubleAt(index);
-        if (id < 0 || !std::isfinite(distance) || centerIds.contains(id))
+        if (rawId < 0 || rawId > static_cast<Hlong>(std::numeric_limits<int>::max())
+                || !std::isfinite(distance) || distance < 0.0) {
+            return errorResult(QStringLiteral("knn_model_mismatch"),
+                               QStringLiteral("Center KNN output has an invalid class id or distance."));
+        }
+        const int id = static_cast<int>(rawId);
+        if (centerIds.contains(id))
             return errorResult(QStringLiteral("knn_model_mismatch"), QStringLiteral("Center KNN output has duplicate or invalid classes."));
         centerIds.insert(id);
         result.centerDistances.append({id, distance});

@@ -103,10 +103,24 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
         return makeError(QStringLiteral("image_empty"), QStringLiteral("Input image is empty."), config, image, timer.elapsed());
     if (config.modelPath.trimmed().isEmpty())
         return makeError(QStringLiteral("model_path_empty"), QStringLiteral("Classification model path is empty."), config, image, timer.elapsed());
+    if (config.modelType == registeredClassificationLegacyMlpModelType()) {
+        return makeError(QStringLiteral("legacy_model_requires_retraining"),
+                         QStringLiteral("Schema 1 MLP model requires V2 KNN retraining."),
+                         config, image, timer.elapsed());
+    }
     if (config.modelType != registeredClassificationKnnModelType())
         return makeError(QStringLiteral("unsupported_model_type"),
                          QStringLiteral("Only schema-2 HALCON KNN registered-classification packages can run."),
                          config, image, timer.elapsed());
+    const RegisteredClassificationModelInspection inspection =
+            inspectRegisteredClassificationModelPackage(config.modelPath);
+    if (inspection.legacy) {
+        return makeError(QStringLiteral("legacy_model_requires_retraining"),
+                         inspection.message.isEmpty()
+                         ? QStringLiteral("Schema 1 MLP model requires V2 KNN retraining.")
+                         : inspection.message,
+                         config, image, timer.elapsed());
+    }
     const RegisteredClassificationModelPackageResult package =
             validateRegisteredClassificationKnnPackage(config.modelPath);
     if (!package.success)
@@ -191,6 +205,8 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
     result.classRadius = winnerStats.radius;
     result.radiusEnabled = winnerStats.radiusEnabled;
     result.topClasses = scores.mid(0, qBound(1, config.topK, scores.size()));
+    const int bestCandidateClassId = result.predictedClassId;
+    const QString bestCandidateLabel = result.predictedLabel;
     result.elapsedMs = timer.elapsed();
     const int minSimilarity = qBound(0, config.minSimilarity, 100);
     const int minMargin = qBound(0, config.minMargin, 100);
@@ -209,6 +225,7 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
         result.status = result.rejectionReason;
         result.message = QStringLiteral("Classification was rejected: %1.").arg(result.rejectionReason);
         result.predictedLabel = QStringLiteral("UNKNOWN");
+        result.predictedClassId = -1;
     } else if (config.judgeMode == QStringLiteral("min_score")) {
         result.ok = result.score >= config.minScore;
         if (!result.ok) {
@@ -228,6 +245,8 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
     result.payload.insert(QStringLiteral("modelName"), config.modelName);
     result.payload.insert(QStringLiteral("predictedClassId"), result.predictedClassId);
     result.payload.insert(QStringLiteral("predictedLabel"), result.predictedLabel);
+    result.payload.insert(QStringLiteral("bestCandidateClassId"), bestCandidateClassId);
+    result.payload.insert(QStringLiteral("bestCandidateLabel"), bestCandidateLabel);
     result.payload.insert(QStringLiteral("score"), result.score);
     result.payload.insert(QStringLiteral("sampleSimilarity"), result.sampleSimilarity);
     result.payload.insert(QStringLiteral("centerSimilarity"), result.centerSimilarity);

@@ -78,3 +78,15 @@ rg -n "T_(create|add_sample|train|write|read|classify|clear)_class_mlp|classify_
 - Removed the temporary public `extractV2()` alias. `RegisteredClassificationFeatureExtractor`
   now exposes only `extract(image, RegisteredClassificationFeatureRegion, config)`, which is the
   V2 pipeline used by training, inference, and feature smoke tests.
+
+## Review Fixes
+
+- Rejected results now expose `predictedLabel="UNKNOWN"` and `predictedClassId=-1`; the best known
+  candidate remains available through `topClasses` and explicit `bestCandidateClassId/Label`
+  payload fields.
+- Training verifies the complete byte count, flush result, JSON parse, and exact object round-trip
+  of `training_report.json` before validating and promoting the temporary package.
+- Explicit legacy model types and metadata-less `model.gmc` directories now return
+  `legacy_model_requires_retraining` from inspection and runtime.
+- KNN output class IDs are range-checked before narrowing from `Hlong`, and returned distances must
+  be finite and non-negative.

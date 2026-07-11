@@ -152,6 +152,8 @@ int main(int argc, char **argv)
           "training must create class_centers.gnc");
     check(QFileInfo(registeredClassificationClassStatsPath(trainedModelDir)).exists(),
           "training must create class_stats.json");
+    check(QFileInfo(registeredClassificationTrainingReportPath(trainedModelDir)).size() > 0,
+          "training must persist a non-empty training report before promotion");
     check(!QFileInfo(QDir(trainedModelDir).filePath(QStringLiteral("model.gmc"))).exists(),
           "V2 package must not contain model.gmc");
     check(validateRegisteredClassificationKnnPackage(trainedModelDir).success,
@@ -214,8 +216,39 @@ int main(int argc, char **argv)
     check(outOfRadius.success && !outOfRadius.ok &&
           outOfRadius.status == QStringLiteral("classification_rejected_out_of_radius"),
           "out-of-radius query must reject after similarity and ambiguity checks");
-    check(outOfRadius.predictedLabel == QStringLiteral("UNKNOWN") && !outOfRadius.topClasses.isEmpty(),
+    check(outOfRadius.predictedLabel == QStringLiteral("UNKNOWN")
+                  && outOfRadius.predictedClassId == -1
+                  && !outOfRadius.topClasses.isEmpty(),
           "UNKNOWN must retain the candidate payload");
+    check(outOfRadius.payload.value(QStringLiteral("bestCandidateClassId")).toInt(-1) >= 0,
+          "UNKNOWN payload must retain the best known candidate separately");
+
+    RegisteredClassificationHalconConfig explicitLegacyConfig = config;
+    explicitLegacyConfig.modelType = registeredClassificationLegacyMlpModelType();
+    const RegisteredClassificationHalconResult explicitLegacy =
+            runner.run(makePartImage(true, 0), explicitLegacyConfig);
+    check(!explicitLegacy.success
+                  && explicitLegacy.status == QStringLiteral("legacy_model_requires_retraining"),
+          "explicit legacy model type must require retraining");
+
+    const QString legacyOnlyDir = smokeDir(QStringLiteral("legacy_only"));
+    QFile legacyOnlyFile(registeredClassificationMlpPath(legacyOnlyDir));
+    check(legacyOnlyFile.open(QIODevice::WriteOnly | QIODevice::Truncate),
+          "legacy-only model fixture must open");
+    check(legacyOnlyFile.write("legacy") == 6, "legacy-only model fixture must write");
+    legacyOnlyFile.close();
+    const RegisteredClassificationModelInspection legacyOnlyInspection =
+            inspectRegisteredClassificationModelPackage(legacyOnlyDir);
+    check(legacyOnlyInspection.legacy && !legacyOnlyInspection.runnable
+                  && legacyOnlyInspection.status == QStringLiteral("legacy_model_requires_retraining"),
+          "model.gmc-only package inspection must require retraining");
+    RegisteredClassificationHalconConfig legacyOnlyConfig = config;
+    legacyOnlyConfig.modelPath = legacyOnlyDir;
+    const RegisteredClassificationHalconResult legacyOnly =
+            runner.run(makePartImage(true, 0), legacyOnlyConfig);
+    check(!legacyOnly.success
+                  && legacyOnly.status == QStringLiteral("legacy_model_requires_retraining"),
+          "model.gmc-only runtime must require retraining");
 
     const QString centerPath = registeredClassificationCenterKnnPath(trainedModelDir);
     const QString savedCenterPath = centerPath + QStringLiteral(".saved");

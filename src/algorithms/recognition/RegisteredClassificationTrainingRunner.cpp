@@ -255,8 +255,30 @@ RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::t
         cleanup();
         return errorResult(QStringLiteral("model_write_failed"), reportFile.errorString());
     }
-    reportFile.write(QJsonDocument(report).toJson(QJsonDocument::Indented));
+    const QByteArray reportBytes = QJsonDocument(report).toJson(QJsonDocument::Indented);
+    const qint64 reportWritten = reportFile.write(reportBytes);
+    const bool reportFlushed = reportFile.flush();
     reportFile.close();
+    if (reportWritten != reportBytes.size() || !reportFlushed) {
+        cleanup();
+        return errorResult(QStringLiteral("model_write_failed"),
+                           QStringLiteral("Failed to write the complete training report."));
+    }
+    QFile reportValidationFile(registeredClassificationTrainingReportPath(temporaryDir));
+    if (!reportValidationFile.open(QIODevice::ReadOnly)) {
+        cleanup();
+        return errorResult(QStringLiteral("model_write_failed"), reportValidationFile.errorString());
+    }
+    QJsonParseError reportParseError;
+    const QJsonDocument persistedReport = QJsonDocument::fromJson(
+                reportValidationFile.readAll(), &reportParseError);
+    reportValidationFile.close();
+    if (reportParseError.error != QJsonParseError::NoError
+            || !persistedReport.isObject() || persistedReport.object() != report) {
+        cleanup();
+        return errorResult(QStringLiteral("model_write_failed"),
+                           QStringLiteral("Persisted training report is incomplete or invalid."));
+    }
     if (!request.trainingSessionManifest.isEmpty() || !request.trainingSessionAssets.isEmpty()) {
         const RegisteredClassificationTrainingSessionResult sessionWrite =
                 writeRegisteredClassificationTrainingSession(QDir(temporaryDir).filePath(QStringLiteral("training_session")),
