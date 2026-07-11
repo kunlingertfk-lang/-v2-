@@ -113,5 +113,8 @@ correction.
 - Every HALCON numeric output consumed by the V2 pipeline is checked for tuple presence and
   finiteness before clamping, mapping, weighting, or normalization. Missing or non-finite outputs
   now return `invalid_feature_value` instead of becoming a valid zero or bounded value.
+- The 256-bin relative histogram is validated for exact length, finite values, and non-negative
+  entries before compression. `count_obj` must also return a present, non-negative count that fits
+  in `int`; malformed tuple output now returns `invalid_feature_value`.
 
 After these fixes, the feature V2 smoke rebuilt without warnings and passed.

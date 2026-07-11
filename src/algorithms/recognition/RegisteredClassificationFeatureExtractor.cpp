@@ -16,6 +16,7 @@
 #include <cmath>
 #include <dlfcn.h>
 #include <exception>
+#include <limits>
 #include <opencv2/imgproc.hpp>
 
 namespace {
@@ -520,10 +521,23 @@ void checkStatus(HalconFeatureApi *api, const Herror status, const QString &stag
 
 QVector<double> compressHistogram(const HalconTuple &relativeHistogram)
 {
+    if (relativeHistogram.size() != kGrayHistogramBins) {
+        throw std::pair<QString, QString>(
+                QStringLiteral("invalid_feature_value"),
+                QStringLiteral("HALCON gray histogram must contain exactly %1 bins.")
+                .arg(kGrayHistogramBins));
+    }
     QVector<double> compressed(kCompressedHistogramBins, 0.0);
     for (int index = 0; index < relativeHistogram.size(); ++index) {
+        const double value = relativeHistogram.doubleAt(index);
+        if (!std::isfinite(value) || value < 0.0) {
+            throw std::pair<QString, QString>(
+                    QStringLiteral("invalid_feature_value"),
+                    QStringLiteral("HALCON gray histogram contains an invalid value at bin %1.")
+                    .arg(index));
+        }
         const int bucket = qBound(0, index / kGrayHistogramGroupSize, kCompressedHistogramBins - 1);
-        compressed[bucket] += relativeHistogram.doubleAt(index);
+        compressed[bucket] += value;
     }
     return compressed;
 }
@@ -1148,7 +1162,19 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         const auto scoreCandidates = [&](const Hobject connected, const QString &polarity) {
             HalconTuple count(api);
             checkStatus(api, api->countObj(connected, count.ptr()), QStringLiteral("count_obj"));
-            const int objectCount = static_cast<int>(count.intAt(0));
+            if (count.size() <= 0) {
+                throw std::pair<QString, QString>(
+                        QStringLiteral("invalid_feature_value"),
+                        QStringLiteral("HALCON count_obj returned no object count."));
+            }
+            const Hlong objectCountValue = count.intAt(0);
+            if (objectCountValue < 0
+                    || objectCountValue > static_cast<Hlong>(std::numeric_limits<int>::max())) {
+                throw std::pair<QString, QString>(
+                        QStringLiteral("invalid_feature_value"),
+                        QStringLiteral("HALCON count_obj returned an invalid object count."));
+            }
+            const int objectCount = static_cast<int>(objectCountValue);
             for (int index = 1; index <= objectCount; ++index) {
                 HalconObjectGuard candidate(api);
                 HalconObjectGuard borderOverlap(api);
