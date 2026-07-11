@@ -86,6 +86,8 @@ rg -n "T_(create|add_sample|train|write|read|classify|clear)_class_mlp|classify_
   payload fields.
 - Training verifies the complete byte count, flush result, JSON parse, and exact object round-trip
   of `training_report.json` before validating and promoting the temporary package.
+  The backend smoke reopens the promoted report, parses it, and verifies its sample, class-stat,
+  valid/invalid sample, and warning diagnostics.
 - Explicit legacy model types and metadata-less `model.gmc` directories now return
   `legacy_model_requires_retraining` from inspection and runtime.
 - KNN output class IDs are range-checked before narrowing from `Hlong`, and returned distances must

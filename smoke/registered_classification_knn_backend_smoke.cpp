@@ -154,6 +154,23 @@ int main(int argc, char **argv)
           "training must create class_stats.json");
     check(QFileInfo(registeredClassificationTrainingReportPath(trainedModelDir)).size() > 0,
           "training must persist a non-empty training report before promotion");
+    QFile trainingReportFile(registeredClassificationTrainingReportPath(trainedModelDir));
+    check(trainingReportFile.open(QIODevice::ReadOnly),
+          "persisted training report must be readable");
+    QJsonParseError trainingReportParseError;
+    const QJsonDocument trainingReportDocument = QJsonDocument::fromJson(
+                trainingReportFile.readAll(), &trainingReportParseError);
+    trainingReportFile.close();
+    check(trainingReportParseError.error == QJsonParseError::NoError
+                  && trainingReportDocument.isObject(),
+          "persisted training report must parse as a JSON object");
+    const QJsonObject trainingReport = trainingReportDocument.object();
+    check(trainingReport.value(QStringLiteral("sampleCount")).toInt(-1) == 6
+                  && trainingReport.value(QStringLiteral("validSamplesByClass")).isObject()
+                  && trainingReport.value(QStringLiteral("invalidSamplesByClass")).isObject()
+                  && trainingReport.value(QStringLiteral("classStats")).isObject()
+                  && trainingReport.value(QStringLiteral("warnings")).isArray(),
+          "persisted training report must retain the complete training diagnostics");
     check(!QFileInfo(QDir(trainedModelDir).filePath(QStringLiteral("model.gmc"))).exists(),
           "V2 package must not contain model.gmc");
     check(validateRegisteredClassificationKnnPackage(trainedModelDir).success,
