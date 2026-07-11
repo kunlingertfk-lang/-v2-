@@ -45,10 +45,6 @@ class RegisteredClassificationFeatureExtractor
 public:
     RegisteredClassificationFeatureResult extract(
             const cv::Mat &image,
-            const QRectF &roiNormalized,
-            const RegisteredClassificationFeatureConfig &config) const;
-    RegisteredClassificationFeatureResult extractV2(
-            const cv::Mat &image,
             const RegisteredClassificationFeatureRegion &region,
             const RegisteredClassificationFeatureConfig &config) const;
 };

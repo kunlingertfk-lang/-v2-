@@ -77,6 +77,7 @@ SOURCES += \
     src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
     src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
+    src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
     src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
     src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
     src/algorithms/ai/AiDetectionRunner.cpp \
@@ -148,6 +149,7 @@ HEADERS += \
     src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
     src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+    src/algorithms/recognition/RegisteredClassificationKnnRuntime.h \
     src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
     src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
     src/algorithms/ai/AiDetectionRunner.h \

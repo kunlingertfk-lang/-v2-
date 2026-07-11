@@ -44,7 +44,6 @@ struct HalconFeatureApi
     using Rgb1ToGrayFn = Herror (*)(const Hobject, Hobject *);
     using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
-    using ThresholdFn = Herror (*)(const Hobject, Hobject *, double, double);
     using UnaryObjectTupleFn = Herror (*)(const Hobject, Hobject *, const Htuple);
     using UnaryObjectFn = Herror (*)(const Hobject, Hobject *);
     using BinaryObjectFn = Herror (*)(const Hobject, const Hobject, Hobject *);
@@ -53,7 +52,6 @@ struct HalconFeatureApi
     using SelectObjFn = Herror (*)(const Hobject, Hobject *, const Htuple);
     using CountObjFn = Herror (*)(const Hobject, Htuple *);
     using AreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
-    using MomentsRegion2ndFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *, Htuple *, Htuple *);
     using IntensityFn = Herror (*)(const Hobject, const Hobject, Htuple *, Htuple *);
     using GrayHistoFn = Herror (*)(const Hobject, const Hobject, Htuple *, Htuple *);
     using SmallestRectangle2Fn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *, Htuple *, Htuple *);
@@ -91,7 +89,6 @@ struct HalconFeatureApi
     Rgb1ToGrayFn rgb1ToGray = nullptr;
     GenRectangle1Fn genRectangle1 = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
-    ThresholdFn threshold = nullptr;
     UnaryObjectTupleFn gaussFilter = nullptr;
     BinaryThresholdFn binaryThreshold = nullptr;
     UnaryObjectTupleFn openingCircle = nullptr;
@@ -105,7 +102,6 @@ struct HalconFeatureApi
     SelectObjFn selectObj = nullptr;
     CountObjFn countObj = nullptr;
     AreaCenterFn areaCenter = nullptr;
-    MomentsRegion2ndFn momentsRegion2nd = nullptr;
     IntensityFn intensity = nullptr;
     GrayHistoFn grayHisto = nullptr;
     SmallestRectangle2Fn smallestRectangle2 = nullptr;
@@ -320,7 +316,6 @@ public:
             !resolveRequired(m_handle, api.rgb1ToGray, "rgb1_to_gray", errorMessage) ||
             !resolveRequired(m_handle, api.genRectangle1, "gen_rectangle1", errorMessage) ||
             !resolveRequired(m_handle, api.reduceDomain, "reduce_domain", errorMessage) ||
-            !resolveRequired(m_handle, api.threshold, "threshold", errorMessage) ||
             !resolveRequired(m_handle, api.gaussFilter, "T_gauss_filter", errorMessage) ||
             !resolveRequired(m_handle, api.binaryThreshold, "T_binary_threshold", errorMessage) ||
             !resolveRequired(m_handle, api.openingCircle, "T_opening_circle", errorMessage) ||
@@ -334,7 +329,6 @@ public:
             !resolveRequired(m_handle, api.selectObj, "T_select_obj", errorMessage) ||
             !resolveRequired(m_handle, api.countObj, "T_count_obj", errorMessage) ||
             !resolveRequired(m_handle, api.areaCenter, "T_area_center", errorMessage) ||
-            !resolveRequired(m_handle, api.momentsRegion2nd, "T_moments_region_2nd", errorMessage) ||
             !resolveRequired(m_handle, api.intensity, "T_intensity", errorMessage) ||
             !resolveRequired(m_handle, api.grayHisto, "T_gray_histo", errorMessage) ||
             !resolveRequired(m_handle, api.smallestRectangle2, "T_smallest_rectangle2", errorMessage) ||
@@ -542,32 +536,6 @@ QVector<double> compressHistogram(const HalconTuple &relativeHistogram)
     return compressed;
 }
 
-double normalizedCenter(const double center, const int start, const int extent)
-{
-    if (extent <= 0)
-        return 0.0;
-    const double normalized = (center - static_cast<double>(start)) / static_cast<double>(extent);
-    return qBound(0.0, normalized, 1.0);
-}
-
-int histogramMinValue(const HalconTuple &absoluteHistogram)
-{
-    for (int index = 0; index < absoluteHistogram.size(); ++index) {
-        if (absoluteHistogram.intAt(index) > 0)
-            return index;
-    }
-    return 0;
-}
-
-int histogramMaxValue(const HalconTuple &absoluteHistogram)
-{
-    for (int index = absoluteHistogram.size() - 1; index >= 0; --index) {
-        if (absoluteHistogram.intAt(index) > 0)
-            return index;
-    }
-    return 0;
-}
-
 HalconTuple tupleDouble(HalconFeatureApi *api, const double value)
 {
     HalconTuple tuple(api);
@@ -769,202 +737,6 @@ void appendWeightedGroups(QVector<double> *feature)
 } // namespace
 
 RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::extract(
-        const cv::Mat &image,
-        const QRectF &roiNormalized,
-        const RegisteredClassificationFeatureConfig &config) const
-{
-    if (image.empty())
-        return errorResult(QStringLiteral("image_empty"), QStringLiteral("Feature extraction input image is empty."));
-
-    const cv::Mat halconFrame = toBgr8ForHalcon(image);
-    if (halconFrame.empty()) {
-        return errorResult(QStringLiteral("unsupported_image_type"),
-                           QStringLiteral("Only images convertible to continuous CV_8UC3 are supported."));
-    }
-
-    const QRect roiPixels = normalizedRoiToPixels(roiNormalized, halconFrame.cols, halconFrame.rows);
-    if (roiPixels.width() < kMinRoiPixelSize || roiPixels.height() < kMinRoiPixelSize) {
-        return errorResult(QStringLiteral("invalid_roi"),
-                           QStringLiteral("Normalized ROI must resolve to at least 2x2 pixels."));
-    }
-
-    HalconRuntimePaths::initializeHalconEnvironment();
-    const QStringList halconCandidates = halconLibCandidates(config);
-    const QString halconLibPath = resolveExistingHalconLib(halconCandidates);
-    if (halconLibPath.isEmpty()) {
-        RegisteredClassificationFeatureResult result = errorResult(
-                    QStringLiteral("halcon_so_not_found"),
-                    QStringLiteral("HALCON runtime file not found. Tried: %1")
-                    .arg(HalconRuntimePaths::formatTriedPaths(halconCandidates)));
-        result.roiPixels = roiPixels;
-        result.payload.insert(QStringLiteral("roiPixels"), rectToJson(roiPixels));
-        result.payload.insert(QStringLiteral("halconSoPathCandidates"), stringListToJson(halconCandidates));
-        return result;
-    }
-
-    HalconLibrary library;
-    QString loadMessage;
-    bool symbolMissing = false;
-    if (!library.load(halconLibPath, loadMessage, symbolMissing)) {
-        RegisteredClassificationFeatureResult result = errorResult(
-                    symbolMissing ? QStringLiteral("halcon_symbol_missing")
-                                  : QStringLiteral("halcon_load_failed"),
-                    loadMessage);
-        result.roiPixels = roiPixels;
-        result.payload.insert(QStringLiteral("roiPixels"), rectToJson(roiPixels));
-        result.payload.insert(QStringLiteral("halconSoPath"), halconLibPath);
-        result.payload.insert(QStringLiteral("halconSoPathCandidates"), stringListToJson(halconCandidates));
-        return result;
-    }
-
-    HalconFeatureApi *api = &library.api;
-    HalconObjectGuard halconImage(api);
-    HalconObjectGuard grayImage(api);
-    HalconObjectGuard roiRegion(api);
-    HalconObjectGuard roiGray(api);
-    HalconObjectGuard foreground(api);
-    HalconTuple area(api);
-    HalconTuple row(api);
-    HalconTuple column(api);
-    HalconTuple momentM11(api);
-    HalconTuple momentM20(api);
-    HalconTuple momentM02(api);
-    HalconTuple momentIa(api);
-    HalconTuple momentIb(api);
-    HalconTuple grayMean(api);
-    HalconTuple grayDeviation(api);
-    HalconTuple absoluteHistogram(api);
-    HalconTuple relativeHistogram(api);
-
-    RegisteredClassificationFeatureResult result;
-    result.featureNames = registeredClassificationFeatureNamesV1();
-    result.roiPixels = roiPixels;
-    result.payload.insert(QStringLiteral("roiPixels"), rectToJson(roiPixels));
-    result.payload.insert(QStringLiteral("roiNormalizedX"), roiNormalized.x());
-    result.payload.insert(QStringLiteral("roiNormalizedY"), roiNormalized.y());
-    result.payload.insert(QStringLiteral("roiNormalizedWidth"), roiNormalized.width());
-    result.payload.insert(QStringLiteral("roiNormalizedHeight"), roiNormalized.height());
-    result.payload.insert(QStringLiteral("halconSoPath"), halconLibPath);
-    result.payload.insert(QStringLiteral("halconSoPathCandidates"), stringListToJson(halconCandidates));
-    result.payload.insert(QStringLiteral("featureNames"), stringListToJson(result.featureNames));
-
-    try {
-        checkStatus(api, api->genImageInterleaved(halconImage.ptr(),
-                                                  reinterpret_cast<Hlong>(halconFrame.data),
-                                                  "bgr",
-                                                  halconFrame.cols,
-                                                  halconFrame.rows,
-                                                  0,
-                                                  "byte",
-                                                  0,
-                                                  0,
-                                                  0,
-                                                  0,
-                                                  8,
-                                                  0),
-                    QStringLiteral("gen_image_interleaved"));
-        checkStatus(api, api->rgb1ToGray(halconImage.value(), grayImage.ptr()),
-                    QStringLiteral("rgb1_to_gray"));
-
-        const double row1 = static_cast<double>(roiPixels.top());
-        const double col1 = static_cast<double>(roiPixels.left());
-        const double row2 = static_cast<double>(roiPixels.bottom());
-        const double col2 = static_cast<double>(roiPixels.right());
-        checkStatus(api, api->genRectangle1(roiRegion.ptr(), row1, col1, row2, col2),
-                    QStringLiteral("gen_rectangle1"));
-        checkStatus(api, api->reduceDomain(grayImage.value(), roiRegion.value(), roiGray.ptr()),
-                    QStringLiteral("reduce_domain"));
-
-        checkStatus(api, api->intensity(roiRegion.value(), grayImage.value(), grayMean.ptr(), grayDeviation.ptr()),
-                    QStringLiteral("intensity"));
-        const double mean = grayMean.size() > 0 ? grayMean.doubleAt(0) : 0.0;
-        checkStatus(api, api->threshold(roiGray.value(), foreground.ptr(), mean, 255.0),
-                    QStringLiteral("threshold"));
-        checkStatus(api, api->areaCenter(foreground.value(), area.ptr(), row.ptr(), column.ptr()),
-                    QStringLiteral("area_center"));
-        checkStatus(api, api->momentsRegion2nd(foreground.value(),
-                                               momentM11.ptr(),
-                                               momentM20.ptr(),
-                                               momentM02.ptr(),
-                                               momentIa.ptr(),
-                                               momentIb.ptr()),
-                    QStringLiteral("moments_region_2nd"));
-        checkStatus(api, api->grayHisto(roiRegion.value(), grayImage.value(),
-                                        absoluteHistogram.ptr(), relativeHistogram.ptr()),
-                    QStringLiteral("gray_histo"));
-
-        const double roiArea = static_cast<double>(roiPixels.width()) * static_cast<double>(roiPixels.height());
-        const double imageArea = static_cast<double>(halconFrame.cols) * static_cast<double>(halconFrame.rows);
-        const double foregroundArea = area.size() > 0 ? area.doubleAt(0) : 0.0;
-        const double centerRow = row.size() > 0 ? row.doubleAt(0) : static_cast<double>(roiPixels.top());
-        const double centerColumn = column.size() > 0 ? column.doubleAt(0) : static_cast<double>(roiPixels.left());
-        const double m11 = momentM11.size() > 0 ? momentM11.doubleAt(0) : 0.0;
-        const double m20 = momentM20.size() > 0 ? momentM20.doubleAt(0) : 0.0;
-        const double m02 = momentM02.size() > 0 ? momentM02.doubleAt(0) : 0.0;
-        const double phi = 0.5 * std::atan2(2.0 * m11, m20 - m02);
-        const QVector<double> grayHistogram = compressHistogram(relativeHistogram);
-
-        result.feature.reserve(result.featureNames.size());
-        result.feature.append(static_cast<double>(roiPixels.width()) / static_cast<double>(roiPixels.height()));
-        result.feature.append(imageArea > 0.0 ? roiArea / imageArea : 0.0);
-        result.feature.append(roiArea > 0.0 ? foregroundArea / roiArea : 0.0);
-        result.feature.append(normalizedCenter(centerColumn, roiPixels.left(), roiPixels.width()));
-        result.feature.append(normalizedCenter(centerRow, roiPixels.top(), roiPixels.height()));
-        result.feature.append(momentIa.size() > 0 ? momentIa.doubleAt(0) : 0.0);
-        result.feature.append(momentIb.size() > 0 ? momentIb.doubleAt(0) : 0.0);
-        result.feature.append(phi);
-        result.feature.append(mean);
-        result.feature.append(static_cast<double>(histogramMinValue(absoluteHistogram)));
-        result.feature.append(static_cast<double>(histogramMaxValue(absoluteHistogram)));
-        result.feature.append(grayDeviation.size() > 0 ? grayDeviation.doubleAt(0) : 0.0);
-        for (double value : grayHistogram)
-            result.feature.append(value);
-
-        result.success = (result.feature.size() == result.featureNames.size());
-        result.status = result.success ? QStringLiteral("ok") : QStringLiteral("feature_length_mismatch");
-        result.message = result.success
-                ? QStringLiteral("Feature extraction succeeded.")
-                : QStringLiteral("Feature vector length does not match metadata.");
-        result.payload.insert(QStringLiteral("feature"), vectorToJson(result.feature));
-        result.payload.insert(QStringLiteral("roiAspect"), result.feature.value(0));
-        result.payload.insert(QStringLiteral("foregroundArea"), foregroundArea);
-        result.payload.insert(QStringLiteral("grayMean"), mean);
-        result.payload.insert(QStringLiteral("grayDeviation"), result.feature.value(11));
-        result.payload.insert(QStringLiteral("grayMin"), result.feature.value(9));
-        result.payload.insert(QStringLiteral("grayMax"), result.feature.value(10));
-        result.payload.insert(QStringLiteral("foregroundCenterRow"), centerRow);
-        result.payload.insert(QStringLiteral("foregroundCenterColumn"), centerColumn);
-        result.payload.insert(QStringLiteral("momentM11"), m11);
-        result.payload.insert(QStringLiteral("momentM20"), m20);
-        result.payload.insert(QStringLiteral("momentM02"), m02);
-        result.payload.insert(QStringLiteral("errorCode"), result.status);
-        result.payload.insert(QStringLiteral("errorMessage"), result.message);
-        return result;
-    } catch (const std::pair<QString, QString> &failure) {
-        result.success = false;
-        result.status = failure.first;
-        result.message = failure.second;
-        result.payload.insert(QStringLiteral("errorCode"), result.status);
-        result.payload.insert(QStringLiteral("errorMessage"), result.message);
-        return result;
-    } catch (const std::exception &e) {
-        result.success = false;
-        result.status = QStringLiteral("exception");
-        result.message = QString::fromLocal8Bit(e.what());
-        result.payload.insert(QStringLiteral("errorCode"), result.status);
-        result.payload.insert(QStringLiteral("errorMessage"), result.message);
-        return result;
-    } catch (...) {
-        result.success = false;
-        result.status = QStringLiteral("exception");
-        result.message = QStringLiteral("Unknown exception during feature extraction.");
-        result.payload.insert(QStringLiteral("errorCode"), result.status);
-        result.payload.insert(QStringLiteral("errorMessage"), result.message);
-        return result;
-    }
-}
-
-RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::extractV2(
         const cv::Mat &image,
         const RegisteredClassificationFeatureRegion &region,
         const RegisteredClassificationFeatureConfig &config) const

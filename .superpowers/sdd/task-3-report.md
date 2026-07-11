@@ -1,117 +1,80 @@
-# Task 3 Report
+# Task 3 Report: HALCON Dual KNN Replacement
 
-- Status: DONE
-- Commits made:
-  - `test: preserve registered classification trained smoke package`
+## RED
 
-## Files changed
+The renamed KNN backend smoke was written before the KNN runtime existed:
 
-- `src/algorithms/recognition/RegisteredClassificationTrainingRunner.h`
-- `src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp`
-- `smoke/registered_classification_mlp_backend_smoke.cpp`
-- `smoke/registered_classification_mlp_backend_smoke.pro`
-- `qt_ui_test.pro`
-- `.superpowers/sdd/task-3-report.md`
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_knn_backend_smoke.pro -o build/registered_classification_knn_backend.Makefile
+make -C build -f registered_classification_knn_backend.Makefile -j8
+```
 
-## Exact commands run
+It failed as expected because `RegisteredClassificationKnnRuntime.h/.cpp` did not exist and the new smoke referenced the missing KNN runtime contract.
 
-1. `sed -n '1,260p' .superpowers/sdd/task-3-brief.md`
-2. `rg -n "RegisteredClassification" src smoke qt_ui_test.pro`
-3. `sed -n '1,320p' src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp`
-4. `sed -n '1,360p' src/algorithms/recognition/RegisteredClassificationModelPackage.cpp`
-5. `sed -n '1,320p' src/algorithms/halcon/HalconRuntimePaths.cpp`
-6. `sed -n '1,260p' src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp`
-7. `git status --short`
-8. `git log --oneline -5 -- .superpowers/sdd/task-3-brief.md src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp smoke/registered_classification_mlp_backend_smoke.cpp`
-9. `/home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc)` in `smoke/` before adding the runner files
-10. `ls /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/lib/x64-linux/libhalconc.so*`
-11. `nm -D /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/lib/x64-linux/libhalconc.so | rg "(create_class_mlp|add_sample_class_mlp|train_class_mlp|write_class_mlp|clear_class_mlp|F_create_tuple|F_set_d|F_set_i|F_set_s|F_destroy_tuple|F_get_d)"`
-12. `rg -n "create_class_mlp|add_sample_class_mlp|train_class_mlp|write_class_mlp|clear_class_mlp" /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include`
-13. `/home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc)` in `smoke/` after implementation
-14. `../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke`
-15. `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j$(nproc)` in repo root
-16. `git diff -- src/algorithms/recognition/RegisteredClassificationTrainingRunner.h src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp smoke/registered_classification_mlp_backend_smoke.cpp smoke/registered_classification_mlp_backend_smoke.pro qt_ui_test.pro`
-17. `git rev-parse --abbrev-ref HEAD && git rev-parse --short HEAD`
-18. `git add qt_ui_test.pro smoke/registered_classification_mlp_backend_smoke.cpp smoke/registered_classification_mlp_backend_smoke.pro src/algorithms/recognition/RegisteredClassificationTrainingRunner.h src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp`
-19. `git add -f .superpowers/sdd/task-3-report.md`
-20. `git commit -m "feat: train registered classification mlp models"`
-21. `git add -f .superpowers/sdd/task-3-report.md && git commit --amend --no-edit`
+## GREEN
 
-## Key outputs
+- Added dynamically loaded HALCON KNN runtime with `T_create_class_knn`, `T_add_sample_class_knn`, `T_train_class_knn`, `T_set_params_class_knn`, `T_write_class_knn`, `T_read_class_knn`, `T_classify_class_knn`, and `T_clear_class_knn`.
+- Verified local `HProto.h` signatures and exports from HALCON 24.11.1.0. The runtime also uses `T_get_sample_num_class_knn` to reapply the persisted `classes_distance` settings after read; HALCON read restores `max_num_classes` to one otherwise.
+- Two KNN handles are marked only after a successful read/create and each guard clears exactly once.
+- Training now extracts only V2 features, creates a sample KNN and a class-center KNN, persists V2 class-radius statistics, writes the complete schema-2 package in a temporary directory, validates it, then atomically swaps it into place.
+- Inference fuses `0.70 * sampleSimilarity + 0.30 * centerSimilarity`, applies deterministic class-id tie breaks, and rejects in the required order: low similarity, ambiguity, then radius. Rejected results remain successful executions with `UNKNOWN`, candidate TopK, and diagnostics retained.
+- The legacy V1 feature extractor is no longer compiled or publicly callable. MLP HALCON operators and `model.gmc` use were removed from the three core implementation files.
 
-- Red step smoke build failed as expected before implementation:
-  - `WARNING: Failure to find: ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp`
-  - `fatal error: algorithms/recognition/RegisteredClassificationTrainingRunner.h: 没有那个文件或目录`
-- HALCON runtime inspection confirmed required symbols are present:
-  - `T_add_sample_class_mlp`
-  - `T_clear_class_mlp`
-  - `T_create_class_mlp`
-  - `T_train_class_mlp`
-  - `T_write_class_mlp`
-  - `F_create_tuple`
-  - `F_destroy_tuple`
-  - `F_get_d`
-  - `F_set_d`
-  - `F_set_i`
-  - `F_set_s`
-- Post-implementation smoke build succeeded.
-- Smoke executable output:
-  - `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`
-- Root Qt build succeeded and linked `build/qt_ui_test/bin/qt_ui_test`.
-- Final task commit is recorded in git history.
+## Verification
 
-## Self-review notes
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_feature_v2_smoke.pro -o build/registered_classification_feature_v2.Makefile
+make -C build -f registered_classification_feature_v2.Makefile -j8
+./build/smoke/registered_classification_feature_v2/bin/registered_classification_feature_v2_smoke
+```
 
-- The new runner stays inside the task write scope and reuses `RegisteredClassificationFeatureExtractor` instead of duplicating HALCON feature extraction.
-- HALCON is used for the MLP training path only; OpenCV remains the image container/bridge.
-- The runner validates output dir, class labels, and per-class valid sample coverage before training.
-- Model package writes go through `<outputModelDir>.tmp` and only swap into place after `model.gmc`, `metadata.json`, and `training_report.json` all exist.
-- The smoke now writes the positive training output under `/tmp/registered_classification_mlp_backend_smoke_model/trained` and keeps the one-class negative case in a separate sibling directory, so the trained artifacts remain present after the smoke exits.
+Output: `registered_classification_feature_v2_smoke: feature contract and schema 2 package checks passed`
 
-## Concerns
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/registered_classification_knn_backend_smoke.pro -o build/registered_classification_knn_backend.Makefile
+make -C build -f registered_classification_knn_backend.Makefile -j8
+./build/smoke/registered_classification_knn_backend/bin/registered_classification_knn_backend_smoke
+./build/smoke/registered_classification_knn_backend/bin/registered_classification_knn_backend_smoke
+```
 
-- None.
+Both runs output: `registered_classification_knn_backend_smoke: dual KNN training and inference checks passed`
 
-## Follow-up Fix
+```bash
+mkdir -p build/task-3-main && cd build/task-3-main
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake ../../qt_ui_test.pro
+make -j8
+```
 
-The review finding about post-smoke artifact preservation is fixed in `smoke/registered_classification_mlp_backend_smoke.cpp`:
+The shadow build linked `build/qt_ui_test/bin/qt_ui_test`.
 
-- Positive training output stays in `/tmp/registered_classification_mlp_backend_smoke_model/trained`.
-- The one-class negative case uses its own temp root and no longer clears the trained output.
-- The smoke now re-checks `model.gmc`, `metadata.json`, and `training_report.json` after the negative case completes.
-- The success banner now reads `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`.
+## Smoke Coverage
 
-### Commands run
+- `model.gnc`, `class_centers.gnc`, `class_stats.json`, and absence of `model.gmc`.
+- One sample per class with radius disabled; three samples with radius enabled.
+- Same image/class with multiple ROI shapes counted independently.
+- Transformed same-class query, full payload, low-similarity, ambiguous, out-of-radius, and `UNKNOWN` semantics.
+- Missing center model, mismatched KNN category sets, repeated classification, and missing KNN symbols.
 
-1. `cd smoke && /home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc) && ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke`
-2. `test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/model.gmc && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/metadata.json && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/training_report.json`
-3. `mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)`
+## Cleanup Audit
 
-### Outputs
+The following search has no matches and exits one:
 
-- Smoke run output:
-  - `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`
-- Artifact existence check succeeded with exit status `0`.
-- Qt build succeeded.
+```bash
+rg -n "T_(create|add_sample|train|write|read|classify|clear)_class_mlp|classify_class_mlp|model\\.gmc" \
+  src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
+  src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
+  src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp
+```
 
-## Task 3 Review Fixes
+## Deviations And Concerns
 
-- Fixed `training_report.json` field casing in `RegisteredClassificationTrainingRunner.cpp` from lowercase `error` / `errorLog` to HALCON-spec `Error` / `ErrorLog`.
-- Hardened `HalconMlpHandleGuard` so cleanup only runs after `create_class_mlp` succeeds: `outPtr()` no longer marks the handle valid, and `markCreated()` is called only after a successful create.
-- Extended `registered_classification_mlp_backend_smoke.cpp` to open `training_report.json` after training and assert the exact `Error` and `ErrorLog` keys exist.
+- Existing UI/adapter source was intentionally not changed. Source-compatible legacy request/config fields remain in the Task 3 headers but are ignored by the KNN training path; they exist only so the required full Qt build can complete while the UI migration is handled separately.
+- The schema-2 package reader intentionally reports a missing center model as `model_package_incomplete`, which is the existing actionable package-layer status.
 
-### Review-fix commands run
+## Local Review Corrections
 
-1. `cd smoke && /home/tt/Qt/5.15.2/gcc_64/bin/qmake registered_classification_mlp_backend_smoke.pro && make -j$(nproc) && ../build/smoke/registered_classification_mlp_backend/bin/registered_classification_mlp_backend_smoke`
-2. `test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/model.gmc && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/metadata.json && test -f /tmp/registered_classification_mlp_backend_smoke_model/trained/training_report.json`
-3. `mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)`
-
-### Review-fix outputs
-
-- Red step before the runner patch:
-  - `FAIL: training_report.json must contain Error`
-  - `FAIL: training_report.json must contain ErrorLog`
-- Post-fix smoke run:
-  - `registered_classification_mlp_backend_smoke: metadata, feature, and training checks passed`
-- Artifact existence check succeeded with exit status `0`.
-- Repo build completed and linked `build/qt_ui_test/bin/qt_ui_test`.
+- Removed the disabled `#if 0` schema-1 28-dimensional extractor body and its unused HALCON
+  operators/helpers; the old implementation is no longer present in core source.
+- Removed the temporary public `extractV2()` alias. `RegisteredClassificationFeatureExtractor`
+  now exposes only `extract(image, RegisteredClassificationFeatureRegion, config)`, which is the
+  V2 pipeline used by training, inference, and feature smoke tests.

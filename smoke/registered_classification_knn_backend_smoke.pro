@@ -2,9 +2,9 @@ QT += core
 CONFIG += console c++17
 CONFIG -= app_bundle
 TEMPLATE = app
-TARGET = registered_classification_mlp_backend_smoke
+TARGET = registered_classification_knn_backend_smoke
 
-BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/registered_classification_mlp_backend
+BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/registered_classification_knn_backend
 DESTDIR = $$BUILD_ROOT/bin
 OBJECTS_DIR = $$BUILD_ROOT/obj
 MOC_DIR = $$BUILD_ROOT/moc
@@ -26,10 +26,11 @@ LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
 LIBS += -lopencv_core -lopencv_imgproc -ldl
 
 SOURCES += \
-    registered_classification_mlp_backend_smoke.cpp \
+    registered_classification_knn_backend_smoke.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
     ../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
@@ -40,6 +41,7 @@ HEADERS += \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+    ../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h \
     ../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
     ../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \

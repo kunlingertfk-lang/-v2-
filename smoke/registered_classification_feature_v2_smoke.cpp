@@ -322,15 +322,15 @@ int main(int argc, char **argv)
     region.rectNormalized = QRectF(0.05, 0.05, 0.90, 0.90);
 
     const RegisteredClassificationFeatureResult base =
-            extractor.extractV2(makePartImage(0.0, 1.0), region, extractorConfig);
+            extractor.extract(makePartImage(0.0, 1.0), region, extractorConfig);
     const RegisteredClassificationFeatureResult rotated =
-            extractor.extractV2(makePartImage(45.0, 1.0), region, extractorConfig);
+            extractor.extract(makePartImage(45.0, 1.0), region, extractorConfig);
     const RegisteredClassificationFeatureResult scaled =
-            extractor.extractV2(makePartImage(90.0, 0.70), region, extractorConfig);
+            extractor.extract(makePartImage(90.0, 0.70), region, extractorConfig);
     const RegisteredClassificationFeatureResult rotated180 =
-            extractor.extractV2(makePartImage(180.0, 1.0), region, extractorConfig);
+            extractor.extract(makePartImage(180.0, 1.0), region, extractorConfig);
     const RegisteredClassificationFeatureResult scaledUp =
-            extractor.extractV2(makePartImage(0.0, 1.30), region, extractorConfig);
+            extractor.extract(makePartImage(0.0, 1.30), region, extractorConfig);
     check(base.success && rotated.success && scaled.success
                   && rotated180.success && scaledUp.success,
           "rotation and scale variants must extract");
@@ -344,10 +344,10 @@ int main(int argc, char **argv)
                   && base.payload.value(QStringLiteral("canonicalHeight")).toInt() == 128,
           "V2 payload must report the fixed canonical size");
 
-    const RegisteredClassificationFeatureResult light = extractor.extractV2(
+    const RegisteredClassificationFeatureResult light = extractor.extract(
             makePartImage(0.0, 1.0, cv::Scalar(230, 230, 230), cv::Scalar(25, 25, 25)),
             region, extractorConfig);
-    const RegisteredClassificationFeatureResult dark = extractor.extractV2(
+    const RegisteredClassificationFeatureResult dark = extractor.extract(
             makePartImage(0.0, 1.0, cv::Scalar(25, 25, 25), cv::Scalar(230, 230, 230)),
             region, extractorConfig);
     check(light.success && light.foregroundPolarity == QStringLiteral("light"),
@@ -355,10 +355,10 @@ int main(int argc, char **argv)
     check(dark.success && dark.foregroundPolarity == QStringLiteral("dark"),
           "dark foreground polarity must extract");
 
-    const RegisteredClassificationFeatureResult sameColorCircle = extractor.extractV2(
+    const RegisteredClassificationFeatureResult sameColorCircle = extractor.extract(
             makePartImage(0.0, 1.0, cv::Scalar(40, 190, 230), cv::Scalar(28, 28, 28), true),
             region, extractorConfig);
-    const RegisteredClassificationFeatureResult differentColorRectangle = extractor.extractV2(
+    const RegisteredClassificationFeatureResult differentColorRectangle = extractor.extract(
             makePartImage(0.0, 1.0, cv::Scalar(220, 70, 40), cv::Scalar(28, 28, 28)),
             region, extractorConfig);
     check(sameColorCircle.success && differentColorRectangle.success,
@@ -382,7 +382,7 @@ int main(int argc, char **argv)
         QPointF(0.10, 0.10), QPointF(0.10, 0.90), QPointF(0.55, 0.50)
     };
     const RegisteredClassificationFeatureResult polygonExcluded =
-            extractor.extractV2(polygonFixture, polygonRegion, extractorConfig);
+            extractor.extract(polygonFixture, polygonRegion, extractorConfig);
     check(!polygonExcluded.success
                   && polygonExcluded.status == QStringLiteral("foreground_not_found"),
           "polygon ROI must use the true polygon instead of its bounding rectangle");
@@ -403,11 +403,11 @@ int main(int argc, char **argv)
     cv::Mat boundsCenterCandidateOnly(256, 256, CV_8UC3, cv::Scalar(20, 20, 20));
     cv::circle(boundsCenterCandidateOnly, cv::Point(128, 128), 14, boundsCenterColor, cv::FILLED);
     const RegisteredClassificationFeatureResult polygonChoice =
-            extractor.extractV2(twoCandidates, asymmetricPolygon, extractorConfig);
+            extractor.extract(twoCandidates, asymmetricPolygon, extractorConfig);
     const RegisteredClassificationFeatureResult centroidReference =
-            extractor.extractV2(centroidCandidateOnly, asymmetricPolygon, extractorConfig);
+            extractor.extract(centroidCandidateOnly, asymmetricPolygon, extractorConfig);
     const RegisteredClassificationFeatureResult boundsCenterReference =
-            extractor.extractV2(boundsCenterCandidateOnly, asymmetricPolygon, extractorConfig);
+            extractor.extract(boundsCenterCandidateOnly, asymmetricPolygon, extractorConfig);
     check(polygonChoice.success && centroidReference.success && boundsCenterReference.success,
           "asymmetric polygon candidate-scoring fixtures must extract");
     check(registeredClassificationFeatureDistance(polygonChoice.feature, centroidReference.feature)
@@ -415,7 +415,7 @@ int main(int argc, char **argv)
                       polygonChoice.feature, boundsCenterReference.feature),
           "polygon candidate scoring must use the actual ROI centroid");
 
-    const RegisteredClassificationFeatureResult uniform = extractor.extractV2(
+    const RegisteredClassificationFeatureResult uniform = extractor.extract(
             cv::Mat(256, 256, CV_8UC3, cv::Scalar(128, 128, 128)),
             region, extractorConfig);
     check(!uniform.success && uniform.status == QStringLiteral("foreground_not_found"),
@@ -423,7 +423,7 @@ int main(int argc, char **argv)
 
     RegisteredClassificationFeatureConfig missingSymbolConfig;
     missingSymbolConfig.halconSoPath = existingNonHalconLibrary();
-    const RegisteredClassificationFeatureResult missingSymbol = extractor.extractV2(
+    const RegisteredClassificationFeatureResult missingSymbol = extractor.extract(
             makePartImage(0.0, 1.0), region, missingSymbolConfig);
     check(!missingSymbolConfig.halconSoPath.isEmpty(),
           "missing-symbol test requires an existing non-HALCON shared object");

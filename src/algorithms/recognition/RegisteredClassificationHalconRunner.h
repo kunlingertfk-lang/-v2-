@@ -1,8 +1,8 @@
 #ifndef ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONHALCONRUNNER_H
 #define ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONHALCONRUNNER_H
 
-#include "toolcore/ToolOverlay.h"
 #include "toolcore/PositionCorrection.h"
+#include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
 #include <QRectF>
@@ -11,32 +11,35 @@
 
 #include <opencv2/core.hpp>
 
-// 注册分类 HALCON 推理配置。字段对齐 docs/FID/RegisteredClassification/
-// registered_classification_function_implementation.md 的配置字段表。
 struct RegisteredClassificationHalconConfig
 {
     QString halconSoPath;
     QStringList halconSoPathCandidates;
     QString modelPath;
     QString modelName;
-    QString modelType = QStringLiteral("halcon_mlp_registered_classification");
-    QString detectRegionType = QStringLiteral("full"); // full | rectangle
+    QString modelType = QStringLiteral("halcon_knn_registered_classification");
+    QString detectRegionType = QStringLiteral("full");
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     PositionCorrectionConfig positionCorrection;
     int topK = 1;
-    QString judgeMode = QStringLiteral("class_match"); // class_match | min_score
+    QString judgeMode = QStringLiteral("class_match");
     QString expectedLabel;
     int minScore = 80;
+    int minSimilarity = 80;
+    int minMargin = 8;
+    // Kept only for source compatibility with existing UI/adapter configuration parsing.
     int rejectScore = 60;
     int top2Gap = 0;
 };
 
-// 单个候选类别结果。
 struct RegisteredClassificationClassScore
 {
     QString label;
     int classId = -1;
-    double score = 0.0; // 0-100
+    double score = 0.0;
+    double sampleSimilarity = 0.0;
+    double centerSimilarity = 0.0;
+    double centerDistance = 0.0;
 };
 
 struct RegisteredClassificationHalconResult
@@ -47,8 +50,17 @@ struct RegisteredClassificationHalconResult
     QString message;
     QString predictedLabel;
     int predictedClassId = -1;
-    double score = 0.0; // 0-100
-    int rejectScore = 60;
+    double score = 0.0;
+    double sampleSimilarity = 0.0;
+    double centerSimilarity = 0.0;
+    double centerDistance = 0.0;
+    double secondScore = 0.0;
+    double scoreMargin = 0.0;
+    double classRadius = 0.0;
+    bool radiusEnabled = false;
+    bool rejected = false;
+    QString rejectionReason;
+    int rejectScore = 0;
     int top2Gap = 0;
     QVector<RegisteredClassificationClassScore> topClasses;
     qint64 elapsedMs = 0;

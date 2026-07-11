@@ -2,6 +2,7 @@
 #define ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONTRAININGRUNNER_H
 
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
+#include "algorithms/recognition/RegisteredClassificationFeatureExtractor.h"
 #include "algorithms/recognition/RegisteredClassificationTrainingSession.h"
 
 #include <QJsonObject>
@@ -15,8 +16,18 @@
 struct RegisteredClassificationTrainingSample
 {
     cv::Mat image;
+    RegisteredClassificationFeatureRegion region;
+    // Retained only to keep pre-Task-3 callers source compatible; training converts it to V2 region.
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     int classId = -1;
+};
+
+struct RegisteredClassificationTrainingKnnThresholds : RegisteredClassificationKnnThresholds
+{
+    // Existing UI callers still populate these values. KNN training deliberately ignores them.
+    int minScore = 80;
+    int rejectScore = 60;
+    int top2Gap = 0;
 };
 
 struct RegisteredClassificationTrainingRequest
@@ -28,8 +39,10 @@ struct RegisteredClassificationTrainingRequest
     QVector<RegisteredClassificationTrainingSample> samples;
     QJsonObject trainingSessionManifest;
     QVector<RegisteredClassificationTrainingSessionAsset> trainingSessionAssets;
+    RegisteredClassificationKnnParams knn;
+    RegisteredClassificationTrainingKnnThresholds thresholds;
+    // Legacy caller fields are ignored. They avoid an unrelated UI/adapter source edit in this task.
     RegisteredClassificationMlpParams mlp;
-    RegisteredClassificationThresholds thresholds;
 };
 
 struct RegisteredClassificationTrainingResult
