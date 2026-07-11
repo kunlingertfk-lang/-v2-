@@ -47,3 +47,11 @@ Results:
 ## Verification Boundary
 
 The parent task owns the requested qmake/make, registered-classification smoke, main shadow build and manual UI verification. This task intentionally performed documentation/static checks only.
+
+## Review Corrections
+
+- Clarified that `80/8` are the metadata/default values. Runtime `minSimilarity` and `minMargin`
+  are configurable in `[0,100]`; the three-state rejection order remains fixed.
+- Clarified the package boundary: runtime validation requires metadata, both KNN files, and
+  `class_stats.json`; `training_report.json` is a trainer artifact and `training_session/` is
+  optional recovery data.

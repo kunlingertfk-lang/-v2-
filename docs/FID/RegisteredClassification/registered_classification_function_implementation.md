@@ -79,7 +79,8 @@ Feature V2 使用 HALCON 完成 ROI、前景、规范化和统计。特征名称
 
 ## 双 KNN 和模型包
 
-每个 schema 2 包必须是完整目录，不能只导入一个 KNN 文件：
+训练器生成的 schema 2 目录如下；其中 `training_report.json` 是训练记录，
+`training_session/` 仅在存在可恢复训练会话时生成：
 
 ```text
 ModelFiles/RegisteredClass/yyyyMMdd/model_HHmmss_zzz/
@@ -87,13 +88,19 @@ ModelFiles/RegisteredClass/yyyyMMdd/model_HHmmss_zzz/
 ├── class_centers.gnc
 ├── metadata.json
 ├── class_stats.json
-├── training_report.json
-└── training_session/
+├── training_report.json                 # 训练器生成，非运行最小包校验项
+└── training_session/                    # 可选
     ├── session.json
     └── images/*.png
 ```
 
-`model.gnc` 保存每个有效注册样本的 HALCON KNN；`class_centers.gnc` 保存每个类别的归一化中心。两者都使用 59 维输入、`method=classes_distance`、`normalization=false`、`num_trees=4`、`num_checks=0`、`epsilon=0.0`。样本 KNN 的 `k` 为有效样本总数，中心 KNN 的 `k` 为类别数；两者的 `max_num_classes` 为类别数。metadata 必须同时保存样本权重 `0.70`、中心权重 `0.30` 和拒识阈值 `80/8`。
+运行最小包必须包含 `metadata.json`、`model.gnc`、`class_centers.gnc` 和
+`class_stats.json`，不能只导入一个 KNN 文件。`model.gnc` 保存每个有效注册样本的
+HALCON KNN；`class_centers.gnc` 保存每个类别的归一化中心。两者都使用 59 维输入、
+`method=classes_distance`、`normalization=false`、`num_trees=4`、`num_checks=0`、
+`epsilon=0.0`。样本 KNN 的 `k` 为有效样本总数，中心 KNN 的 `k` 为类别数；两者的
+`max_num_classes` 为类别数。metadata 保存样本权重 `0.70`、中心权重 `0.30` 和默认
+拒识阈值 `80/8`。
 
 每个类别的中心是该类别样本向量的均值再归一化。类内半径为：
 
@@ -118,10 +125,11 @@ centerSimilarity = 100 * centerSimilarity01
 score = 0.70 * sampleSimilarity + 0.30 * centerSimilarity
 ```
 
-类别按 score 降序排序，分数相同时按 classId 升序。拒识顺序固定为：
+类别按 score 降序排序，分数相同时按 classId 升序。`minSimilarity` 和 `minMargin`
+默认分别为 `80` 和 `8`，工具配置可在 `[0,100]` 内覆盖运行时阈值；拒识顺序固定为：
 
-1. `score < 80`：`classification_rejected_low_similarity`。
-2. `score - secondScore < 8`：`classification_rejected_ambiguous`。
+1. `score < minSimilarity`：`classification_rejected_low_similarity`。
+2. `score - secondScore < minMargin`：`classification_rejected_ambiguous`。
 3. 启用类内半径且 `centerDistance > classRadius`：`classification_rejected_out_of_radius`。
 
 三种状态均表示算法成功完成但拒绝给出已知类别：`success=true`、`ok=false`、`predictedLabel=UNKNOWN`、`predictedClassId=-1`。payload 必须保留最佳已知候选的 `bestCandidateClassId`/`bestCandidateLabel`、分数、TopK、`rejectionReason`、半径和距离诊断。模型缺失、图像为空、ROI 无效、HALCON 错误或特征错误才令 `success=false`。
