@@ -1,4 +1,5 @@
 #include "RegisteredClassificationDialog.h"
+#include "RegisteredClassificationModelManagementDialog.h"
 #include "RegisteredClassificationTrainingDialog.h"
 
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
@@ -19,6 +20,7 @@
 #include <QFrame>
 #include <QGraphicsView>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
@@ -252,6 +254,72 @@ bool anyThumbnailCaptionContains(QWidget &root, const QString &text)
     return false;
 }
 
+bool anyLabelContains(QWidget &root, const QString &text)
+{
+    const QList<QLabel *> labels = root.findChildren<QLabel *>();
+    for (QLabel *label : labels) {
+        if (label && label->text().contains(text))
+            return true;
+    }
+    return false;
+}
+
+bool copyDirectoryRecursively(const QString &sourcePath, const QString &targetPath)
+{
+    const QDir source(sourcePath);
+    if (!source.exists() || !QDir().mkpath(targetPath))
+        return false;
+    const QFileInfoList entries = source.entryInfoList(QDir::Files | QDir::Dirs |
+                                                       QDir::NoDotAndDotDot);
+    for (const QFileInfo &entry : entries) {
+        const QString target = QDir(targetPath).filePath(entry.fileName());
+        if (entry.isDir()) {
+            if (!copyDirectoryRecursively(entry.absoluteFilePath(), target))
+                return false;
+        } else if (!QFile::copy(entry.absoluteFilePath(), target)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool writeLegacyModelFixture(const QString &modelDir,
+                             const QString &sourceSessionDir,
+                             bool withTrainingSession)
+{
+    QDir(modelDir).removeRecursively();
+    if (!QDir().mkpath(modelDir))
+        return false;
+
+    const QJsonArray classLabels{
+        QJsonObject{{QStringLiteral("id"), 0},
+                    {QStringLiteral("name"), QStringLiteral("Classification0")}},
+        QJsonObject{{QStringLiteral("id"), 1},
+                    {QStringLiteral("name"), QStringLiteral("Classification1")}}
+    };
+    const QJsonObject metadata{
+        {QStringLiteral("modelType"), QStringLiteral("halcon_mlp_registered_classification")},
+        {QStringLiteral("schemaVersion"), 1},
+        {QStringLiteral("featureVersion"), QStringLiteral("halcon_mlp_roi_stats_v1")},
+        {QStringLiteral("classLabels"), classLabels},
+        {QStringLiteral("trainingSampleCount"), 2}
+    };
+    QFile metadataFile(registeredClassificationMetadataPath(modelDir));
+    if (!metadataFile.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+        metadataFile.write(QJsonDocument(metadata).toJson(QJsonDocument::Indented)) <= 0)
+        return false;
+
+    QFile legacyModel(QDir(modelDir).filePath(QStringLiteral("model.gmc")));
+    if (!legacyModel.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+        legacyModel.write("legacy") != 6)
+        return false;
+    legacyModel.close();
+
+    return !withTrainingSession || copyDirectoryRecursively(
+                sourceSessionDir,
+                QDir(modelDir).filePath(QStringLiteral("training_session")));
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -269,6 +337,8 @@ int main(int argc, char **argv)
     dialog.show();
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     QString managementModelDir;
+    QString legacyWithSessionModelDir;
+    QString legacyWithoutSessionModelDir;
 
     QCheckBox *positionSwitch = dialog.findChild<QCheckBox *>(QStringLiteral("positionCorrectionSwitch"));
     check(positionSwitch != nullptr, "position correction switch must exist");
@@ -921,6 +991,21 @@ int main(int argc, char **argv)
                         typedTrainingDialog->trainToModelDirForTest(managementModelDir);
                 check(managementTrainResult.success,
                       "training dialog must create a runtime model package for model management");
+                legacyWithSessionModelDir = QDir(QCoreApplication::applicationDirPath()).filePath(
+                            QStringLiteral("ModelFiles/RegisteredClass/20990102/model_smoke_legacy_with_session"));
+                legacyWithoutSessionModelDir = QDir(QCoreApplication::applicationDirPath()).filePath(
+                            QStringLiteral("ModelFiles/RegisteredClass/20990103/model_smoke_legacy_without_session"));
+                check(writeLegacyModelFixture(
+                          legacyWithSessionModelDir,
+                          QDir(managementModelDir).filePath(QStringLiteral("training_session")),
+                          true),
+                      "dialog smoke must create a schema 1 legacy fixture with training session");
+                check(writeLegacyModelFixture(legacyWithoutSessionModelDir, QString(), false),
+                      "dialog smoke must create a schema 1 legacy fixture without training session");
+                QString legacyImportError;
+                check(!dialog.validateModelPackageForTest(legacyWithSessionModelDir, &legacyImportError) &&
+                      legacyImportError.contains(QStringLiteral("旧版模型不能直接运行")),
+                      "main dialog import must reject legacy packages with retraining guidance");
                 QPushButton *mainDeleteModelButton = buttonByText(dialog, QStringLiteral("删除模型"));
                 if (mainDeleteModelButton)
                     clickAndProcess(mainDeleteModelButton);
@@ -1003,24 +1088,69 @@ int main(int argc, char **argv)
               "model row export icon must have export tooltip");
         check(deleteButton && deleteButton->toolTip() == QStringLiteral("删除"),
               "model row delete icon must have delete tooltip");
-        QFrame *scannedModelRow = nullptr;
+        QList<QFrame *> scannedModelRows;
         const QList<QFrame *> modelRows = managementDialog->findChildren<QFrame *>();
         for (QFrame *row : modelRows) {
-            if (row && row->property("modelDir").toString() == managementModelDir) {
-                scannedModelRow = row;
-                break;
+            if (row && !row->property("modelDir").toString().isEmpty())
+                scannedModelRows.append(row);
+        }
+        check(scannedModelRows.size() == 3,
+              "model management must show complete V2 and both legacy model rows");
+        auto rowForDir = [&scannedModelRows](const QString &modelDir) {
+            for (QFrame *row : scannedModelRows) {
+                if (row && row->property("modelDir").toString() == modelDir)
+                    return row;
             }
-        }
-        check(scannedModelRow != nullptr, "model management must list scanned model packages");
+            return static_cast<QFrame *>(nullptr);
+        };
+        QFrame *scannedModelRow = rowForDir(managementModelDir);
+        QFrame *legacyWithSessionRow = rowForDir(legacyWithSessionModelDir);
+        QFrame *legacyWithoutSessionRow = rowForDir(legacyWithoutSessionModelDir);
+        check(scannedModelRow && legacyWithSessionRow && legacyWithoutSessionRow,
+              "model management must retain all three dated model rows");
         if (scannedModelRow) {
-            check(scannedModelRow->property("modelDir").toString() == managementModelDir,
-                  "model management row must store model package directory");
+            QPushButton *v2UseButton = buttonByText(*scannedModelRow, QStringLiteral("使用模型"));
+            check(v2UseButton && v2UseButton->isEnabled(),
+                  "complete V2 model use action must be enabled");
         }
-        QPushButton *retrainButton = scannedModelRow
-                ? buttonByText(*scannedModelRow, QStringLiteral("重新训练"))
+        for (QFrame *legacyRow : {legacyWithSessionRow, legacyWithoutSessionRow}) {
+            if (!legacyRow)
+                continue;
+            QPushButton *legacyUseButton = buttonByText(*legacyRow, QStringLiteral("使用模型"));
+            QPushButton *legacyRetrainButton = buttonByText(*legacyRow, QStringLiteral("重新训练"));
+            check(legacyUseButton && !legacyUseButton->isEnabled(),
+                  "legacy model use action must be disabled");
+            check(legacyUseButton && legacyUseButton->toolTip().contains(QStringLiteral("旧模型不能运行")),
+                  "legacy model use action must explain retraining requirement");
+            check(legacyRetrainButton && legacyRetrainButton->isEnabled(),
+                  "legacy model retrain action must remain enabled");
+        }
+        check(legacyWithSessionRow && legacyWithoutSessionRow &&
+              anyLabelContains(*legacyWithSessionRow, QStringLiteral("旧版，需重新训练")) &&
+              anyLabelContains(*legacyWithoutSessionRow, QStringLiteral("旧版，需重新训练")),
+              "legacy model rows must show the old-model retraining status");
+        bool modelSelectedBeforeUpgrade = false;
+        RegisteredClassificationModelManagementDialog *typedManagementDialog =
+                qobject_cast<RegisteredClassificationModelManagementDialog *>(managementDialog);
+        QObject::connect(typedManagementDialog,
+                         &RegisteredClassificationModelManagementDialog::modelSelected,
+                         typedManagementDialog,
+                         [&modelSelectedBeforeUpgrade](const QString &, const QString &) {
+            modelSelectedBeforeUpgrade = true;
+        });
+        QPushButton *legacyUseButton = legacyWithSessionRow
+                ? buttonByText(*legacyWithSessionRow, QStringLiteral("使用模型"))
                 : nullptr;
-        check(retrainButton != nullptr, "model management must expose retrain action");
-        if (retrainButton && scannedModelRow) {
+        if (legacyUseButton)
+            clickAndProcess(legacyUseButton);
+        check(!modelSelectedBeforeUpgrade,
+              "legacy use must not emit modelSelected before successful upgrade");
+
+        QPushButton *retrainButton = legacyWithSessionRow
+                ? buttonByText(*legacyWithSessionRow, QStringLiteral("重新训练"))
+                : nullptr;
+        check(retrainButton != nullptr, "model management must expose legacy retrain action");
+        if (retrainButton && legacyWithSessionRow) {
             clickAndProcess(retrainButton);
             RegisteredClassificationTrainingDialog *typedRetrainDialog = nullptr;
             const QList<RegisteredClassificationTrainingDialog *> retrainDialogs =
@@ -1030,12 +1160,12 @@ int main(int argc, char **argv)
                     continue;
                 const QJsonObject preview = candidate->buildTrainingRequestPreviewForTest();
                 if (preview.value(QStringLiteral("updateTargetModelDir")).toString()
-                        == managementModelDir) {
+                        == legacyWithSessionModelDir) {
                     typedRetrainDialog = candidate;
                     break;
                 }
             }
-            check(typedRetrainDialog != nullptr, "retrain must open training dialog for selected model package");
+            check(typedRetrainDialog != nullptr, "legacy retrain must open training dialog for selected model package");
             if (typedRetrainDialog) {
                 const QJsonObject restoredPreview = typedRetrainDialog->buildTrainingRequestPreviewForTest();
                 check(restoredPreview.value(QStringLiteral("restoredSessionStatus")).toString()
@@ -1047,15 +1177,39 @@ int main(int argc, char **argv)
                       "retrain must restore class names");
                 check(restoredPreview.value(QStringLiteral("restoredRoiCount")).toInt() >= 2,
                       "retrain must restore ROI marks");
+                const RegisteredClassificationTrainingResult upgradeResult =
+                        typedRetrainDialog->trainToModelDirForTest(legacyWithSessionModelDir);
+                check(upgradeResult.success,
+                      "legacy retrain with session must successfully upgrade the same model directory");
+                check(QFileInfo(registeredClassificationSampleKnnPath(legacyWithSessionModelDir)).isFile() &&
+                      QFileInfo(registeredClassificationCenterKnnPath(legacyWithSessionModelDir)).isFile(),
+                      "legacy retrain must create both V2 KNN model files");
+                check(!QFileInfo(QDir(legacyWithSessionModelDir).filePath(QStringLiteral("model.gmc"))).exists(),
+                      "successful legacy upgrade must remove model.gmc");
+                const RegisteredClassificationModelInspection upgradedInspection =
+                        inspectRegisteredClassificationModelPackage(legacyWithSessionModelDir);
+                check(upgradedInspection.runnable && !upgradedInspection.legacy,
+                      "successful legacy upgrade must refresh to a runnable V2 inspection");
+                check(modelSelectedBeforeUpgrade,
+                      "successful legacy upgrade may emit modelSelected only after inspection becomes runnable");
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+                QFrame *refreshedUpgradedRow = nullptr;
+                for (QFrame *row : managementDialog->findChildren<QFrame *>()) {
+                    if (row && row->property("modelDir").toString() == legacyWithSessionModelDir)
+                        refreshedUpgradedRow = row;
+                }
+                QPushButton *refreshedUseButton = refreshedUpgradedRow
+                        ? buttonByText(*refreshedUpgradedRow, QStringLiteral("使用模型"))
+                        : nullptr;
+                check(refreshedUseButton && refreshedUseButton->isEnabled(),
+                      "model management must refresh the upgraded row to runnable");
                 typedRetrainDialog->close();
             }
         }
-        const QString legacyModelDir = QDir::temp().filePath(
-                    QStringLiteral("registered_classification_legacy_model_without_session"));
-        QDir(legacyModelDir).removeRecursively();
-        QDir().mkpath(legacyModelDir);
+        check(legacyWithoutSessionRow != nullptr,
+              "legacy model without session must remain visible in model management");
         RegisteredClassificationTrainingDialog legacyRetrainDialog;
-        legacyRetrainDialog.setUpdateTargetModelDir(legacyModelDir);
+        legacyRetrainDialog.setUpdateTargetModelDir(legacyWithoutSessionModelDir);
         const QJsonObject legacyPreview = legacyRetrainDialog.buildTrainingRequestPreviewForTest();
         check(legacyPreview.value(QStringLiteral("restoredSessionStatus")).toString()
                   == QStringLiteral("missing_training_session"),
@@ -1063,7 +1217,9 @@ int main(int argc, char **argv)
         check(legacyPreview.value(QStringLiteral("restoredSessionMessage")).toString()
                   .contains(QStringLiteral("没有历史训练数据")),
               "legacy model without a session must expose an actionable message");
-        QDir(legacyModelDir).removeRecursively();
+        check(legacyPreview.value(QStringLiteral("imageCount")).toInt(-1) == 0 &&
+              legacyPreview.value(QStringLiteral("roiCount")).toInt(-1) == 0,
+              "legacy model without a session must open an empty training state");
         QPushButton *useModelButton = scannedModelRow
                 ? buttonByText(*scannedModelRow, QStringLiteral("使用模型"))
                 : nullptr;

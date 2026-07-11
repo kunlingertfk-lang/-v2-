@@ -14,35 +14,6 @@ struct RegisteredClassificationClassLabel
     QString name;
 };
 
-struct RegisteredClassificationMlpParams
-{
-    int numHidden = 16;
-    int maxIterations = 200;
-    int randSeed = 42;
-};
-
-struct RegisteredClassificationThresholds
-{
-    int minScore = 80;
-    int rejectScore = 60;
-    int top2Gap = 0;
-};
-
-struct RegisteredClassificationModelMetadata
-{
-    QString modelType;
-    int schemaVersion = 1;
-    QString featureVersion;
-    QString halconVersion;
-    QVector<RegisteredClassificationClassLabel> classLabels;
-    QStringList featureNames;
-    int featureLength = 0;
-    QJsonObject preprocess;
-    RegisteredClassificationMlpParams mlp;
-    RegisteredClassificationThresholds thresholds;
-    int trainingSampleCount = 0;
-};
-
 struct RegisteredClassificationModelPackageResult
 {
     bool success = false;
@@ -122,26 +93,15 @@ struct RegisteredClassificationModelInspection
     RegisteredClassificationKnnModelMetadata metadata;
 };
 
-QString registeredClassificationMlpModelType();
 QString registeredClassificationKnnModelType();
 QString registeredClassificationLegacyMlpModelType();
-QString registeredClassificationFeatureVersionV1();
-QStringList registeredClassificationFeatureNamesV1();
 QString registeredClassificationMetadataPath(const QString &modelDir);
-QString registeredClassificationMlpPath(const QString &modelDir);
+QString registeredClassificationLegacyModelPath(const QString &modelDir);
 QString registeredClassificationTrainingReportPath(const QString &modelDir);
 QString registeredClassificationSampleKnnPath(const QString &modelDir);
 QString registeredClassificationCenterKnnPath(const QString &modelDir);
 QString registeredClassificationClassStatsPath(const QString &modelDir);
 
-RegisteredClassificationModelPackageResult validateRegisteredClassificationMetadata(
-        const RegisteredClassificationModelMetadata &metadata);
-RegisteredClassificationModelPackageResult writeRegisteredClassificationMetadata(
-        const QString &modelDir,
-        const RegisteredClassificationModelMetadata &metadata);
-RegisteredClassificationModelPackageResult readRegisteredClassificationMetadata(
-        const QString &modelDir,
-        RegisteredClassificationModelMetadata *metadata);
 RegisteredClassificationModelPackageResult validateRegisteredClassificationKnnMetadata(
         const RegisteredClassificationKnnModelMetadata &metadata);
 RegisteredClassificationModelPackageResult writeRegisteredClassificationKnnMetadata(

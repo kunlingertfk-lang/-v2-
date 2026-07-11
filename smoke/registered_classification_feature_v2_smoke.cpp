@@ -1062,15 +1062,16 @@ int main(int argc, char **argv)
           "altered KNN normalization must report actionable parameter status");
 
     const QString legacyDir = smokeModelDir(QStringLiteral("legacy"));
-    RegisteredClassificationModelMetadata legacyMetadata;
-    legacyMetadata.modelType = registeredClassificationMlpModelType();
-    legacyMetadata.schemaVersion = 1;
-    legacyMetadata.featureVersion = registeredClassificationFeatureVersionV1();
-    legacyMetadata.featureNames = registeredClassificationFeatureNamesV1();
-    legacyMetadata.featureLength = legacyMetadata.featureNames.size();
-    legacyMetadata.classLabels = {{0, QStringLiteral("A")}, {1, QStringLiteral("B")}};
-    legacyMetadata.trainingSampleCount = 4;
-    check(writeRegisteredClassificationMetadata(legacyDir, legacyMetadata).success,
+    const QJsonObject legacyMetadata{
+        {QStringLiteral("modelType"), QStringLiteral("halcon_mlp_registered_classification")},
+        {QStringLiteral("schemaVersion"), 1},
+        {QStringLiteral("featureVersion"), QStringLiteral("halcon_mlp_roi_stats_v1")},
+        {QStringLiteral("classLabels"), QJsonArray{
+             QJsonObject{{QStringLiteral("id"), 0}, {QStringLiteral("name"), QStringLiteral("A")} },
+             QJsonObject{{QStringLiteral("id"), 1}, {QStringLiteral("name"), QStringLiteral("B")} }}},
+        {QStringLiteral("trainingSampleCount"), 4}
+    };
+    check(writeMetadataJson(legacyDir, legacyMetadata),
           "schema 1 metadata fixture must write");
     RegisteredClassificationKnnModelMetadata legacyAsKnn;
     const RegisteredClassificationModelPackageResult legacyRead =

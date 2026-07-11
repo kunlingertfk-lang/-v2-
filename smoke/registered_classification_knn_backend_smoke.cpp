@@ -270,7 +270,7 @@ int main(int argc, char **argv)
           "explicit legacy model type must require retraining");
 
     const QString legacyOnlyDir = smokeDir(QStringLiteral("legacy_only"));
-    QFile legacyOnlyFile(registeredClassificationMlpPath(legacyOnlyDir));
+    QFile legacyOnlyFile(registeredClassificationLegacyModelPath(legacyOnlyDir));
     check(legacyOnlyFile.open(QIODevice::WriteOnly | QIODevice::Truncate),
           "legacy-only model fixture must open");
     check(legacyOnlyFile.write("legacy") == 6, "legacy-only model fixture must write");

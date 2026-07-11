@@ -1032,8 +1032,11 @@ bool RegisteredClassificationDialog::validateImportedModelPath(const QString &pa
     const RegisteredClassificationModelPackageResult packageResult =
             validateRegisteredClassificationKnnPackage(info.absoluteFilePath());
     if (!packageResult.success) {
-        if (errorMessage)
-            *errorMessage = packageResult.message;
+        if (errorMessage) {
+            *errorMessage = packageResult.status == QStringLiteral("legacy_model_requires_retraining")
+                    ? tr("旧版模型不能直接运行，请在模型管理中重新训练")
+                    : packageResult.message;
+        }
         return false;
     }
 

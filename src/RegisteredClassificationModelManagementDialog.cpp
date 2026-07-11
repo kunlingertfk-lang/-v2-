@@ -10,6 +10,7 @@
 #include <QDateTime>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QDebug>
 #include <QFileInfo>
 #include <QFileInfoList>
 #include <QFrame>
@@ -38,7 +39,7 @@ struct ModelRecord
     QString modelDir;
     QString modelName;
     QString dateText;
-    RegisteredClassificationKnnModelMetadata metadata;
+    RegisteredClassificationModelInspection inspection;
     QDateTime lastModified;
     bool hasTrainingSession = false;
 };
@@ -190,11 +191,13 @@ QVector<ModelRecord> scanModelRecords()
                                                               QDir::Time | QDir::Reversed);
         for (const QFileInfo &modelDirInfo : modelDirs) {
             const QString modelDir = modelDirInfo.absoluteFilePath();
-            RegisteredClassificationKnnModelMetadata metadata;
-            const RegisteredClassificationModelPackageResult readResult =
-                    readRegisteredClassificationKnnMetadata(modelDir, &metadata);
-            if (!readResult.success ||
-                !validateRegisteredClassificationKnnPackage(modelDir).success) {
+            if (!QFileInfo::exists(registeredClassificationMetadataPath(modelDir)))
+                continue;
+            const RegisteredClassificationModelInspection inspection =
+                    inspectRegisteredClassificationModelPackage(modelDir);
+            if (!inspection.success) {
+                qWarning().noquote() << QStringLiteral("Registered classification model skipped: %1 (%2)")
+                                        .arg(modelDir, inspection.message);
                 continue;
             }
 
@@ -202,10 +205,9 @@ QVector<ModelRecord> scanModelRecords()
             record.modelDir = modelDir;
             record.modelName = modelDirInfo.fileName();
             record.dateText = dateDirInfo.fileName();
-            record.metadata = metadata;
+            record.inspection = inspection;
             record.lastModified = modelDirInfo.lastModified();
-            record.hasTrainingSession = QFileInfo::exists(
-                        QDir(modelDir).filePath(QStringLiteral("training_session/session.json")));
+            record.hasTrainingSession = inspection.hasTrainingSession;
             records.append(record);
         }
     }
@@ -237,11 +239,16 @@ QFrame *modelRow(QWidget *parent,
     QVBoxLayout *texts = new QVBoxLayout;
     QLabel *nameLabel = new QLabel(record.modelName, row);
     nameLabel->setProperty("role", QStringLiteral("itemTitle"));
-    const QString detail = QObject::tr("%1 / 类别 %2 / 样本 %3 / %4 / %5")
+    const QString modelStatus = record.inspection.legacy
+            ? QObject::tr("旧版，需重新训练")
+            : (record.inspection.runnable ? QObject::tr("可运行")
+                                          : QObject::tr("不可运行：%1").arg(record.inspection.status));
+    const QString detail = QObject::tr("%1 / 类别 %2 / 样本 %3 / %4 / %5 / %6")
             .arg(record.dateText)
-            .arg(record.metadata.classLabels.size())
-            .arg(record.metadata.trainingSampleCount)
-            .arg(record.metadata.featureVersion)
+            .arg(record.inspection.classCount)
+            .arg(record.inspection.trainingSampleCount)
+            .arg(record.inspection.featureVersion)
+            .arg(modelStatus)
             .arg(record.hasTrainingSession ? QObject::tr("可重新训练")
                                            : QObject::tr("缺少历史训练数据"));
     QLabel *detailLabel = new QLabel(detail, row);
@@ -254,6 +261,10 @@ QFrame *modelRow(QWidget *parent,
     useButton->setObjectName(QStringLiteral("useModelButton"));
     useButton->setProperty("actionRole", QStringLiteral("primary"));
     useButton->setMinimumHeight(44);
+    useButton->setEnabled(record.inspection.runnable);
+    useButton->setToolTip(record.inspection.runnable
+                          ? QObject::tr("使用模型")
+                          : QObject::tr("旧模型不能运行，请先重新训练"));
     layout->addWidget(useButton);
     QObject::connect(useButton, &QPushButton::clicked, row, [record, useModel]() {
         useModel(record);
@@ -263,6 +274,7 @@ QFrame *modelRow(QWidget *parent,
     retrainButton->setObjectName(QStringLiteral("retrainModelButton"));
     retrainButton->setProperty("actionRole", QStringLiteral("secondary"));
     retrainButton->setMinimumHeight(44);
+    retrainButton->setEnabled(true);
     layout->addWidget(retrainButton);
     QObject::connect(retrainButton, &QPushButton::clicked, row, [record, retrainModel]() {
         retrainModel(record);
@@ -489,7 +501,12 @@ RegisteredClassificationModelManagementDialog::RegisteredClassificationModelMana
                 this, [this, refreshModelList, record](const QString &modelDir, const QString &modelName) {
             if (*refreshModelList)
                 (*refreshModelList)(modelDir);
-            emit modelSelected(modelDir, modelName.trimmed().isEmpty() ? record.modelName : modelName);
+            const RegisteredClassificationModelInspection inspection =
+                    inspectRegisteredClassificationModelPackage(modelDir);
+            if (inspection.success && inspection.runnable) {
+                emit modelSelected(modelDir,
+                                   modelName.trimmed().isEmpty() ? record.modelName : modelName);
+            }
         });
         trainingDialog->show();
     };
@@ -511,7 +528,8 @@ RegisteredClassificationModelManagementDialog::RegisteredClassificationModelMana
                         record,
                         index,
                         [this](const ModelRecord &selected) {
-                emit modelSelected(selected.modelDir, selected.modelName);
+                if (selected.inspection.runnable)
+                    emit modelSelected(selected.modelDir, selected.modelName);
             },
                         [openTrainingForRecord](const ModelRecord &selected) {
                 openTrainingForRecord(selected);
