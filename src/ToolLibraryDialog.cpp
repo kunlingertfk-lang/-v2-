@@ -154,6 +154,7 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->templateLocationButton, TemplateLocation); //模板定位
     m_buttonGroup->addButton(ui->edgeLocationButton, EdgeLocationButton);   //边缘定位
     m_buttonGroup->addButton(ui->circleLocationButton, CircleLocationButton);   //圆定位
+    m_buttonGroup->addButton(ui->positionCorrectionToolButton, PositionCorrectionTool);
 
     //识别工具
     m_buttonGroup->addButton(ui->colorRecognitionToolButton, ColorRecognition); //颜色识别
@@ -237,6 +238,12 @@ void ToolLibraryDialog::confirmSelection()
 
     if (tool == Classification) {
         m_selectedToolType = ToolType::AiClassification;
+        accept();
+        return;
+    }
+
+    if (tool == PositionCorrectionTool) {
+        m_selectedToolType = ToolType::PositionCorrection;
         accept();
         return;
     }
@@ -348,6 +355,10 @@ void ToolLibraryDialog::updatePreview(int id)
     case Classification:
         ui->previewTitleLabel->setText(tr("分类"));
         ui->previewDescriptionLabel->setText(tr("配置深度学习分类模型与结果判断参数"));
+        break;
+    case PositionCorrectionTool:
+        ui->previewTitleLabel->setText(tr("位置修正"));
+        ui->previewDescriptionLabel->setText(tr("根据基准与运行位置计算平移和旋转修正信息"));
         break;
 
 /*===========================tfk add===========================*/       

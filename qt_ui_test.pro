@@ -32,6 +32,7 @@ SOURCES += \
     src/PlanDialogUtils.cpp \
     src/CameraParamsDialog.cpp \
     src/ReferenceImageDialog.cpp \
+    src/PositionCorrectionDialog.cpp \
     src/ToolLibraryDialog.cpp \
     src/CharacterRecognitionDialog.cpp \
     src/ColorRecognitionDialog.cpp \
@@ -97,6 +98,7 @@ HEADERS += \
     src/PlanDialogUtils.h \
     src/CameraParamsDialog.h \
     src/ReferenceImageDialog.h \
+    src/PositionCorrectionDialog.h \
     src/ToolLibraryDialog.h \
     src/CharacterRecognitionDialog.h \
     src/ColorRecognitionDialog.h \
@@ -167,6 +169,7 @@ FORMS += \
     ui/MainWindow.ui \
     ui/CameraParamsDialog.ui \
     ui/ReferenceImageDialog.ui \
+    ui/PositionCorrectionDialog.ui \
     ui/ToolLibraryDialog.ui \
     ui/CharacterRecognitionDialog.ui \
     ui/ColorRecognitionDialog.ui \

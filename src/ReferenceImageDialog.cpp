@@ -2,11 +2,14 @@
 
 #include <QDebug>
 #include <QFileDialog>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QIcon>
 #include <QImage>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QLabel>
 #include <QPushButton>
 #include <QSize>
 #include <QToolButton>
@@ -31,6 +34,7 @@ ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     setupUiState();
     setupReferenceImageControls();
+    setupPositionCorrectionControls();
     connectNavigation();
     connect(&CameraFrameProvider::instance(),
             &CameraFrameProvider::frameUpdated,
@@ -59,6 +63,7 @@ ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
         qWarning() << "[ReferenceImageDialog]" << error;
     }
     refreshSchemeHeader();
+    loadPositionCorrectionConfig();
     showReferenceImageMode();
 }
 
@@ -128,6 +133,7 @@ void ReferenceImageDialog::editCurrentSchemeName()
 
 void ReferenceImageDialog::saveCurrentScheme()
 {
+    SchemeStore::instance().setReferencePositionCorrection(m_referencePositionCorrection);
     QString error;
     if (!SchemeStore::instance().saveCurrentScheme(&error)) {
         qWarning() << "[ReferenceImageDialog] 方案保存失败:" << error;
@@ -135,6 +141,103 @@ void ReferenceImageDialog::saveCurrentScheme()
         return;
     }
     refreshSchemeHeader();
+}
+
+void ReferenceImageDialog::setupPositionCorrectionControls()
+{
+    m_positionSettingsFrame = new QFrame(ui->positionCorrectionCard);
+    m_positionSettingsFrame->setObjectName(QStringLiteral("positionCorrectionSettingsFrame"));
+    m_positionSettingsFrame->setProperty("panelRole", QStringLiteral("configCard"));
+    QVBoxLayout *settingsLayout = new QVBoxLayout(m_positionSettingsFrame);
+    settingsLayout->setContentsMargins(0, 8, 0, 0);
+    settingsLayout->setSpacing(10);
+
+    QHBoxLayout *header = new QHBoxLayout;
+    QLabel *title = new QLabel(tr("模板区域设置"), m_positionSettingsFrame);
+    title->setProperty("role", QStringLiteral("cardTitle"));
+    QPushButton *testButton = new QPushButton(tr("测试运行"), m_positionSettingsFrame);
+    testButton->setObjectName(QStringLiteral("referencePositionTestButton"));
+    testButton->setToolTip(tr("测试基准图位置修正；当前后端尚未实现"));
+    header->addWidget(title);
+    header->addStretch(1);
+    header->addWidget(testButton);
+    settingsLayout->addLayout(header);
+
+    QHBoxLayout *tools = new QHBoxLayout;
+    QLabel *field = new QLabel(tr("模板区域"), m_positionSettingsFrame);
+    field->setProperty("role", QStringLiteral("rowField"));
+    m_positionRectButton = new QPushButton(tr("矩形"), m_positionSettingsFrame);
+    m_positionRectButton->setObjectName(QStringLiteral("referencePositionRectButton"));
+    m_positionRectButton->setCheckable(true);
+    m_positionPolygonButton = new QPushButton(tr("多边形"), m_positionSettingsFrame);
+    m_positionPolygonButton->setObjectName(QStringLiteral("referencePositionPolygonButton"));
+    m_positionPolygonButton->setCheckable(true);
+    QPushButton *finishButton = new QPushButton(tr("完成"), m_positionSettingsFrame);
+    finishButton->setObjectName(QStringLiteral("referencePositionRoiFinishButton"));
+    finishButton->setProperty("actionRole", QStringLiteral("primary"));
+    tools->addWidget(field);
+    tools->addStretch(1);
+    tools->addWidget(m_positionRectButton);
+    tools->addWidget(m_positionPolygonButton);
+    tools->addWidget(finishButton);
+    settingsLayout->addLayout(tools);
+
+    m_positionStatusLabel = new QLabel(tr("配置已保存，尚未测试"), m_positionSettingsFrame);
+    m_positionStatusLabel->setObjectName(QStringLiteral("referencePositionStatusLabel"));
+    m_positionStatusLabel->setProperty("hint", true);
+    settingsLayout->addWidget(m_positionStatusLabel);
+    ui->positionCorrectionCard->layout()->addWidget(m_positionSettingsFrame);
+
+    connect(ui->positionCorrectionCheckBox, &QCheckBox::toggled,
+            this, &ReferenceImageDialog::updatePositionCorrectionUi);
+    connect(m_positionRectButton, &QPushButton::clicked, this, [this]() {
+        m_referencePositionCorrection.templateRegionType = QStringLiteral("rectangle");
+        m_positionRectButton->setChecked(true);
+        m_positionPolygonButton->setChecked(false);
+        m_positionStatusLabel->setText(ReferenceImageProvider::instance().referenceImage().isNull()
+                                       ? tr("请先设置基准图")
+                                       : tr("矩形模板区域编辑将在算法 UI 联调阶段接入"));
+    });
+    connect(m_positionPolygonButton, &QPushButton::clicked, this, [this]() {
+        m_referencePositionCorrection.templateRegionType = QStringLiteral("polygon");
+        m_positionRectButton->setChecked(false);
+        m_positionPolygonButton->setChecked(true);
+        m_positionStatusLabel->setText(ReferenceImageProvider::instance().referenceImage().isNull()
+                                       ? tr("请先设置基准图")
+                                       : tr("多边形模板区域编辑将在算法 UI 联调阶段接入"));
+    });
+    connect(finishButton, &QPushButton::clicked, this, [this]() {
+        m_positionStatusLabel->setText(tr("配置已保存，尚未测试"));
+    });
+    connect(testButton, &QPushButton::clicked, this, [this]() {
+        if (ReferenceImageProvider::instance().referenceImage().isNull()) {
+            m_positionStatusLabel->setText(tr("请先设置基准图"));
+            return;
+        }
+        m_positionStatusLabel->setText(tr("位置修正后端尚未实现"));
+    });
+}
+
+void ReferenceImageDialog::loadPositionCorrectionConfig()
+{
+    m_referencePositionCorrection =
+            SchemeStore::instance().currentScheme().referencePositionCorrection;
+    ui->positionCorrectionCheckBox->setChecked(m_referencePositionCorrection.enabled);
+    updatePositionCorrectionUi(m_referencePositionCorrection.enabled);
+}
+
+void ReferenceImageDialog::updatePositionCorrectionUi(bool enabled)
+{
+    m_referencePositionCorrection.enabled = enabled;
+    ui->correctionExampleFrame->setVisible(!enabled);
+    if (m_positionSettingsFrame)
+        m_positionSettingsFrame->setVisible(enabled);
+    if (m_positionRectButton)
+        m_positionRectButton->setChecked(
+                    m_referencePositionCorrection.templateRegionType == QStringLiteral("rectangle"));
+    if (m_positionPolygonButton)
+        m_positionPolygonButton->setChecked(
+                    m_referencePositionCorrection.templateRegionType == QStringLiteral("polygon"));
 }
 
 void ReferenceImageDialog::saveCurrentSchemeAs()

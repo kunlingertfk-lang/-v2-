@@ -6,6 +6,7 @@
 #include <QVector>
 
 #include "toolcore/ToolConfig.h"
+#include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolPreviewSnapshot.h"
 
 class FrameViewHelper;
@@ -32,6 +33,8 @@ public:
     void setInitialToolState(const QVector<ToolConfig> &configs,
                              const QMap<QString, ToolPreviewSnapshot> &snapshots);
     bool openedOutputDialog() const;
+    QVector<PositionCorrectionSource> positionCorrectionSourcesFor(
+            const ToolConfig *consumer) const;
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;

@@ -11,6 +11,7 @@
 #include <opencv2/core.hpp>
 
 #include "toolcore/ToolConfig.h"
+#include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolPreviewSnapshot.h"
 
 struct SchemeState
@@ -20,6 +21,7 @@ struct SchemeState
     QString schemeName;
     QString schemeDir;
     QString referenceImagePath;
+    ReferencePositionCorrectionConfig referencePositionCorrection;
     QVector<ToolConfig> toolConfigs;
     QMap<QString, ToolPreviewSnapshot> referencePreviewSnapshots;
     QJsonObject outputConfig;
@@ -61,6 +63,7 @@ public:
     void setToolConfigs(const QVector<ToolConfig> &configs,
                         const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
     void setOutputConfig(const QJsonObject &outputConfig);
+    void setReferencePositionCorrection(const ReferencePositionCorrectionConfig &config);
 
     bool setReferenceFrame(const cv::Mat &frame, QString *errorMessage = nullptr);
     bool loadCurrentReferenceIntoProvider(QString *errorMessage = nullptr);

@@ -58,6 +58,7 @@ enum class ToolType {
     TemplateLocation,
     EdgeLocation,
     CircleLocation,
+    PositionCorrection,
 
     // Deep learning
     AiClassification,
@@ -188,6 +189,8 @@ inline QString toolTypeToString(ToolType type)
         return QStringLiteral("EdgeLocation");
     case ToolType::CircleLocation:
         return QStringLiteral("CircleLocation");
+    case ToolType::PositionCorrection:
+        return QStringLiteral("PositionCorrection");
     case ToolType::AiClassification:
         return QStringLiteral("AiClassification");
     case ToolType::AiDetection:
@@ -295,6 +298,10 @@ inline ToolType toolTypeFromString(const QString &value)
         return ToolType::EdgeLocation;
     if (key == QStringLiteral("circlelocation"))
         return ToolType::CircleLocation;
+    if (key == QStringLiteral("positioncorrection") ||
+        key == QStringLiteral("position_correction") ||
+        key.contains(QStringLiteral("位置修正")))
+        return ToolType::PositionCorrection;
     if (key == QStringLiteral("aiclassification"))
         return ToolType::AiClassification;
     if (key == QStringLiteral("aidetection"))

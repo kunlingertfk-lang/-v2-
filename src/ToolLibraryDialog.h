@@ -41,6 +41,7 @@ public:
         TemplateLocation,       //模板定位
         EdgeLocationButton,     //边缘定位
         CircleLocationButton,   //圆定位
+        PositionCorrectionTool,
 
         //识别工具
         ColorRecognition,       //颜色识别

@@ -8,6 +8,7 @@
 - 颜色比较：`docs/FID/ColorComparison/颜色比较提示词规范.md`、`docs/FID/ColorComparison/color_comparison_function_implementation.md`
 - 注册分类：`docs/FID/RegisteredClassification/注册分类提示词规范.md`、`docs/FID/RegisteredClassification/registered_classification_function_implementation.md`、`docs/FID/RegisteredClassification/注册分类算法当前实现说明.md`
 - 注册目标检测：`docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md`、`docs/FID/RegisteredClassificationDetection/registered_classification_detection_function_implementation.md`
+- 位置修正：`docs/FID/PositionCorrection/位置修正UI设计规范.md`、`docs/FID/PositionCorrection/位置修正提示词规范.md`、`docs/FID/PositionCorrection/position_correction_function_implementation.md`
 
 ## 约束优先级
 
@@ -228,7 +229,18 @@ ToolResult / overlays / payload
 
 ## 位置修正统一规范
 
-位置修正是多个 FID 算子的统一能力入口。涉及位置修正 UI 时，应使用统一字段和占位语义。代码侧公共入口为 `src/toolcore/PositionCorrection.{h,cpp}`，当前只提供字段解析、写回和未应用 payload 占位，不代表真实位置补偿已经实现。
+位置修正是多个 FID 算子的统一能力入口。正式名称统一为“位置修正”，代码和配置英文名使用 `PositionCorrection`。涉及位置修正 UI 时，应使用统一字段、稳定引用和占位语义。代码侧公共入口为 `src/toolcore/PositionCorrection.{h,cpp}`，当前只提供字段解析、写回和未应用 payload 占位，不代表真实位置补偿已经实现。
+
+专项 UI、配置和截图规范见 `docs/FID/PositionCorrection/位置修正UI设计规范.md`。
+
+### 节点模型
+
+位置修正包含两类互相独立的节点：
+
+- 基准图位置修正：方案级固定节点，只允许一份，固定来源 ID 为 `reference.positionCorrection`，不占用工具序号。
+- 工具位置修正：属于 `Location` 分类，允许创建多个实例，每个实例使用独立且稳定的 `toolId`。
+
+基准图配置和工具实例配置不得相互覆盖。界面中的 `1 基准图`、`12 位置修正` 等序号是动态显示文本，不得作为唯一引用键。
 
 ### UI 字段
 
@@ -237,6 +249,8 @@ ToolResult / overlays / payload
 - 默认来源：`1 基准图.位置修正信息`
 - 开关关闭时隐藏来源行，开启时显示来源行。
 - 开关样式优先使用现有 `positionCorrectionSwitch` 样式。
+- 开启时，来源菜单只显示固定基准图节点以及当前消费工具之前、已启用且有效的位置修正工具实例。
+- 不得显示当前工具自身、后置工具、已删除工具或会形成循环依赖的节点。
 
 ### 配置字段
 
@@ -244,13 +258,31 @@ ToolResult / overlays / payload
 
 ```text
 enablePositionCorrection: bool
+positionCorrectionSourceId: string
 positionCorrectionSource: string
 ```
+
+目标合同中：
+
+- `positionCorrectionSourceId` 是运行和引用校验使用的稳定键。
+- `positionCorrectionSource` 是显示文本和旧配置兼容字段。
+- 当前公共 helper 尚未读写 `positionCorrectionSourceId`；新增稳定 ID 必须在位置修正 UI/config 专项实施中统一补齐，不得由单个消费工具私自定义不同字段。
 
 旧配置缺少字段时：
 
 - `enablePositionCorrection` 默认 `false`，除非已有功能历史默认值不同。
 - `positionCorrectionSource` 默认 `1 基准图.位置修正信息` 或空字符串，按已有功能兼容策略确定。
+- 只有旧文本能唯一映射到合法节点时才补齐 `positionCorrectionSourceId`；无法匹配或匹配不唯一时必须显示来源失效，不得自动回退到基准图。
+
+### 来源生命周期
+
+- 创建位置修正工具时生成新的 `toolId`；不得因为已有同类工具而复用实例。
+- 复制位置修正工具时生成新的 `toolId`，已有消费关系继续指向原实例。
+- 工具插入或重排后动态更新显示序号，但稳定 ID 不变。
+- 来源被删除、禁用或移动到消费工具之后时，消费配置保留原来源 ID，并显示 `来源不可用` 或等价明确错误。
+- 当 `enablePositionCorrection=true` 且来源无效时，禁止完成保存和测试运行。
+- 当 `enablePositionCorrection=false` 时可以保存失效 ID，但运行时不得应用位置修正。
+- 任何来源失效场景都不允许静默使用默认来源、第一项来源或上一次运行结果。
 
 ### Adapter 和 Runner
 
@@ -258,8 +290,11 @@ Adapter 应解析并透传：
 
 ```text
 enablePositionCorrection
+positionCorrectionSourceId
 positionCorrectionSource
 ```
+
+在稳定 ID 尚未完成公共 helper 接入前，已有 Adapter/Runner 可以继续只透传旧字段，但必须保持 `positionCorrectionApplied=false` 和明确的未实现原因；不得假报稳定引用已经生效。
 
 新增或改造工具时优先使用公共结构和方法：
 
@@ -274,6 +309,7 @@ Runner payload 至少输出：
 
 ```text
 enablePositionCorrection
+positionCorrectionSourceId
 positionCorrectionSource
 positionCorrectionApplied
 positionCorrectionReason

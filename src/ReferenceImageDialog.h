@@ -3,8 +3,12 @@
 
 #include <QDialog>
 
+#include "toolcore/PositionCorrection.h"
+
 class FrameViewHelper;
 class QPushButton;
+class QFrame;
+class QLabel;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -31,6 +35,7 @@ private slots:
     void editCurrentSchemeName();
     void saveCurrentScheme();
     void saveCurrentSchemeAs();
+    void updatePositionCorrectionUi(bool enabled);
 
 private:
     void setupUiState();
@@ -41,12 +46,19 @@ private:
     void updateReferenceImageControls();
     void refreshCurrentImage();
     void refreshReferenceImage();
+    void setupPositionCorrectionControls();
+    void loadPositionCorrectionConfig();
 
     Ui::ReferenceImageDialog *ui;
     FrameViewHelper *m_previewHelper = nullptr;
     QPushButton *m_captureImageButton = nullptr;
     QPushButton *m_exitCaptureButton = nullptr;
+    QFrame *m_positionSettingsFrame = nullptr;
+    QLabel *m_positionStatusLabel = nullptr;
+    QPushButton *m_positionRectButton = nullptr;
+    QPushButton *m_positionPolygonButton = nullptr;
     bool m_liveCaptureMode = false;
+    ReferencePositionCorrectionConfig m_referencePositionCorrection;
 };
 
 #endif // REFERENCEIMAGEDIALOG_H

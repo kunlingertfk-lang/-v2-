@@ -1,6 +1,8 @@
 #include "ToolsDialog.h"
 
 #include <QDebug>
+#include <QColor>
+#include <QComboBox>
 #include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -38,6 +40,7 @@
 #include "ObjectDetectionDialog.h"
 #include "OutputDialog.h"
 #include "PatternPresenceDialog.h"
+#include "PositionCorrectionDialog.h"
 #include "PlanDialogUtils.h"
 #include "ReferenceImageDialog.h"
 #include "RegisteredClassificationDialog.h"
@@ -76,6 +79,83 @@ QImage currentReferenceImage()
     return imageFromFrame(ReferenceImageProvider::instance().referenceFrame());
 }
 
+QString findParamString(const QJsonObject &object, const QString &key)
+{
+    const QString direct = object.value(key).toString().trimmed();
+    if (!direct.isEmpty())
+        return direct;
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        if (it.value().isObject()) {
+            const QString nested = findParamString(it.value().toObject(), key);
+            if (!nested.isEmpty())
+                return nested;
+        }
+    }
+    return QString();
+}
+
+QJsonObject writeSourceId(QJsonObject object,
+                          const QString &sourceId,
+                          const QString &sourceText)
+{
+    if (object.contains(QStringLiteral("positionCorrectionSource"))) {
+        object.insert(QStringLiteral("positionCorrectionSourceId"), sourceId);
+        object.insert(QStringLiteral("positionCorrectionSource"), sourceText);
+    }
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        if (it.value().isObject())
+            it.value() = writeSourceId(it.value().toObject(), sourceId, sourceText);
+    }
+    return object;
+}
+
+void configurePositionSourceCombos(QWidget *dialog,
+                                   const QVector<PositionCorrectionSource> &sources,
+                                   const ToolConfig *initialConfig)
+{
+    const QString selectedId = initialConfig
+            ? findParamString(initialConfig->params, QStringLiteral("positionCorrectionSourceId"))
+            : PositionCorrection::defaultSourceId();
+    const QString selectedText = initialConfig
+            ? findParamString(initialConfig->params, QStringLiteral("positionCorrectionSource"))
+            : PositionCorrection::defaultSource();
+    for (QComboBox *combo : dialog->findChildren<QComboBox *>()) {
+        if (!combo->objectName().toLower().contains(QStringLiteral("positioncorrection")))
+            continue;
+        combo->clear();
+        int selectedIndex = -1;
+        for (const PositionCorrectionSource &source : sources) {
+            combo->addItem(source.displayText, source.sourceId);
+            if (source.sourceId == selectedId)
+                selectedIndex = combo->count() - 1;
+        }
+        if (selectedIndex < 0 && !selectedId.isEmpty()) {
+            combo->insertItem(0,
+                              QObject::tr("来源不可用：%1").arg(
+                                  selectedText.isEmpty() ? selectedId : selectedText),
+                              selectedId);
+            combo->setItemData(0, QColor(QStringLiteral("#dc2626")), Qt::ForegroundRole);
+            selectedIndex = 0;
+        }
+        if (selectedIndex >= 0)
+            combo->setCurrentIndex(selectedIndex);
+    }
+}
+
+void persistPositionSource(QWidget *dialog, ToolConfig *config)
+{
+    for (QComboBox *combo : dialog->findChildren<QComboBox *>()) {
+        if (!combo->objectName().toLower().contains(QStringLiteral("positioncorrection")))
+            continue;
+        const QString sourceId = combo->currentData().toString();
+        if (sourceId.isEmpty())
+            continue;
+        config->params.insert(QStringLiteral("positionCorrectionSourceId"), sourceId);
+        config->params = writeSourceId(config->params, sourceId, combo->currentText());
+        return;
+    }
+}
+
 QString toolIconForType(ToolType type)
 {
     switch (type) {
@@ -95,10 +175,32 @@ QString toolIconForType(ToolType type)
     case ToolType::EdgePresence:
     case ToolType::LinePresence:
     case ToolType::ContourPresence:
+    case ToolType::PositionCorrection:
         return QStringLiteral(":/icons/eye.svg");
     default:
         return QStringLiteral(":/icons/tool.svg");
     }
+}
+
+template <typename Dialog>
+void configureProducerContext(Dialog *, ToolsDialog *, const ToolConfig *)
+{
+}
+
+void configureProducerContext(PositionCorrectionDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    int index = toolsDialog->toolConfigs().size();
+    if (initialConfig) {
+        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
+            if (toolsDialog->toolConfigs().at(i).toolId == initialConfig->toolId) {
+                index = i;
+                break;
+            }
+        }
+    }
+    dialog->setAvailableProducers(toolsDialog->toolConfigs(), index);
 }
 
 template <typename Dialog>
@@ -115,6 +217,13 @@ bool runToolConfigDialog(QWidget *parent,
     if (initialConfig)
         configDialog.loadFromConfig(*initialConfig);
 
+    if (ToolsDialog *toolsDialog = qobject_cast<ToolsDialog *>(parent)) {
+        configureProducerContext(&configDialog, toolsDialog, initialConfig);
+        configurePositionSourceCombos(&configDialog,
+                                      toolsDialog->positionCorrectionSourcesFor(initialConfig),
+                                      initialConfig);
+    }
+
     QTimer::singleShot(0, &configDialog, [&configDialog]() {
         configDialog.raise();
         configDialog.activateWindow();
@@ -125,8 +234,10 @@ bool runToolConfigDialog(QWidget *parent,
     if (configDialog.exec() != QDialog::Accepted)
         return false;
 
-    if (toolConfig)
+    if (toolConfig) {
         *toolConfig = configDialog.toolConfig();
+        persistPositionSource(&configDialog, toolConfig);
+    }
     if (snapshot)
         *snapshot = configDialog.referencePreviewSnapshot();
     return true;
@@ -199,6 +310,24 @@ void ToolsDialog::setInitialToolState(const QVector<ToolConfig> &configs,
 bool ToolsDialog::openedOutputDialog() const
 {
     return m_openedOutputDialog;
+}
+
+QVector<PositionCorrectionSource> ToolsDialog::positionCorrectionSourcesFor(
+        const ToolConfig *consumer) const
+{
+    int consumerIndex = m_toolConfigs.size();
+    if (consumer && !consumer->toolId.trimmed().isEmpty()) {
+        for (int index = 0; index < m_toolConfigs.size(); ++index) {
+            if (m_toolConfigs.at(index).toolId == consumer->toolId) {
+                consumerIndex = index;
+                break;
+            }
+        }
+    }
+    return PositionCorrection::sourcesBefore(
+                m_toolConfigs,
+                consumerIndex,
+                SchemeStore::instance().currentScheme().referencePositionCorrection.enabled);
 }
 
 bool ToolsDialog::eventFilter(QObject *watched, QEvent *event)
@@ -468,6 +597,9 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     case ToolType::AiClassification:
         accepted = runToolConfigDialog<ClassificationDialog>(this, nullptr, &config, &snapshot);
         break;
+    case ToolType::PositionCorrection:
+        accepted = runToolConfigDialog<PositionCorrectionDialog>(this, nullptr, &config, &snapshot);
+        break;
 /*============================tfk add=================================*/
     case ToolType::TemplateLocation:
         qDebug() << "[ToolsDialog] TemplateLocation dialog is not implemented yet.";
@@ -539,6 +671,9 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
         break;
     case ToolType::AiClassification:
         accepted = runToolConfigDialog<ClassificationDialog>(this, &originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::PositionCorrection:
+        accepted = runToolConfigDialog<PositionCorrectionDialog>(this, &originalConfig, &editedConfig, &snapshot);
         break;
     default:
         qDebug() << "[ToolsDialog] Unsupported tool edit type:" << toolTypeToString(originalConfig.toolType);
@@ -783,6 +918,8 @@ QString ToolsDialog::toolDisplayName(const ToolConfig &config) const
         return tr("目标检测");
     case ToolType::AiClassification:
         return tr("分类");
+    case ToolType::PositionCorrection:
+        return tr("位置修正");
     default:
         return toolTypeToString(config.toolType);
     }

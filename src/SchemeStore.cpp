@@ -253,6 +253,7 @@ SchemeState SchemeStore::createEmptyScheme(const QString &schemeName, QString *e
     state.schemeName = trimmedName.isEmpty() ? defaultName : trimmedName;
     state.schemeDir = QDir(projectsRootPath()).filePath(state.schemeId);
     state.referenceImagePath.clear();
+    state.referencePositionCorrection = ReferencePositionCorrectionConfig();
     state.toolConfigs.clear();
     state.referencePreviewSnapshots.clear();
     state.outputConfig = QJsonObject();
@@ -391,6 +392,15 @@ void SchemeStore::setOutputConfig(const QJsonObject &outputConfig)
     m_currentScheme.updatedAt = QDateTime::currentDateTime();
 }
 
+void SchemeStore::setReferencePositionCorrection(
+        const ReferencePositionCorrectionConfig &config)
+{
+    if (!ensureLoaded(nullptr))
+        return;
+    m_currentScheme.referencePositionCorrection = config;
+    m_currentScheme.updatedAt = QDateTime::currentDateTime();
+}
+
 bool SchemeStore::setReferenceFrame(const cv::Mat &frame, QString *errorMessage)
 {
     if (!ensureLoaded(errorMessage))
@@ -459,6 +469,8 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
         loaded.schemeId = QFileInfo(loaded.schemeDir).fileName();
     loaded.schemeName = json.value(QStringLiteral("schemeName")).toString(loaded.schemeId);
     loaded.referenceImagePath = json.value(QStringLiteral("referenceImage")).toString();
+    loaded.referencePositionCorrection = PositionCorrection::referenceFromJson(
+                json.value(QStringLiteral("referencePositionCorrection")).toObject());
     loaded.toolConfigs = toolConfigsFromJson(json.value(QStringLiteral("tools")).toArray());
     loaded.referencePreviewSnapshots = previewSnapshotsFromJson(json.value(QStringLiteral("previews")).toObject());
     loaded.outputConfig = json.value(QStringLiteral("output")).toObject();
@@ -495,6 +507,8 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state, QString *errorMessa
     json.insert(QStringLiteral("schemeId"), normalized.schemeId);
     json.insert(QStringLiteral("schemeName"), normalized.schemeName);
     json.insert(QStringLiteral("referenceImage"), normalized.referenceImagePath);
+    json.insert(QStringLiteral("referencePositionCorrection"),
+                PositionCorrection::referenceToJson(normalized.referencePositionCorrection));
     json.insert(QStringLiteral("tools"), toolConfigsToJson(normalized.toolConfigs));
     json.insert(QStringLiteral("previews"), previewSnapshotsToJson(normalized.referencePreviewSnapshots));
     json.insert(QStringLiteral("output"), normalized.outputConfig);
