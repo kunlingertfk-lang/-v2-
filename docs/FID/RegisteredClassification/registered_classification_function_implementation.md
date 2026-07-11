@@ -2,726 +2,152 @@
 
 ## 文档用途
 
-本文档单独记录注册分类算子的需求、HALCON 实现方案、阶段边界、接口字段、验证要求和后续实现记录。后续继续开发注册分类时，以根目录 `AGENTS.md` 的项目约束和 HALCON 约束为最高规则，以 `docs/FID/Function_Docs.md` 作为 FID 公共规范，以本文档作为注册分类功能状态追踪依据。
+本文档是当前注册分类功能的实现基线。当前基线以 `7728ac0` 及其之前的 Task 1-5 实现为准，后续 UI、Adapter、训练、模型管理和 Runner 变更必须同时更新本文档与同目录的当前实现说明、提示词规范。
 
-## 需求来源
+## 当前结论
 
-注册分类参考海康官方功能描述：
+注册分类当前唯一可运行主线是 HALCON Feature V2 + 双 KNN：
 
-- 根据已注册图像类别对图像分类。
-- 支持设置检测区域，默认全屏，可绘制矩形检测区域。
-- 支持独立位置修正使能，默认开启，可订阅基准图或位置修正工具信息。
-- 支持模型导入、注册训练、模型管理、导出和删除。
-- 支持类别判断和最低得分两种结果判断。
-- 测试运行时实时采集图像并输出分类结果。
+- 模型类型固定为 `halcon_knn_registered_classification`。
+- 模型包 schema 固定为 `2`，特征版本固定为 `halcon_registered_feature_v2`，特征长度固定为 `59`。
+- 训练和推理均使用 HALCON 核心算子；OpenCV 仅作为 `cv::Mat` 图像输入和格式桥接。
+- 当前运行链不包含 MLP 或 DL 推理，也不读取 `model.gmc` 作为可运行模型。
 
-当前项目不能直接照搬海康实现。所有视觉核心算法必须基于 HALCON 已有算子、类或过程实现；海康 `.scbin` 作为专有格式，第一版不解析、不伪装兼容。
-
-## 第一版目标
-
-注册分类第一版实现“推理闭环”：
-
-- 工具库入口可见，能创建注册分类工具。
-- 配置对话框能保存、重新打开并回显模型、检测 ROI、位置修正占位和结果判断。
-- 模型导入仅支持本机 HALCON 确认可读的分类模型。
-- `.scbin` 导入返回 `unsupported_model_format`。
-- 测试运行时使用 HALCON 执行分类推理。
-- UI 显示 OK/NG、预测类别、得分、TopK 类别、ROI、耗时和错误状态。
-- 空图像、无模型、模型路径不存在、模型格式不支持、无效 ROI、HALCON runtime/license/符号缺失时不崩溃，并返回明确错误。
-
-第一版暂不实现：
-
-- 注册图像窗口。
-- 本地数据集管理。
-- 图像标注。
-- 本地训练。
-- 模型管理窗口的真实训练能力。
-- 海康 `.scbin` 读取。
-- 海康 `OLClassify*.bin` 底层模型接入。
-- 位置修正真实补偿。
-
-## 总体链路
+## 端到端链路
 
 ```text
-ToolLibraryDialog / ToolsDialog
-        |
-        v
-RegisteredClassificationDialog
-        |
-        v
-ToolConfig.params / judgeRule
-        |
-        v
-RegisteredClassificationAdapter
-        |
-        v
-RegisteredClassificationHalconRunner
-        |
-        v
-ToolResult / overlays / payload
+注册图 + 类别 + ROI
+  -> HALCON ROI / 前景分割
+  -> 姿态与尺度规范化
+  -> 59 维 Feature V2
+  -> 样本 KNN + 类别中心 KNN
+  -> class_stats.json 类内半径
+  -> schema 2 模型包
+
+输入图 + 检测 ROI
+  -> 同一 Feature V2 提取链
+  -> 两个 HALCON KNN 分类
+  -> 相似度融合
+  -> 80 最低相似度、8 最小类别差值、类内半径拒识
+  -> 已知类别或 UNKNOWN
+  -> judgeRule 输出 OK/NG
 ```
 
-第一版按独立注册分类工具链实现，不复用 AI 检测桥接链路，不把颜色识别、颜色比较或模板匹配作为 fallback。
+## UI 和配置闭环
 
-## UI 和后端分层边界
+主注册分类 Dialog 保存、回显并传递以下字段：
 
-注册分类第一版应按 UI、后端、联调三段推进，避免一个任务同时修改界面、配置、Adapter、Runner 和 HALCON 推理细节。
+| 路径 | 当前值或语义 |
+| --- | --- |
+| `params.registeredClassification.version` | `2` |
+| `params.registeredClassification.modelType` | `halcon_knn_registered_classification` |
+| `params.registeredClassification.modelPath` | 完整模型包目录，不是单个 `.gnc` 文件 |
+| `params.registeredClassification.modelName` | 模型目录名或用户显示名称 |
+| `params.registeredClassification.detectRegionType` | `full` 或 `rectangle` |
+| `params.registeredClassification.roiNormalized` | 检测矩形 ROI；全屏为 `(0, 0, 1, 1)` |
+| `params.registeredClassification.topK` | 仅控制候选 payload/UI 展示数量，默认 `1` |
+| `params.registeredClassification.minSimilarity` | 模型拒识阈值，固定默认 `80` |
+| `params.registeredClassification.minMargin` | Top1/Top2 类别差值阈值，固定默认 `8` |
+| `params.registeredClassification.enablePositionCorrection` | 可保存和回显，但当前不应用 |
+| `params.registeredClassification.positionCorrectionSource` | 位置修正来源文本，默认 `1 基准图.位置修正信息` |
 
-UI 阶段：
+`judgeRule.mode` 仍使用 `class_match` 或 `min_score`。`judgeRule.minScore` 是结果判断阈值，不替代模型拒识的 `minSimilarity` 和 `minMargin`。UNKNOWN 在两种判断模式下都为 NG。
 
-- 负责工具入口、配置对话框、基础/全部页、模型路径管理、检测 ROI、位置修正控件、结果判断控件、保存和回显。
-- 可以提供测试运行入口，但后端未完成时只能返回或展示 `backend_not_implemented`。
-- 不得伪造分类结果，不得调用颜色识别、颜色比较、AI 检测或其他替代算法。
-- `.scbin` 导入必须在 UI 阶段就明确提示不支持。
+主 Dialog 的检测 ROI 当前只支持全屏和矩形。注册训练窗口的样本 ROI 支持全屏、矩形和多边形；训练请求保留多边形点列，不降级为外接矩形。
 
-后端阶段：
+## Feature V2
 
-- 负责 `RegisteredClassificationAdapter`、`RegisteredClassificationHalconRunner`、HALCON 模型读取、分类推理、错误码、payload、overlay 和 smoke 测试。
-- 只通过 `ToolConfig.params.registeredClassification`、`judgeRule`、`ToolRequest` 和 `ToolResult` 与 UI 对接。
-- 不重做 UI 布局，不新增训练/模型管理真实能力。
-- 不改变 `.scbin` 不支持策略。
+Feature V2 使用 HALCON 完成 ROI、前景、规范化和统计。特征名称、顺序、映射、权重和 59 维长度是持久化契约，训练与推理必须完全一致。五组维度和组权重如下：
 
-联调阶段：
+| 组 | 维度 | 权重 | 内容 |
+| --- | ---: | ---: | --- |
+| shape | 13 | 0.35 | 形状比例、填充率、圆度、紧致度倒数、凸度、矩形度、各向异性倒数、体积性、结构因子、4 个中心不变矩 |
+| occupancy | 16 | 0.25 | 规范化前景的 4x4 网格占用 |
+| gray | 18 | 0.15 | 灰度均值、偏差和 16 档直方图 |
+| color | 6 | 0.15 | Lab 均值和偏差 |
+| texture | 6 | 0.10 | 熵、各向异性及共生矩阵能量/相关性/同质性/对比度 |
 
-- 负责把 UI 测试运行、基准图测试、连续运行、运行一次、退出测试接到真实 Adapter/Runner。
-- 负责工具页预览、状态栏、OK/NG、类别、得分、ROI 和耗时显示。
-- 负责验证异常输入和 HALCON 异常能从后端传到 UI。
+组内按 `sqrt(groupWeight / groupDimension)` 加权，最后对完整向量做 L2 归一化。HALCON KNN 的自动 normalization 固定关闭。无效或非有限特征必须返回 `invalid_feature_value`，不得静默改成零向量。
 
-## UI 方案
+### ROI 和前景
 
-`RegisteredClassificationDialog` 参考现有颜色识别、颜色比较对话框：
+训练样本的全屏、矩形和多边形 ROI 均生成真实 HALCON 区域：矩形使用 `gen_rectangle1`，多边形使用 `gen_region_polygon_filled`。多边形的前景分割、边界带、质心和候选评分都基于真实区域，不能用 bounding rectangle 替代。多边形至少需要三个有效点。
+
+前景流程使用 `reduce_domain`、`gauss_filter`、亮/暗两次 `binary_threshold(..., 'max_separability', ...)`、形态学处理、连通域、面积门限和边界/中心/面积评分。目标区域再经 HALCON 姿态、尺度规范化，输出 `128 x 128` 规范图与区域。
+
+在线检测 ROI 只接受全屏或矩形，因为主 Dialog 当前没有在线多边形检测区域配置。
+
+## 双 KNN 和模型包
+
+每个 schema 2 包必须是完整目录，不能只导入一个 KNN 文件：
 
 ```text
-RegisteredClassificationDialog
-|
-+-- 顶部标题栏
-|
-+-- 左侧参数区
-|   +-- 基础 / 全部 分段按钮
-|   |
-|   +-- 模型训练卡片
-|   |   +-- 导入模型
-|   |   +-- 注册训练
-|   |   +-- 模型管理
-|   |   +-- 导出模型
-|   |   +-- 删除模型
-|   |
-|   +-- 检测区域卡片
-|   |   +-- 全屏
-|   |   +-- 矩形 ROI
-|   |   +-- 完成
-|   |   +-- 独立位置修正使能 ⓘ
-|   |   +-- 位置修正：1 基准图.位置修正信息
-|   |
-|   +-- 全部页扩展参数
-|   |   +-- 模型类型
-|   |   +-- TopK
-|   |   +-- HALCON runtime 信息
-|   |
-|   +-- 结果判断卡片
-|       +-- 类别判断
-|       +-- 最低得分
-|
-+-- 右侧图像预览区
-|   +-- 基准图 / 当前图像
-|   +-- 检测 ROI / 结果 overlay
-|   +-- 底部状态栏
-|
-+-- 底部按钮
-    +-- 基准图测试 / 测试运行 / 完成
-    +-- 测试态：停止运行 / 运行一次 / 退出测试
+ModelFiles/RegisteredClass/yyyyMMdd/model_HHmmss_zzz/
+├── model.gnc
+├── class_centers.gnc
+├── metadata.json
+├── class_stats.json
+├── training_report.json
+└── training_session/
+    ├── session.json
+    └── images/*.png
 ```
 
-交互约束：
+`model.gnc` 保存每个有效注册样本的 HALCON KNN；`class_centers.gnc` 保存每个类别的归一化中心。两者都使用 59 维输入、`method=classes_distance`、`normalization=false`、`num_trees=4`、`num_checks=0`、`epsilon=0.0`。样本 KNN 的 `k` 为有效样本总数，中心 KNN 的 `k` 为类别数；两者的 `max_num_classes` 为类别数。metadata 必须同时保存样本权重 `0.70`、中心权重 `0.30` 和拒识阈值 `80/8`。
 
-- `注册训练`、`模型管理` 第一版若显示入口，点击必须提示未实现。
-- 普通按钮不得误触发 `accept`、`reject` 或程序退出。
-- ROI 编辑使用单一状态，第一版只实现 `Full` 和 `DetectRect`。
-- 未实现的自由绘制、圆形 ROI、屏蔽区域不得写入假参数。
-
-## 配置字段
-
-通过 `ToolConfig.params.registeredClassification` 和 `judgeRule` 保存配置：
+每个类别的中心是该类别样本向量的均值再归一化。类内半径为：
 
 ```text
-ToolConfig
-|
-+-- toolType = RegisteredClassification
-+-- category = Recognition
-+-- roiNormalized
-|   +-- 检测矩形 ROI；全屏为 (0, 0, 1, 1)
-|
-+-- params
-|   +-- registeredClassification
-|       +-- version = 1
-|       +-- modelPath
-|       +-- modelName
-|       +-- modelType = "halcon_mlp_registered_classification"
-|       +-- detectRegionType = "full" | "rectangle"
-|       +-- roiNormalized
-|       +-- enablePositionCorrection = true
-|       +-- positionCorrectionSource = "1 基准图.位置修正信息"
-|       +-- topK = 1
-|       +-- halconSoPath
-|
-+-- judgeRule
-    +-- mode = "class_match" | "min_score"
-    +-- expectedLabel
-    +-- minScore
+radius = max(maxDistance * 1.10,
+             meanDistance + 2.5 * populationStdDev)
+radius = clamp(radius, 0.10, 2.00)
 ```
 
-默认值：
+少于 3 个样本时 `radiusEnabled=false` 且 `radius=0`；达到 3 个样本时启用半径。模型包写入临时目录，校验所有文件后原子替换目标目录。
 
-- `version=1`
-- `modelType=halcon_mlp_registered_classification`
-- `detectRegionType=full`
-- `roiNormalized=(0, 0, 1, 1)`
-- `enablePositionCorrection=true`
-- `positionCorrectionSource=1 基准图.位置修正信息`
-- `topK=1`
-- `judgeRule.mode=class_match`
-- `judgeRule.minScore=80`
+新注册训练写入新的日期/时间目录；模型管理中的重新训练使用选中模型的同一目录原子升级，不另建目录。
 
-旧配置缺少字段时必须按以上默认值回退。保存和回显必须一致。
+## 融合和拒识
 
-## HALCON 算法方案
-
-当前主线是 HALCON 经典 MLP 分类链：
-
-- `create_class_mlp`：创建 MLP 分类器。
-- `add_sample_class_mlp`：写入 ROI 特征和类别目标。
-- `train_class_mlp`：训练 MLP。
-- `write_class_mlp` / `read_class_mlp`：保存和读取 `model.gmc`。
-- `classify_class_mlp`：执行 TopK 分类推理。
-- `gen_image_interleaved`：将工程侧 `cv::Mat` 桥接为 HALCON image。
-- `rgb1_to_gray`、`gen_rectangle1`、`reduce_domain`、`threshold`、`area_center`、`moments_region_2nd`、`intensity`、`gray_histo`：提取固定 28 维 `halcon_mlp_roi_stats_v1` ROI 特征。
-- `clear_class_mlp` / `clear_obj`：释放 HALCON 资源。
-
-`halcon_dl_classification` 不再作为兼容分支保留，旧配置必须返回 `unsupported_model_type`。MLP 链不能作为 `.scbin` 替代解析方案，也不能绕过 HALCON 能力确认。
-
-## 模型格式策略
-
-第一版模型格式策略：
-
-- `.scbin`：返回 `unsupported_model_format`。
-- 不符合英文大小写字母、数字、下划线命名规则的模型文件：返回 `invalid_model_name`。
-- 文件不存在或不可读：返回 `model_file_not_found`。
-- HALCON runtime 不存在：返回 `halcon_so_not_found`。
-- HALCON 库加载失败：返回 `halcon_load_failed`。
-- HALCON 必要符号缺失：返回 `halcon_symbol_missing`。
-- HALCON 读取或训练模型失败：返回 `model_load_failed`、`mlp_create_failed` 或 `mlp_train_failed`。
-
-可支持的模型后缀必须以本机 HALCON 实测可读为准。实现前应在功能计划中列出已确认后缀和 HALCON 读取接口。
-
-## 结果判断
-
-类别判断：
-
-- `judgeRule.mode = "class_match"`。
-- `predictedLabel == expectedLabel` 时 OK，否则 NG。
-- `expectedLabel` 为空返回 `missing_expected_label`。
-
-最低得分：
-
-- `judgeRule.mode = "min_score"`。
-- `score >= minScore` 时 OK，否则 NG。
-- `minScore` 范围为 0-100。
-
-输出分数统一为 0-100，分数越高表示分类置信度越高。
-
-## payload 和 overlay
-
-`ToolResult.payload` 至少输出：
-
-- `predictedLabel`
-- `predictedClassId`
-- `score`
-- `topClasses`
-- `modelPath`
-- `modelName`
-- `modelType`
-- `detectRegionType`
-- `roiPixelsRect`
-- `elapsedMs`
-- `judgeMode`
-- `expectedLabel`
-- `minScore`
-- `enablePositionCorrection`
-- `positionCorrectionSource`
-- `positionCorrectionApplied`
-- `positionCorrectionReason`
-- `errorCode`
-- `errorMessage`
-
-Overlay 至少输出：
-
-- 检测 ROI 矩形。
-- OK/NG 文本。
-- 预测类别和得分文本。
-
-位置修正第一版只做占位：
+对两个 KNN 返回的 L2 距离分别使用：
 
 ```text
-positionCorrectionApplied = false
-positionCorrectionReason = "not implemented"
+similarity = clamp(1 - distance^2 / 2, 0, 1)
+sampleSimilarity = 100 * sampleSimilarity01
+centerSimilarity = 100 * centerSimilarity01
+score = 0.70 * sampleSimilarity + 0.30 * centerSimilarity
 ```
 
-不允许在 UI 开启位置修正后静默忽略，也不允许假报已应用。
+类别按 score 降序排序，分数相同时按 classId 升序。拒识顺序固定为：
 
-## 验证要求
+1. `score < 80`：`classification_rejected_low_similarity`。
+2. `score - secondScore < 8`：`classification_rejected_ambiguous`。
+3. 启用类内半径且 `centerDistance > classRadius`：`classification_rejected_out_of_radius`。
 
-涉及 Qt 工程或 UI 接入时执行：
+三种状态均表示算法成功完成但拒绝给出已知类别：`success=true`、`ok=false`、`predictedLabel=UNKNOWN`、`predictedClassId=-1`。payload 必须保留最佳已知候选的 `bestCandidateClassId`/`bestCandidateLabel`、分数、TopK、`rejectionReason`、半径和距离诊断。模型缺失、图像为空、ROI 无效、HALCON 错误或特征错误才令 `success=false`。
 
-```bash
-/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro
-make -j8
-git diff --check
-```
+拒识完成后才执行 `judgeRule`；UNKNOWN 在 `class_match` 和 `min_score` 下均为 NG。
 
-涉及 runner 或 adapter 时新增或运行注册分类 smoke 测试，至少覆盖：
+## 资源生命周期和位置修正
 
-- 正常模型推理成功路径。
-- 空图像。
-- 无模型或模型路径不存在。
-- 不支持 `.scbin`。
-- 无效 ROI。
-- 类别判断 OK/NG。
-- 最低得分 OK/NG。
-- HALCON runtime、license 或符号缺失。
+HALCON 动态库、tuple、图像/区域对象和两个 KNN 句柄均使用作用域清理。每个已成功创建或读取的 KNN 句柄只清理一次；正常返回、拒识、异常和中途错误都不能泄漏句柄。当前不跨运行缓存 KNN 句柄。
 
-手动验证：
+位置修正字段仍可保存、回显并写入 payload，但分类 Runner 不改变 ROI 坐标，不执行补偿；payload 固定表达 `positionCorrectionApplied=false` 和未实现原因。不得把位置修正字段存在误写成已应用。
 
-- 工具库入口可见。
-- 新建、保存、重新打开回显。
-- 导入模型名称校验只允许英文大小写、数字和下划线。
-- ROI 绘制和取消/完成按钮不误触发窗口关闭。
-- 测试运行显示 OK/NG、类别、得分、ROI、耗时。
+## 旧模型与模型管理
 
-## 当前状态
+模型管理扫描真实模型目录并保留可识别的完整 V2、旧 schema 1 和不完整包记录。完整 schema 2 KNN 包可以使用；旧 schema 1/`model.gmc` 记录只能显示为 legacy、导出/删除或重新训练，不能直接运行、不能发出可运行模型选择信号。
 
-截至本文档创建时：
+带 `training_session/session.json` 的 legacy 模型重新训练时恢复注册图、名称、类别和 ROI；没有训练会话时打开空白训练状态并提示重新添加注册图和 ROI。重新训练成功后在原目录生成 `model.gnc`、`class_centers.gnc`、schema 2 metadata 和统计文件，并移除旧 `model.gmc`，确认包完整后才允许选择。
 
-- 已完成注册分类第一版方案和提示词规范。
-- 已实现 UI 第一阶段：
-  - `RegisteredClassificationDialog` 代码构建界面。
-  - 工具库“注册分类”入口。
-  - `ToolsDialog` / `MainWindow` 新建和编辑入口。
-  - `ToolType::RegisteredClassification` 字符串映射。
-  - `RegisteredClassificationAdapter` 占位端口，固定返回 `backend_not_implemented`。
-  - 注册分类占位 adapter smoke 测试。
-- 尚未实现真实 HALCON Runner 和模型推理。
-- `.scbin` 明确列为第一版不支持格式。
-- 注册训练、模型管理、底层模型选择和真实位置修正列为后续阶段。
+MLP/DL 仅作为历史模型的识别标签和升级入口存在。不得新增 MLP/DL 推理、模型读取兼容、特征兼容、权重转换或“自动兼容”分支；不得把 legacy 直接降级为当前 KNN 运行。
 
-后续每次修改注册分类功能后，应在本文档继续追加：
+## 关键错误状态
 
-- 已实现功能。
-- 本次更改。
-- 出现的问题与处理。
-- 验证结果。
-- 剩余事项。
+当前链路至少应明确区分：`invalid_roi`、`foreground_not_found`、`invalid_feature_value`、`model_package_incomplete`、`legacy_model_requires_retraining`、`knn_read_failed`、`knn_model_mismatch`、`knn_classify_failed`、`halcon_symbol_missing`、`classification_rejected_low_similarity`、`classification_rejected_ambiguous` 和 `classification_rejected_out_of_radius`。错误 payload 应包含状态、消息、模型/ROI/耗时等定位信息。
 
-## 实现记录
+## 历史记录（仅供追溯，不是当前实现）
 
-### 2026-07-09 UI 训练闭环：注册训练窗口接入 HALCON MLP 训练
-
-#### 已实现功能
-
-- `RegisteredClassificationTrainingDialog` 将会话内注册图、类别和 ROI 标注转换为 `RegisteredClassificationTrainingRequest`。
-- 训练窗口在至少两个类别且每类有 ROI 样本时启用 `开始训练`，否则保持禁用并提示补齐样本。
-- `开始训练` 自动写入运行目录下 `ModelFiles/RegisteredClass/yyyyMMdd/model_HHmmss_zzz/`，同名目录已存在时自动追加序号，随后调用 `RegisteredClassificationTrainingRunner::train()` 生成 `model.gmc`、`metadata.json`、`training_report.json`。
-- 训练成功后通过 `trainingCompleted` 信号回填主注册分类 Dialog 的 `modelPath` / `modelName`。
-- 主注册分类 Dialog 默认模型类型修正为 `halcon_mlp_registered_classification`，不再从 UI 默认保存旧的 `halcon_dl_classification`。
-
-#### 验证结果
-
-- `registered_classification_dialog_smoke` 覆盖两类样本可训练、UI 会话转换为真实 MLP 训练请求、模型包三文件生成、训练成功回填主 Dialog 模型路径。
-
-#### 剩余事项
-
-- 模型管理窗口尚未扫描真实模型包、支持选择模型并回填主配置、支持选中模型后重新训练更新。
-- 注册训练会话尚未落盘为可复用数据集。
-- 模型导入/导出仍需按模型包目录进一步完善。
-
-### 2026-07-09 后端替换：HALCON MLP 注册分类闭环
-
-#### 已实现功能
-
-- 注册分类后端主线已从 `halcon_dl_classification` 硬替换为 `halcon_mlp_registered_classification`。
-- 模型包目录结构为 `model.gmc`、`metadata.json`、`training_report.json`。
-- 训练阶段将注册图、类别和 ROI 转为固定 28 维 `halcon_mlp_roi_stats_v1` 特征，并通过 HALCON `create_class_mlp` / `add_sample_class_mlp` / `train_class_mlp` 训练。
-- 推理阶段读取 `model.gmc` 和 `metadata.json`，提取同版本 ROI 特征，通过 `classify_class_mlp` 输出 TopK、类别和置信度。
-- 旧配置 `halcon_dl_classification` 返回 `unsupported_model_type`，不再尝试读取 HALCON DL 模型。
-- 模板匹配、形状模型、姿态归一化和位置修正不属于注册分类后端。
-
-#### 验证结果
-
-- `smoke/registered_classification_mlp_backend_smoke` 通过，覆盖 metadata、feature、training、inference 和旧 DL 拒绝。
-- `smoke/registered_classification_adapter_smoke` 通过，覆盖 adapter 到 MLP 后端的错误和成功路径。
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖 UI 测试运行错误码、训练状态预览和既有 ROI 交互。
-- 主工程 shadow build 通过：`mkdir -p build && cd build && /home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j$(nproc)`。
-
-### 2026-07-02 后端阶段：HALCON DL 分类推理闭环
-
-#### 已实现功能
-
-- 注册分类后端从占位 `backend_not_implemented` 升级为真实 HALCON DL 分类推理链。
-- `RegisteredClassificationHalconRunner` 实现：cv::Mat→HALCON image 桥接 → `T_read_dl_model` 读模型 → `gen_rectangle1`/`reduce_domain` 限制检测 ROI → `T_create_dict`/`T_set_dict_object` 构造 DLSample → `T_apply_dl_model` 推理 → `T_get_dict_tuple` 解析 `classification_classes`/`classification_confidences` → topK 排序 → 判别（class_match / min_score）。
-- 输入校验返回明确错误码：`image_empty` / `no_model` / `invalid_model_name` / `unsupported_model_format`（.scbin）/ `model_file_not_found` / `invalid_roi` / `missing_expected_label` / `halcon_so_not_found` / `halcon_load_failed` / `halcon_symbol_missing` / `model_load_failed`（read_dl_model 失败）/ `inference_result_missing` / `halcon_error` / `exception`。
-- payload 输出按文档字段表：`predictedLabel`/`predictedClassId`/`score`(0-100)/`topClasses`/`modelPath`/`modelName`/`modelType`/`detectRegionType`/`roiPixelsRect`/`elapsedMs`/`judgeMode`/`expectedLabel`/`minScore`/`enablePositionCorrection`/`positionCorrectionSource`/`positionCorrectionApplied=false`/`positionCorrectionReason="not implemented"`/`errorCode`/`errorMessage`。
-- overlay 输出检测 ROI 矩形 + OK/NG 文本（含预测类别与得分）。
-- 位置修正保持占位，不假报已应用。
-- HALCON runtime 走 `HalconRuntimePaths::resolveHalconLibPath`，符号走 `dlsym` 动态加载，镜像 `ColorRecognitionHalconRunner` 模式。
-
-#### 本次更改
-
-- 新增 `src/algorithms/recognition/RegisteredClassificationHalconRunner.h` —— `RegisteredClassificationHalconConfig` + `RegisteredClassificationHalconResult` + `RegisteredClassificationClassScore` + `run()` 声明。
-- 新增 `src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp` —— 自包含 HALCON C API 动态加载设施（`HalconCApi`/`HalconLibrary`/`HalconTuple`/`DictHandle`/`DlModelHandle`）+ DL 推理实现。
-- 修改 `src/tooladapters/RegisteredClassificationAdapter.{h,cpp}` —— `run()` 从占位改为解析 `params.registeredClassification`/`judgeRule` → `RegisteredClassificationHalconConfig` → 调 Runner → 转 `ToolResult`；新增 `intParam`/`rectFromJson` 工具函数。
-- 修改 `qt_ui_test.pro` —— SOURCES/HEADERS 加新 Runner 文件。
-- 修改 `smoke/registered_classification_adapter_smoke.{pro,cpp}` —— .pro 加 Runner/HalconRuntimePaths/HALCON include/`-ldl`/opencv imgproc；.cpp 从"断言 backend_not_implemented"改为覆盖 9 个异常路径断言。
-
-#### 出现的问题与处理
-
-- 问题：`DictHandle`/`DlModelHandle` 析构调 `T_clear_handle`/`T_clear_dl_model` 时传 `&m_handle`（Htuple*），但这两个算子签名是按值 `const Htuple`，编译报 `could not convert Htuple* to Htuple`。
-  处理：析构改为传 `m_handle`（按值），`ptr()` 仍返回 `Htuple*` 供 `create_dict`/`read_dl_model` 等输出参数使用。
-- 问题：smoke .pro 缺 HALCON include 路径与 `-ldl`/opencv imgproc，导致 `HalconC.h` 找不到、`dlsym`/`cv::cvtColor` 链接失败。
-  处理：参照 `color_comparison_smoke.pro` 补 `HALCON_ROOT` include、`-ldl`、`-lopencv_imgproc`。
-
-#### 验证结果
-
-- 主工程影子构建：`/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro && make -j$(nproc)` 通过（Runner + Adapter 编译链接，无 error/undefined）。
-- smoke 异常路径：`cd smoke && qmake registered_classification_adapter_smoke.pro && make && ./registered_classification_adapter_smoke` 全部断言通过，覆盖 image_empty / no_model / unsupported_model_format(.scbin) / invalid_model_name / model_file_not_found / invalid_roi / missing_expected_label / 非模型文件(model_load_failed|halcon_error|exception) / 位置修正占位 payload 字段完整性。
-  - 注意：`HalconRuntimePaths::resolveHalconLibPath` 对错误 so 路径会容错回退到默认 HALCON 库，故无法在本地构造 `halcon_so_not_found`；非模型文件会走到 `T_read_dl_model` 失败，返回 model_load_failed / halcon_error / exception，已纳入断言。
-- 成功推理路径：暂无 HALCON DL 模型文件可验证，留待后续。
-
-#### 剩余事项
-
-- 待有 HALCON DL 分类模型（.hdl 等 HALCON 可读格式）后，补成功推理路径 smoke 与手动 UI 验证（OK/NG、类别、得分、TopK、ROI、耗时显示）。
-- 注册训练窗口、模型管理真实训练、本地数据集/标注仍为后续阶段。
-- 海康 `.scbin`/`OLClassify*.bin` 第一版不支持，保持现状。
-- 位置修正真实补偿仍为占位。
-- 经典分类备选链（`read_class_mlp/svm/knn`）未实现，文档已列为备选。
-
-### 2026-07-03 联调阶段：测试图像传递与 UI 结果展示
-
-#### 已实现功能
-
-- `RegisteredClassificationDialog` 的“基准图测试”现在把 `ReferenceImageProvider::referenceFrame()` 同时写入 `ToolRequest.image` 和 `referenceImage`，避免后端误报 `image_empty`。
-- “测试运行”现在从 `CameraFrameProvider::currentFrame()` 获取当前相机帧并写入 `ToolRequest.image`。
-- 测试结果状态栏显示 OK/NG、预测类别、分数、TopK 和耗时；错误结果显示错误码、错误信息和耗时。
-- 预览区使用 runner 返回的 overlay 绘制检测 ROI 和结果文本。
-- 位置修正控件默认关闭并禁用，tooltip 明确说明当前版本尚未实现，避免误导用户。
-- `RegisteredClassificationHalconRunner` 为结果文本 overlay 补充 `p1` 锚点和状态字段，确保 `FrameViewHelper` 可绘制文本。
-
-#### 本次更改
-
-- 修改 `src/RegisteredClassificationDialog.{h,cpp}`：测试帧来源、结果展示、overlay 展示、位置修正默认关闭/禁用。
-- 修改 `src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp`：结果文本 overlay 增加锚点。
-- 新增 `smoke/registered_classification_dialog_smoke.{cpp,pro}` 和测试专用 `registered_classification_dialog_plan_stub.cpp`，覆盖基准图/相机帧传入与位置修正默认关闭、禁用状态。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 覆盖基准图/测试运行传入 `request.image`，以及位置修正默认关闭和禁用状态。
-- `smoke/registered_classification_adapter_smoke` 通过。
-- 主工程 `qmake qt_ui_test.pro && make -j$(nproc)` 通过。
-
-#### 剩余事项
-
-- 仍需真实 HALCON DL 分类模型验证成功推理路径的 OK/NG、TopK 和 overlay 视觉效果。
-- 连续运行、运行一次、退出测试等完整测试态尚未按颜色识别工具补齐。
-- 位置修正真实补偿仍未实现；当前 UI 明确禁用。
-
-### 2026-07-03 UI 调整：模型训练与检测区域换位
-
-#### 本次更改
-
-- `RegisteredClassificationDialog` 左侧参数区中，“模型训练”卡片调整到“检测区域”卡片上方。
-- 更新 `registered_classification_dialog_smoke`，增加模型训练卡片位于检测区域卡片上方的断言。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过。
-
-### 2026-07-03 公共位置修正占位 helper 接入
-
-#### 已实现功能
-
-- 新增 `src/toolcore/PositionCorrection.{h,cpp}`，沉淀 FID 公共位置修正占位能力。
-- 公共 helper 支持从 params 解析 `enablePositionCorrection` / `positionCorrectionSource`，写回 params，并向 payload 写入 `positionCorrectionApplied=false` / `positionCorrectionReason="not implemented"`。
-- 注册分类 Adapter 改为通过 `PositionCorrection::fromParams()` 解析位置修正配置。
-- 注册分类 Runner 配置改为持有 `PositionCorrectionConfig`，错误和正常结果 payload 均通过 `PositionCorrection::writeNotAppliedPayload()` 写入统一字段。
-- 注册分类 UI 保存 params 改为通过 `PositionCorrection::writeParams()` 写入位置修正字段，并清理重复 tooltip。
-
-#### 本次更改
-
-- 新增 `src/toolcore/PositionCorrection.h`、`src/toolcore/PositionCorrection.cpp`。
-- 修改 `RegisteredClassificationDialog`、`RegisteredClassificationAdapter`、`RegisteredClassificationHalconRunner` 接入公共 helper。
-- 更新 `qt_ui_test.pro`、`registered_classification_adapter_smoke.pro`、`registered_classification_dialog_smoke.pro` 链接新模块。
-- 新增 `smoke/position_correction_smoke.{cpp,pro}` 覆盖公共 helper 的解析、写回和 payload 输出。
-
-#### 验证结果
-
-- `smoke/position_correction_smoke` 通过。
-- `smoke/registered_classification_adapter_smoke` 通过。
-- `smoke/registered_classification_dialog_smoke` 通过。
-- 主工程 `qmake qt_ui_test.pro && make -j$(nproc)` 通过。
-
-#### 剩余事项
-
-- 有无类、颜色类等工具仍有各自的重复位置修正占位写法，后续可逐步迁移到 `PositionCorrection` 公共 helper。
-- 真实位置补偿仍未实现；公共 helper 仅统一当前占位语义。
-
-### 2026-07-03 UI 占位闭环：训练窗口、模型管理与全部参数调整
-
-#### 已实现功能
-
-- 新增 `RegisteredClassificationTrainingDialog` 占位窗口，`注册训练` 按钮可打开“注册分类”训练界面。
-- 训练窗口按截图结构提供左侧注册图预览区、添加注册图、标注图像、类别列表、模型类型、任务类型、未注册状态和禁用的开始训练按钮。
-- 新增 `RegisteredClassificationModelManagementDialog` 占位窗口，`模型管理` 按钮可打开“模型训练”管理界面。
-- 模型管理窗口按截图结构提供数据集列表、创建/导入入口、模型列表、类型筛选、搜索框和提示文本。
-- 主对话框“全部参数”卡片调整为“参数设置”，内容收敛为 `前K个类别` 和 `最小相似度`。
-- `params.registeredClassification.minSimilarity` 默认保存为 `68`，`topK` 继续保存并回显。
-- 结果判断新增 `判断类型` 下拉框，支持 `所有检测区域输出结果为 OK` 和 `任意检测区域输出结果为 OK`。
-- `judgeRule.judgeType` 保存为 `all_ok` / `any_ok`，同时保存 `judgeTypeText` 供 UI 回显。
-
-#### 本次更改
-
-- 新增 `src/RegisteredClassificationTrainingDialog.{h,cpp}`。
-- 新增 `src/RegisteredClassificationModelManagementDialog.{h,cpp}`。
-- 修改 `src/RegisteredClassificationDialog.{h,cpp}`，接入两个占位窗口并调整参数/判断字段。
-- 更新 `qt_ui_test.pro` 和 `smoke/registered_classification_dialog_smoke.pro` 链接新窗口。
-- 更新 `smoke/registered_classification_dialog_smoke.cpp`，覆盖参数设置字段、判断类型默认值和两个窗口入口。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖新字段默认保存、窗口可打开和既有基准图/测试运行路径。
-
-#### 剩余事项
-
-- 注册训练窗口当前只做 UI 占位，不接入本地标注、数据集落盘或 HALCON 训练流程。
-- 该阶段模型管理窗口只做 UI 占位，不接入真实模型仓库、重新训练、导出或删除逻辑；后续必须按提示词规范中的“模型管理真实模型包流程”升级。
-- `minSimilarity` 当前进入配置保存/回显链路，后续若要参与判定，需要同步扩展 Adapter/Runner 的多区域或相似度判定语义。
-
-### 2026-07-03 UI 调整：训练/模型管理窗口尺寸与可读性
-
-#### 本次更改
-
-- `RegisteredClassificationTrainingDialog` 和 `RegisteredClassificationModelManagementDialog` 初始尺寸改为父窗口约 `76%`，无父窗口时保留默认兜底尺寸。
-- 两个窗口统一提升标题、标签、按钮和表格字号，增加蓝色/橙色高对比边框和按钮状态，避免浅灰样式导致人眼难以识别。
-- 模型管理窗口的数据集列表去掉“生产样本”和“验证样本”，仅保留“默认数据集”占位。
-- 模型管理窗口的“创建数据集”和“导入”按钮移动到数据集列表标题栏右上角。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖两个子窗口 70%-80% 初始尺寸、数据集裁剪和数据集操作按钮标题栏位置。
-
-### 2026-07-03 UI 调整：数据集创建弹窗与高对比样式
-
-#### 本次更改
-
-- 模型管理窗口的“创建数据集”和“导入”改为带图标按钮，不再依赖文本或临时符号表达动作。
-- 模型列表行的编辑、导出、删除动作改为标准图标按钮，去掉 `...` / `⇩` / `×` 文本符号样式。
-- 新增“创建数据集”弹窗，占位复刻数据集名称、训练类型和确定/取消流程。
-- “创建数据集”弹窗点击“确定”后关闭模型管理窗口，并进入注册训练窗口。
-- 注册训练窗口和模型管理窗口继续提升字体大小，并将蓝/灰重底色改为白底、深色文字、橙色强调线，提升可读性。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖创建/导入图标、创建数据集弹窗打开、确认后进入注册训练窗口。
-
-### 2026-07-03 UI 调整：模型列表动作图标与提示
-
-#### 本次更改
-
-- 模型列表每行的三个操作按钮改为语义化自绘图标：
-  - 重命名：文档 + 笔形图标。
-  - 导出：向下箭头 + 托盘图标。
-  - 删除：红色圆形叉号图标。
-- 每个操作按钮增加 tooltip，鼠标悬停分别显示 `重命名`、`导出`、`删除`。
-- 为按钮增加稳定 objectName，便于后续自动化测试和交互接线。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖三个模型操作按钮 tooltip。
-
-### 2026-07-03 注册训练窗口一阶段：抓图、导入和 ROI 绘制
-
-#### 已实现功能
-
-- `注册训练`窗口接入左侧预览区的 `FrameViewHelper`，用于显示注册图像和绘制 ROI。
-- `相机抓图` 从 `CameraFrameProvider::currentFrame()` 获取当前帧并显示到左侧预览区。
-- `外部导入` 打开图片文件选择框，仅允许选择图片文件，导入后显示到左侧预览区。
-- `存图导入` 保持占位禁用，并用 tooltip 明确暂未接入。
-- `全屏框选`、`矩形框选`、`多边形框选` 改为带语义图标的 `QToolButton`，并提供 tooltip。
-- ROI 按钮手动互斥：点击高亮并进入对应 ROI 模式，再次点击同一高亮按钮退出绘制状态。
-- 只有 `矩形框选` 高亮时启用矩形 ROI 绘制；只有 `多边形框选` 高亮时启用多边形 ROI 绘制；`全屏框选` 高亮时显示全屏 ROI。
-- 矩形 ROI 和多边形 ROI 当前只做 UI 交互和预览显示，不写入真实训练样本或数据集。
-
-#### 本次更改
-
-- 修改 `src/RegisteredClassificationTrainingDialog.cpp`，接入图像显示、相机抓图、图片导入、ROI 按钮图标、互斥高亮和绘制状态。
-- 更新 `smoke/registered_classification_dialog_smoke.cpp`，覆盖相机抓图显示、ROI 图标/tooltip、互斥切换和二次点击退出。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过。
-
-#### 剩余事项
-
-- 外部导入当前只读取本地图片并显示，不保存到数据集。
-- 矩形/多边形 ROI 当前只显示和更新训练窗口状态，不保存到真实样本标注。
-- 存图导入仍为占位禁用。
-- 真实训练、数据集落盘、类别标注和模型生成仍未接入。
-
-### 2026-07-07 注册训练窗口二阶段：缩略图、分类列表和 ROI 会话缓存
-
-#### 已实现功能
-
-- 注册训练窗口左侧预览区底部新增注册图缩略图列表，`相机抓图` 会加入缩略图并选中当前图。
-- 训练窗口维护当前会话内的注册图列表、类别列表和 ROI 缓存；这些数据只用于 UI 交互，不落盘、不生成训练数据集。
-- 右侧 `2/ 标注图像` 改为分类列表结构，显示 `分类列表(N)`、类别名称、`目标总数/图像总数` 和行内语义图标按钮。
-- 分类行操作提供 `重命名`、`预览类别 ROI`、`删除当前 ROI` tooltip；不再使用 `...`、`◉`、`×` 作为最终操作表达。
-- `+ 新建` 可在当前会话追加类别，并为新增类别生成对应预览/删除操作。
-- 矩形 ROI 和多边形 ROI 完成后，会更新当前图片的已标注状态、类别统计和左侧缩略图文本。
-- 点击类别预览按钮会在左侧大图显示当前类别的 ROI；删除当前 ROI 和清除全部标注会更新缩略图和统计。
-- 无图片时 ROI 按钮不会产生有效标注，并在状态栏提示先添加注册图。
-- `相机抓图` 在当前相机帧为空但基准图存在时，会自动取基准图加入注册图列表并显示，状态栏提示 `当前图像帧为空，已获取基准图`。
-- 分类列表改为浅色高对比样式，避免深色底和字体颜色不符合项目控件规范。
-- 分类行 `重命名` 按钮接入重命名弹窗，可修改当前会话内类别名称。
-- 类别 ROI 预览时状态栏明确显示 `正在预览类别 ROI：<类别名>`。
-- 注册图像工具栏新增 `上一张注册图` / `下一张注册图` 按钮，按循环列表语义切换当前缩略图和大图。
-
-#### 本次更改
-
-- 修改 `src/RegisteredClassificationTrainingDialog.cpp`，新增训练窗口内会话状态、缩略图列表、分类列表、类别操作按钮和 ROI 缓存刷新逻辑。
-- 修改 `smoke/registered_classification_dialog_smoke.cpp`，覆盖缩略图生成、分类列表控件、ROI 标注状态、类别预览、删除当前 ROI、清除全部标注和新建类别。
-- 根据截图反馈补充当前帧为空取基准图、分类列表浅色规范样式、类别重命名、类别预览状态文案和注册图循环切换。
-- 新增 `docs/superpowers/plans/2026-07-07-registered-classification-training-window-ui.md` 记录本次实施计划。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过，覆盖训练窗口二阶段关键控件和交互、当前帧为空取基准图、类别重命名以及注册图循环切换路径。
-
-#### 剩余事项
-
-- 外部导入仍依赖手动文件选择，当前 smoke 未覆盖真实文件导入路径。
-- 当前 ROI、类别和缩略图状态只保存在窗口会话内，不保存为真实数据集。
-- 该阶段真实 HALCON 训练、模型生成、数据集落盘和模型管理真实能力仍未接入；后续后端训练能力见 2026-07-09 MLP 后端替换记录。
-
-### 2026-07-07 注册训练窗口三阶段：ROI 预览页和多 ROI 会话标注
-
-#### 已实现功能
-
-- 注册训练窗口的会话标注模型由“每图每类单 ROI”升级为“每图每类多 ROI 列表”，矩形、全屏和多边形标注都会追加到当前类别。
-- 左侧大图页显示当前图片、当前类别下的全部 ROI；ROI 左上角显示序号，最新 ROI 仍保留在 `FrameViewHelper` 的可编辑 ROI 状态中。
-- 左侧预览区新增 ROI 预览页，点击类别行的预览按钮后显示该类别所有 ROI 的裁剪预览卡片，标题显示 `<类别名> | 已标注目标：N`。
-- 预览页支持关闭按钮返回大图；再次点击同一个类别的预览按钮也会返回大图。
-- 预览页 ROI 卡片支持点击选中；右键菜单提供 `删除当前 ROI`，只删除被选中的单个 ROI 并刷新卡片、统计和缩略图状态。
-- 编辑当前多边形 ROI 时更新当前 ROI，不重复追加为新的 ROI。
-- 预览页打开时进行类别重命名或新建类别，会返回大图页，避免左侧预览内容和右侧当前类别状态不一致。
-- 分类行删除按钮语义调整为删除类别：多类别时删除该类别并移除对应 ROI 标注，剩余类别索引同步重排；只剩一个类别时保留该类别，但清空其 ROI 标注。
-
-#### 本次更改
-
-- 修改 `src/RegisteredClassificationTrainingDialog.cpp`，新增多 ROI 会话结构、左侧 `QStackedWidget` 预览页、ROI 裁剪卡片、右键删除单 ROI、类别删除和多 ROI 大图 overlay 显示。
-- 修改 `smoke/registered_classification_dialog_smoke.cpp`，覆盖多 ROI 序号、预览页切换/关闭、ROI 卡片、右键删除单 ROI、删除类别和最后类别保留清标注语义。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过。
-- 影子目录执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j8` 通过。
-- `git diff --check` 通过。
-
-#### 剩余事项
-
-- 大图 overlay 的点击选中 ROI 暂未实现，仍作为后续优化；当前只实现预览页卡片选中和右键删除单个 ROI。
-- ROI、类别和预览卡片仍为窗口会话内状态，不落盘、不生成真实数据集。
-- 该阶段真实 HALCON 训练、模型生成、数据集落盘和 `.scbin` 支持仍未接入；后续后端训练能力见 2026-07-09 MLP 后端替换记录，`.scbin` 仍不支持。
-
-> 上述“只保存在窗口会话内”的描述属于 2026-07-07 历史阶段。自 2026-07-10 起，训练成功时会将当前会话复制到模型包的 `training_session/session.json` 和 `training_session/images/*.png`；独立数据集管理仍不在范围内。
-
-### 2026-07-10 注册分类训练上下文持久化与重新训练恢复
-
-#### 已实现功能
-
-- 新模型包在 `model.gmc`、`metadata.json`、`training_report.json` 之外增加 `training_session/session.json` 和 PNG 注册图副本。
-- `session.json` 保存 schema 版本、类别顺序、注册图名称、图像尺寸、相对图片路径、类别 ROI、矩形/全屏/多边形 ROI 类型和坐标。
-- 训练窗口将当前会话转换为训练请求；HALCON MLP 训练和训练上下文写入同一个临时模型目录，全部成功后才替换目标模型目录。
-- 重新训练使用选中模型原目录，启动训练窗口时恢复图片、命名、类别名称和 ROI，恢复后继续沿用原目录更新模型。
-- 模型上下文缺失、JSON 损坏、图片缺失或路径越界时不会覆盖原模型；窗口显示明确原因。
-- 没有训练上下文的旧模型仍可用于推理，重新训练时显示“该模型没有历史训练数据，请重新添加注册图和 ROI”，允许用户补充数据后生成新的上下文。
-- 模型管理列表显示“可重新训练”或“缺少历史训练数据”状态，但不因缺少上下文而隐藏或禁止使用旧模型。
-
-#### 本次更改
-
-- 新增 `src/algorithms/recognition/RegisteredClassificationTrainingSession.{h,cpp}`，负责训练上下文 JSON/PNG 编解码和路径校验。
-- 扩展 `RegisteredClassificationTrainingRequest`，由 `RegisteredClassificationTrainingRunner` 在临时目录中原子写入训练上下文。
-- 更新 `RegisteredClassificationTrainingDialog` 和 `RegisteredClassificationModelManagementDialog`，实现恢复、状态提示和重新训练回填。
-- 更新 `smoke/registered_classification_dialog_smoke.cpp`，覆盖上下文往返、模型包文件、重新训练恢复和旧模型兼容提示。
-
-#### 验证结果
-
-- 提交 `c9fc0bc`：训练上下文 codec、PNG 资源和 qmake 工程接入。
-- 提交 `7ea83b0`：训练包原子写入、训练窗口恢复和模型管理状态。
-- 注册分类 smoke 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
-- 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
-
-### 2026-07-10 检测区域完成状态同步与特征诊断
-
-#### 已完成
-
-- 点击检测区域“完成”后，`FrameViewHelper` 退出 ROI 绘制，矩形 ROI 按钮同步取消高亮。
-- 修复 exclusive `QButtonGroup` 无法直接取消唯一选中按钮的问题：刷新 ROI 按钮状态时临时关闭互斥，完成后恢复互斥。
-- 当前 ROI 坐标、ROI overlay、最近测试结果和基准图持续测试模式均保持不变。
-- smoke 增加完成按钮回归断言，覆盖绘制关闭、按钮取消高亮和 ROI 保留。
-
-#### 当前模型特征与偏置诊断
-
-当前 `halcon_mlp_roi_stats_v1` 使用固定 28 维 HALCON 特征：ROI 宽高比和面积比例，前景面积比例和重心，二阶矩 `momentRa/momentRb/momentPhi`，灰度均值/最小值/最大值/偏差，以及 16 个压缩灰度直方图 bin。
-
-当前运行模型的训练报告为 `Circle=2`、`Rectangle=3`、`Polay=2`，只有一张训练图，并明确警告 Circle 和 Polay 样本少于 3 个。模型偏向圆形主要是样本少、类别不均衡、训练图单一和 ROI 混入背景/邻近目标造成的训练数据问题，不表示特征或 HALCON MLP 只支持圆形。
-
-#### 验证结果
-
-- 提交：`f5f7e9c`。
-- `registered_classification_dialog_smoke` 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
-- 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
-
-### 2026-07-10 基准图持续测试与 ROI 自动复测
-
-#### 已实现功能
-
-- `基准图测试` 改为可切换的持续测试模式，点击后立即执行一次测试并保持按钮高亮。
-- 持续测试模式开启时，检测区域矩形 ROI 每次完成有效绘制都会自动触发一次基准图测试。
-- ROI 可以反复绘制和修改，不需要重复点击“基准图测试”；测试模式保持开启直到再次点击测试按钮退出。
-- 矩形 ROI 图标在编辑期间保持高亮；点击“完成”只退出 ROI 编辑，保留 ROI、结果和持续测试模式。
-- 无基准图时不进入持续测试模式，显示 `no_reference_image`；无效 ROI 不触发测试且保留原状态。
-- “测试运行”仍保持当前相机帧一次性测试语义，不受基准图持续测试模式影响。
-
-#### 本次更改
-
-- 修改 `src/RegisteredClassificationDialog.{h,cpp}`，增加持续测试和 ROI 编辑状态、稳定控件对象名，并拆分测试模式切换与单次执行路径。
-- 修改 `smoke/registered_classification_dialog_smoke.cpp`，覆盖按钮高亮、连续两次 ROI 自动复测、完成后状态保留和无基准图保护。
-
-#### 验证结果
-
-- 提交：`5cd156e`。
-- `registered_classification_dialog_smoke` 通过，输出 `registered_classification_dialog_smoke: all checks passed`。
-- 主 Qt shadow build 和 `git diff --check` 在本阶段最终验证中执行。
-
-### 2026-07-07 注册训练窗口四阶段：标签类型行点击切换当前类别
-
-#### 已实现功能
-
-- 分类列表行主体区域支持 `current item selection`，点击标签名称、统计区域或行空白区域会切换当前类别。
-- 被选中类别成为后续 ROI 标注的 `active class` / `current class`。
-- 行内 `重命名`、`预览类别 ROI`、`删除类别` 保持独立 `command action`，不把按钮区域作为行主体点击处理。
-- 预览页打开时点击其他类别行主体区域，会返回大图页并切换到该类别。
-- 切换类别时退出矩形/多边形 ROI 绘制状态，避免后续 ROI 写入错误类别。
-
-#### 验证结果
-
-- `smoke/registered_classification_dialog_smoke` 通过。
-- 影子目录执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake ../qt_ui_test.pro && make -j8` 通过。
-- `git diff --check` 通过。
+- 早期 UI/后端阶段曾使用 `halcon_dl_classification`、`model.gmc` 以及固定 28 维 ROI 统计特征；这些内容已经退出当前运行路径。
+- 2026-07-09 的中间实现曾完成 HALCON MLP 训练和推理闭环；Task 1-5 本轮已将其硬替换为 schema 2 双 KNN。
+- 2026-07-03 至 2026-07-10 的 UI、训练会话、ROI 预览、基准图持续测试和位置修正占位记录仍保留其历史事实，但其模型格式和当前算法语义以本文档前文为准。
