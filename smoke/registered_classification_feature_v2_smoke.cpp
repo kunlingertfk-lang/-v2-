@@ -387,6 +387,34 @@ int main(int argc, char **argv)
                   && polygonExcluded.status == QStringLiteral("foreground_not_found"),
           "polygon ROI must use the true polygon instead of its bounding rectangle");
 
+    RegisteredClassificationFeatureRegion asymmetricPolygon;
+    asymmetricPolygon.type = QStringLiteral("polygon");
+    asymmetricPolygon.polygonNormalized = {
+        QPointF(0.475, 0.10), QPointF(0.525, 0.10),
+        QPointF(0.99, 0.90), QPointF(0.01, 0.90)
+    };
+    const cv::Scalar centroidColor(30, 150, 30);
+    const cv::Scalar boundsCenterColor(30, 30, 220);
+    cv::Mat twoCandidates(256, 256, CV_8UC3, cv::Scalar(20, 20, 20));
+    cv::circle(twoCandidates, cv::Point(128, 159), 14, centroidColor, cv::FILLED);
+    cv::circle(twoCandidates, cv::Point(128, 128), 14, boundsCenterColor, cv::FILLED);
+    cv::Mat centroidCandidateOnly(256, 256, CV_8UC3, cv::Scalar(20, 20, 20));
+    cv::circle(centroidCandidateOnly, cv::Point(128, 159), 14, centroidColor, cv::FILLED);
+    cv::Mat boundsCenterCandidateOnly(256, 256, CV_8UC3, cv::Scalar(20, 20, 20));
+    cv::circle(boundsCenterCandidateOnly, cv::Point(128, 128), 14, boundsCenterColor, cv::FILLED);
+    const RegisteredClassificationFeatureResult polygonChoice =
+            extractor.extractV2(twoCandidates, asymmetricPolygon, extractorConfig);
+    const RegisteredClassificationFeatureResult centroidReference =
+            extractor.extractV2(centroidCandidateOnly, asymmetricPolygon, extractorConfig);
+    const RegisteredClassificationFeatureResult boundsCenterReference =
+            extractor.extractV2(boundsCenterCandidateOnly, asymmetricPolygon, extractorConfig);
+    check(polygonChoice.success && centroidReference.success && boundsCenterReference.success,
+          "asymmetric polygon candidate-scoring fixtures must extract");
+    check(registeredClassificationFeatureDistance(polygonChoice.feature, centroidReference.feature)
+                  < registeredClassificationFeatureDistance(
+                      polygonChoice.feature, boundsCenterReference.feature),
+          "polygon candidate scoring must use the actual ROI centroid");
+
     const RegisteredClassificationFeatureResult uniform = extractor.extractV2(
             cv::Mat(256, 256, CV_8UC3, cv::Scalar(128, 128, 128)),
             region, extractorConfig);

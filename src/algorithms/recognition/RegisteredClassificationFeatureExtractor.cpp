@@ -578,9 +578,20 @@ HalconTuple tupleString(HalconFeatureApi *api, const char *value)
     return tuple;
 }
 
-double firstDouble(const HalconTuple &tuple, const double fallback = 0.0)
+double requiredFiniteDouble(const HalconTuple &tuple, const QString &stage)
 {
-    return tuple.size() > 0 ? tuple.doubleAt(0) : fallback;
+    if (tuple.size() <= 0) {
+        throw std::pair<QString, QString>(
+                QStringLiteral("invalid_feature_value"),
+                QStringLiteral("HALCON returned no numeric value for %1.").arg(stage));
+    }
+    const double value = tuple.doubleAt(0);
+    if (!std::isfinite(value)) {
+        throw std::pair<QString, QString>(
+                QStringLiteral("invalid_feature_value"),
+                QStringLiteral("HALCON returned a non-finite value for %1.").arg(stage));
+    }
+    return value;
 }
 
 double bounded01(const double value)
@@ -615,7 +626,9 @@ QVector<double> occupancyVector(HalconFeatureApi *api, const Hobject region)
                         QStringLiteral("intersection(occupancy)"));
             checkStatus(api, api->areaCenter(overlap.value(), area.ptr(), row.ptr(), column.ptr()),
                         QStringLiteral("area_center(occupancy)"));
-            occupancy.append(bounded01(firstDouble(area) / (cellSize * cellSize)));
+            occupancy.append(bounded01(
+                    requiredFiniteDouble(area, QStringLiteral("occupancy area"))
+                    / (cellSize * cellSize)));
         }
     }
     return occupancy;
@@ -680,10 +693,10 @@ void buildCanonicalCandidate(HalconFeatureApi *api,
     checkStatus(api, api->smallestRectangle1(transformedRegion.value(), row1.ptr(), column1.ptr(),
                                               row2.ptr(), column2.ptr()),
                 QStringLiteral("smallest_rectangle1"));
-    const double rawRow1 = firstDouble(row1);
-    const double rawColumn1 = firstDouble(column1);
-    const double rawRow2 = firstDouble(row2);
-    const double rawColumn2 = firstDouble(column2);
+    const double rawRow1 = requiredFiniteDouble(row1, QStringLiteral("canonical row1"));
+    const double rawColumn1 = requiredFiniteDouble(column1, QStringLiteral("canonical column1"));
+    const double rawRow2 = requiredFiniteDouble(row2, QStringLiteral("canonical row2"));
+    const double rawColumn2 = requiredFiniteDouble(column2, QStringLiteral("canonical column2"));
     const double paddingRows = qMax(1.0, (rawRow2 - rawRow1 + 1.0) * paddingRatio);
     const double paddingColumns = qMax(1.0, (rawColumn2 - rawColumn1 + 1.0) * paddingRatio);
     const double cropRow1 = qBound(0.0, std::floor(rawRow1 - paddingRows),
@@ -1060,7 +1073,11 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         checkStatus(api, api->areaCenter(roiRegion.value(), roiAreaTuple.ptr(),
                                          roiCenterRowTuple.ptr(), roiCenterColumnTuple.ptr()),
                     QStringLiteral("area_center(roi)"));
-        const double roiArea = firstDouble(roiAreaTuple);
+        const double roiArea = requiredFiniteDouble(roiAreaTuple, QStringLiteral("ROI area"));
+        const double roiCenterRow = requiredFiniteDouble(
+                    roiCenterRowTuple, QStringLiteral("ROI center row"));
+        const double roiCenterColumn = requiredFiniteDouble(
+                    roiCenterColumnTuple, QStringLiteral("ROI center column"));
         if (roiArea <= 0.0)
             return errorResult(QStringLiteral("invalid_roi"), QStringLiteral("Feature ROI has no pixels."));
 
@@ -1146,7 +1163,8 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
                             QStringLiteral("select_obj"));
                 checkStatus(api, api->areaCenter(candidate.value(), area.ptr(), row.ptr(), column.ptr()),
                             QStringLiteral("area_center(candidate)"));
-                const double candidateArea = firstDouble(area);
+                const double candidateArea = requiredFiniteDouble(
+                            area, QStringLiteral("candidate area"));
                 const double areaRatio = candidateArea / roiArea;
                 const double minAreaRatio = segmentation.value(QStringLiteral("candidateAreaRatioMin")).toDouble();
                 const double maxAreaRatio = segmentation.value(QStringLiteral("candidateAreaRatioMax")).toDouble();
@@ -1159,10 +1177,16 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
                                                   borderRow.ptr(), borderColumn.ptr()),
                             QStringLiteral("area_center(border)"));
                 const double borderTouchRatio = candidateArea > 0.0
-                        ? firstDouble(borderArea) / candidateArea : 1.0;
-                const double dx = (firstDouble(column) - (roiPixels.left() + roiPixels.right()) * 0.5)
+                        ? requiredFiniteDouble(borderArea, QStringLiteral("border overlap area"))
+                          / candidateArea
+                        : 1.0;
+                const double dx = (requiredFiniteDouble(
+                                       column, QStringLiteral("candidate center column"))
+                                   - roiCenterColumn)
                         / qMax(1.0, roiPixels.width() * 0.5);
-                const double dy = (firstDouble(row) - (roiPixels.top() + roiPixels.bottom()) * 0.5)
+                const double dy = (requiredFiniteDouble(
+                                       row, QStringLiteral("candidate center row"))
+                                   - roiCenterRow)
                         / qMax(1.0, roiPixels.height() * 0.5);
                 const double normalizedCenterDistance = bounded01(std::hypot(dx, dy) / std::sqrt(2.0));
                 const double centerScore = 1.0 - normalizedCenterDistance;
@@ -1209,9 +1233,13 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         checkStatus(api, api->smallestRectangle2(foreground.value(), sourceRow.ptr(), sourceColumn.ptr(),
                                                   sourcePhi.ptr(), sourceLength1.ptr(), sourceLength2.ptr()),
                     QStringLiteral("smallest_rectangle2"));
-        double phi = firstDouble(sourcePhi);
-        double length1 = firstDouble(sourceLength1);
-        double length2 = firstDouble(sourceLength2);
+        const double sourceCenterRow = requiredFiniteDouble(
+                    sourceRow, QStringLiteral("foreground center row"));
+        const double sourceCenterColumn = requiredFiniteDouble(
+                    sourceColumn, QStringLiteral("foreground center column"));
+        double phi = requiredFiniteDouble(sourcePhi, QStringLiteral("foreground orientation"));
+        double length1 = requiredFiniteDouble(sourceLength1, QStringLiteral("foreground long axis"));
+        double length2 = requiredFiniteDouble(sourceLength2, QStringLiteral("foreground short axis"));
         if (length2 > length1) {
             std::swap(length1, length2);
             phi += M_PI_2;
@@ -1242,7 +1270,7 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
             HalconObjectGuard candidateImage(api);
             HalconObjectGuard candidateRegion(api);
             buildCanonicalCandidate(api, halconImage.value(), foreground.value(),
-                                    firstDouble(sourceRow), firstDouble(sourceColumn), phi,
+                                    sourceCenterRow, sourceCenterColumn, phi,
                                     destinationAngle, halconFrame.cols, halconFrame.rows,
                                     paddingRatio, &candidateImage, &candidateRegion);
             const QVector<qint64> orientation = quantizedOccupancy(
@@ -1256,7 +1284,7 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         HalconObjectGuard canonicalImage(api);
         HalconObjectGuard canonicalRegion(api);
         buildCanonicalCandidate(api, halconImage.value(), foreground.value(),
-                                firstDouble(sourceRow), firstDouble(sourceColumn), phi,
+                                sourceCenterRow, sourceCenterColumn, phi,
                                 selectedAngle, halconFrame.cols, halconFrame.rows,
                                 paddingRatio, &canonicalImage, &canonicalRegion);
         const QVector<double> occupancy = occupancyVector(api, canonicalRegion.value());
@@ -1267,7 +1295,8 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         checkStatus(api, api->areaCenter(foreground.value(), foregroundAreaTuple.ptr(),
                                          foregroundRowTuple.ptr(), foregroundColumnTuple.ptr()),
                     QStringLiteral("area_center(foreground)"));
-        const double foregroundArea = firstDouble(foregroundAreaTuple);
+        const double foregroundArea = requiredFiniteDouble(
+                    foregroundAreaTuple, QStringLiteral("foreground area"));
         HalconTuple circularity(api);
         HalconTuple compactness(api);
         HalconTuple convexity(api);
@@ -1293,17 +1322,22 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         feature.reserve(59);
         feature.append(bounded01(length2 / length1));
         feature.append(bounded01(foregroundArea / (4.0 * length1 * length2)));
-        feature.append(bounded01(firstDouble(circularity)));
-        feature.append(bounded01(1.0 / qMax(1.0, firstDouble(compactness, 1.0))));
-        feature.append(bounded01(firstDouble(convexity)));
-        feature.append(bounded01(firstDouble(rectangularity)));
-        feature.append(bounded01(1.0 / qMax(1.0, firstDouble(anisometry, 1.0))));
-        feature.append(bounded01(firstDouble(bulkiness)));
-        feature.append(bounded01(firstDouble(structureFactor)));
-        feature.append(boundedSigned(firstDouble(psi1)));
-        feature.append(boundedSigned(firstDouble(psi2)));
-        feature.append(boundedSigned(firstDouble(psi3)));
-        feature.append(boundedSigned(firstDouble(psi4)));
+        feature.append(bounded01(requiredFiniteDouble(circularity, QStringLiteral("circularity"))));
+        feature.append(bounded01(1.0 / qMax(
+                                            1.0,
+                                            requiredFiniteDouble(compactness, QStringLiteral("compactness")))));
+        feature.append(bounded01(requiredFiniteDouble(convexity, QStringLiteral("convexity"))));
+        feature.append(bounded01(requiredFiniteDouble(rectangularity, QStringLiteral("rectangularity"))));
+        feature.append(bounded01(1.0 / qMax(
+                                            1.0,
+                                            requiredFiniteDouble(anisometry, QStringLiteral("anisometry")))));
+        feature.append(bounded01(requiredFiniteDouble(bulkiness, QStringLiteral("bulkiness"))));
+        feature.append(bounded01(requiredFiniteDouble(
+                                     structureFactor, QStringLiteral("structure factor"))));
+        feature.append(boundedSigned(requiredFiniteDouble(psi1, QStringLiteral("moment psi1"))));
+        feature.append(boundedSigned(requiredFiniteDouble(psi2, QStringLiteral("moment psi2"))));
+        feature.append(boundedSigned(requiredFiniteDouble(psi3, QStringLiteral("moment psi3"))));
+        feature.append(boundedSigned(requiredFiniteDouble(psi4, QStringLiteral("moment psi4"))));
         for (double value : occupancy)
             feature.append(value);
 
@@ -1319,8 +1353,9 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         checkStatus(api, api->grayHisto(canonicalRegion.value(), canonicalGray.value(),
                                         absoluteHistogram.ptr(), relativeHistogram.ptr()),
                     QStringLiteral("gray_histo"));
-        feature.append(bounded01(firstDouble(grayMean) / 255.0));
-        feature.append(bounded01(firstDouble(grayDeviation) / 255.0));
+        feature.append(bounded01(requiredFiniteDouble(grayMean, QStringLiteral("gray mean")) / 255.0));
+        feature.append(bounded01(
+                           requiredFiniteDouble(grayDeviation, QStringLiteral("gray deviation")) / 255.0));
         const QVector<double> histogram = compressHistogram(relativeHistogram);
         for (double value : histogram)
             feature.append(bounded01(value));
@@ -1345,8 +1380,10 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
             HalconTuple deviation(api);
             checkStatus(api, api->intensity(canonicalRegion.value(), channel, mean.ptr(), deviation.ptr()),
                         QStringLiteral("intensity(lab)"));
-            labMeans.append(bounded01(firstDouble(mean) / 255.0));
-            labDeviations.append(bounded01(firstDouble(deviation) / 255.0));
+            labMeans.append(bounded01(
+                                requiredFiniteDouble(mean, QStringLiteral("Lab mean")) / 255.0));
+            labDeviations.append(bounded01(
+                                     requiredFiniteDouble(deviation, QStringLiteral("Lab deviation")) / 255.0));
         }
         for (double value : labMeans)
             feature.append(value);
@@ -1368,12 +1405,17 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
                                                ldGray.value(), direction.value(), energy.ptr(),
                                                correlation.ptr(), homogeneity.ptr(), contrast.ptr()),
                     QStringLiteral("cooc_feature_image"));
-        feature.append(bounded01(firstDouble(entropy) / 8.0));
-        feature.append(boundedSigned(firstDouble(textureAnisotropy)));
-        feature.append(bounded01(firstDouble(energy)));
-        feature.append(bounded01(0.5 + 0.5 * firstDouble(correlation)));
-        feature.append(bounded01(firstDouble(homogeneity)));
-        feature.append(bounded01(firstDouble(contrast) / (1.0 + std::abs(firstDouble(contrast)))));
+        feature.append(bounded01(requiredFiniteDouble(entropy, QStringLiteral("texture entropy")) / 8.0));
+        feature.append(boundedSigned(requiredFiniteDouble(
+                                         textureAnisotropy, QStringLiteral("texture anisotropy"))));
+        feature.append(bounded01(requiredFiniteDouble(energy, QStringLiteral("cooc energy"))));
+        feature.append(bounded01(0.5 + 0.5 * requiredFiniteDouble(
+                                     correlation, QStringLiteral("cooc correlation"))));
+        feature.append(bounded01(requiredFiniteDouble(
+                                     homogeneity, QStringLiteral("cooc homogeneity"))));
+        const double contrastValue = requiredFiniteDouble(
+                    contrast, QStringLiteral("cooc contrast"));
+        feature.append(bounded01(contrastValue / (1.0 + std::abs(contrastValue))));
 
         appendWeightedGroups(&feature);
         if (feature.size() != result.featureNames.size()

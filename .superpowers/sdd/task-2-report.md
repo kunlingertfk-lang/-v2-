@@ -104,3 +104,14 @@ replaced that operation with HALCON `T_erosion_circle`, then computes
 `difference(ROI, erodedROI)`, so the configured band width represents a real inward border for
 rectangles and polygons. The V2 smoke, legacy MLP smoke, and main Qt build passed again after this
 correction.
+
+## Review Fixes
+
+- Polygon candidate scoring now uses the centroid returned by HALCON `area_center(roi)` instead of
+  the polygon bounding-box center. The smoke includes an asymmetric trapezoid with competing
+  candidates and verifies selection toward the true ROI centroid.
+- Every HALCON numeric output consumed by the V2 pipeline is checked for tuple presence and
+  finiteness before clamping, mapping, weighting, or normalization. Missing or non-finite outputs
+  now return `invalid_feature_value` instead of becoming a valid zero or bounded value.
+
+After these fixes, the feature V2 smoke rebuilt without warnings and passed.
