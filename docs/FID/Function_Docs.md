@@ -5,7 +5,7 @@
 ## 功能文档索引
 
 - 颜色识别：`docs/FID/ColorRecognition/颜色识别提示词规范.md`、`docs/FID/ColorRecognition/color_recognition_function_implementation.md`
-- 颜色比较：`docs/FID/ColorComparison/颜色比较提示词规范.md`、`docs/FID/ColorComparison/color_comparison_function_implementation.md`
+- 颜色比较：`docs/FID/ColorComparison/颜色比较V2设计说明.md`、`docs/FID/ColorComparison/颜色比较V2提示词规范.md`、`docs/FID/ColorComparison/color_comparison_function_implementation.md`（V1 历史提示词仅供追溯）
 - 注册分类：`docs/FID/RegisteredClassification/注册分类提示词规范.md`、`docs/FID/RegisteredClassification/registered_classification_function_implementation.md`、`docs/FID/RegisteredClassification/注册分类算法当前实现说明.md`
 - 注册目标检测：`docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md`、`docs/FID/RegisteredClassificationDetection/registered_classification_detection_function_implementation.md`
 - 位置修正：`docs/FID/PositionCorrection/位置修正UI设计规范.md`、`docs/FID/PositionCorrection/位置修正提示词规范.md`、`docs/FID/PositionCorrection/position_correction_function_implementation.md`

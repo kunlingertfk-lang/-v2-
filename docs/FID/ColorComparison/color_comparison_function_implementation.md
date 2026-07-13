@@ -3,9 +3,22 @@
 
 # 颜色比较功能实现记录
 
+> **当前有效设计已升级为 V2。** 后续实现必须遵循
+> `docs/FID/ColorComparison/颜色比较V2设计说明.md` 和
+> `docs/superpowers/specs/2026-07-13-color-comparison-v2-design.md`。
+> 本文下方原有“第一版目标、实现方案和实现记录”作为 V1 历史追溯保留；其中的一维 HSV、伪 Bhattacharyya、主峰覆盖率、C++ soft-kernel、OpenCV compareHist、亮度参与扣分、裸特征和基础/全部切换清模等内容均不是现行规范。
+
 ## 文档用途
 
 本文档单独记录颜色比较算子的需求、实现方案、每次实现的功能、更改内容、错误问题、验证结果和剩余事项。后续继续开发颜色比较时，以根目录 `AGENTS.md` 的项目约束和 HALCON 约束为最高规则，以本文档作为功能状态追踪依据。
+
+当前规范入口：
+
+- `docs/FID/ColorComparison/颜色比较V2设计说明.md`
+- `docs/superpowers/specs/2026-07-13-color-comparison-v2-design.md`
+- `docs/superpowers/plans/2026-07-13-color-comparison-v2.md`
+
+以下第一版方案和历次实现记录仅用于解释现有代码来源，不得直接作为新实现提示词。
 
 ## 参考截图
 
