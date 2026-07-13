@@ -401,7 +401,9 @@ void SchemeStore::setReferencePositionCorrection(
     m_currentScheme.updatedAt = QDateTime::currentDateTime();
 }
 
-bool SchemeStore::setReferenceFrame(const cv::Mat &frame, QString *errorMessage)
+bool SchemeStore::setReferenceFrame(const cv::Mat &frame,
+                                    QString *errorMessage,
+                                    const FrameInputMetadata &metadata)
 {
     if (!ensureLoaded(errorMessage))
         return false;
@@ -411,7 +413,9 @@ bool SchemeStore::setReferenceFrame(const cv::Mat &frame, QString *errorMessage)
         return false;
     }
 
-    ReferenceImageProvider::instance().setReferenceFrame(frame);
+    ReferenceImageProvider::instance().setReferenceFrame(frame, metadata);
+    m_currentScheme.referenceInputMetadata =
+            ReferenceImageProvider::instance().referenceFrameMetadata();
     m_currentScheme.referenceImagePath = QString::fromLatin1(kReferenceImageName);
     m_currentScheme.updatedAt = QDateTime::currentDateTime();
     return saveCurrentScheme(errorMessage);
@@ -435,7 +439,15 @@ bool SchemeStore::loadCurrentReferenceIntoProvider(QString *errorMessage)
         return false;
     }
 
-    ReferenceImageProvider::instance().setReferenceFrame(frame);
+    FrameInputMetadata metadata = m_currentScheme.referenceInputMetadata;
+    if (metadata.colorMode == QStringLiteral("unknown")
+            && metadata.pixelFormat.isEmpty()
+            && metadata.originalChannels == 0
+            && metadata.originalDepth < 0
+            && metadata.source.isEmpty()) {
+        metadata.source = QStringLiteral("reference");
+    }
+    ReferenceImageProvider::instance().setReferenceFrame(frame, metadata);
     return true;
 }
 
@@ -469,6 +481,8 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
         loaded.schemeId = QFileInfo(loaded.schemeDir).fileName();
     loaded.schemeName = json.value(QStringLiteral("schemeName")).toString(loaded.schemeId);
     loaded.referenceImagePath = json.value(QStringLiteral("referenceImage")).toString();
+    loaded.referenceInputMetadata = FrameInputMetadata::fromJson(
+                json.value(QStringLiteral("referenceInputMetadata")).toObject());
     loaded.referencePositionCorrection = PositionCorrection::referenceFromJson(
                 json.value(QStringLiteral("referencePositionCorrection")).toObject());
     loaded.toolConfigs = toolConfigsFromJson(json.value(QStringLiteral("tools")).toArray());
@@ -507,6 +521,8 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state, QString *errorMessa
     json.insert(QStringLiteral("schemeId"), normalized.schemeId);
     json.insert(QStringLiteral("schemeName"), normalized.schemeName);
     json.insert(QStringLiteral("referenceImage"), normalized.referenceImagePath);
+    json.insert(QStringLiteral("referenceInputMetadata"),
+                normalized.referenceInputMetadata.toJson());
     json.insert(QStringLiteral("referencePositionCorrection"),
                 PositionCorrection::referenceToJson(normalized.referencePositionCorrection));
     json.insert(QStringLiteral("tools"), toolConfigsToJson(normalized.toolConfigs));

@@ -6,6 +6,7 @@
 #include "ToolRequest.h"
 #include "ToolResult.h"
 
+#include <QJsonObject>
 #include <QVector>
 #include <opencv2/core.hpp>
 
@@ -17,7 +18,8 @@ public:
     ToolResult runTool(const ToolRequest &request) const;
     QVector<ToolResult> runTools(const QVector<ToolConfig> &configs,
                                   const cv::Mat &image,
-                                  const cv::Mat &referenceImage = cv::Mat()) const;
+                                  const cv::Mat &referenceImage = cv::Mat(),
+                                  const QJsonObject &runtimeContext = QJsonObject()) const;
 
 private:
     ToolAdapter *findAdapter(ToolType type) const;

@@ -150,11 +150,21 @@ bool CameraFrameProvider::isGrabbing() const
     return m_grabRunning.loadAcquire() != 0;
 }
 
-void CameraFrameProvider::setCurrentFrame(const cv::Mat &frame)
+void CameraFrameProvider::setCurrentFrame(const cv::Mat &frame,
+                                          const FrameInputMetadata &metadata)
 {
     if (frame.empty()) {
         clearFrame();
         return;
+    }
+
+    FrameInputMetadata resolvedMetadata = metadata;
+    if (resolvedMetadata.colorMode == QStringLiteral("unknown")
+            && resolvedMetadata.pixelFormat.isEmpty()
+            && resolvedMetadata.originalChannels == 0
+            && resolvedMetadata.originalDepth < 0
+            && resolvedMetadata.source.isEmpty()) {
+        resolvedMetadata = FrameInputMetadata::fromMat(frame, QStringLiteral("camera"));
     }
 
     const cv::Mat normalized = normalizeFrame(frame);
@@ -167,6 +177,7 @@ void CameraFrameProvider::setCurrentFrame(const cv::Mat &frame)
     {
         QMutexLocker locker(&m_frameMutex);
         m_currentFrame = normalized.clone();
+        m_currentFrameMetadata = resolvedMetadata;
         frameIndex = ++m_frameIndex;
     }
 
@@ -187,6 +198,12 @@ cv::Mat CameraFrameProvider::currentFrame(qint64 *frameIndex) const
     if (frameIndex)
         *frameIndex = m_frameIndex;
     return m_currentFrame.clone();
+}
+
+FrameInputMetadata CameraFrameProvider::currentFrameMetadata() const
+{
+    QMutexLocker locker(&m_frameMutex);
+    return m_currentFrameMetadata;
 }
 
 qint64 CameraFrameProvider::currentFrameIndex() const
@@ -218,6 +235,7 @@ void CameraFrameProvider::clearFrame()
     {
         QMutexLocker locker(&m_frameMutex);
         m_currentFrame.release();
+        m_currentFrameMetadata = FrameInputMetadata();
         frameIndex = ++m_frameIndex;
     }
 
@@ -424,13 +442,25 @@ void CameraFrameProvider::workerLoop()
         }
 
         failureCount = 0;
+        FrameInputMetadata capturedMetadata =
+                FrameInputMetadata::fromMat(capturedFrame, QStringLiteral("camera"));
+        if (m_useNv12Path) {
+            capturedMetadata.colorMode = QStringLiteral("color");
+            capturedMetadata.pixelFormat = QStringLiteral("NV12");
+            capturedMetadata.originalChannels = capturedFrame.channels();
+            capturedMetadata.originalDepth = 8;
+        } else if (capturedFrame.type() == CV_8UC2) {
+            capturedMetadata.colorMode = QStringLiteral("color");
+            capturedMetadata.pixelFormat = QStringLiteral("UYVY8");
+        }
+
         const cv::Mat bgrFrame = decodeCapturedFrame(capturedFrame);
         if (bgrFrame.empty()) {
             QThread::msleep(5);
             continue;
         }
 
-        setCurrentFrame(bgrFrame);
+        setCurrentFrame(bgrFrame, capturedMetadata);
         ++frameCount;
         if (frameCount == 1 || frameCount % 120 == 0) {
             qDebug() << QString("[CameraFrameProvider] frame #%1: %2x%3 type=%4")

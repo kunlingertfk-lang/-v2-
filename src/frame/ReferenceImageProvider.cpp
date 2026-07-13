@@ -17,11 +17,21 @@ ReferenceImageProvider &ReferenceImageProvider::instance()
     return provider;
 }
 
-void ReferenceImageProvider::setReferenceFrame(const cv::Mat &frame)
+void ReferenceImageProvider::setReferenceFrame(const cv::Mat &frame,
+                                               const FrameInputMetadata &metadata)
 {
     if (frame.empty()) {
         clearReferenceFrame();
         return;
+    }
+
+    FrameInputMetadata resolvedMetadata = metadata;
+    if (resolvedMetadata.colorMode == QStringLiteral("unknown")
+            && resolvedMetadata.pixelFormat.isEmpty()
+            && resolvedMetadata.originalChannels == 0
+            && resolvedMetadata.originalDepth < 0
+            && resolvedMetadata.source.isEmpty()) {
+        resolvedMetadata = FrameInputMetadata::fromMat(frame, QStringLiteral("reference"));
     }
 
     const cv::Mat normalized = normalizeFrame(frame);
@@ -33,6 +43,7 @@ void ReferenceImageProvider::setReferenceFrame(const cv::Mat &frame)
     {
         QMutexLocker locker(&m_mutex);
         m_referenceFrame = normalized.clone();
+        m_referenceFrameMetadata = resolvedMetadata;
     }
 
     emit referenceFrameChanged(matToImage(normalized));
@@ -42,6 +53,12 @@ cv::Mat ReferenceImageProvider::referenceFrame() const
 {
     QMutexLocker locker(&m_mutex);
     return m_referenceFrame.clone();
+}
+
+FrameInputMetadata ReferenceImageProvider::referenceFrameMetadata() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_referenceFrameMetadata;
 }
 
 QImage ReferenceImageProvider::referenceImage() const
@@ -66,6 +83,7 @@ void ReferenceImageProvider::clearReferenceFrame()
     {
         QMutexLocker locker(&m_mutex);
         m_referenceFrame.release();
+        m_referenceFrameMetadata = FrameInputMetadata();
     }
 
     emit referenceFrameChanged(QImage());

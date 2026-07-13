@@ -54,6 +54,7 @@ SOURCES += \
     src/ToolsDialog.cpp \
     src/OutputDialog.cpp \
     src/frame/CameraFrameProvider.cpp \
+    src/frame/FrameInputMetadata.cpp \
     src/frame/FrameViewHelper.cpp \
     src/frame/MatImageConverter.cpp \
     src/frame/ReferenceImageProvider.cpp \
@@ -121,6 +122,7 @@ HEADERS += \
     src/ToolsDialog.h \
     src/OutputDialog.h \
     src/frame/CameraFrameProvider.h \
+    src/frame/FrameInputMetadata.h \
     src/frame/FrameViewHelper.h \
     src/frame/MatImageConverter.h \
     src/frame/ReferenceImageProvider.h \

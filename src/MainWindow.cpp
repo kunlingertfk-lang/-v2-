@@ -16,6 +16,7 @@
 #include <QIcon>
 #include <QImage>
 #include <QInputDialog>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -1128,6 +1129,12 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
     const cv::Mat referenceImage = ReferenceImageProvider::instance().referenceFrame();
     const qint64 referenceCopyMs = referenceCopyTimer.elapsed();
 
+    QJsonObject runtimeContext;
+    runtimeContext.insert(QStringLiteral("input"),
+                          CameraFrameProvider::instance().currentFrameMetadata().toJson());
+    runtimeContext.insert(QStringLiteral("referenceInput"),
+                          ReferenceImageProvider::instance().referenceFrameMetadata().toJson());
+
     QElapsedTimer displayImageTimer;
     displayImageTimer.start();
     const QImage displayImage = imageFromFrame(image);
@@ -1151,6 +1158,7 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
                                      enabledConfigs,
                                      image,
                                      referenceImage,
+                                     runtimeContext,
                                      displayImage,
                                      startedWallMs,
                                      frameCopyMs,
@@ -1180,7 +1188,10 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
 
         QElapsedTimer timer;
         timer.start();
-        output.results = engine->runTools(enabledConfigs, image, referenceImage);
+        output.results = engine->runTools(enabledConfigs,
+                                          image,
+                                          referenceImage,
+                                          runtimeContext);
         output.engineMs = timer.elapsed();
 
         output.overallOk = !output.results.isEmpty();

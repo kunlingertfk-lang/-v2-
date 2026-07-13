@@ -45,7 +45,8 @@ ToolResult ToolEngine::runTool(const ToolRequest &request) const
 
 QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
                                          const cv::Mat &image,
-                                         const cv::Mat &referenceImage) const
+                                         const cv::Mat &referenceImage,
+                                         const QJsonObject &runtimeContext) const
 {
     QVector<ToolResult> results;
     results.reserve(configs.size());
@@ -58,6 +59,7 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
         request.config = config;
         request.image = image;
         request.referenceImage = referenceImage;
+        request.runtimeContext = runtimeContext;
         results.append(runTool(request));
     }
 

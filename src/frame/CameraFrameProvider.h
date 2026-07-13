@@ -10,6 +10,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "frame/FrameInputMetadata.h"
+
 class CameraFrameProvider : public QObject
 {
     Q_OBJECT
@@ -25,9 +27,11 @@ public:
     bool isOpened() const;
     bool isGrabbing() const;
 
-    void setCurrentFrame(const cv::Mat &frame);
+    void setCurrentFrame(const cv::Mat &frame,
+                         const FrameInputMetadata &metadata = FrameInputMetadata());
     cv::Mat currentFrame() const;
     cv::Mat currentFrame(qint64 *frameIndex) const;
+    FrameInputMetadata currentFrameMetadata() const;
     qint64 currentFrameIndex() const;
 
     QImage currentImage() const;
@@ -56,6 +60,7 @@ private:
     mutable QMutex m_frameMutex;
     mutable QMutex m_cameraMutex;
     cv::Mat m_currentFrame;
+    FrameInputMetadata m_currentFrameMetadata;
     qint64 m_frameIndex = 0;
     cv::VideoCapture m_capture;
     QString m_devicePath;

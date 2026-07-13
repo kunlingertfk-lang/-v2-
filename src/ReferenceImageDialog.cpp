@@ -22,9 +22,43 @@
 #include "SchemeStore.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
+#include "frame/FrameInputMetadata.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/ReferenceImageProvider.h"
 #include "ui_ReferenceImageDialog.h"
+
+namespace {
+
+FrameInputMetadata importedImageMetadata(const QImage &image)
+{
+    FrameInputMetadata metadata;
+    metadata.source = QStringLiteral("file");
+
+    const bool isGrayscale8 = image.format() == QImage::Format_Grayscale8;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+    const bool isGrayscale16 = image.format() == QImage::Format_Grayscale16;
+#else
+    const bool isGrayscale16 = false;
+#endif
+
+    if (isGrayscale8 || isGrayscale16) {
+        metadata.colorMode = QStringLiteral("mono");
+        metadata.pixelFormat = isGrayscale16
+                ? QStringLiteral("Mono16")
+                : QStringLiteral("Mono8");
+        metadata.originalChannels = 1;
+        metadata.originalDepth = isGrayscale16 ? 16 : 8;
+        return metadata;
+    }
+
+    metadata.colorMode = QStringLiteral("color");
+    metadata.pixelFormat = QStringLiteral("BGR8");
+    metadata.originalChannels = 3;
+    metadata.originalDepth = 8;
+    return metadata;
+}
+
+} // namespace
 
 ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
     : QDialog(parent)
@@ -291,6 +325,8 @@ void ReferenceImageDialog::showCurrentImageMode()
 void ReferenceImageDialog::captureReferenceImage()
 {
     const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    const FrameInputMetadata metadata =
+            CameraFrameProvider::instance().currentFrameMetadata();
     if (frame.empty()) {
         qWarning() << "[ReferenceImageDialog] 当前无图像，无法设置基准图。";
         ui->viewerTitleLabel->setText(tr("当前无图像"));
@@ -301,7 +337,7 @@ void ReferenceImageDialog::captureReferenceImage()
     }
 
     QString error;
-    if (!SchemeStore::instance().setReferenceFrame(frame, &error)) {
+    if (!SchemeStore::instance().setReferenceFrame(frame, &error, metadata)) {
         qWarning() << "[ReferenceImageDialog] 基准图保存失败:" << error;
         QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
         return;
@@ -337,6 +373,8 @@ void ReferenceImageDialog::importReferenceImageFromPc()
         return;
     }
 
+    const FrameInputMetadata metadata = importedImageMetadata(image);
+
     const QImage rgbImage = image.convertToFormat(QImage::Format_RGB888);
     cv::Mat rgbFrame(rgbImage.height(),
                      rgbImage.width(),
@@ -354,7 +392,7 @@ void ReferenceImageDialog::importReferenceImageFromPc()
     }
 
     QString error;
-    if (!SchemeStore::instance().setReferenceFrame(bgrFrame, &error)) {
+    if (!SchemeStore::instance().setReferenceFrame(bgrFrame, &error, metadata)) {
         qWarning() << "[ReferenceImageDialog] PC 基准图保存失败:" << error;
         QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
         return;

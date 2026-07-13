@@ -13,6 +13,7 @@
 #include "toolcore/ToolConfig.h"
 #include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolPreviewSnapshot.h"
+#include "frame/FrameInputMetadata.h"
 
 struct SchemeState
 {
@@ -21,6 +22,7 @@ struct SchemeState
     QString schemeName;
     QString schemeDir;
     QString referenceImagePath;
+    FrameInputMetadata referenceInputMetadata;
     ReferencePositionCorrectionConfig referencePositionCorrection;
     QVector<ToolConfig> toolConfigs;
     QMap<QString, ToolPreviewSnapshot> referencePreviewSnapshots;
@@ -65,7 +67,10 @@ public:
     void setOutputConfig(const QJsonObject &outputConfig);
     void setReferencePositionCorrection(const ReferencePositionCorrectionConfig &config);
 
-    bool setReferenceFrame(const cv::Mat &frame, QString *errorMessage = nullptr);
+    bool setReferenceFrame(
+            const cv::Mat &frame,
+            QString *errorMessage = nullptr,
+            const FrameInputMetadata &metadata = FrameInputMetadata());
     bool loadCurrentReferenceIntoProvider(QString *errorMessage = nullptr);
 
 private:
