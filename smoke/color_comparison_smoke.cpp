@@ -423,6 +423,49 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
               "sync mode must build and run with the actual circular region");
     }
 
+    {
+        ColorComparisonHalconConfig sync = baseConfig();
+        sync.templateRegionMode = QStringLiteral("sync");
+        sync.detectMaskPolygonNormalized = {
+            QPointF(0.0, 0.0), QPointF(0.25, 0.0),
+            QPointF(0.25, 1.0), QPointF(0.0, 1.0)
+        };
+        sync.templateMaskPolygonNormalized = {
+            QPointF(0.75, 0.0), QPointF(1.0, 0.0),
+            QPointF(1.0, 1.0), QPointF(0.75, 1.0)
+        };
+        const ColorComparisonTemplateBuildResult built =
+                runner->buildTemplateModel(referenceImage, sync);
+        ColorComparisonHalconConfig templateOnly = sync;
+        templateOnly.detectMaskPolygonNormalized.clear();
+        const ColorComparisonTemplateBuildResult templateOnlyBuilt =
+                runner->buildTemplateModel(referenceImage, templateOnly);
+        check(built.success && templateOnlyBuilt.success &&
+              built.model.effectivePixelCount
+                  < templateOnlyBuilt.model.effectivePixelCount,
+              "sync template build must apply detection and template masks");
+
+        ColorComparisonHalconConfig changedSync = sync;
+        changedSync.model = built.model;
+        changedSync.detectMaskPolygonNormalized[1].setX(0.30);
+        const ColorComparisonHalconResult stale = runner->run(referenceImage, changedSync);
+        check(!stale.success && stale.status == QStringLiteral("model_stale"),
+              "sync detection mask changes must stale the model");
+
+        ColorComparisonHalconConfig custom = sync;
+        custom.templateRegionMode = QStringLiteral("custom");
+        custom.detectMaskPolygonNormalized.clear();
+        const ColorComparisonTemplateBuildResult customBuilt =
+                runner->buildTemplateModel(referenceImage, custom);
+        custom.model = customBuilt.model;
+        custom.detectMaskPolygonNormalized = sync.detectMaskPolygonNormalized;
+        custom.halconSoPath = QCoreApplication::applicationFilePath();
+        const ColorComparisonHalconResult customResult =
+                runner->run(referenceImage, custom);
+        check(customResult.status != QStringLiteral("model_stale"),
+              "custom detection mask changes must not stale the model");
+    }
+
     const QVector<QPointF> rightHalfMask = {
         QPointF(0.5, 0.0), QPointF(1.0, 0.0),
         QPointF(1.0, 1.0), QPointF(0.5, 1.0)
