@@ -20,6 +20,210 @@
 
 以下第一版方案和历次实现记录仅用于解释现有代码来源，不得直接作为新实现提示词。
 
+## 2026-07-13 - 颜色比较 V2 实施与验证记录
+
+### 当前状态和实现范围
+
+- 实现提交范围：`21f774a..90af1cd`。
+- V2 已完成模型合同、原始输入元数据、HALCON Runner、Adapter、Dialog 保存回显和异步测试链路。
+- 新增文件：
+  - `src/frame/FrameInputMetadata.{h,cpp}`
+  - `src/algorithms/recognition/ColorComparisonModel.{h,cpp}`
+  - `smoke/frame_input_metadata_smoke.{cpp,pro}`
+  - `smoke/color_comparison_model_smoke.{cpp,pro}`
+  - `smoke/color_comparison_dialog_smoke.{cpp,pro}`
+- 主要修改文件：
+  - `src/ColorComparisonDialog.{h,cpp}`
+  - `src/algorithms/recognition/ColorComparisonHalconRunner.{h,cpp}`
+  - `src/tooladapters/ColorComparisonAdapter.{h,cpp}`
+  - `src/frame/CameraFrameProvider.{h,cpp}`
+  - `src/frame/ReferenceImageProvider.{h,cpp}`
+  - `src/SchemeStore.{h,cpp}`、`src/toolcore/ToolEngine.{h,cpp}`
+  - `src/MainWindow.cpp`、`src/ReferenceImageDialog.cpp`
+  - `smoke/color_comparison_smoke.{cpp,pro}`、`qt_ui_test.pro`
+- 三个颜色比较 smoke 均不再链接 `ColorRecognitionHalconRunner`；颜色比较 V2 的生产算法不调用颜色识别 Runner，也没有 OpenCV `compareHist`、伪 Bhattacharyya、C++ Gaussian soft-kernel 或经验主峰评分旁路。
+
+### 最终配置字段
+
+`ToolConfig.params.colorComparison` 当前保存：
+
+```text
+colorComparison
+├── version = 2
+├── templateRegionMode = "custom" | "sync"
+├── templateRoiNormalized
+├── templateMaskPolygon
+├── model
+├── dialogLifecycle
+│   ├── originVersion
+│   ├── status
+│   └── reason
+├── detectRegionType = "rectangle" | "circle"
+├── detectGlobal
+├── detectRoiNormalized
+├── detectCircleNormalized
+├── detectMaskPolygon
+├── comparison
+│   ├── sensitivity = "high" | "medium" | "low"
+│   └── brightnessCompensation
+└── positionCorrection
+    ├── enabled
+    ├── sourceId
+    └── interfaceVersion = 1
+```
+
+`ToolConfig.judgeRule` 固定使用 `mode="min_score"` 和整数 `minScore`。当前默认值为：模板区域 `custom`、检测矩形、灵敏度 `medium`、光照补偿关闭、最低分 `80`。全局检测在 Adapter 合同中保存为全图矩形，并以 `detectGlobal` 保持 UI 保存/重新打开后的全局选中状态。
+
+`dialogLifecycle` 是 Dialog 的迁移来源元数据，不属于公共 `ColorComparisonModelV2`：
+
+- V1 有参考图：保存为 V2 stale，保留 `originVersion=1/model_stale`。
+- V1 无参考图：保存为 V2 unsupported，保留 `originVersion=1/model_rebuild_required`，参考图后续到达时仍只允许用户显式重新取样。
+- 未知版本：保持 unsupported/`unsupported_model_version`，不能借保存/重新打开降级成普通 stale。
+- 原生 V2 的模型状态与 lifecycle 不满足迁移白名单组合时，不允许 lifecycle 覆盖严格模型解析结果。
+- 成功重新取样后重置为 `originVersion=2/status=ok`。
+
+### V2 模型合同
+
+正式模型固定为：
+
+```text
+state = empty | stale | ready | invalid | unsupported
+featureType = "histogram_hs_2d"
+algorithm = "histogram_intersection"
+colorSpace = "hsv"
+hueBins = 32
+saturationBins = 32
+layout = "hue_major"
+normalized = true
+values = 1024 维归一化 H/S 联合直方图
+valueHistogram = 32 维归一化 V 直方图（仅作展示和光照诊断，不参与颜色扣分）
+effectivePixelCount
+referenceImageHash
+extractParamsHash
+inputSignature
+brightnessReference { mean, deviation }
+```
+
+`inputSignature` 保存 `colorMode`、`pixelFormat`、`bitDepth`、`whiteBalance`、`ccm`、`exposure` 和 `gain`。严格校验拒绝错误状态、非 32×32 bins、错误 layout/算法、非有限值、负数、未归一化、空哈希、无效有效像素数以及不合法亮度参考。参考图和提取参数使用 SHA-256 哈希；stale 只改变状态和原因，不删除原模型直方图与哈希。
+
+### 原始输入合同
+
+- `FrameInputMetadata` 在显示或算法桥接为 BGR 前保存原始颜色模式、像素格式、通道、位深和来源。
+- Camera/Reference Provider 提供图像与 metadata 的原子快照；方案 JSON 保存 `referenceInputMetadata`，重新加载 PNG 时不会把未知旧来源伪造为彩色来源。
+- `MainWindow` 和 Dialog 将 `input`、`referenceInput` 注入 `ToolRequest.runtimeContext`，Adapter 在进入 Runner 前完成唯一的严格解析。
+- 原始 Mono 来源返回 invalid NG/`unsupported_color_input`，即使显示 Mat 已经转换为三通道也不能继续颜色评分。
+- 非 8-bit、非支持原始像素格式或非 `CV_8UC3/CV_8UC4` 算法输入返回 `unsupported_pixel_format`；空图优先返回 `image_empty`。
+- unknown 颜色模式为兼容旧方案允许继续，但 payload 必须输出 `input_color_mode_unknown` warning。
+
+### 实际 HALCON 算法链路
+
+V2 核心算法实际动态解析并调用以下 HALCON C 接口：
+
+1. `gen_image_interleaved` 将连续 BGR/BGRA `cv::Mat` 桥接成 HALCON image。
+2. `decompose3` 和 `trans_from_rgb(..., "hsv")` 得到 H/S/V。
+3. `gen_rectangle1`、`gen_circle` 或 `T_gen_region_polygon_filled` 构造 ROI/Mask；`difference` 扣除 Mask；`T_area_center` 检查最终有效像素数。
+4. `T_scale_image` 将 H/S 量化到 32 bins；`T_histo_2dim(Region, H, S)` 生成联合直方图；`T_get_grayval` 按官方合同 row=Hue、column=Saturation 读取 `hueBin*32+saturationBin`。
+5. `T_tuple_sum + T_tuple_div` 归一化 HS 与 V 直方图。
+6. 灵敏度只控制有限位移搜索半径：high=0、medium=1、low=2；Hue 位移循环回绕，Saturation 位移不回绕。
+7. 每个位移使用 `T_tuple_select + T_tuple_min2 + T_tuple_sum` 计算直方图交集，取最大值，`score=clamp(intersection*100,0,100)`。
+
+`sync` 模板建模的有效区域顺序固定为：检测几何 → `difference` 检测 Mask → `difference` 模板 Mask。`custom` 模板只使用自定义模板矩形和模板 Mask，检测 ROI/圆/检测 Mask 不进入模板提取哈希。
+
+光照补偿默认关闭。开启时使用 HALCON `T_intensity` 计算 V 均值，以受限比例同时缩放 R/G/B，再 `compose3` 和 HSV 转换；允许模板/检测均值范围 `[8,247]`、scale 范围 `[0.75,1.3333333333]`、最大截断比例 `0.02`。超出范围返回 `invalid_illumination` 及完整 diagnostics；V 通道差异不直接加入最终颜色得分。
+
+### 模型 stale 矩阵
+
+会使模型 stale 或使进行中的建模结果失效：
+
+- 参考图变化。
+- 模板模式、custom 模板 ROI、模板 Mask、特征类型、光照补偿变化。
+- `sync` 模式下检测全图/矩形/圆形几何或检测 Mask 变化。
+- 加载其他配置、接受、拒绝、关闭和析构会使旧异步结果无效。
+
+不会使 ready 模型 stale：
+
+- `custom` 模式下检测全图/矩形/圆形和检测 Mask 变化。
+- 灵敏度、最低分、位置修正预留状态变化。
+- 基础/全部切换、测试启动/停止。
+
+### Dialog 与异步执行
+
+- 只有显式“重新取样”按钮调用 `buildTemplateModel`；基准图测试、当前图测试和完成按钮不会隐式建模。
+- 模型建模与检测测试分别使用独立单调 generation；worker 只按值捕获完整 `ToolRequest`，在 worker 内创建局部 `ColorComparisonAdapter`。
+- 进行中的检测只保留最新 pending 请求；新帧、配置或关闭使旧结果过期。
+- 成功模型重建会先使旧 active/pending 检测请求失效，再发布新模型，旧 score、overlay 或 reference preview 不能覆盖新模型状态。
+- 关闭 Dialog 不等待 HALCON worker；QObject 生命周期和 generation 门禁阻止回调写入已关闭界面。
+- H/S 图由 1024 维联合直方图求边缘分布，V 图使用 `valueHistogram`；非 ready 模型清空三张统计图。
+- 当前图只显示检测 ROI/检测 Mask/结果 overlay；模板 ROI/同步检测 Mask/模板 Mask 只在独立模板预览中显示。
+
+### 结果 payload
+
+检测运行的成功和失败路径均提供便于 UI 与诊断使用的稳定字段：
+
+```text
+status, message, measurementValid, passed
+algorithm, featureType, modelVersion
+score, similarity, threshold
+effectiveTemplatePixels, effectiveDetectionPixels
+brightnessCompensation {
+  enabled, applied, templateMean,
+  detectMeanBefore, detectMeanAfter, scale, clippedRatio
+}
+positionCorrection { requested, applied=false, sourceId }
+detectionRoi
+warnings
+elapsedMs
+```
+
+Mono 来源属于“算子执行成功但测量无效”的 NG：`success=true`、`ok=false`、`measurementValid=false`、`status=unsupported_color_input`。空图、配置、模型、HALCON runtime/符号/license 等错误返回明确失败状态。
+
+### 2026-07-13 Task 6 验证结果
+
+qmake 接线检查：
+
+- `qt_ui_test.pro` 同时包含 `FrameInputMetadata`、`ColorComparisonModel` 的 cpp/h。
+- `color_comparison_smoke.pro`、`color_comparison_model_smoke.pro`、`color_comparison_dialog_smoke.pro` 均未链接 `ColorRecognitionHalconRunner`。
+
+四个无 license smoke 均重新执行 qmake、make 和 binary，exit 均为 `0`：
+
+```text
+color_comparison_model_smoke: V2 model contract checks passed
+frame_input_metadata_smoke: all checks passed
+Color comparison V2 preflight passed; licensed HALCON checks were skipped. Set RUN_HALCON_LICENSED_SMOKE=1 to require licensed checks.
+color_comparison_dialog_smoke: V2 Dialog checks passed
+```
+
+其中算法 smoke 使用 `env -u RUN_HALCON_LICENSED_SMOKE`，上述结果仅证明无 license 合同和 preflight 通过，不代表 HALCON 数值测试通过。
+
+有效 license 下显式运行 `RUN_HALCON_LICENSED_SMOKE=1`，binary exit `1`，恰好保留两项本机 HALCON 文档/运行时差异：
+
+```text
+axis diagnostic: maxIndex=1002 hueBin=31 saturationBin=10
+FAIL: histo_2dim must flatten row=Hue and column=Saturation as hue-major
+red-wrap diagnostic: status=ok score=0 templatePeak=864 detectPeak=895
+FAIL: medium tolerance must wrap hue across red bin 31/0
+Color comparison V2 licensed smoke failed with 2 failure(s).
+```
+
+本实现继续以 HALCON 官方 `histo_2dim(Region,H,S)` 的 row=H、column=S 合同为准，不按本机观测转置模型、不删除或放宽断言。除上述两项外，licensed 用例没有新增失败；在两项差异解决前，不得宣称 V2 HALCON 数值验证完整通过。
+
+使用 `HALCON_LICENSE_FILE=/tmp RUN_HALCON_LICENSED_SMOKE=1` 强制验证缺 license，binary exit `1`：
+
+```text
+licensed template build failed (base): halcon_license_error: gen_image_interleaved: HALCON #2036: could not find license file
+Color comparison V2 licensed smoke failed with 1 failure(s).
+```
+
+主工程重新执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro -o build/Makefile` 和 `make -C build -j8`，exit `0`，`build/qt_ui_test/bin/qt_ui_test` 存在且可执行。提交前 `git diff --check` 无输出；构建产物均位于已忽略的 `build/`。
+
+### 未人工验证和剩余能力
+
+- 本轮未在真实相机和图形桌面环境中人工执行完整 UI 验收；工具库入口、新建/保存/重新打开、sync/custom 切换、ROI/Mask 实际鼠标拖拽、单次/连续/停止/退出以及长时间连续运行均标记为“未人工验证”。offscreen smoke 不能替代上述人工验证。
+- 色谱特征仍禁用并显示“待实现”；只保留 future interface，不静默降级到直方图。
+- 位置修正整组 UI 禁用并显示“接口预留，暂未实现”；旧配置请求时继续原始 ROI，并在 payload 输出 `position_correction_not_implemented` warning。
+- 现场数据尚未完成光照补偿范围、截断阈值、灵敏度与最低分标定。
+- `ColorRecognitionHalconRunner` 自身 H/S 轴、历史模型兼容不属于本 V2 任务，未修改其既有行为。
+
 ## 参考截图
 
 - 基础页参考：`docs/FID/ColorComparison/颜色比较基础.png`
