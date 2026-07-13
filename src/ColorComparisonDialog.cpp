@@ -631,6 +631,39 @@ CircleRoi circleFromJson(const QJsonObject &json)
     return circle;
 }
 
+QRectF circleBoundingRectForImage(const CircleRoi &circle,
+                                  int imageWidth,
+                                  int imageHeight)
+{
+    if (!circle.valid || imageWidth <= 0 || imageHeight <= 0
+            || !finiteValue(circle.centerNormalized.x())
+            || !finiteValue(circle.centerNormalized.y())
+            || !finiteValue(circle.radiusNormalized)
+            || circle.radiusNormalized <= 0.0) {
+        return QRectF();
+    }
+
+    const double maxDimension = static_cast<double>(
+                qMax(imageWidth, imageHeight));
+    const double radiusPixels = circle.radiusNormalized * maxDimension;
+    const double xRadius = radiusPixels / static_cast<double>(imageWidth);
+    const double yRadius = radiusPixels / static_cast<double>(imageHeight);
+    return QRectF(circle.centerNormalized.x() - xRadius,
+                  circle.centerNormalized.y() - yRadius,
+                  xRadius * 2.0,
+                  yRadius * 2.0);
+}
+
+bool circleBoundingRectFitsImage(const QRectF &rect)
+{
+    constexpr double epsilon = 1e-9;
+    return rect.isValid()
+            && rect.left() >= -epsilon
+            && rect.top() >= -epsilon
+            && rect.right() <= 1.0 + epsilon
+            && rect.bottom() <= 1.0 + epsilon;
+}
+
 QImage imageFromFrame(const cv::Mat &frame)
 {
     return MatImageConverter::matToDisplayImage(frame, QStringLiteral("ColorComparisonDialog"));
@@ -1485,11 +1518,22 @@ void ColorComparisonDialog::handleCircleChanged(const CircleRoi &circle)
 {
     if (m_editState != EditState::DetectCircle)
         return;
-    m_detectCircle = circle;
-    if (circle.valid) {
-        m_globalDetection = false;
-        m_detectRoi = normalizedRoiOrDefault(circle.boundingRectNormalized);
+
+    const QRectF exactBounds = circleBoundingRectForImage(
+                circle, m_previewImage.width(), m_previewImage.height());
+    if (!circleBoundingRectFitsImage(exactBounds)) {
+        updateStatus(tr("圆形检测区域无效或超出图像范围，请重新绘制"));
+        if (m_previewHelper)
+            m_previewHelper->clearCircleRoi();
+        refreshRoiOverlay();
+        return;
     }
+
+    m_detectCircle = circle;
+    m_detectCircle.boundingRectNormalized = exactBounds;
+    m_detectCircle.valid = true;
+    m_globalDetection = false;
+    m_detectRoi = exactBounds;
     refreshRoiOverlay();
     handleDetectionConfigChanged(QStringLiteral("detect_circle_changed"));
 }
@@ -1525,13 +1569,20 @@ QImage ColorComparisonDialog::templateRoiImage() const
     if (referenceImage.isNull())
         return QImage();
 
+    QRectF syncCircleRoi;
     QRectF effectiveRoi = m_templateRoi;
     if (m_templateRegionMode == QStringLiteral("sync")) {
         if (m_globalDetection) {
             effectiveRoi = QRectF(0.0, 0.0, 1.0, 1.0);
         } else if (m_detectRegionType == QStringLiteral("circle")
                    && m_detectCircle.valid) {
-            effectiveRoi = m_detectCircle.boundingRectNormalized;
+            syncCircleRoi = circleBoundingRectForImage(
+                        m_detectCircle,
+                        referenceImage.width(),
+                        referenceImage.height());
+            if (!circleBoundingRectFitsImage(syncCircleRoi))
+                return QImage();
+            effectiveRoi = syncCircleRoi;
         } else {
             effectiveRoi = m_detectRoi;
         }
@@ -1554,7 +1605,7 @@ QImage ColorComparisonDialog::templateRoiImage() const
     if (m_templateRegionMode == QStringLiteral("sync")
             && m_detectRegionType == QStringLiteral("circle")
             && m_detectCircle.valid) {
-        overlayPainter.drawEllipse(imageRect(m_detectCircle.boundingRectNormalized));
+        overlayPainter.drawEllipse(imageRect(syncCircleRoi));
     } else {
         overlayPainter.drawRect(imageRect(roi));
     }
@@ -1990,12 +2041,25 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     const QJsonValue colorComparisonValue = config.params
             .value(QStringLiteral("colorComparison"));
     const QJsonObject colorComparison = colorComparisonValue.toObject();
+    if (!colorComparisonValue.isObject()) {
+        enterInvalidConfigReadOnly(
+                    config,
+                    QStringLiteral("unsupported_model_version"),
+                    tr("颜色比较参数缺失或不是对象；原配置已只读保留"));
+        return;
+    }
     int serializedVersion = 0;
     const bool hasIntegerVersion = strictJsonInteger(
                 colorComparison.value(QStringLiteral("version")),
                 &serializedVersion);
-    if (colorComparisonValue.isObject()
-            && hasIntegerVersion && serializedVersion == 2) {
+    if (!hasIntegerVersion) {
+        enterInvalidConfigReadOnly(
+                    config,
+                    QStringLiteral("unsupported_model_version"),
+                    tr("颜色比较模型版本必须是 int 范围内的整数；原配置已只读保留"));
+        return;
+    }
+    if (serializedVersion == 2) {
         const V2DialogConfigValidation validation =
                 validateV2DialogConfig(config);
         if (!validation.success) {
@@ -2079,6 +2143,16 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
                                &m_modelOriginVersion,
                                &m_modelStatus,
                                &m_modelReason);
+    }
+    if (m_model.state == ColorComparisonModelState::Ready) {
+        const QString currentReferenceHash = reference.frame.empty()
+                ? QString()
+                : colorComparisonReferenceHash(reference.frame);
+        if (currentReferenceHash != m_model.referenceImageHash) {
+            m_model.state = ColorComparisonModelState::Stale;
+            m_modelStatus = QStringLiteral("model_stale");
+            m_modelReason = tr("基准图已变化，请重新取样");
+        }
     }
 
     if (m_templateRegionModeComboBox) {
@@ -2516,6 +2590,11 @@ bool ColorComparisonDialog::rebuildTemplateModelFromFrame(
                 params.value(QStringLiteral("colorComparison")).toObject();
         colorComparison.insert(QStringLiteral("model"),
                                colorComparisonModelToJson(buildableModel));
+        QJsonObject lifecycle = colorComparison.value(
+                    QStringLiteral("dialogLifecycle")).toObject();
+        lifecycle.insert(QStringLiteral("status"),
+                         QStringLiteral("model_stale"));
+        colorComparison.insert(QStringLiteral("dialogLifecycle"), lifecycle);
         params.insert(QStringLiteral("colorComparison"), colorComparison);
         request.config.params = params;
 

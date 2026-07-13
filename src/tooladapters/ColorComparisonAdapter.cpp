@@ -358,6 +358,12 @@ ToolResult makeError(const ToolConfig &config,
         }
     }
 
+    QJsonArray warnings;
+    if (positionRequested) {
+        warnings.append(
+                    QStringLiteral("position_correction_not_implemented"));
+    }
+
     QJsonObject detectionRoi{
         {QStringLiteral("type"), QStringLiteral("rectangle")},
         {QStringLiteral("angle"), 0.0},
@@ -452,7 +458,7 @@ ToolResult makeError(const ToolConfig &config,
              {QStringLiteral("sourceId"), positionSource}
          }},
         {QStringLiteral("detectionRoi"), detectionRoi},
-        {QStringLiteral("warnings"), QJsonArray()},
+        {QStringLiteral("warnings"), warnings},
         {QStringLiteral("elapsedMs"), 0.0}
     };
     for (auto iterator = payloadPatch.constBegin();
@@ -495,6 +501,39 @@ ToolResult mapRunnerResult(const ToolConfig &config,
     result.text = QString::number(runnerResult.score, 'f', 2);
     result.overlays = runnerResult.overlays;
     result.payload = runnerResult.payload;
+    return result;
+}
+
+ToolResult mapInputContractFailure(
+        const ToolConfig &config,
+        const cv::Mat &targetImage,
+        const ColorComparisonHalconResult &runnerResult)
+{
+    ToolResult result = mapRunnerResult(config, runnerResult);
+    const ToolResult configuredPayload = makeError(
+                config, result.status, result.message, targetImage);
+    const QString configuredKeys[] = {
+        QStringLiteral("algorithm"),
+        QStringLiteral("featureType"),
+        QStringLiteral("modelVersion"),
+        QStringLiteral("threshold"),
+        QStringLiteral("effectiveTemplatePixels"),
+        QStringLiteral("brightnessCompensation"),
+        QStringLiteral("positionCorrection"),
+        QStringLiteral("detectionRoi")
+    };
+    for (const QString &key : configuredKeys)
+        result.payload.insert(key, configuredPayload.payload.value(key));
+
+    QJsonArray warnings = result.payload.value(
+                QStringLiteral("warnings")).toArray();
+    const QJsonArray configuredWarnings = configuredPayload.payload.value(
+                QStringLiteral("warnings")).toArray();
+    for (const QJsonValue &warning : configuredWarnings) {
+        if (!warnings.contains(warning))
+            warnings.append(warning);
+    }
+    result.payload.insert(QStringLiteral("warnings"), warnings);
     return result;
 }
 
@@ -927,8 +966,10 @@ ToolResult ColorComparisonAdapter::run(const ToolRequest &request)
                              &message)) {
         ColorComparisonHalconConfig preflightConfig;
         preflightConfig.inputSignature = inputSignature;
-        return mapRunnerResult(config,
-                               m_runner.run(request.image, preflightConfig));
+        return mapInputContractFailure(
+                    config,
+                    request.image,
+                    m_runner.run(request.image, preflightConfig));
     }
 
     QJsonObject colorComparison;

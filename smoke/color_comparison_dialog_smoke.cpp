@@ -27,6 +27,7 @@
 #include <QToolButton>
 #include <QtConcurrent/QtConcurrentRun>
 
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <limits>
@@ -87,6 +88,22 @@ bool containsRedMask(const QImage &image)
         }
     }
     return false;
+}
+
+QRect nonWhiteContentBounds(const QImage &image)
+{
+    QRect bounds;
+    for (int y = 0; y < image.height(); ++y) {
+        const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            if (qRed(line[x]) < 245 || qGreen(line[x]) < 245
+                    || qBlue(line[x]) < 245) {
+                bounds = bounds.isNull() ? QRect(x, y, 1, 1)
+                                         : bounds.united(QRect(x, y, 1, 1));
+            }
+        }
+    }
+    return bounds;
 }
 
 QJsonObject rectJson(double x, double y, double width, double height)
@@ -198,6 +215,16 @@ ToolResult controlledOldTestResult(const QString &status,
 ToolConfig v2Config(const QString &templateMode,
                     const ColorComparisonModelV2 &model = readyModel())
 {
+    ColorComparisonModelV2 serializedModel = model;
+    if (serializedModel.state == ColorComparisonModelState::Ready) {
+        const cv::Mat currentReference =
+                ReferenceImageProvider::instance().referenceFrame();
+        if (!currentReference.empty()) {
+            serializedModel.referenceImageHash =
+                    colorComparisonReferenceHash(currentReference);
+        }
+    }
+
     ToolConfig config;
     config.toolId = QStringLiteral("color-comparison-dialog-smoke");
     config.toolName = QStringLiteral("ColorComparison");
@@ -226,7 +253,7 @@ ToolConfig v2Config(const QString &templateMode,
                         {QStringLiteral("valid"), true}});
     colorComparison.insert(QStringLiteral("detectMaskPolygon"), QJsonArray());
     colorComparison.insert(QStringLiteral("model"),
-                           colorComparisonModelToJson(model));
+                           colorComparisonModelToJson(serializedModel));
     colorComparison.insert(
             QStringLiteral("comparison"),
             QJsonObject{{QStringLiteral("sensitivity"),
@@ -858,7 +885,113 @@ int main(int argc, char **argv)
               "unknown-version sampling must preserve unsupported model content");
     }
 
+    {
+        QVector<QPair<QString, QJsonValue>> malformedVersions{
+            {QStringLiteral("missing"), QJsonValue(QJsonValue::Undefined)},
+            {QStringLiteral("string"), QJsonValue(QStringLiteral("2"))},
+            {QStringLiteral("fractional"), QJsonValue(2.5)},
+            {QStringLiteral("out-of-int-range"), QJsonValue(2147483648.0)}
+        };
+        for (const auto &entry : malformedVersions) {
+            ToolConfig malformed = legacyConfig(77);
+            QJsonObject root = malformed.params;
+            QJsonObject params = root.value(QStringLiteral("colorComparison"))
+                    .toObject();
+            if (entry.second.isUndefined())
+                params.remove(QStringLiteral("version"));
+            else
+                params.insert(QStringLiteral("version"), entry.second);
+            root.insert(QStringLiteral("colorComparison"), params);
+            malformed.params = root;
+
+            ColorComparisonDialog dialog;
+            dialog.loadFromConfig(malformed);
+            QPushButton *finish = requiredChild<QPushButton>(
+                    dialog, QStringLiteral("colorComparisonFinishButton"),
+                    "malformed source version needs the Finish button");
+            QLabel *status = requiredChild<QLabel>(
+                    dialog, QStringLiteral("colorComparisonStatusLabel"),
+                    "malformed source version needs the status label");
+            check(finish && !finish->isEnabled()
+                          && status
+                          && status->text().contains(
+                                 QStringLiteral("unsupported_model_version"))
+                          && dialog.toolConfig().toJson() == malformed.toJson(),
+                  QStringLiteral("%1 source version must remain exact read-only data instead of manufacturing originVersion=0")
+                  .arg(entry.first));
+        }
+
+        QVector<QPair<QString, QJsonValue>> malformedEnvelopes{
+            {QStringLiteral("missing"), QJsonValue(QJsonValue::Undefined)},
+            {QStringLiteral("string"), QJsonValue(QStringLiteral("bad"))},
+            {QStringLiteral("array"), QJsonValue(QJsonArray{1, 2})},
+            {QStringLiteral("null"), QJsonValue(QJsonValue::Null)}
+        };
+        for (const auto &entry : malformedEnvelopes) {
+            ToolConfig malformed = legacyConfig(77);
+            QJsonObject params = malformed.params;
+            if (entry.second.isUndefined())
+                params.remove(QStringLiteral("colorComparison"));
+            else
+                params.insert(QStringLiteral("colorComparison"), entry.second);
+            malformed.params = params;
+
+            ColorComparisonDialog dialog;
+            dialog.loadFromConfig(malformed);
+            QPushButton *finish = requiredChild<QPushButton>(
+                    dialog, QStringLiteral("colorComparisonFinishButton"),
+                    "malformed color-comparison envelope needs the Finish button");
+            check(finish && !finish->isEnabled()
+                          && dialog.toolConfig().toJson() == malformed.toJson(),
+                  QStringLiteral("%1 colorComparison envelope must remain exact read-only data")
+                  .arg(entry.first));
+        }
+    }
+
     ReferenceImageProvider::instance().setReferenceFrame(colorFrame, colorMetadata);
+    {
+        ColorComparisonDialog dialog;
+        loadReady(dialog, QStringLiteral("custom"),
+                  QStringLiteral("reject-clipped-circle"));
+        FrameViewHelper *preview = dialog.findChild<FrameViewHelper *>();
+        QToolButton *circleButton = requiredChild<QToolButton>(
+                dialog, QStringLiteral("colorComparisonDetectCircleButton"),
+                "clipped circle test needs the circle button");
+        QLabel *status = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonStatusLabel"),
+                "clipped circle test needs the viewer status");
+        if (circleButton)
+            circleButton->click();
+
+        CircleRoi clippedCircle;
+        clippedCircle.centerNormalized = QPointF(10.0 / 128.0, 0.5);
+        clippedCircle.radiusNormalized = 40.0 / 128.0;
+        clippedCircle.boundingRectNormalized =
+                QRectF(0.0, 8.0 / 96.0, 50.0 / 128.0, 80.0 / 96.0);
+        clippedCircle.valid = true;
+        if (preview)
+            preview->circleChanged(clippedCircle);
+
+        const ToolConfig saved = dialog.toolConfig();
+        const QJsonObject savedCircle = saved.params
+                .value(QStringLiteral("colorComparison")).toObject()
+                .value(QStringLiteral("detectCircleNormalized")).toObject();
+        check(std::abs(savedCircle.value(QStringLiteral("radius")).toDouble()
+                       - 0.20) < 1e-9,
+              "Dialog must reject an image-clipped circle instead of saving inconsistent geometry");
+        check(status && status->text().contains(QStringLiteral("超出")),
+              "Dialog must explain that a rejected circle exceeds the image boundary");
+
+        ColorComparisonDialog reopened;
+        reopened.loadFromConfig(saved);
+        QPushButton *finish = requiredChild<QPushButton>(
+                reopened, QStringLiteral("colorComparisonFinishButton"),
+                "reopened clipped-circle result needs the Finish button");
+        check(modelState(reopened) == QStringLiteral("ready")
+                      && finish && finish->isEnabled(),
+              "a rejected clipped circle must not create a V2 config that becomes invalid on reopen");
+    }
+
     {
         ColorComparisonDialog dialog;
         dialog.loadFromConfig(v2Config(QStringLiteral("custom"),
@@ -907,12 +1040,19 @@ int main(int argc, char **argv)
 
         ColorComparisonDialog dialog;
         dialog.loadFromConfig(aspectCircle);
+        QLabel *templatePreview = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonTemplatePreview"),
+                "aspect-correct circle needs the template preview");
         QPushButton *finish = requiredChild<QPushButton>(
                 dialog, QStringLiteral("colorComparisonFinishButton"),
                 "aspect-correct circle needs the Finish button");
         check(modelState(dialog) == QStringLiteral("ready")
                       && finish && finish->isEnabled(),
               "1920x515 aspect-correct circle bounding boxes must remain valid V2 input");
+        const QRect previewContent = nonWhiteContentBounds(
+                    labelImage(templatePreview));
+        check(previewContent.width() >= 60,
+              "sync circle template preview must recompute its max-dimension bounds for the current reference aspect ratio");
         const ToolConfig saved = dialog.toolConfig();
         ColorComparisonDialog reopened;
         reopened.loadFromConfig(saved);
@@ -1027,7 +1167,9 @@ int main(int argc, char **argv)
         dialog.loadFromConfig(recovered);
         check(modelState(dialog) == QStringLiteral("ready")
                       && modelReferenceHash(dialog)
-                         == QStringLiteral("reference-hash-recovered-valid")
+                         == colorComparisonReferenceHash(
+                                ReferenceImageProvider::instance()
+                                .referenceFrame())
                       && finish && rebuild && referenceTest && testRun
                       && finish->isEnabled() && rebuild->isEnabled()
                       && referenceTest->isEnabled() && testRun->isEnabled(),
@@ -1037,6 +1179,31 @@ int main(int argc, char **argv)
                                                  Qt::CaseInsensitive)
                       && !status->text().contains(QStringLiteral("只读")),
               "valid V2 recovery must clear the previous invalid read-only status");
+    }
+
+    {
+        ToolConfig staleReference = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("stale-reference-on-load")));
+        QJsonObject root = staleReference.params;
+        QJsonObject params = root.value(QStringLiteral("colorComparison"))
+                .toObject();
+        QJsonObject model = params.value(QStringLiteral("model")).toObject();
+        model.insert(QStringLiteral("referenceImageHash"),
+                     QStringLiteral("different-reference-hash"));
+        params.insert(QStringLiteral("model"), model);
+        root.insert(QStringLiteral("colorComparison"), params);
+        staleReference.params = root;
+
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(staleReference);
+        check(modelState(dialog) == QStringLiteral("stale")
+                      && dialogLifecycle(dialog)
+                         .value(QStringLiteral("status")).toString()
+                         == QStringLiteral("model_stale")
+                      && modelReferenceHash(dialog)
+                         == QStringLiteral("different-reference-hash"),
+              "loading a ready model against a changed current reference must immediately preserve its hash and mark it stale");
     }
 
     {
@@ -1062,6 +1229,87 @@ int main(int argc, char **argv)
               "malformed V2 mask points must not be dropped or repaired on load/save");
         check(finish && !finish->isEnabled(),
               "malformed V2 masks must enter the read-only invalid state");
+    }
+
+    {
+        QVector<QPair<QString, ToolConfig>> malformedStaleModels;
+
+        ToolConfig nonNumeric = v2Config(
+                    QStringLiteral("custom"),
+                    staleModel(QStringLiteral("malformed-stale-string")));
+        QJsonObject root = nonNumeric.params;
+        QJsonObject params = root.value(QStringLiteral("colorComparison"))
+                .toObject();
+        QJsonObject model = params.value(QStringLiteral("model")).toObject();
+        QJsonArray values = model.value(QStringLiteral("values")).toArray();
+        values[0] = QStringLiteral("not-a-number");
+        model.insert(QStringLiteral("values"), values);
+        params.insert(QStringLiteral("model"), model);
+        root.insert(QStringLiteral("colorComparison"), params);
+        nonNumeric.params = root;
+        malformedStaleModels.append({QStringLiteral("non-numeric"), nonNumeric});
+
+        ToolConfig wrongSize = v2Config(
+                    QStringLiteral("custom"),
+                    staleModel(QStringLiteral("malformed-stale-size")));
+        root = wrongSize.params;
+        params = root.value(QStringLiteral("colorComparison")).toObject();
+        model = params.value(QStringLiteral("model")).toObject();
+        values = model.value(QStringLiteral("values")).toArray();
+        values.removeLast();
+        model.insert(QStringLiteral("values"), values);
+        params.insert(QStringLiteral("model"), model);
+        root.insert(QStringLiteral("colorComparison"), params);
+        wrongSize.params = root;
+        malformedStaleModels.append({QStringLiteral("wrong-size"), wrongSize});
+
+        ToolConfig negative = v2Config(
+                    QStringLiteral("custom"),
+                    staleModel(QStringLiteral("malformed-stale-negative")));
+        root = negative.params;
+        params = root.value(QStringLiteral("colorComparison")).toObject();
+        model = params.value(QStringLiteral("model")).toObject();
+        values = model.value(QStringLiteral("values")).toArray();
+        values[0] = -0.1;
+        model.insert(QStringLiteral("values"), values);
+        params.insert(QStringLiteral("model"), model);
+        root.insert(QStringLiteral("colorComparison"), params);
+        negative.params = root;
+        malformedStaleModels.append({QStringLiteral("negative"), negative});
+
+        ToolConfig unnormalized = v2Config(
+                    QStringLiteral("custom"),
+                    staleModel(QStringLiteral("malformed-stale-sum")));
+        root = unnormalized.params;
+        params = root.value(QStringLiteral("colorComparison")).toObject();
+        model = params.value(QStringLiteral("model")).toObject();
+        values = model.value(QStringLiteral("values")).toArray();
+        values[0] = 0.1;
+        model.insert(QStringLiteral("values"), values);
+        params.insert(QStringLiteral("model"), model);
+        root.insert(QStringLiteral("colorComparison"), params);
+        unnormalized.params = root;
+        malformedStaleModels.append(
+                    {QStringLiteral("unnormalized"), unnormalized});
+
+        for (const auto &entry : malformedStaleModels) {
+            ColorComparisonDialog dialog;
+            dialog.loadFromConfig(entry.second);
+            QPushButton *finish = requiredChild<QPushButton>(
+                    dialog, QStringLiteral("colorComparisonFinishButton"),
+                    "malformed stale model needs the Finish button");
+            QLabel *status = requiredChild<QLabel>(
+                    dialog, QStringLiteral("colorComparisonStatusLabel"),
+                    "malformed stale model needs the status label");
+            check(finish && !finish->isEnabled()
+                          && status
+                          && status->text().contains(
+                                 QStringLiteral("model_invalid"))
+                          && dialog.toolConfig().toJson()
+                             == entry.second.toJson(),
+                  QStringLiteral("%1 non-ready V2 model must enter exact read-only preservation instead of being canonicalized")
+                  .arg(entry.first));
+        }
     }
 
     {

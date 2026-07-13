@@ -3,6 +3,7 @@
 #include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QStringList>
 
 #include <cmath>
 #include <limits>
@@ -87,6 +88,40 @@ bool isEffectivePixelCountJsonValue(const QJsonValue &value)
             && number <= static_cast<double>(kMaxExactJsonInteger);
 }
 
+bool hasValidReadyInputSignature(
+        const ColorComparisonInputSignature &signature)
+{
+    const QString colorMode = signature.colorMode.trimmed().toLower();
+    if (colorMode != QStringLiteral("color")
+            && colorMode != QStringLiteral("unknown")) {
+        return false;
+    }
+
+    static const QStringList supportedPixelFormats = {
+        QStringLiteral("BGR8"),
+        QStringLiteral("BGRA8"),
+        QStringLiteral("UYVY8"),
+        QStringLiteral("NV12"),
+        QStringLiteral("RGB8"),
+        QStringLiteral("RGBX8"),
+        QStringLiteral("ARGB8"),
+        QStringLiteral("ARGB8_Premultiplied"),
+        QStringLiteral("RGBA8"),
+        QStringLiteral("RGBA8_Premultiplied")
+    };
+    return signature.bitDepth == 8
+            && supportedPixelFormats.contains(signature.pixelFormat.trimmed());
+}
+
+bool hasOnlyFiniteNumbers(const QJsonArray &array)
+{
+    for (const QJsonValue &value : array) {
+        if (!value.isDouble() || !std::isfinite(value.toDouble()))
+            return false;
+    }
+    return true;
+}
+
 bool hasStrictModelShape(const QJsonObject &object)
 {
     const QJsonObject inputSignature =
@@ -103,7 +138,11 @@ bool hasStrictModelShape(const QJsonObject &object)
             && object.value(QStringLiteral("layout")).isString()
             && object.value(QStringLiteral("normalized")).isBool()
             && object.value(QStringLiteral("values")).isArray()
+            && hasOnlyFiniteNumbers(
+                    object.value(QStringLiteral("values")).toArray())
             && object.value(QStringLiteral("valueHistogram")).isArray()
+            && hasOnlyFiniteNumbers(
+                    object.value(QStringLiteral("valueHistogram")).toArray())
             && isEffectivePixelCountJsonValue(
                     object.value(QStringLiteral("effectivePixelCount")))
             && object.value(QStringLiteral("referenceImageHash")).isString()
@@ -118,7 +157,11 @@ bool hasStrictModelShape(const QJsonObject &object)
             && inputSignature.contains(QStringLiteral("gain"))
             && object.value(QStringLiteral("brightnessReference")).isObject()
             && brightnessReference.value(QStringLiteral("mean")).isDouble()
-            && brightnessReference.value(QStringLiteral("deviation")).isDouble();
+            && std::isfinite(brightnessReference
+                             .value(QStringLiteral("mean")).toDouble())
+            && brightnessReference.value(QStringLiteral("deviation")).isDouble()
+            && std::isfinite(brightnessReference
+                             .value(QStringLiteral("deviation")).toDouble());
 }
 
 ColorComparisonModelState stateFromName(const QString &name, bool *known)
@@ -184,6 +227,80 @@ ColorComparisonModelV2 modelFromJson(const QJsonObject &object, bool *stateKnown
     model.brightnessReference.deviation =
             brightnessReference.value(QStringLiteral("deviation")).toDouble();
     return model;
+}
+
+bool isPristineModelPlaceholder(const ColorComparisonModelV2 &model)
+{
+    return model.featureType == QStringLiteral("histogram_hs_2d")
+            && model.algorithm == QStringLiteral("histogram_intersection")
+            && model.colorSpace == QStringLiteral("hsv")
+            && model.hueBins == 32
+            && model.saturationBins == 32
+            && model.layout == QStringLiteral("hue_major")
+            && model.normalized
+            && model.values.isEmpty()
+            && model.valueHistogram.isEmpty()
+            && model.effectivePixelCount == 0
+            && model.referenceImageHash.isEmpty()
+            && model.extractParamsHash.isEmpty()
+            && model.inputSignature.colorMode == QStringLiteral("unknown")
+            && model.inputSignature.pixelFormat.isEmpty()
+            && model.inputSignature.bitDepth == -1
+            && model.inputSignature.whiteBalance.isNull()
+            && model.inputSignature.ccm.isNull()
+            && model.inputSignature.exposure.isNull()
+            && model.inputSignature.gain.isNull()
+            && model.brightnessReference.mean == 0.0
+            && model.brightnessReference.deviation == 0.0;
+}
+
+bool lifecycleAllowsPlaceholder(const QJsonObject &colorComparison,
+                                ColorComparisonModelState state)
+{
+    const QJsonValue lifecycleValue = colorComparison.value(
+                QStringLiteral("dialogLifecycle"));
+    if (!lifecycleValue.isObject())
+        return false;
+
+    const QJsonObject lifecycle = lifecycleValue.toObject();
+    if (!isIntJsonValue(lifecycle.value(QStringLiteral("originVersion")))
+            || !lifecycle.value(QStringLiteral("status")).isString()
+            || !lifecycle.value(QStringLiteral("reason")).isString()
+            || lifecycle.value(QStringLiteral("reason")).toString().size()
+               > 1024) {
+        return false;
+    }
+
+    const int origin = lifecycle.value(QStringLiteral("originVersion")).toInt();
+    const QString status = lifecycle.value(QStringLiteral("status")).toString();
+    return (origin == 1
+            && state == ColorComparisonModelState::Stale
+            && status == QStringLiteral("model_stale"))
+            || (origin == 1
+                && state == ColorComparisonModelState::Unsupported
+                && status == QStringLiteral("model_rebuild_required"))
+            || (origin != 1 && origin != 2
+                && state == ColorComparisonModelState::Unsupported
+                && status == QStringLiteral("unsupported_model_version"));
+}
+
+bool hasValidSerializedPayload(const QJsonObject &colorComparison,
+                               const ColorComparisonModelV2 &model)
+{
+    if (model.state == ColorComparisonModelState::Ready)
+        return true;
+    if (model.state == ColorComparisonModelState::Empty)
+        return isPristineModelPlaceholder(model);
+    if (model.state == ColorComparisonModelState::Stale
+            || model.state == ColorComparisonModelState::Unsupported) {
+        if (isPristineModelPlaceholder(model)) {
+            return lifecycleAllowsPlaceholder(colorComparison, model.state);
+        }
+        ColorComparisonModelV2 readyPayload = model;
+        readyPayload.state = ColorComparisonModelState::Ready;
+        return validateColorComparisonModel(readyPayload).success;
+    }
+    return false;
 }
 
 ColorComparisonModelReadResult invalidReadResult(const QString &message)
@@ -288,6 +405,10 @@ ColorComparisonModelReadResult readColorComparisonModel(
         result.message = QStringLiteral("颜色比较模型状态无效");
         return result;
     }
+    if (!hasValidSerializedPayload(colorComparison, result.model)) {
+        return invalidReadResult(
+                    QStringLiteral("颜色比较非 ready 模型内容无效"));
+    }
 
     const ColorComparisonModelValidation validation =
             validateColorComparisonModel(result.model);
@@ -313,7 +434,7 @@ ColorComparisonModelValidation validateColorComparisonModel(
             || model.colorSpace != QStringLiteral("hsv")
             || model.hueBins != 32 || model.saturationBins != 32
             || model.layout != QStringLiteral("hue_major") || !model.normalized
-            || model.inputSignature.bitDepth != 8) {
+            || !hasValidReadyInputSignature(model.inputSignature)) {
         return validationFailure(QStringLiteral("model_invalid"),
                                  QStringLiteral("颜色比较模型合同不匹配"));
     }

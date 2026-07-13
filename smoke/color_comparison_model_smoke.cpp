@@ -253,6 +253,59 @@ void checkAdapterContract()
                   && mono.elapsedMs >= 0,
           "Adapter must map runner score, similarity, text, and elapsed time");
 
+    QJsonObject configuredMonoParams = validAdapterParams(model);
+    configuredMonoParams.insert(QStringLiteral("detectRegionType"),
+                                QStringLiteral("circle"));
+    configuredMonoParams.insert(
+            QStringLiteral("detectCircleNormalized"),
+            QJsonObject{{QStringLiteral("center"), pointJson(0.5, 0.5)},
+                        {QStringLiteral("radius"), 0.20}});
+    configuredMonoParams.insert(
+            QStringLiteral("comparison"),
+            QJsonObject{{QStringLiteral("sensitivity"), QStringLiteral("medium")},
+                        {QStringLiteral("brightnessCompensation"), true}});
+    configuredMonoParams.insert(
+            QStringLiteral("positionCorrection"),
+            QJsonObject{{QStringLiteral("enabled"), true},
+                        {QStringLiteral("sourceId"), QStringLiteral("pose-mono")},
+                        {QStringLiteral("interfaceVersion"), 1}});
+    ToolRequest configuredMonoRequest = adapterRequest(configuredMonoParams);
+    configuredMonoRequest.config.judgeRule.insert(QStringLiteral("minScore"), 67);
+    configuredMonoRequest.runtimeContext.insert(
+            QStringLiteral("input"),
+            inputMetadata(QStringLiteral("mono"), QStringLiteral("Mono8"), 1, 8));
+    const ToolResult configuredMono = adapter.run(configuredMonoRequest);
+    const QJsonObject configuredMonoRoi = configuredMono.payload
+            .value(QStringLiteral("detectionRoi")).toObject();
+    check(configuredMono.success && !configuredMono.ok
+                  && configuredMono.status
+                          == QStringLiteral("unsupported_color_input")
+                  && configuredMono.payload.value(QStringLiteral("threshold"))
+                         .toDouble() == 67.0
+                  && configuredMono.payload
+                         .value(QStringLiteral("effectiveTemplatePixels"))
+                         .toDouble()
+                         == static_cast<double>(model.effectivePixelCount)
+                  && configuredMonoRoi.value(QStringLiteral("type")).toString()
+                         == QStringLiteral("circle")
+                  && std::abs(configuredMonoRoi
+                              .value(QStringLiteral("radiusPixels")).toDouble()
+                              - 3.2) < 1e-9
+                  && configuredMono.payload
+                         .value(QStringLiteral("brightnessCompensation"))
+                         .toObject().value(QStringLiteral("enabled")).toBool()
+                  && configuredMono.payload
+                         .value(QStringLiteral("positionCorrection"))
+                         .toObject().value(QStringLiteral("requested")).toBool()
+                  && configuredMono.payload
+                         .value(QStringLiteral("positionCorrection"))
+                         .toObject().value(QStringLiteral("sourceId")).toString()
+                         == QStringLiteral("pose-mono")
+                  && warningsContain(
+                         configuredMono.payload,
+                         QStringLiteral("position_correction_not_implemented")),
+          "input-contract failures must retain the configured threshold, model, circle, brightness, and position payload");
+
     QJsonObject monoBadModelParams{
         {QStringLiteral("version"), 2},
         {QStringLiteral("model"), QJsonObject{
@@ -951,6 +1004,36 @@ int main(int argc, char **argv)
     ColorComparisonModelV2 invalid = model;
     invalid.inputSignature.bitDepth = 16;
     checkInvalid(invalid, "ready V2 model bit depth must equal 8");
+
+    invalid = model;
+    invalid.inputSignature.colorMode = QStringLiteral("mono");
+    checkInvalid(invalid,
+                 "ready V2 model cannot claim a monochrome source");
+
+    invalid = model;
+    invalid.inputSignature.colorMode = QStringLiteral("garbage");
+    checkInvalid(invalid,
+                 "ready V2 model color mode must use a supported enum");
+
+    ColorComparisonModelV2 unknownColorMode = model;
+    unknownColorMode.inputSignature.colorMode = QStringLiteral("unknown");
+    check(validateColorComparisonModel(unknownColorMode).success,
+          "ready V2 model may preserve an unknown legacy color source");
+
+    invalid = model;
+    invalid.inputSignature.pixelFormat.clear();
+    checkInvalid(invalid,
+                 "ready V2 model must store its resolved source pixel format");
+
+    invalid = model;
+    invalid.inputSignature.pixelFormat = QStringLiteral("Mono8");
+    checkInvalid(invalid,
+                 "ready V2 model cannot store a monochrome pixel format");
+
+    invalid = model;
+    invalid.inputSignature.pixelFormat = QStringLiteral("RGB16");
+    checkInvalid(invalid,
+                 "ready V2 model pixel format must use a supported 8-bit color enum");
 
     invalid = model;
     invalid.effectivePixelCount = 9007199254740992LL;
