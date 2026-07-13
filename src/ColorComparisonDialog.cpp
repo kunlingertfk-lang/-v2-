@@ -1570,8 +1570,12 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     refreshRoiOverlay();
     m_loadingConfig = false;
     updateModelStateUi();
-    if (buildWasActive)
-        displayStoredModelInstruction();
+    if (buildWasActive) {
+        if (m_model.state == ColorComparisonModelState::Ready)
+            updateStatus(tr("模型已加载，可直接测试"));
+        else
+            displayStoredModelInstruction();
+    }
 }
 
 QString ColorComparisonDialog::summaryText() const
@@ -2018,6 +2022,7 @@ void ColorComparisonDialog::handleModelBuildFinished()
         return;
     }
 
+    invalidateAsyncWork();
     m_model = result.model;
     m_modelOriginVersion = 2;
     m_modelStatus = result.status.isEmpty()

@@ -21,6 +21,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QPushButton>
+#include <QSemaphore>
 #include <QSpinBox>
 #include <QThread>
 #include <QToolButton>
@@ -164,6 +165,24 @@ ColorComparisonTemplateBuildResult successfulBuildResult(const QString &suffix)
     result.success = true;
     result.status = QStringLiteral("ok");
     result.model = readyModel(suffix);
+    return result;
+}
+
+ToolResult controlledOldTestResult(const QString &status,
+                                   const QString &overlayLabel)
+{
+    ToolResult result;
+    result.toolType = ToolType::ColorComparison;
+    result.success = true;
+    result.ok = true;
+    result.status = status;
+    result.message = QStringLiteral("controlled old-model test completion");
+    result.score = 17.0;
+    ToolOverlay overlay;
+    overlay.type = ToolOverlayType::Rect;
+    overlay.rect = QRectF(8.0, 7.0, 24.0, 18.0);
+    overlay.label = overlayLabel;
+    result.overlays.append(overlay);
     return result;
 }
 
@@ -316,6 +335,27 @@ QFutureWatcher<ColorComparisonTemplateBuildResult> *templateBuildWatcher(
         }
     }
     return nullptr;
+}
+
+QFutureWatcher<ToolResult> *testResultWatcher(ColorComparisonDialog &dialog)
+{
+    for (QObject *child : dialog.children()) {
+        if (auto *watcher = dynamic_cast<QFutureWatcher<ToolResult> *>(child))
+            return watcher;
+    }
+    return nullptr;
+}
+
+bool sceneHasToolTip(ColorComparisonDialog &dialog, const QString &toolTip)
+{
+    QGraphicsView *view = dialog.findChild<QGraphicsView *>();
+    if (!view || !view->scene())
+        return false;
+    for (QGraphicsItem *item : view->scene()->items()) {
+        if (item && item->isVisible() && item->toolTip() == toolTip)
+            return true;
+    }
+    return false;
 }
 
 } // namespace
@@ -1170,6 +1210,232 @@ int main(int argc, char **argv)
               "template extraction changes during build must keep the stored model stale");
         checkHashesPreserved(dialog, referenceHash, extractHash,
                              "template build invalidation must preserve stored model hashes");
+    }
+
+    {
+        const cv::Mat monoReference(80, 120, CV_8UC1, cv::Scalar(126));
+        ReferenceImageProvider::instance().setReferenceFrame(
+                monoReference,
+                FrameInputMetadata::fromMat(monoReference,
+                                            QStringLiteral("reference")));
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(v2Config(QStringLiteral("custom"),
+                                       readyModel(QStringLiteral("old-active-test"))));
+        QPushButton *rebuild = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonRebuildModelButton"),
+                "active old-test race needs the sampling button");
+        QPushButton *referenceTest = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonReferenceTestButton"),
+                "active old-test race needs the reference-test button");
+        QLabel *status = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonStatusLabel"),
+                "active old-test race needs the status label");
+        QFutureWatcher<ColorComparisonTemplateBuildResult> *buildWatcher =
+                templateBuildWatcher(dialog);
+        QFutureWatcher<ToolResult> *testWatcher = testResultWatcher(dialog);
+        check(buildWatcher && testWatcher,
+              "active old-test race must locate both Dialog watchers");
+
+        if (rebuild)
+            rebuild->click();
+        check(waitUntil([status, rebuild]() {
+                  return status && rebuild && rebuild->isEnabled()
+                          && status->text().contains(
+                                  QStringLiteral("unsupported_color_input"));
+              }),
+              "active old-test race must establish the current build epoch");
+
+        QSemaphore buildGate;
+        if (buildWatcher) {
+            const ColorComparisonTemplateBuildResult success =
+                    successfulBuildResult(QStringLiteral("new-active-model"));
+            buildWatcher->setFuture(QtConcurrent::run([&buildGate, success]() {
+                buildGate.acquire();
+                return success;
+            }));
+        }
+        if (referenceTest)
+            referenceTest->click();
+        check(waitUntil([&dialog, testWatcher]() {
+                  return testWatcher && !testWatcher->isRunning()
+                          && dialog.referencePreviewSnapshot().valid;
+              }),
+              "reference test created during build must first capture the old ready model");
+        const ToolPreviewSnapshot baselinePreview =
+                dialog.referencePreviewSnapshot();
+
+        const QString oldOverlayLabel =
+                QStringLiteral("controlled_old_active_overlay");
+        QSemaphore oldTestGate;
+        if (testWatcher) {
+            const ToolResult oldResult = controlledOldTestResult(
+                        QStringLiteral("controlled_old_active_result"),
+                        oldOverlayLabel);
+            testWatcher->setFuture(QtConcurrent::run([&oldTestGate, oldResult]() {
+                oldTestGate.acquire();
+                return oldResult;
+            }));
+        }
+
+        buildGate.release();
+        check(waitUntil([&dialog, buildWatcher]() {
+                  return buildWatcher && !buildWatcher->isRunning()
+                          && modelReferenceHash(dialog)
+                          == QStringLiteral("reference-hash-new-active-model");
+              }),
+              "test activity during build must not cancel successful model application");
+        check(testWatcher && testWatcher->isRunning()
+                      && status
+                      && status->text().contains(QStringLiteral("取样完成")),
+              "new model status must be visible while the old active test is still blocked");
+
+        oldTestGate.release();
+        check(waitUntil([testWatcher]() {
+                  return testWatcher && !testWatcher->isRunning();
+              }),
+              "controlled old active test must finish after the successful build");
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        const ToolPreviewSnapshot finalPreview =
+                dialog.referencePreviewSnapshot();
+        check(status
+                      && status->text().contains(QStringLiteral("取样完成"))
+                      && !status->text().contains(
+                          QStringLiteral("controlled_old_active_result")),
+              "old active test completion must not overwrite the rebuilt-model status");
+        check(!sceneHasToolTip(dialog, oldOverlayLabel),
+              "old active test completion must not restore an obsolete overlay");
+        check(finalPreview.timestamp == baselinePreview.timestamp
+                      && finalPreview.statusText == baselinePreview.statusText
+                      && !finalPreview.statusText.contains(
+                          QStringLiteral("controlled_old_active_result")),
+              "old active reference-test completion must not overwrite the reference preview snapshot");
+    }
+
+    {
+        const cv::Mat monoReference(80, 120, CV_8UC1, cv::Scalar(130));
+        ReferenceImageProvider::instance().setReferenceFrame(
+                monoReference,
+                FrameInputMetadata::fromMat(monoReference,
+                                            QStringLiteral("reference")));
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(v2Config(QStringLiteral("custom"),
+                                       readyModel(QStringLiteral("old-pending-test"))));
+        QPushButton *rebuild = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonRebuildModelButton"),
+                "pending old-test race needs the sampling button");
+        QPushButton *referenceTest = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonReferenceTestButton"),
+                "pending old-test race needs the reference-test button");
+        QLabel *status = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonStatusLabel"),
+                "pending old-test race needs the status label");
+        QFutureWatcher<ColorComparisonTemplateBuildResult> *buildWatcher =
+                templateBuildWatcher(dialog);
+        QFutureWatcher<ToolResult> *testWatcher = testResultWatcher(dialog);
+
+        if (rebuild)
+            rebuild->click();
+        check(waitUntil([status, rebuild]() {
+                  return status && rebuild && rebuild->isEnabled()
+                          && status->text().contains(
+                                  QStringLiteral("unsupported_color_input"));
+              }),
+              "pending old-test race must establish the current build epoch");
+
+        QSemaphore buildGate;
+        if (buildWatcher) {
+            const ColorComparisonTemplateBuildResult success =
+                    successfulBuildResult(QStringLiteral("new-pending-model"));
+            buildWatcher->setFuture(QtConcurrent::run([&buildGate, success]() {
+                buildGate.acquire();
+                return success;
+            }));
+        }
+        if (referenceTest)
+            referenceTest->click();
+        check(waitUntil([&dialog, testWatcher]() {
+                  return testWatcher && !testWatcher->isRunning()
+                          && dialog.referencePreviewSnapshot().valid;
+              }),
+              "pending race must establish a reference-preview baseline");
+        const ToolPreviewSnapshot baselinePreview =
+                dialog.referencePreviewSnapshot();
+
+        QSemaphore activeTestGate;
+        if (testWatcher) {
+            const ToolResult activeResult = controlledOldTestResult(
+                        QStringLiteral("controlled_obsolete_active_result"),
+                        QStringLiteral("controlled_obsolete_active_overlay"));
+            testWatcher->setFuture(QtConcurrent::run(
+                        [&activeTestGate, activeResult]() {
+                activeTestGate.acquire();
+                return activeResult;
+            }));
+        }
+        if (referenceTest)
+            referenceTest->click();
+
+        buildGate.release();
+        check(waitUntil([&dialog, buildWatcher]() {
+                  return buildWatcher && !buildWatcher->isRunning()
+                          && modelReferenceHash(dialog)
+                          == QStringLiteral("reference-hash-new-pending-model");
+              }),
+              "a pending old-model test must not cancel the successful build");
+        check(testWatcher && testWatcher->isRunning()
+                      && status
+                      && status->text().contains(QStringLiteral("取样完成")),
+              "successful build must apply before releasing the active test that guards pending work");
+
+        activeTestGate.release();
+        check(waitUntil([testWatcher]() {
+                  return testWatcher && !testWatcher->isRunning();
+              }),
+              "active test must finish without launching an old pending request after rebuild");
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+        const ToolPreviewSnapshot finalPreview =
+                dialog.referencePreviewSnapshot();
+        check(status && status->text().contains(QStringLiteral("取样完成"))
+                      && !status->text().contains(
+                          QStringLiteral("unsupported_color_input")),
+              "pending old-model request must not overwrite rebuilt-model status");
+        check(finalPreview.timestamp == baselinePreview.timestamp
+                      && finalPreview.statusText == baselinePreview.statusText,
+              "pending old reference request must not refresh the preview after model rebuild");
+    }
+
+    {
+        const cv::Mat monoReference(80, 120, CV_8UC1, cv::Scalar(134));
+        ReferenceImageProvider::instance().setReferenceFrame(
+                monoReference,
+                FrameInputMetadata::fromMat(monoReference,
+                                            QStringLiteral("reference")));
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(v2Config(QStringLiteral("custom"),
+                                       readyModel(QStringLiteral("load-old"))));
+        QPushButton *rebuild = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonRebuildModelButton"),
+                "active-build load replacement needs the sampling button");
+        QLabel *status = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonStatusLabel"),
+                "active-build load replacement needs the status label");
+        if (rebuild)
+            rebuild->click();
+        dialog.loadFromConfig(v2Config(QStringLiteral("custom"),
+                                       readyModel(QStringLiteral("load-ready"))));
+        check(modelState(dialog) == QStringLiteral("ready")
+                      && status
+                      && !status->text().contains(QStringLiteral("NG"))
+                      && !status->text().contains(QStringLiteral("模型未就绪"))
+                      && (status->text().contains(QStringLiteral("已加载"))
+                          || status->text().contains(QStringLiteral("可用"))),
+              "loading a ready config over an active build must show ready/loaded status instead of a model-unready NG");
+        check(waitUntil([rebuild]() {
+                  return rebuild && rebuild->isEnabled();
+              }),
+              "obsolete build replaced by ready load must finish without blocking");
+        check(status && !status->text().contains(QStringLiteral("模型未就绪")),
+              "obsolete build completion must preserve the loaded-ready status");
     }
 
     ReferenceImageProvider::instance().clearReferenceFrame();
