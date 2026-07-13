@@ -6,12 +6,15 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QImage>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTemporaryDir>
 
 #include <iostream>
 
 #include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 namespace {
 
@@ -72,6 +75,19 @@ int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
 
+    QTemporaryDir isolatedProjectRoot;
+    check(isolatedProjectRoot.isValid(),
+          "metadata smoke must have an isolated project root");
+    if (!isolatedProjectRoot.isValid())
+        return 1;
+    QFile projectMarker(QDir(isolatedProjectRoot.path())
+                        .filePath(QStringLiteral("qt_ui_test.pro")));
+    check(projectMarker.open(QIODevice::WriteOnly),
+          "isolated project marker must be writable");
+    projectMarker.close();
+    check(QDir::setCurrent(isolatedProjectRoot.path()),
+          "metadata smoke must enter its isolated project root");
+
     using SetReferenceFrameSignature = bool (SchemeStore::*)(
             const cv::Mat &, QString *, const FrameInputMetadata &);
     const SetReferenceFrameSignature setReferenceFrame =
@@ -95,6 +111,45 @@ int main(int argc, char **argv)
                   == QStringLiteral("BGR8"),
           "metadata must JSON round-trip");
 
+    const FrameInputMetadata bgra =
+            FrameInputMetadata::fromMat(cv::Mat(8, 8, CV_8UC4),
+                                        QStringLiteral("camera"));
+    check(bgra.colorMode == QStringLiteral("color")
+                  && bgra.pixelFormat == QStringLiteral("BGRA8")
+                  && bgra.originalChannels == 4
+                  && bgra.originalDepth == 8,
+          "CV_8UC4 must map to color BGRA8");
+
+    const FrameInputMetadata mono1 = FrameInputMetadata::fromQImage(
+            QImage(8, 8, QImage::Format_Mono), QStringLiteral("file"));
+    check(mono1.isMono()
+                  && mono1.pixelFormat == QStringLiteral("Mono1")
+                  && mono1.originalChannels == 1
+                  && mono1.originalDepth == 1,
+          "QImage Format_Mono must map to mono Mono1");
+
+    const FrameInputMetadata indexed = FrameInputMetadata::fromQImage(
+            QImage(8, 8, QImage::Format_Indexed8), QStringLiteral("file"));
+    check(indexed.colorMode == QStringLiteral("unknown")
+                  && indexed.pixelFormat.isEmpty(),
+          "QImage Format_Indexed8 must remain unknown");
+
+    const FrameInputMetadata rgb888 = FrameInputMetadata::fromQImage(
+            QImage(8, 8, QImage::Format_RGB888), QStringLiteral("file"));
+    check(rgb888.colorMode == QStringLiteral("color")
+                  && !rgb888.pixelFormat.isEmpty()
+                  && rgb888.originalChannels == 3
+                  && rgb888.originalDepth == 8,
+          "QImage Format_RGB888 must map to explicit three-channel color8");
+
+    const FrameInputMetadata argb32 = FrameInputMetadata::fromQImage(
+            QImage(8, 8, QImage::Format_ARGB32), QStringLiteral("file"));
+    check(argb32.colorMode == QStringLiteral("color")
+                  && !argb32.pixelFormat.isEmpty()
+                  && argb32.originalChannels == 4
+                  && argb32.originalDepth == 8,
+          "QImage ARGB32/BGRA-family input must map to explicit four-channel color8");
+
     const FrameInputMetadata uyvy =
             FrameInputMetadata::fromMat(cv::Mat(8, 8, CV_8UC2),
                                         QStringLiteral("camera"));
@@ -114,12 +169,24 @@ int main(int argc, char **argv)
           "display frame may be normalized to BGR");
     check(ReferenceImageProvider::instance().referenceFrameMetadata().isMono(),
           "reference metadata must preserve original mono source");
+    const auto referenceSnapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    check(referenceSnapshot.frame.channels() == 3
+                  && referenceSnapshot.metadata.isMono(),
+          "reference snapshot must return its cloned frame and metadata together");
 
     CameraFrameProvider::instance().setCurrentFrame(cv::Mat(8, 8, CV_8UC1));
     check(CameraFrameProvider::instance().currentFrame().channels() == 3,
           "camera display frame may be normalized to BGR");
     check(CameraFrameProvider::instance().currentFrameMetadata().isMono(),
           "camera metadata must be inferred before BGR normalization");
+    const auto cameraSnapshot =
+            CameraFrameProvider::instance().currentFrameSnapshot();
+    check(cameraSnapshot.frame.channels() == 3
+                  && cameraSnapshot.metadata.isMono()
+                  && cameraSnapshot.frameIndex
+                          == CameraFrameProvider::instance().currentFrameIndex(),
+          "camera snapshot must return its cloned frame, index and metadata together");
 
     SchemeStore &store = SchemeStore::instance();
     const QString schemeId = QStringLiteral("frame_metadata_smoke_%1")
@@ -148,13 +215,27 @@ int main(int argc, char **argv)
     const QJsonObject legacyJson{
         {QStringLiteral("schemaVersion"), 1},
         {QStringLiteral("schemeId"), legacySchemeId},
-        {QStringLiteral("schemeName"), QStringLiteral("Legacy metadata smoke")}
+        {QStringLiteral("schemeName"), QStringLiteral("Legacy metadata smoke")},
+        {QStringLiteral("referenceImage"), QStringLiteral("reference.png")}
     };
     legacyFile.write(QJsonDocument(legacyJson).toJson(QJsonDocument::Compact));
     legacyFile.close();
+    check(cv::imwrite(QDir(legacySchemeDir).filePath(QStringLiteral("reference.png"))
+                              .toStdString(),
+                      cv::Mat(8, 8, CV_8UC3, cv::Scalar(24, 48, 96))),
+          "legacy reference PNG must be writable");
     const SchemeState legacyLoaded = store.loadScheme(legacySchemeId, &error);
     check(legacyLoaded.referenceInputMetadata.colorMode == QStringLiteral("unknown"),
           "legacy schemes without metadata must remain unknown");
+    QDir(schemeDir).removeRecursively();
+    check(store.setCurrentScheme(legacySchemeId, &error),
+          "isolated legacy scheme must become current");
+    const ReferenceFrameSnapshot legacyReferenceSnapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    check(legacyReferenceSnapshot.frame.channels() == 3
+                  && legacyReferenceSnapshot.metadata.colorMode
+                          == QStringLiteral("unknown"),
+          "legacy BGR PNG reload must preserve unknown source metadata");
 
     RuntimeContextAdapter adapter;
     ToolEngine engine;

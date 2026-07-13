@@ -1,6 +1,7 @@
 #ifndef FRAME_FRAMEINPUTMETADATA_H
 #define FRAME_FRAMEINPUTMETADATA_H
 
+#include <QImage>
 #include <QJsonObject>
 #include <QString>
 
@@ -16,6 +17,8 @@ struct FrameInputMetadata
 
     static FrameInputMetadata fromMat(const cv::Mat &image,
                                       const QString &source);
+    static FrameInputMetadata fromQImage(const QImage &image,
+                                         const QString &source);
     static FrameInputMetadata fromJson(const QJsonObject &json);
     QJsonObject toJson() const;
     bool isMono() const;

@@ -12,6 +12,13 @@
 
 #include "frame/FrameInputMetadata.h"
 
+struct CameraFrameSnapshot
+{
+    cv::Mat frame;
+    qint64 frameIndex = 0;
+    FrameInputMetadata metadata;
+};
+
 class CameraFrameProvider : public QObject
 {
     Q_OBJECT
@@ -31,6 +38,7 @@ public:
                          const FrameInputMetadata &metadata = FrameInputMetadata());
     cv::Mat currentFrame() const;
     cv::Mat currentFrame(qint64 *frameIndex) const;
+    CameraFrameSnapshot currentFrameSnapshot() const;
     FrameInputMetadata currentFrameMetadata() const;
     qint64 currentFrameIndex() const;
 

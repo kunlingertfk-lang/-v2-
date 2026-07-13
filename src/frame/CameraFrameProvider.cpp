@@ -200,6 +200,16 @@ cv::Mat CameraFrameProvider::currentFrame(qint64 *frameIndex) const
     return m_currentFrame.clone();
 }
 
+CameraFrameSnapshot CameraFrameProvider::currentFrameSnapshot() const
+{
+    QMutexLocker locker(&m_frameMutex);
+    CameraFrameSnapshot snapshot;
+    snapshot.frame = m_currentFrame.clone();
+    snapshot.frameIndex = m_frameIndex;
+    snapshot.metadata = m_currentFrameMetadata;
+    return snapshot;
+}
+
 FrameInputMetadata CameraFrameProvider::currentFrameMetadata() const
 {
     QMutexLocker locker(&m_frameMutex);

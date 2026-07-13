@@ -55,6 +55,15 @@ cv::Mat ReferenceImageProvider::referenceFrame() const
     return m_referenceFrame.clone();
 }
 
+ReferenceFrameSnapshot ReferenceImageProvider::referenceFrameSnapshot() const
+{
+    QMutexLocker locker(&m_mutex);
+    ReferenceFrameSnapshot snapshot;
+    snapshot.frame = m_referenceFrame.clone();
+    snapshot.metadata = m_referenceFrameMetadata;
+    return snapshot;
+}
+
 FrameInputMetadata ReferenceImageProvider::referenceFrameMetadata() const
 {
     QMutexLocker locker(&m_mutex);

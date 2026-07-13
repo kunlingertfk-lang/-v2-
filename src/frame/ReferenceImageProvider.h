@@ -9,6 +9,12 @@
 
 #include "frame/FrameInputMetadata.h"
 
+struct ReferenceFrameSnapshot
+{
+    cv::Mat frame;
+    FrameInputMetadata metadata;
+};
+
 class ReferenceImageProvider : public QObject
 {
     Q_OBJECT
@@ -19,6 +25,7 @@ public:
     void setReferenceFrame(const cv::Mat &frame,
                            const FrameInputMetadata &metadata = FrameInputMetadata());
     cv::Mat referenceFrame() const;
+    ReferenceFrameSnapshot referenceFrameSnapshot() const;
     FrameInputMetadata referenceFrameMetadata() const;
     QImage referenceImage() const;
     bool hasReferenceFrame() const;

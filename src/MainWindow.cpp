@@ -1105,8 +1105,10 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
 
     QElapsedTimer frameCopyTimer;
     frameCopyTimer.start();
-    qint64 actualFrameIndex = -1;
-    const cv::Mat image = CameraFrameProvider::instance().currentFrame(&actualFrameIndex);
+    const CameraFrameSnapshot cameraSnapshot =
+            CameraFrameProvider::instance().currentFrameSnapshot();
+    const cv::Mat image = cameraSnapshot.frame;
+    const qint64 actualFrameIndex = cameraSnapshot.frameIndex;
     const qint64 frameCopyMs = frameCopyTimer.elapsed();
 
     if (continuousRun) {
@@ -1126,14 +1128,16 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
 
     QElapsedTimer referenceCopyTimer;
     referenceCopyTimer.start();
-    const cv::Mat referenceImage = ReferenceImageProvider::instance().referenceFrame();
+    const ReferenceFrameSnapshot referenceSnapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    const cv::Mat referenceImage = referenceSnapshot.frame;
     const qint64 referenceCopyMs = referenceCopyTimer.elapsed();
 
     QJsonObject runtimeContext;
     runtimeContext.insert(QStringLiteral("input"),
-                          CameraFrameProvider::instance().currentFrameMetadata().toJson());
+                          cameraSnapshot.metadata.toJson());
     runtimeContext.insert(QStringLiteral("referenceInput"),
-                          ReferenceImageProvider::instance().referenceFrameMetadata().toJson());
+                          referenceSnapshot.metadata.toJson());
 
     QElapsedTimer displayImageTimer;
     displayImageTimer.start();

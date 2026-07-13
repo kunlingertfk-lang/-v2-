@@ -61,6 +61,93 @@ FrameInputMetadata FrameInputMetadata::fromMat(const cv::Mat &image,
     return metadata;
 }
 
+FrameInputMetadata FrameInputMetadata::fromQImage(const QImage &image,
+                                                  const QString &source)
+{
+    FrameInputMetadata metadata;
+    metadata.source = source;
+    if (image.isNull())
+        return metadata;
+
+    switch (image.format()) {
+    case QImage::Format_Mono:
+    case QImage::Format_MonoLSB:
+        metadata.colorMode = QStringLiteral("mono");
+        metadata.pixelFormat = QStringLiteral("Mono1");
+        metadata.originalChannels = 1;
+        metadata.originalDepth = 1;
+        break;
+    case QImage::Format_Grayscale8:
+        metadata.colorMode = QStringLiteral("mono");
+        metadata.pixelFormat = QStringLiteral("Mono8");
+        metadata.originalChannels = 1;
+        metadata.originalDepth = 8;
+        break;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+    case QImage::Format_Grayscale16:
+        metadata.colorMode = QStringLiteral("mono");
+        metadata.pixelFormat = QStringLiteral("Mono16");
+        metadata.originalChannels = 1;
+        metadata.originalDepth = 16;
+        break;
+#endif
+    case QImage::Format_RGB888:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("RGB8");
+        metadata.originalChannels = 3;
+        metadata.originalDepth = 8;
+        break;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+    case QImage::Format_BGR888:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("BGR8");
+        metadata.originalChannels = 3;
+        metadata.originalDepth = 8;
+        break;
+#endif
+    case QImage::Format_RGB32:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("RGBX8");
+        metadata.originalChannels = 4;
+        metadata.originalDepth = 8;
+        break;
+    case QImage::Format_ARGB32:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("ARGB8");
+        metadata.originalChannels = 4;
+        metadata.originalDepth = 8;
+        break;
+    case QImage::Format_ARGB32_Premultiplied:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("ARGB8_Premultiplied");
+        metadata.originalChannels = 4;
+        metadata.originalDepth = 8;
+        break;
+    case QImage::Format_RGBX8888:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("RGBX8");
+        metadata.originalChannels = 4;
+        metadata.originalDepth = 8;
+        break;
+    case QImage::Format_RGBA8888:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("RGBA8");
+        metadata.originalChannels = 4;
+        metadata.originalDepth = 8;
+        break;
+    case QImage::Format_RGBA8888_Premultiplied:
+        metadata.colorMode = QStringLiteral("color");
+        metadata.pixelFormat = QStringLiteral("RGBA8_Premultiplied");
+        metadata.originalChannels = 4;
+        metadata.originalDepth = 8;
+        break;
+    default:
+        break;
+    }
+
+    return metadata;
+}
+
 FrameInputMetadata FrameInputMetadata::fromJson(const QJsonObject &json)
 {
     FrameInputMetadata metadata;
@@ -99,7 +186,13 @@ bool FrameInputMetadata::isSupportedColor8() const
         QStringLiteral("BGR8"),
         QStringLiteral("BGRA8"),
         QStringLiteral("UYVY8"),
-        QStringLiteral("NV12")
+        QStringLiteral("NV12"),
+        QStringLiteral("RGB8"),
+        QStringLiteral("RGBX8"),
+        QStringLiteral("ARGB8"),
+        QStringLiteral("ARGB8_Premultiplied"),
+        QStringLiteral("RGBA8"),
+        QStringLiteral("RGBA8_Premultiplied")
     };
     return colorMode == QStringLiteral("color")
             && originalDepth == 8
