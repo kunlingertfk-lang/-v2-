@@ -20,6 +20,7 @@
 10. 色谱特征本阶段禁用并返回 unsupported；后续可单独研究 `class_2dim_sup`，但不宣称复刻海康内部算法。
 11. 位置修正本阶段不实现，只保留接口；旧配置请求时继续原始 ROI 并输出未应用 warning。
 12. 颜色比较采用独立 V2 提取路径，本轮不修改颜色识别现有行为。
+13. `templateRegionMode="custom"` 时，检测 ROI/圆形/检测 Mask 变化不使模型失效；`templateRegionMode="sync"` 时，检测区域形状、几何和检测 Mask 都属于模板提取参数，任一变化都使模型 stale。sync 建模先应用同步检测 Mask，再叠加模板专用 Mask。
 
 ## 已知阻塞
 

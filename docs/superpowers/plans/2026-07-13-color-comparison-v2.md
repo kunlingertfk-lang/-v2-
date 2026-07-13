@@ -19,6 +19,7 @@
 - V1 裸模型只允许 stale/unsupported 后重新取样，不允许转置、静默迁移或继续使用旧评分。
 - 位置修正只保留接口；UI 禁用，运行不应用，payload 输出 warning。
 - 色谱特征禁用并返回 `unsupported_feature`。
+- `custom` 模式下检测 ROI/圆形/检测 Mask 变化不使模型失效；`sync` 模式下三者属于模板提取参数，变化必须 stale，sync 建模先应用检测 Mask 再叠加模板 Mask。
 - 本轮不修改 `ColorRecognitionHalconRunner` 的算法或既有评分行为；其 H/S 轴问题另立任务。
 - 不修改用户现有改动：`docs/FID/RegisteredClassification/tempFunc.md`、`projects/scheme_0d5611a7/reference.png`、`projects/scheme_0d5611a7/scheme.json` 和本地智能相机手册 PDF。
 - 所有手工修改使用 `apply_patch`；构建使用 `build/` 影子目录；构建产物不入库。
@@ -543,7 +544,7 @@ for (int hueBin = 0; hueBin < 32; ++hueBin) {
 
 归一化使用 `tuple_sum/tuple_div`。V 生成 32 维诊断直方图，不加入 H/S 分数。
 
-模板建模时，`templateRegionMode="custom"` 使用独立矩形模板 ROI；`templateRegionMode="sync"` 使用检测区域的实际形状和几何，检测区为圆形时模板也生成同一圆形 Region。模板 mask 在最终模板 Region 上做 difference。成功模型必须写入 referenceImageHash、覆盖模板模式/几何/mask/补偿常量的 extractParamsHash、effectivePixelCount 和输入签名。
+模板建模时，`templateRegionMode="custom"` 使用独立矩形模板 ROI；`templateRegionMode="sync"` 使用检测区域的实际形状和几何，检测区为圆形时模板也生成同一圆形 Region，并先对同步检测 mask 做 difference。模板 mask 随后在最终模板 Region 上再次做 difference。成功模型必须写入 referenceImageHash、覆盖模板模式/几何/有效 mask/补偿常量的 extractParamsHash、effectivePixelCount 和输入签名。
 
 - [ ] **Step 5: 实现交集、容差和补偿**
 
@@ -706,6 +707,98 @@ Expected: 模型、迁移和 Adapter 合同全部通过。
 
 ---
 
+### Task 4.5: 固化 sync 模式的检测 Mask 与 stale 合同
+
+**Files:**
+
+- Modify: `src/algorithms/recognition/ColorComparisonHalconRunner.cpp`
+- Modify: `smoke/color_comparison_smoke.cpp`
+
+**Interfaces:**
+
+- Keeps: `ColorComparisonHalconRunner::buildTemplateModel(...)`、`run(...)` 公开签名不变。
+- Changes: `templateRegionMode="sync"` 的模板有效 Region 与 `extractParamsHash` 同时纳入检测 Mask；`custom` 明确忽略检测几何和检测 Mask。
+
+- [ ] **Step 1: 写 sync Mask 失败测试**
+
+在 licensed smoke 中先构造 sync 配置，检测 ROI 使用全图，检测 Mask 使用非退化矩形多边形，模板 Mask 使用另一块不重叠多边形：
+
+```cpp
+ColorComparisonHalconConfig sync = baseConfig;
+sync.templateRegionMode = QStringLiteral("sync");
+sync.detectMaskPolygonNormalized = {
+    QPointF(0.0, 0.0), QPointF(0.25, 0.0),
+    QPointF(0.25, 1.0), QPointF(0.0, 1.0)
+};
+sync.templateMaskPolygonNormalized = {
+    QPointF(0.75, 0.0), QPointF(1.0, 0.0),
+    QPointF(1.0, 1.0), QPointF(0.75, 1.0)
+};
+const ColorComparisonTemplateBuildResult built =
+        runner.buildTemplateModel(image, sync);
+check(built.success && built.model.effectivePixelCount < image.total(),
+      "sync template build must apply detection and template masks");
+
+ColorComparisonHalconConfig changedSync = sync;
+changedSync.model = built.model;
+changedSync.detectMaskPolygonNormalized[1].setX(0.30);
+const ColorComparisonHalconResult stale = runner.run(image, changedSync);
+check(!stale.success && stale.status == QStringLiteral("model_stale"),
+      "sync detection mask changes must stale the model");
+
+ColorComparisonHalconConfig custom = sync;
+custom.templateRegionMode = QStringLiteral("custom");
+custom.detectMaskPolygonNormalized.clear();
+const ColorComparisonTemplateBuildResult customBuilt =
+        runner.buildTemplateModel(image, custom);
+custom.model = customBuilt.model;
+custom.detectMaskPolygonNormalized = sync.detectMaskPolygonNormalized;
+custom.halconSoPath = QCoreApplication::applicationFilePath();
+const ColorComparisonHalconResult customResult = runner.run(image, custom);
+check(customResult.status != QStringLiteral("model_stale"),
+      "custom detection mask changes must not stale the model");
+```
+
+- [ ] **Step 2: 运行测试确认新增断言失败**
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/color_comparison_smoke.pro -o build/color_comparison.Makefile
+make -C build -f color_comparison.Makefile -j8
+RUN_HALCON_LICENSED_SMOKE=1 ./build/smoke/color_comparison/bin/color_comparison_smoke
+```
+
+Expected: 除已记录的本机 HALCON H/S 轴与红色回绕两项差异外，新增 sync Mask effective pixels 或 stale 断言失败。
+
+- [ ] **Step 3: 实现双 Mask 模板 Region 和哈希**
+
+`templateExtractParams(...)` 仅在 sync 模式加入以下字段；custom 模式不得写入空字段，以保持既有 custom V2 模型哈希兼容：
+
+```cpp
+if (mode == QStringLiteral("sync")) {
+    params.insert(QStringLiteral("syncDetectionMaskPolygon"),
+                  pointsToJson(config.detectMaskPolygonNormalized));
+}
+```
+
+`createEffectiveRegion(...)` 的模板分支按顺序处理：基础检测几何 → sync 检测 Mask difference → 模板 Mask difference。custom 模式只处理模板 Mask；检测分支仍只处理检测 Mask。两个 difference 输出使用独立 `HalconObject`，禁止复用同一 HALCON 输出句柄或重复 clear。
+
+- [ ] **Step 4: 构建运行并提交**
+
+```bash
+/home/tt/Qt/5.15.2/gcc_64/bin/qmake smoke/color_comparison_smoke.pro -o build/color_comparison.Makefile
+make -C build -f color_comparison.Makefile -j8
+./build/smoke/color_comparison/bin/color_comparison_smoke
+RUN_HALCON_LICENSED_SMOKE=1 ./build/smoke/color_comparison/bin/color_comparison_smoke
+git diff --check
+git add src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
+        smoke/color_comparison_smoke.cpp
+git commit -m "fix: align sync color comparison masks"
+```
+
+Expected: 默认 preflight exit 0；licensed smoke 仅保留用户已裁决的本机 H/S 轴与红色回绕两项失败，新增 sync/custom Mask 断言通过。
+
+---
+
 ### Task 5: 改造 Dialog 模型状态、UI 和异步运行
 
 **Files:**
@@ -749,7 +842,7 @@ check(before.params == after.params,
       "Basic/All switching must be pure visibility");
 ```
 
-加载 ready V2 后断言：检测 ROI、minScore、sensitivity 不改 model hash；参考图 signal、模板 ROI/Mask、templateRegionMode、brightnessCompensation 使 state=stale；V1 显示重建提示；保存回显保持 version 2。
+加载 ready V2 后断言：custom 模式检测 ROI/圆形/检测 Mask、minScore、sensitivity 不改 model hash；sync 模式检测 ROI/圆形/检测 Mask 使 state=stale；参考图 signal、模板 ROI/Mask、templateRegionMode、brightnessCompensation 使 state=stale；V1 显示重建提示；保存回显保持 version 2。
 
 - [ ] **Step 2: 运行测试确认旧 UI 失败**
 
@@ -792,7 +885,7 @@ connect(&ReferenceImageProvider::instance(),
         });
 ```
 
-模板模式/ROI/Mask/光照补偿置 stale；检测 ROI/Mask、sensitivity、minScore 不置 stale。`colorComparisonParams()` 始终保存 V2 嵌套结构，不读取 allButton 决定算法。
+模板模式/ROI/Mask/光照补偿置 stale；检测 ROI/圆形/检测 Mask 仅在 sync 模式置 stale，在 custom 模式不置 stale；sensitivity、minScore 始终不置 stale。`colorComparisonParams()` 始终保存 V2 嵌套结构，不读取 allButton 决定算法。
 
 - [ ] **Step 4: 完成 UI 和真实统计图**
 
