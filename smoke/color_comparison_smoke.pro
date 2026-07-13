@@ -13,6 +13,8 @@ UI_DIR = $$BUILD_ROOT/ui
 system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 
 INCLUDEPATH += ../src
+COLOR_COMPARISON_RUNNER_SOURCE = $$absolute_path(../src/algorithms/recognition/ColorComparisonHalconRunner.cpp, $$_PRO_FILE_PWD_)
+DEFINES += COLOR_COMPARISON_RUNNER_SOURCE_PATH=\\\"$$COLOR_COMPARISON_RUNNER_SOURCE\\\"
 OPENCV_ROOT = /home/tt/.local/opencv-4.8.0
 INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
 HALCON_ROOT = $$(HALCONROOT)

@@ -2,6 +2,7 @@
 #include "algorithms/recognition/ColorComparisonHalconRunner.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QtGlobal>
@@ -151,6 +152,36 @@ bool warningsContain(const QJsonObject &payload, const QString &warning)
     return false;
 }
 
+void checkRunnerSourceContract()
+{
+    QFile source(QString::fromLocal8Bit(COLOR_COMPARISON_RUNNER_SOURCE_PATH));
+    check(source.open(QIODevice::ReadOnly),
+          "runner source must be readable for HALCON-only scoring contract checks");
+    if (!source.isOpen())
+        return;
+
+    const QByteArray code = source.readAll();
+    check(!code.contains("constexpr qint64 kMinEffectivePixels"),
+          "runner must not duplicate the shared minimum-effective-pixels contract");
+    check(code.contains("kColorComparisonMinimumEffectivePixels"),
+          "runner must use the shared minimum-effective-pixels contract");
+    check(code.contains("\"T_tuple_max\""),
+          "runner must resolve T_tuple_max as a required HALCON symbol");
+    const int scoringStart = code.indexOf("double shiftedHistogramIntersection");
+    const int scoringEnd = code.indexOf("QJsonObject brightnessDiagnostics",
+                                        scoringStart);
+    check(scoringStart >= 0 && scoringEnd > scoringStart,
+          "runner scoring implementation must be locatable for static contract checks");
+    if (scoringStart < 0 || scoringEnd <= scoringStart)
+        return;
+
+    const QByteArray scoring = code.mid(scoringStart, scoringEnd - scoringStart);
+    check(scoring.contains("api->tupleMax("),
+          "runner scoring must call the resolved HALCON tuple_max operator");
+    check(!scoring.contains("qMax("),
+          "runner must not use C++ qMax for scoring candidate aggregation");
+}
+
 void checkDefaultContract(ColorComparisonHalconRunner *runner)
 {
     ColorComparisonHalconConfig emptyModelConfig;
@@ -228,6 +259,23 @@ void checkDefaultContract(ColorComparisonHalconRunner *runner)
     check(!invalidCircle.success &&
           invalidCircle.status == QStringLiteral("invalid_detect_roi"),
           "zero-radius detection circle must fail before the model");
+
+    const cv::Mat landscapeImage(103, 384, CV_8UC3, cv::Scalar(0, 0, 0));
+    ColorComparisonHalconConfig shortEdgeCircleConfig = baseConfig();
+    shortEdgeCircleConfig.halconSoPath = QCoreApplication::applicationFilePath();
+    shortEdgeCircleConfig.detectRegionType = QStringLiteral("circle");
+    shortEdgeCircleConfig.detectCircleCenterNormalized = QPointF(0.5, 0.2);
+    shortEdgeCircleConfig.detectCircleRadiusNormalized = 30.0 / 384.0;
+    const ColorComparisonHalconResult shortEdgeRun =
+            runner->run(landscapeImage, shortEdgeCircleConfig);
+    check(!shortEdgeRun.success &&
+          shortEdgeRun.status == QStringLiteral("invalid_detect_roi"),
+          "landscape circle crossing the short image edge must fail run preflight");
+    const ColorComparisonTemplateBuildResult shortEdgeBuild =
+            runner->buildTemplateModel(landscapeImage, shortEdgeCircleConfig);
+    check(!shortEdgeBuild.success &&
+          shortEdgeBuild.status == QStringLiteral("invalid_detect_roi"),
+          "landscape circle crossing the short image edge must fail build preflight");
 
     ColorComparisonHalconConfig invalidMaskConfig;
     invalidMaskConfig.detectMaskPolygonNormalized = {
@@ -309,7 +357,7 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
     }
     check(greenMaximum >= 0 && greenMaximum / 32 >= 9 && greenMaximum / 32 <= 11 &&
           greenMaximum % 32 >= 30,
-          "histo_2dim must flatten row=Hue and column=Saturation as hue-major");
+          "histo_2dim ImageCol=H/ImageRow=S must read row=S/column=H and expose hue-major output");
 
     ColorComparisonHalconConfig runConfig = buildConfig;
     runConfig.model = built.model;
@@ -468,6 +516,69 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
     }
 
     {
+        constexpr int imageWidth = 384;
+        constexpr int imageHeight = 103;
+        constexpr double radiusPixels = 30.0;
+        constexpr double pi = 3.14159265358979323846;
+        const double radiusNormalized = radiusPixels / imageWidth;
+        const double expectedArea = pi * radiusPixels * radiusPixels;
+        const cv::Mat landscapeImage = solidColor(imageHeight, imageWidth, green);
+
+        ColorComparisonHalconConfig landscapeCircleConfig = baseConfig();
+        landscapeCircleConfig.templateRegionMode = QStringLiteral("sync");
+        landscapeCircleConfig.detectRegionType = QStringLiteral("circle");
+        landscapeCircleConfig.detectCircleCenterNormalized = QPointF(0.5, 0.5);
+        landscapeCircleConfig.detectCircleRadiusNormalized = radiusNormalized;
+
+        ColorComparisonTemplateBuildResult landscapeBuilt;
+        if (buildOrReport(runner,
+                          landscapeImage,
+                          landscapeCircleConfig,
+                          &landscapeBuilt,
+                          "landscape sync circle")) {
+            check(std::abs(static_cast<double>(landscapeBuilt.model.effectivePixelCount)
+                           - expectedArea) <= expectedArea * 0.03,
+                  "landscape circle template area must use radius normalized by the maximum image side");
+
+            landscapeCircleConfig.model = landscapeBuilt.model;
+            const ColorComparisonHalconResult landscape =
+                    runner->run(landscapeImage, landscapeCircleConfig);
+            check(landscape.success &&
+                  std::abs(landscape.payload
+                               .value(QStringLiteral("effectiveDetectionPixels"))
+                               .toDouble() - expectedArea) <= expectedArea * 0.03,
+                  "landscape circle detection area must preserve the user-drawn pixel radius");
+            check(landscape.success && landscape.overlays.size() == 1 &&
+                  landscape.overlays.first().type == ToolOverlayType::Circle &&
+                  near(landscape.overlays.first().center.x(), imageWidth * 0.5, 1e-9) &&
+                  near(landscape.overlays.first().center.y(), imageHeight * 0.5, 1e-9) &&
+                  near(landscape.overlays.first().radius, radiusPixels, 1e-9),
+                  "landscape circle overlay must use the same pixel center and maximum-side radius");
+
+            const QJsonObject detectionRoi = landscape.payload
+                    .value(QStringLiteral("detectionRoi")).toObject();
+            check(detectionRoi.value(QStringLiteral("type")).toString()
+                      == QStringLiteral("circle") &&
+                  near(detectionRoi.value(QStringLiteral("radius")).toDouble(),
+                       radiusNormalized,
+                       1e-12) &&
+                  near(detectionRoi.value(QStringLiteral("radiusNormalized")).toDouble(),
+                       radiusNormalized,
+                       1e-12) &&
+                  near(detectionRoi.value(QStringLiteral("radiusPixels")).toDouble(),
+                       radiusPixels,
+                       1e-9) &&
+                  near(detectionRoi.value(QStringLiteral("width")).toDouble(),
+                       2.0 * radiusPixels / imageWidth,
+                       1e-12) &&
+                  near(detectionRoi.value(QStringLiteral("height")).toDouble(),
+                       2.0 * radiusPixels / imageHeight,
+                       1e-12),
+                  "landscape circle payload must expose maximum-side radius and aspect-correct bounds");
+        }
+    }
+
+    {
         ColorComparisonHalconConfig sync = baseConfig();
         sync.templateRegionMode = QStringLiteral("sync");
         sync.detectMaskPolygonNormalized = {
@@ -508,13 +619,28 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
         const QString legacyCustomHash = colorComparisonExtractParamsHash(
                     legacyCustomExtractParams(custom.templateMaskPolygonNormalized));
         check(customBuilt.success &&
-              customBuilt.model.extractParamsHash == legacyCustomHash,
-              "custom builds must retain the pre-sync V2 extract hash");
+              customBuilt.model.extractParamsHash != legacyCustomHash,
+              "histogram coordinate contract revision must invalidate legacy V2 extract hashes");
         check(customBuilt.success &&
               customBuilt.payload.value(QStringLiteral("extractParams")).isObject() &&
+              customExtractParams
+                  .value(QStringLiteral("histogramCoordinateContract"))
+                  .toString()
+                  == QStringLiteral("image_col_h_image_row_s_row_s_column_h") &&
               !customExtractParams.contains(
                   QStringLiteral("syncDetectionMaskPolygon")),
-              "custom extract payload must omit the sync detection mask key");
+              "custom extract payload must identify the histogram coordinate contract and omit the sync mask key");
+
+        if (customBuilt.success) {
+            ColorComparisonHalconConfig legacyModel = custom;
+            legacyModel.model = customBuilt.model;
+            legacyModel.model.extractParamsHash = legacyCustomHash;
+            const ColorComparisonHalconResult rejectedLegacy =
+                    runner->run(referenceImage, legacyModel);
+            check(!rejectedLegacy.success &&
+                  rejectedLegacy.status == QStringLiteral("model_stale"),
+                  "models hashed without the histogram coordinate contract revision must be stale");
+        }
 
         if (customBuilt.success) {
             custom.model = customBuilt.model;
@@ -652,6 +778,7 @@ int main(int argc, char **argv)
     HalconRuntimePaths::initializeHalconEnvironment();
 
     ColorComparisonHalconRunner runner;
+    checkRunnerSourceContract();
     checkDefaultContract(&runner);
 
     if (!qEnvironmentVariableIsSet("RUN_HALCON_LICENSED_SMOKE")) {

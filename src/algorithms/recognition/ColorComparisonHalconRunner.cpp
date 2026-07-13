@@ -18,7 +18,6 @@ namespace {
 
 constexpr int kHistogramBins = 32;
 constexpr int kHistogramLength = kHistogramBins * kHistogramBins;
-constexpr qint64 kMinEffectivePixels = 4;
 constexpr double kMinBrightnessMean = 8.0;
 constexpr double kMaxBrightnessMean = 247.0;
 constexpr double kMinBrightnessScale = 0.75;
@@ -55,6 +54,25 @@ bool finiteValue(double value)
     return std::isfinite(value);
 }
 
+struct CirclePixelGeometry
+{
+    QPointF center;
+    double radius = 0.0;
+};
+
+CirclePixelGeometry circlePixelGeometry(const QPointF &normalizedCenter,
+                                        double normalizedRadius,
+                                        int imageWidth,
+                                        int imageHeight)
+{
+    return {
+        QPointF(normalizedCenter.x() * static_cast<double>(imageWidth),
+                normalizedCenter.y() * static_cast<double>(imageHeight)),
+        normalizedRadius
+                * static_cast<double>(std::max(imageWidth, imageHeight))
+    };
+}
+
 bool validNormalizedRect(const QRectF &rect)
 {
     return finiteValue(rect.x()) && finiteValue(rect.y())
@@ -65,12 +83,28 @@ bool validNormalizedRect(const QRectF &rect)
             && rect.y() + rect.height() <= 1.0;
 }
 
-bool validNormalizedCircle(const QPointF &center, double radius)
+bool validNormalizedCircle(const QPointF &center,
+                           double radius,
+                           int imageWidth,
+                           int imageHeight)
 {
-    return finiteValue(center.x()) && finiteValue(center.y()) && finiteValue(radius)
-            && radius > 0.0
-            && center.x() - radius >= 0.0 && center.x() + radius <= 1.0
-            && center.y() - radius >= 0.0 && center.y() + radius <= 1.0;
+    if (imageWidth <= 0 || imageHeight <= 0
+            || !finiteValue(center.x()) || !finiteValue(center.y())
+            || !finiteValue(radius) || radius <= 0.0) {
+        return false;
+    }
+
+    const CirclePixelGeometry geometry = circlePixelGeometry(
+                center, radius, imageWidth, imageHeight);
+    return finiteValue(geometry.center.x())
+            && finiteValue(geometry.center.y())
+            && finiteValue(geometry.radius)
+            && geometry.center.x() - geometry.radius >= -kGeometryEpsilon
+            && geometry.center.x() + geometry.radius
+                <= static_cast<double>(imageWidth) + kGeometryEpsilon
+            && geometry.center.y() - geometry.radius >= -kGeometryEpsilon
+            && geometry.center.y() + geometry.radius
+                <= static_cast<double>(imageHeight) + kGeometryEpsilon;
 }
 
 bool validNormalizedPolygon(const QVector<QPointF> &points)
@@ -218,8 +252,10 @@ QJsonObject templateExtractParams(const ColorComparisonHalconConfig &config)
         {QStringLiteral("hueBins"), kHistogramBins},
         {QStringLiteral("saturationBins"), kHistogramBins},
         {QStringLiteral("layout"), QStringLiteral("hue_major")},
+        {QStringLiteral("histogramCoordinateContract"),
+         QStringLiteral("image_col_h_image_row_s_row_s_column_h")},
         {QStringLiteral("minimumEffectivePixels"),
-         static_cast<double>(kMinEffectivePixels)},
+         static_cast<double>(kColorComparisonMinimumEffectivePixels)},
         {QStringLiteral("templateRegionMode"), mode},
         {QStringLiteral("templateGeometry"), geometry},
         {QStringLiteral("templateMaskPolygon"),
@@ -234,18 +270,34 @@ QJsonObject templateExtractParams(const ColorComparisonHalconConfig &config)
     return params;
 }
 
-QJsonObject detectionRoiJson(const ColorComparisonHalconConfig &config)
+QJsonObject detectionRoiJson(const ColorComparisonHalconConfig &config,
+                             int imageWidth,
+                             int imageHeight)
 {
     QJsonObject json;
     const QString type = normalizedDetectRegionType(config.detectRegionType);
     json.insert(QStringLiteral("type"), type);
     json.insert(QStringLiteral("angle"), 0.0);
     if (type == QStringLiteral("circle")) {
+        const CirclePixelGeometry geometry = circlePixelGeometry(
+                    config.detectCircleCenterNormalized,
+                    config.detectCircleRadiusNormalized,
+                    imageWidth,
+                    imageHeight);
+        const double normalizedWidth = imageWidth > 0
+                ? geometry.radius * 2.0 / static_cast<double>(imageWidth)
+                : config.detectCircleRadiusNormalized * 2.0;
+        const double normalizedHeight = imageHeight > 0
+                ? geometry.radius * 2.0 / static_cast<double>(imageHeight)
+                : config.detectCircleRadiusNormalized * 2.0;
         json.insert(QStringLiteral("centerX"), config.detectCircleCenterNormalized.x());
         json.insert(QStringLiteral("centerY"), config.detectCircleCenterNormalized.y());
-        json.insert(QStringLiteral("width"), config.detectCircleRadiusNormalized * 2.0);
-        json.insert(QStringLiteral("height"), config.detectCircleRadiusNormalized * 2.0);
+        json.insert(QStringLiteral("width"), normalizedWidth);
+        json.insert(QStringLiteral("height"), normalizedHeight);
         json.insert(QStringLiteral("radius"), config.detectCircleRadiusNormalized);
+        json.insert(QStringLiteral("radiusNormalized"),
+                    config.detectCircleRadiusNormalized);
+        json.insert(QStringLiteral("radiusPixels"), geometry.radius);
     } else {
         json.insert(QStringLiteral("centerX"),
                     config.detectRoiNormalized.x()
@@ -282,7 +334,9 @@ QJsonObject emptyBrightnessDiagnostics(const ColorComparisonHalconConfig &config
 }
 
 QJsonObject baseRunPayload(const ColorComparisonHalconConfig &config,
-                           const QStringList &warnings)
+                           const QStringList &warnings,
+                           int imageWidth,
+                           int imageHeight)
 {
     return {
         {QStringLiteral("measurementValid"), false},
@@ -299,7 +353,8 @@ QJsonObject baseRunPayload(const ColorComparisonHalconConfig &config,
         {QStringLiteral("brightnessCompensation"),
          emptyBrightnessDiagnostics(config)},
         {QStringLiteral("positionCorrection"), positionCorrectionJson(config)},
-        {QStringLiteral("detectionRoi"), detectionRoiJson(config)},
+        {QStringLiteral("detectionRoi"),
+         detectionRoiJson(config, imageWidth, imageHeight)},
         {QStringLiteral("warnings"), stringsToJson(warnings)}
     };
 }
@@ -308,13 +363,15 @@ ColorComparisonHalconResult runFailure(const QString &status,
                                        const QString &message,
                                        const ColorComparisonHalconConfig &config,
                                        const QStringList &warnings,
-                                       qint64 elapsedMs)
+                                       qint64 elapsedMs,
+                                       int imageWidth,
+                                       int imageHeight)
 {
     ColorComparisonHalconResult result;
     result.status = status;
     result.message = message;
     result.elapsedMs = elapsedMs;
-    result.payload = baseRunPayload(config, warnings);
+    result.payload = baseRunPayload(config, warnings, imageWidth, imageHeight);
     result.payload.insert(QStringLiteral("status"), status);
     result.payload.insert(QStringLiteral("message"), message);
     result.payload.insert(QStringLiteral("elapsedMs"),
@@ -324,14 +381,18 @@ ColorComparisonHalconResult runFailure(const QString &status,
 
 ColorComparisonHalconResult unsupportedColorResult(
         const ColorComparisonHalconConfig &config,
-        qint64 elapsedMs)
+        qint64 elapsedMs,
+        int imageWidth,
+        int imageHeight)
 {
     ColorComparisonHalconResult result = runFailure(
                 QStringLiteral("unsupported_color_input"),
                 QStringLiteral("Original input is monochrome; color comparison is invalid."),
                 config,
                 QStringList(),
-                elapsedMs);
+                elapsedMs,
+                imageWidth,
+                imageHeight);
     result.success = true;
     result.ok = false;
     result.measurementValid = false;
@@ -363,7 +424,9 @@ void mergePayloadPatch(QJsonObject *payload, const QJsonObject &patch)
         payload->insert(iterator.key(), iterator.value());
 }
 
-RunnerFailure validateGeometry(const ColorComparisonHalconConfig &config)
+RunnerFailure validateGeometry(const ColorComparisonHalconConfig &config,
+                               int imageWidth,
+                               int imageHeight)
 {
     const QString templateMode = normalizedTemplateRegionMode(config.templateRegionMode);
     if (templateMode != QStringLiteral("custom")
@@ -389,9 +452,11 @@ RunnerFailure validateGeometry(const ColorComparisonHalconConfig &config)
         }
     } else if (detectType == QStringLiteral("circle")) {
         if (!validNormalizedCircle(config.detectCircleCenterNormalized,
-                                   config.detectCircleRadiusNormalized)) {
+                                   config.detectCircleRadiusNormalized,
+                                   imageWidth,
+                                   imageHeight)) {
             return {QStringLiteral("invalid_detect_roi"),
-                    QStringLiteral("Detection circle must be finite, positive, and inside [0,1].")};
+                    QStringLiteral("Detection circle must be finite, positive, and inside the image bounds.")};
         }
     } else {
         return {QStringLiteral("invalid_detect_roi"),
@@ -451,6 +516,7 @@ struct HalconCApi
     using TupleSelectFn = Herror (*)(const Htuple, const Htuple, Htuple *);
     using TupleMin2Fn = Herror (*)(const Htuple, const Htuple, Htuple *);
     using TupleSumFn = Herror (*)(const Htuple, Htuple *);
+    using TupleMaxFn = Herror (*)(const Htuple, Htuple *);
     using TupleDivFn = Herror (*)(const Htuple, const Htuple, Htuple *);
     using ClearObjFn = Herror (*)(const Hobject);
 
@@ -477,6 +543,7 @@ struct HalconCApi
     TupleSelectFn tupleSelect = nullptr;
     TupleMin2Fn tupleMin2 = nullptr;
     TupleSumFn tupleSum = nullptr;
+    TupleMaxFn tupleMax = nullptr;
     TupleDivFn tupleDiv = nullptr;
     ClearObjFn clearObj = nullptr;
 };
@@ -557,6 +624,7 @@ public:
                 || !resolveRequired(m_handle, api.tupleSelect, "T_tuple_select", message)
                 || !resolveRequired(m_handle, api.tupleMin2, "T_tuple_min2", message)
                 || !resolveRequired(m_handle, api.tupleSum, "T_tuple_sum", message)
+                || !resolveRequired(m_handle, api.tupleMax, "T_tuple_max", message)
                 || !resolveRequired(m_handle, api.tupleDiv, "T_tuple_div", message)
                 || !resolveRequired(m_handle, api.clearObj, "clear_obj", message)) {
             *symbolMissing = true;
@@ -849,10 +917,13 @@ void createCircleRegion(HalconCApi *api,
                         HalconObject *region,
                         const QString &stage)
 {
-    const double row = normalizedCenter.y() * static_cast<double>(height - 1);
-    const double column = normalizedCenter.x() * static_cast<double>(width - 1);
-    const double radius = normalizedRadius * static_cast<double>(std::min(width, height));
-    checkHalcon(api, api->genCircle(region->ptr(), row, column, radius),
+    const CirclePixelGeometry geometry = circlePixelGeometry(
+                normalizedCenter, normalizedRadius, width, height);
+    checkHalcon(api,
+                api->genCircle(region->ptr(),
+                               geometry.center.y(),
+                               geometry.center.x(),
+                               geometry.radius),
                 stage + QStringLiteral(".gen_circle"));
 }
 
@@ -931,7 +1002,7 @@ void createEffectiveRegion(HalconCApi *api,
     }
 
     const double area = regionArea(api, *effectiveRegion, stage);
-    if (area < static_cast<double>(kMinEffectivePixels)) {
+    if (area < static_cast<double>(kColorComparisonMinimumEffectivePixels)) {
         if (*maskApplied) {
             throw RunnerFailure{
                 templateRegion ? QStringLiteral("template_masked_empty")
@@ -1079,11 +1150,12 @@ QVector<double> hsHistogram(HalconCApi *api,
     for (int hueBin = 0; hueBin < kHistogramBins; ++hueBin) {
         for (int saturationBin = 0; saturationBin < kHistogramBins;
              ++saturationBin) {
-            // The HALCON contract defines ImageCol (H) as the output row and
-            // ImageRow (S) as the output column.  Keep the external feature
-            // layout H-major regardless of the image's row-major storage.
-            rows.append(hueBin);
-            columns.append(saturationBin);
+            // HALCON's ImageCol/ImageRow parameter names, related official
+            // guides, and the 24.11.1 runtime canary agree that the first
+            // image maps to columns and the second to rows.  The tuple stays
+            // externally H-major even though the operator-page prose differs.
+            rows.append(saturationBin);
+            columns.append(hueBin);
         }
     }
     HalconTuple rowTuple = indexTuple(api, rows);
@@ -1341,7 +1413,10 @@ double shiftedHistogramIntersection(HalconCApi *api,
     detectWithZero.append(0.0);
     HalconTuple templateTuple = vectorTuple(api, templateFeature);
     HalconTuple detectTuple = vectorTuple(api, detectWithZero);
-    double bestIntersection = 0.0;
+    const int diameter = radius * 2 + 1;
+    HalconTuple intersections(api);
+    intersections.create(diameter * diameter);
+    int intersectionIndex = 0;
 
     for (int deltaHue = -radius; deltaHue <= radius; ++deltaHue) {
         for (int deltaSaturation = -radius;
@@ -1381,10 +1456,14 @@ double shiftedHistogramIntersection(HalconCApi *api,
             checkHalcon(api,
                         api->tupleSum(minimum.value(), intersection.ptr()),
                         QStringLiteral("score.tuple_sum"));
-            bestIntersection = qMax(bestIntersection, tupleScalar(intersection));
+            intersections.setDouble(intersectionIndex++, tupleScalar(intersection));
         }
     }
-    return qBound(0.0, bestIntersection, 1.0);
+    HalconTuple maximum(api);
+    checkHalcon(api,
+                api->tupleMax(intersections.value(), maximum.ptr()),
+                QStringLiteral("score.tuple_max"));
+    return qBound(0.0, tupleScalar(maximum), 1.0);
 }
 
 QJsonObject brightnessDiagnostics(const ColorComparisonHalconConfig &config,
@@ -1428,13 +1507,14 @@ QVector<ToolOverlay> detectionOverlays(const ColorComparisonHalconConfig &config
     ToolOverlay roi;
     if (normalizedDetectRegionType(config.detectRegionType)
             == QStringLiteral("circle")) {
+        const CirclePixelGeometry geometry = circlePixelGeometry(
+                    config.detectCircleCenterNormalized,
+                    config.detectCircleRadiusNormalized,
+                    image.cols,
+                    image.rows);
         roi.type = ToolOverlayType::Circle;
-        roi.center = QPointF(config.detectCircleCenterNormalized.x()
-                             * static_cast<double>(image.cols - 1),
-                             config.detectCircleCenterNormalized.y()
-                             * static_cast<double>(image.rows - 1));
-        roi.radius = config.detectCircleRadiusNormalized
-                * static_cast<double>(std::min(image.cols, image.rows));
+        roi.center = geometry.center;
+        roi.radius = geometry.radius;
     } else {
         roi.type = ToolOverlayType::Rect;
         roi.rect = normalizedRectToPixels(config.detectRoiNormalized, image);
@@ -1503,7 +1583,8 @@ ColorComparisonHalconRunner::buildTemplateModel(
                             QStringLiteral("Only original 8-bit CV_8UC3 and CV_8UC4 inputs are supported."),
                             timer.elapsed());
     }
-    const RunnerFailure geometryFailure = validateGeometry(config);
+    const RunnerFailure geometryFailure = validateGeometry(
+                config, referenceImage.cols, referenceImage.rows);
     if (!geometryFailure.status.isEmpty()) {
         return buildFailure(geometryFailure.status,
                             geometryFailure.message,
@@ -1616,12 +1697,14 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           QStringLiteral("Input image is empty."),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
     const QString colorMode = normalizedColorMode(config.inputSignature.colorMode);
     if (colorMode == QStringLiteral("mono"))
-        return unsupportedColorResult(config, timer.elapsed());
+        return unsupportedColorResult(config, timer.elapsed(), image.cols, image.rows);
     if (colorMode == QStringLiteral("unknown")) {
         warnings.append(QStringLiteral("input_color_mode_unknown"));
     } else if (colorMode != QStringLiteral("color")) {
@@ -1629,7 +1712,9 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           QStringLiteral("Original color mode is invalid."),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
     if (!supportedOriginalBitDepth(config.inputSignature)
@@ -1639,16 +1724,21 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           QStringLiteral("Only original 8-bit CV_8UC3 and CV_8UC4 inputs are supported."),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
-    const RunnerFailure geometryFailure = validateGeometry(config);
+    const RunnerFailure geometryFailure = validateGeometry(
+                config, image.cols, image.rows);
     if (!geometryFailure.status.isEmpty()) {
         return runFailure(geometryFailure.status,
                           geometryFailure.message,
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
     if (config.model.featureType != QStringLiteral("histogram_hs_2d")) {
@@ -1656,7 +1746,9 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           QStringLiteral("Only histogram_hs_2d is implemented."),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
     const QString expectedExtractParamsHash = colorComparisonExtractParamsHash(
@@ -1668,7 +1760,9 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           modelValidation.message,
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
     const int radius = sensitivityRadius(config.sensitivity);
@@ -1677,7 +1771,9 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           QStringLiteral("Sensitivity must be high, medium, or low."),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
     if (config.positionCorrectionRequested)
         warnings.append(QStringLiteral("position_correction_not_implemented"));
@@ -1687,7 +1783,9 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           runtimeNotFoundMessage(config),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
     HalconLibrary library;
@@ -1699,7 +1797,9 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           loadMessage,
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 
     try {
@@ -1728,7 +1828,7 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.elapsedMs = timer.elapsed();
         result.detectFeature = extracted.hsHistogram;
         result.overlays = detectionOverlays(config, image);
-        result.payload = baseRunPayload(config, warnings);
+        result.payload = baseRunPayload(config, warnings, image.cols, image.rows);
         result.payload.insert(QStringLiteral("status"), result.status);
         result.payload.insert(QStringLiteral("message"), result.message);
         result.payload.insert(QStringLiteral("measurementValid"), true);
@@ -1748,7 +1848,9 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                                                         failure.message,
                                                         config,
                                                         warnings,
-                                                        timer.elapsed());
+                                                        timer.elapsed(),
+                                                        image.cols,
+                                                        image.rows);
         mergePayloadPatch(&result.payload, failure.payloadPatch);
         return result;
     } catch (const std::exception &error) {
@@ -1756,12 +1858,16 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           QString::fromLocal8Bit(error.what()),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     } catch (...) {
         return runFailure(QStringLiteral("exception"),
                           QStringLiteral("Unknown exception while comparing colors."),
                           config,
                           warnings,
-                          timer.elapsed());
+                          timer.elapsed(),
+                          image.cols,
+                          image.rows);
     }
 }
