@@ -15,13 +15,15 @@
 
 namespace {
 
+int failureCount = 0;
+
 void check(bool condition, const char *message)
 {
     if (condition)
         return;
 
     std::cerr << "FAIL: " << message << std::endl;
-    std::exit(1);
+    ++failureCount;
 }
 
 ColorComparisonModelV2 readyModel()
@@ -104,6 +106,19 @@ int main(int argc, char **argv)
                           == model.brightnessReference.deviation,
           "V2 round-trip must preserve every runner-consumed model field");
 
+    QJsonObject nonExactCountRoot = root;
+    QJsonObject nonExactCountModel =
+            nonExactCountRoot.value(QStringLiteral("model")).toObject();
+    nonExactCountModel.insert(QStringLiteral("effectivePixelCount"),
+                              9007199254740992.0);
+    nonExactCountRoot.insert(QStringLiteral("model"), nonExactCountModel);
+    const ColorComparisonModelReadResult nonExactCount =
+            readColorComparisonModel(nonExactCountRoot, true);
+    check(!nonExactCount.success
+                  && nonExactCount.status == QStringLiteral("model_invalid")
+                  && nonExactCount.model.effectivePixelCount == 0,
+          "effective pixel count above 2^53-1 must be rejected before conversion");
+
     QJsonObject outOfRangeRoot = root;
     QJsonObject outOfRangeModel =
             outOfRangeRoot.value(QStringLiteral("model")).toObject();
@@ -115,6 +130,22 @@ int main(int argc, char **argv)
                   && outOfRange.status == QStringLiteral("model_invalid")
                   && outOfRange.model.effectivePixelCount == 0,
           "out-of-range effective pixel count must be rejected without narrowing");
+
+    QJsonObject outOfRangeBitDepthRoot = root;
+    QJsonObject outOfRangeBitDepthModel =
+            outOfRangeBitDepthRoot.value(QStringLiteral("model")).toObject();
+    QJsonObject outOfRangeSignature =
+            outOfRangeBitDepthModel.value(QStringLiteral("inputSignature")).toObject();
+    outOfRangeSignature.insert(QStringLiteral("bitDepth"), 2147483648.0);
+    outOfRangeBitDepthModel.insert(QStringLiteral("inputSignature"),
+                                   outOfRangeSignature);
+    outOfRangeBitDepthRoot.insert(QStringLiteral("model"), outOfRangeBitDepthModel);
+    const ColorComparisonModelReadResult outOfRangeBitDepth =
+            readColorComparisonModel(outOfRangeBitDepthRoot, true);
+    check(!outOfRangeBitDepth.success
+                  && outOfRangeBitDepth.status == QStringLiteral("model_invalid")
+                  && outOfRangeBitDepth.model.inputSignature.bitDepth == -1,
+          "out-of-int-range bit depth must be rejected before conversion");
 
     QJsonObject legacy;
     legacy.insert(QStringLiteral("version"), 1);
@@ -144,6 +175,30 @@ int main(int argc, char **argv)
           "unknown model versions must be rejected explicitly");
 
     ColorComparisonModelV2 invalid = model;
+    invalid.inputSignature.bitDepth = 16;
+    checkInvalid(invalid, "ready V2 model bit depth must equal 8");
+
+    invalid = model;
+    invalid.effectivePixelCount = 9007199254740992LL;
+    checkInvalid(invalid,
+                 "ready V2 model effective pixel count above 2^53-1 must be invalid");
+
+    ColorComparisonModelV2 maximumExactCount = model;
+    maximumExactCount.effectivePixelCount = 9007199254740991LL;
+    check(validateColorComparisonModel(maximumExactCount).success,
+          "2^53-1 must remain a valid effective pixel count boundary");
+    const QJsonObject maximumExactCountRoot{
+        {QStringLiteral("version"), 2},
+        {QStringLiteral("model"), colorComparisonModelToJson(maximumExactCount)}
+    };
+    const ColorComparisonModelReadResult maximumExactCountRoundTrip =
+            readColorComparisonModel(maximumExactCountRoot, true);
+    check(maximumExactCountRoundTrip.success
+                  && maximumExactCountRoundTrip.model.effectivePixelCount
+                          == 9007199254740991LL,
+          "2^53-1 effective pixel count must round-trip exactly");
+
+    invalid = model;
     invalid.values.resize(1023);
     checkInvalid(invalid, "1023-dimensional HS model must be invalid");
 
@@ -238,7 +293,9 @@ int main(int argc, char **argv)
     check(extractHash != colorComparisonExtractParamsHash(extractParams),
           "changed extraction parameters must change the hash");
 
-    std::cout << "color_comparison_model_smoke: V2 model contract checks passed"
-              << std::endl;
-    return 0;
+    if (failureCount == 0) {
+        std::cout << "color_comparison_model_smoke: V2 model contract checks passed"
+                  << std::endl;
+    }
+    return failureCount == 0 ? 0 : 1;
 }

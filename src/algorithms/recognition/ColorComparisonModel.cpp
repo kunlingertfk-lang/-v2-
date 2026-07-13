@@ -9,6 +9,8 @@
 
 namespace {
 
+constexpr qint64 kMaxExactJsonInteger = 9007199254740991LL;
+
 ColorComparisonModelValidation validationFailure(const QString &status,
                                                   const QString &message)
 {
@@ -65,14 +67,24 @@ bool isIntegerJsonValue(const QJsonValue &value)
     return std::isfinite(number) && std::floor(number) == number;
 }
 
-bool isQint64JsonValue(const QJsonValue &value)
+bool isIntJsonValue(const QJsonValue &value)
 {
     if (!isIntegerJsonValue(value))
         return false;
 
     const double number = value.toDouble();
-    const double qint64Limit = std::ldexp(1.0, 63);
-    return number >= -qint64Limit && number < qint64Limit;
+    return number >= static_cast<double>(std::numeric_limits<int>::min())
+            && number <= static_cast<double>(std::numeric_limits<int>::max());
+}
+
+bool isEffectivePixelCountJsonValue(const QJsonValue &value)
+{
+    if (!isIntegerJsonValue(value))
+        return false;
+
+    const double number = value.toDouble();
+    return number >= static_cast<double>(std::numeric_limits<qint64>::min())
+            && number <= static_cast<double>(kMaxExactJsonInteger);
 }
 
 bool hasStrictModelShape(const QJsonObject &object)
@@ -86,19 +98,20 @@ bool hasStrictModelShape(const QJsonObject &object)
             && object.value(QStringLiteral("featureType")).isString()
             && object.value(QStringLiteral("algorithm")).isString()
             && object.value(QStringLiteral("colorSpace")).isString()
-            && isIntegerJsonValue(object.value(QStringLiteral("hueBins")))
-            && isIntegerJsonValue(object.value(QStringLiteral("saturationBins")))
+            && isIntJsonValue(object.value(QStringLiteral("hueBins")))
+            && isIntJsonValue(object.value(QStringLiteral("saturationBins")))
             && object.value(QStringLiteral("layout")).isString()
             && object.value(QStringLiteral("normalized")).isBool()
             && object.value(QStringLiteral("values")).isArray()
             && object.value(QStringLiteral("valueHistogram")).isArray()
-            && isQint64JsonValue(object.value(QStringLiteral("effectivePixelCount")))
+            && isEffectivePixelCountJsonValue(
+                    object.value(QStringLiteral("effectivePixelCount")))
             && object.value(QStringLiteral("referenceImageHash")).isString()
             && object.value(QStringLiteral("extractParamsHash")).isString()
             && object.value(QStringLiteral("inputSignature")).isObject()
             && inputSignature.value(QStringLiteral("colorMode")).isString()
             && inputSignature.value(QStringLiteral("pixelFormat")).isString()
-            && isIntegerJsonValue(inputSignature.value(QStringLiteral("bitDepth")))
+            && isIntJsonValue(inputSignature.value(QStringLiteral("bitDepth")))
             && inputSignature.contains(QStringLiteral("whiteBalance"))
             && inputSignature.contains(QStringLiteral("ccm"))
             && inputSignature.contains(QStringLiteral("exposure"))
@@ -299,7 +312,8 @@ ColorComparisonModelValidation validateColorComparisonModel(
             || model.algorithm != QStringLiteral("histogram_intersection")
             || model.colorSpace != QStringLiteral("hsv")
             || model.hueBins != 32 || model.saturationBins != 32
-            || model.layout != QStringLiteral("hue_major") || !model.normalized) {
+            || model.layout != QStringLiteral("hue_major") || !model.normalized
+            || model.inputSignature.bitDepth != 8) {
         return validationFailure(QStringLiteral("model_invalid"),
                                  QStringLiteral("颜色比较模型合同不匹配"));
     }
@@ -335,6 +349,7 @@ ColorComparisonModelValidation validateColorComparisonModel(
     }
     if (model.referenceImageHash.isEmpty() || model.extractParamsHash.isEmpty()
             || model.effectivePixelCount <= 0
+            || model.effectivePixelCount > kMaxExactJsonInteger
             || !std::isfinite(model.brightnessReference.mean)
             || !std::isfinite(model.brightnessReference.deviation)
             || model.brightnessReference.deviation < 0.0) {
