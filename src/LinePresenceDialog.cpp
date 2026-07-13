@@ -1,0 +1,777 @@
+#include "LinePresenceDialog.h"
+#include "ui_LinePresenceDialog.h"
+
+#include "PlanDialogUtils.h"
+
+#include <QButtonGroup>
+#include <QComboBox>
+#include <QDebug>
+#include <QImage>
+#include <QJsonObject>
+#include <QLabel>
+#include <QLineF>
+#include <QPushButton>
+#include <QResizeEvent>
+#include <QSize>
+#include <QSizePolicy>
+#include <QSpinBox>
+#include <QStackedWidget>
+#include <QToolButton>
+#include <QUuid>
+#include <QtGlobal>
+
+#include <opencv2/imgproc.hpp>
+
+#include <cmath>
+
+#include "frame/CameraFrameProvider.h"
+#include "frame/FrameViewHelper.h"
+#include "frame/MatImageConverter.h"
+#include "frame/ReferenceImageProvider.h"
+#include "toolcore/ToolRequest.h"
+
+namespace {
+
+QImage imageFromFrame(const cv::Mat &frame)
+{
+    return MatImageConverter::matToDisplayImage(frame);
+}
+
+int labelDisplayWidth(const QLabel *label)
+{
+    if (!label)
+        return 640;
+
+    const int width = label->contentsRect().width();
+    return width > 80 ? width : 640;
+}
+
+QString boolDisplayText(const bool value)
+{
+    return value ? QStringLiteral("true") : QStringLiteral("false");
+}
+
+QString edgePolarityFromText(const QString &text)
+{
+    const QString key = text.trimmed().toLower();
+    if (key == QStringLiteral("black_to_white") || text.contains(QStringLiteral("黑到白")))
+        return QStringLiteral("black_to_white");
+    if (key == QStringLiteral("white_to_black") || text.contains(QStringLiteral("白到黑")))
+        return QStringLiteral("white_to_black");
+    return QStringLiteral("any");
+}
+
+QString edgePolarityDisplayText(const QString &value)
+{
+    if (value == QStringLiteral("black_to_white"))
+        return QObject::tr("黑到白");
+    if (value == QStringLiteral("white_to_black"))
+        return QObject::tr("白到黑");
+    return QObject::tr("任意");
+}
+
+QString edgeTypeFromText(const QString &text)
+{
+    const QString key = text.trimmed().toLower();
+    if (key == QStringLiteral("first") || text.contains(QStringLiteral("第一")))
+        return QStringLiteral("first");
+    if (key == QStringLiteral("last") || text.contains(QStringLiteral("最后")))
+        return QStringLiteral("last");
+    if (key == QStringLiteral("manual") || text.contains(QStringLiteral("手动")))
+        return QStringLiteral("manual");
+    return QStringLiteral("strongest");
+}
+
+QString edgeTypeDisplayText(const QString &value)
+{
+    if (value == QStringLiteral("first"))
+        return QObject::tr("第一条");
+    if (value == QStringLiteral("last"))
+        return QObject::tr("最后一条");
+    if (value == QStringLiteral("manual"))
+        return QObject::tr("手动选择");
+    return QObject::tr("最强");
+}
+
+QString makeLinePresenceStatusTooltipText(const ToolResult &result)
+{
+    return QStringLiteral("status: %1\nmessage: %2\nscore: %3\nvalue: %4\ncount: %5\nok: %6")
+            .arg(result.status,
+                 result.message,
+                 QString::number(result.score, 'f', 6),
+                 QString::number(result.value, 'f', 3),
+                 QString::number(result.count),
+                 boolDisplayText(result.ok));
+}
+
+QString makeLinePresenceErrorTooltipText(const QString &status, const QString &message)
+{
+    return QStringLiteral("status: %1\nmessage: %2\nscore: 0.000000\nvalue: 0.000\ncount: 0\nok: false")
+            .arg(status, message);
+}
+
+void setComboBoxValue(QComboBox *comboBox, const QString &value)
+{
+    if (!comboBox || value.isEmpty())
+        return;
+
+    const int index = comboBox->findText(value);
+    if (index >= 0)
+        comboBox->setCurrentIndex(index);
+}
+
+QJsonObject pointToJson(const QPointF &point)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("x"), point.x());
+    json.insert(QStringLiteral("y"), point.y());
+    return json;
+}
+
+QPointF pointFromJson(const QJsonObject &json, const QPointF &fallback)
+{
+    if (json.isEmpty())
+        return fallback;
+    return QPointF(json.value(QStringLiteral("x")).toDouble(fallback.x()),
+                   json.value(QStringLiteral("y")).toDouble(fallback.y()));
+}
+
+LineBandRoi defaultLineBandRoi()
+{
+    LineBandRoi roi;
+    roi.p1Normalized = QPointF(0.15, 0.5);
+    roi.p2Normalized = QPointF(0.85, 0.5);
+    roi.widthNormalized = 0.08;
+    roi.valid = true;
+    return roi;
+}
+
+bool validLineBandRoi(const LineBandRoi &roi)
+{
+    return roi.valid &&
+           std::isfinite(roi.p1Normalized.x()) &&
+           std::isfinite(roi.p1Normalized.y()) &&
+           std::isfinite(roi.p2Normalized.x()) &&
+           std::isfinite(roi.p2Normalized.y()) &&
+           std::isfinite(roi.widthNormalized) &&
+           roi.widthNormalized > 0.0 &&
+           QLineF(roi.p1Normalized, roi.p2Normalized).length() > 0.001;
+}
+
+LineBandRoi lineBandFromParams(const QJsonObject &params, const LineBandRoi &fallback)
+{
+    LineBandRoi roi;
+    roi.p1Normalized = pointFromJson(params.value(QStringLiteral("searchLineP1")).toObject(),
+                                     fallback.p1Normalized);
+    roi.p2Normalized = pointFromJson(params.value(QStringLiteral("searchLineP2")).toObject(),
+                                     fallback.p2Normalized);
+    roi.widthNormalized = params.value(QStringLiteral("searchBandWidth")).toDouble(fallback.widthNormalized);
+    roi.valid = validLineBandRoi(roi);
+    return roi.valid ? roi : fallback;
+}
+
+void configureLineBandButton(QToolButton *button, const QString &tooltip)
+{
+    if (!button)
+        return;
+
+    button->setText(QStringLiteral("╱"));
+    button->setToolTip(tooltip);
+    button->setMinimumSize(QSize(52, 38));
+    button->setMaximumSize(QSize(52, 38));
+    button->setProperty("actionRole", QStringLiteral("toolbarIcon"));
+}
+
+} // namespace
+
+LinePresenceDialog::LinePresenceDialog(QWidget *parent)
+    : QDialog(parent)
+    , ui(new Ui::LinePresenceDialog)
+    , m_segmentGroup(new QButtonGroup(this))
+    , m_basicResultPresenceGroup(new QButtonGroup(this))
+    , m_resultPresenceGroup(new QButtonGroup(this))
+{
+    ui->setupUi(this);
+    m_lineBandRoi = defaultLineBandRoi();
+    m_roiNormalized = QRectF(0.15, 0.46, 0.70, 0.08);
+    m_toolId = QStringLiteral("line_presence_%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_testToolEngine.registerAdapter(&m_testLinePresenceAdapter);
+    m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    setupUiState();
+    connectControls();
+    showReferenceImage();
+}
+
+LinePresenceDialog::~LinePresenceDialog()
+{
+    delete ui;
+}
+
+LinePresenceConfig LinePresenceDialog::configuration() const
+{
+    const bool basicMode = ui->lineParamsStackedWidget->currentWidget() == ui->basicParamsPage;
+
+    LinePresenceConfig config;
+    const LineBandRoi lineBand = effectiveLineBandRoi();
+    config.detectRegionType = QStringLiteral("line_band");
+    config.searchLineP1 = lineBand.p1Normalized;
+    config.searchLineP2 = lineBand.p2Normalized;
+    config.searchBandWidth = lineBand.widthNormalized;
+    config.enablePositionCorrection = basicMode
+            ? ui->basicPositionCorrectionSwitch->isChecked()
+            : ui->positionCorrectionSwitch->isChecked();
+    config.positionCorrectionSource = basicMode
+            ? ui->basicPositionCorrectionComboBox->currentText()
+            : ui->positionCorrectionComboBox->currentText();
+    config.sensitivity = basicMode
+            ? ui->lineBasicSensitivitySpinBox->value()
+            : ui->lineSensitivitySpinBox->value();
+    config.lineDegree = basicMode ? 25 : ui->lineDegreeSpinBox->value();
+    config.edgePolarity = basicMode
+            ? QStringLiteral("any")
+            : edgePolarityFromText(ui->edgePolarityComboBox->currentText());
+    config.edgeType = basicMode
+            ? QStringLiteral("strongest")
+            : edgeTypeFromText(ui->edgeTypeComboBox->currentText());
+    config.judgeBasis = QStringLiteral("presence");
+    config.existOk = basicMode ? ui->basicPresentOkButton->isChecked()
+                               : ui->presentOkButton->isChecked();
+    return config;
+}
+
+ToolConfig LinePresenceDialog::toToolConfig() const
+{
+    const LinePresenceConfig lineConfig = configuration();
+    const QString toolId = m_toolId;
+
+    QJsonObject params;
+    params.insert(QStringLiteral("detectRegionType"), lineConfig.detectRegionType);
+    params.insert(QStringLiteral("searchLineP1"), pointToJson(lineConfig.searchLineP1));
+    params.insert(QStringLiteral("searchLineP2"), pointToJson(lineConfig.searchLineP2));
+    params.insert(QStringLiteral("searchBandWidth"), lineConfig.searchBandWidth);
+    params.insert(QStringLiteral("lineBandWidthUnit"), QStringLiteral("normalized_max_dimension"));
+    params.insert(QStringLiteral("enablePositionCorrection"), lineConfig.enablePositionCorrection);
+    params.insert(QStringLiteral("positionCorrectionSource"), lineConfig.positionCorrectionSource);
+    params.insert(QStringLiteral("sensitivity"), lineConfig.sensitivity);
+    params.insert(QStringLiteral("lineDegree"), lineConfig.lineDegree);
+    params.insert(QStringLiteral("edgePolarity"), lineConfig.edgePolarity);
+    params.insert(QStringLiteral("edgeType"), lineConfig.edgeType);
+    params.insert(QStringLiteral("judgeBasis"), lineConfig.judgeBasis);
+    params.insert(QStringLiteral("existOk"), lineConfig.existOk);
+
+    QJsonObject judgeRule;
+    judgeRule.insert(QStringLiteral("mode"), lineConfig.judgeBasis);
+    judgeRule.insert(QStringLiteral("existOk"), lineConfig.existOk);
+
+    ToolConfig config;
+    config.toolId = toolId;
+    config.toolName = tr("直线有无");
+    config.toolType = ToolType::LinePresence;
+    config.category = ToolCategory::Presence;
+    config.enabled = m_enabled;
+    config.roiNormalized = effectiveRoiNormalized();
+    config.params = params;
+    config.judgeRule = judgeRule;
+    config.displayName = tr("直线有无");
+    config.summary = summaryText();
+    return config;
+}
+
+ToolConfig LinePresenceDialog::toolConfig() const
+{
+    return m_hasAcceptedToolConfig ? m_acceptedToolConfig : toToolConfig();
+}
+
+ToolPreviewSnapshot LinePresenceDialog::referencePreviewSnapshot() const
+{
+    return m_referencePreviewSnapshot;
+}
+
+void LinePresenceDialog::loadFromConfig(const ToolConfig &config)
+{
+    if (!config.toolId.trimmed().isEmpty())
+        m_toolId = config.toolId;
+    m_enabled = config.enabled;
+    if (config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0)
+        m_roiNormalized = config.roiNormalized;
+
+    const QJsonObject params = config.params;
+    m_lineBandRoi = lineBandFromParams(params, defaultLineBandRoi());
+    const bool allMode = params.contains(QStringLiteral("lineDegree"))
+            || params.value(QStringLiteral("edgePolarity")).toString() != QStringLiteral("any")
+            || params.value(QStringLiteral("edgeType")).toString() != QStringLiteral("strongest");
+    ui->basicSegmentButton->setChecked(!allMode);
+    ui->allSegmentButton->setChecked(allMode);
+    ui->lineParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
+
+    const bool positionCorrection = params.value(QStringLiteral("enablePositionCorrection")).toBool(ui->basicPositionCorrectionSwitch->isChecked());
+    ui->basicPositionCorrectionSwitch->setChecked(positionCorrection);
+    ui->positionCorrectionSwitch->setChecked(positionCorrection);
+    setComboBoxValue(ui->basicPositionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    const int sensitivity = params.value(QStringLiteral("sensitivity")).toInt(ui->lineBasicSensitivitySpinBox->value());
+    ui->lineBasicSensitivitySpinBox->setValue(sensitivity);
+    ui->lineSensitivitySpinBox->setValue(sensitivity);
+    ui->lineDegreeSpinBox->setValue(params.value(QStringLiteral("lineDegree")).toInt(ui->lineDegreeSpinBox->value()));
+    setComboBoxValue(ui->edgePolarityComboBox, edgePolarityDisplayText(params.value(QStringLiteral("edgePolarity")).toString()));
+    setComboBoxValue(ui->edgeTypeComboBox, edgeTypeDisplayText(params.value(QStringLiteral("edgeType")).toString()));
+
+    const bool existOk = params.value(QStringLiteral("existOk")).toBool(true);
+    ui->basicPresentOkButton->setChecked(existOk);
+    ui->basicAbsentOkButton->setChecked(!existOk);
+    ui->presentOkButton->setChecked(existOk);
+    ui->absentOkButton->setChecked(!existOk);
+
+    m_hasAcceptedToolConfig = false;
+    m_acceptedToolConfig = ToolConfig();
+    m_referencePreviewSnapshot = ToolPreviewSnapshot();
+    if (m_previewHelper) {
+        m_previewHelper->clearRoi();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+        m_roiNormalized = m_previewHelper->lineBandBoundingRectNormalized(effectiveLineBandRoi());
+    }
+    const QString roiText = detectRoiStatusText();
+    setViewerStatusText(roiText, roiText);
+}
+
+QString LinePresenceDialog::summaryText() const
+{
+    const LinePresenceConfig config = configuration();
+    return tr("灵敏度: %1, 直线度: %2, 边缘极性: %3, 边缘类型: %4, %5")
+            .arg(config.sensitivity)
+            .arg(config.lineDegree)
+            .arg(edgePolarityDisplayText(config.edgePolarity),
+                 edgeTypeDisplayText(config.edgeType),
+                 config.existOk ? tr("存在OK") : tr("不存在OK"));
+}
+
+void LinePresenceDialog::resizeEvent(QResizeEvent *event)
+{
+    QDialog::resizeEvent(event);
+    fitPreview();
+}
+
+void LinePresenceDialog::setupUiState()
+{
+    setWindowTitle(tr("方案编辑 - 直线有无"));
+    setWindowModality(Qt::WindowModal);
+    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+    applyAdaptiveWindowSize();
+
+    ui->basicSegmentButton->setChecked(true);
+    ui->allSegmentButton->setChecked(false);
+    ui->lineParamsStackedWidget->setCurrentWidget(ui->basicParamsPage);
+    ui->lineBasicSensitivitySpinBox->setRange(0, 100);
+    ui->lineSensitivitySpinBox->setRange(0, 100);
+    ui->lineDegreeSpinBox->setRange(0, 100);
+    ui->lineBasicSensitivitySpinBox->setValue(60);
+    ui->lineSensitivitySpinBox->setValue(60);
+    ui->lineDegreeSpinBox->setValue(25);
+    ui->edgePolarityComboBox->setCurrentIndex(2);
+    ui->edgeTypeComboBox->setCurrentIndex(0);
+    ui->basicDetectionRectButton->setChecked(true);
+    ui->detectionRectButton->setChecked(true);
+    configureLineBandButton(ui->basicDetectionRectButton, tr("线型搜索 ROI"));
+    configureLineBandButton(ui->detectionRectButton, tr("线型搜索 ROI"));
+
+    ui->viewerStatusBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    ui->viewerStatusBar->setMinimumHeight(42);
+    ui->viewerStatusBar->setMaximumHeight(42);
+    ui->viewerStatusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    ui->viewerStatusLabel->setMinimumWidth(0);
+    ui->viewerStatusLabel->setMaximumHeight(42);
+    ui->viewerStatusLabel->setWordWrap(false);
+    ui->viewerStatusLabel->setTextFormat(Qt::PlainText);
+    ui->viewerStatusLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->horizontalLayout_viewerStatus->setStretch(0, 1);
+    ui->horizontalLayout_viewerStatus->setStretch(1, 0);
+    ui->horizontalLayout_viewerStatus->setStretch(2, 0);
+    const QString roiText = detectRoiStatusText();
+    setViewerStatusText(roiText, roiText);
+}
+
+void LinePresenceDialog::connectControls()
+{
+    connect(ui->headerCloseButton, &QToolButton::clicked, this, &LinePresenceDialog::reject);
+    connect(ui->referenceTestButton, &QPushButton::clicked, this, &LinePresenceDialog::runReferenceTest);
+    connect(ui->testRunButton, &QPushButton::clicked, this, &LinePresenceDialog::runCameraTest);
+    connect(ui->finishButton, &QPushButton::clicked, this, &LinePresenceDialog::finishConfiguration);
+
+    const auto applyParamMode = [this](bool allMode) {
+        ui->basicSegmentButton->setChecked(!allMode);
+        ui->allSegmentButton->setChecked(allMode);
+        ui->lineParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
+    };
+
+    m_segmentGroup->setExclusive(true);
+    m_segmentGroup->addButton(ui->basicSegmentButton, 0);
+    m_segmentGroup->addButton(ui->allSegmentButton, 1);
+    connect(ui->basicSegmentButton, &QPushButton::clicked, this, [applyParamMode]() {
+        applyParamMode(false);
+    });
+    connect(ui->allSegmentButton, &QPushButton::clicked, this, [applyParamMode]() {
+        applyParamMode(true);
+    });
+
+    connect(ui->basicDetectionRectButton,
+            &QToolButton::clicked,
+            this,
+            &LinePresenceDialog::startDetectRoiEditing);
+    connect(ui->detectionRectButton,
+            &QToolButton::clicked,
+            this,
+            &LinePresenceDialog::startDetectRoiEditing);
+    connect(ui->detectionMaskEditButton, &QPushButton::clicked, this, [this]() {
+        showDetectRoiTodo(tr("屏蔽区域暂未实现"));
+    });
+
+    m_basicResultPresenceGroup->setExclusive(true);
+    m_basicResultPresenceGroup->addButton(ui->basicPresentOkButton, 0);
+    m_basicResultPresenceGroup->addButton(ui->basicAbsentOkButton, 1);
+
+    m_resultPresenceGroup->setExclusive(true);
+    m_resultPresenceGroup->addButton(ui->presentOkButton, 0);
+    m_resultPresenceGroup->addButton(ui->absentOkButton, 1);
+
+    if (m_previewHelper) {
+        connect(m_previewHelper,
+                &FrameViewHelper::roiChanged,
+                this,
+                &LinePresenceDialog::handleRoiChanged);
+        connect(m_previewHelper,
+                &FrameViewHelper::roiSelectionRejected,
+                this,
+                [this](const QRectF &) {
+                    handleRoiSelectionRejected();
+                });
+        connect(m_previewHelper,
+                &FrameViewHelper::lineBandChanged,
+                this,
+                &LinePresenceDialog::handleLineBandChanged);
+        connect(m_previewHelper,
+                &FrameViewHelper::lineBandSelectionRejected,
+                this,
+                &LinePresenceDialog::handleLineBandSelectionRejected);
+    }
+
+    connect(&ReferenceImageProvider::instance(),
+            &ReferenceImageProvider::referenceFrameChanged,
+            this,
+            [this](const QImage &) {
+                showReferenceImage();
+            });
+}
+
+void LinePresenceDialog::finishConfiguration()
+{
+    m_acceptedToolConfig = toToolConfig();
+    m_hasAcceptedToolConfig = true;
+    accept();
+}
+
+void LinePresenceDialog::runReferenceTest()
+{
+    const cv::Mat referenceImage = ReferenceImageProvider::instance().referenceFrame();
+    if (referenceImage.empty()) {
+        displayLinePresenceError(QStringLiteral("no_reference_image"),
+                                 tr("基准图为空，无法测试"));
+        return;
+    }
+
+    QImage image = ReferenceImageProvider::instance().referenceImage();
+    if (image.isNull())
+        image = imageFromFrame(referenceImage);
+    if (!image.isNull() && m_previewHelper) {
+        ui->viewerTitleLabel->setText(tr("基准图"));
+        m_previewHelper->setImage(image);
+        m_previewHelper->clearRoi();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+    }
+
+    runLinePresenceOnFrame(referenceImage.clone(),
+                           referenceImage.clone(),
+                           tr("基准图"),
+                           tr("基准图为空，无法测试"),
+                           true);
+}
+
+void LinePresenceDialog::runCameraTest()
+{
+    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    if (frame.empty()) {
+        displayLinePresenceError(QStringLiteral("image_empty"),
+                                 tr("当前图像为空，无法测试"));
+        return;
+    }
+
+    const cv::Mat snapshot = frame.clone();
+    const QImage image = imageFromFrame(snapshot);
+    if (!image.isNull() && m_previewHelper) {
+        ui->viewerTitleLabel->setText(tr("测试图像"));
+        m_previewHelper->setImage(image);
+        m_previewHelper->clearRoi();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+    }
+
+    runLinePresenceOnFrame(snapshot,
+                           ReferenceImageProvider::instance().referenceFrame(),
+                           tr("测试图像"),
+                           tr("当前图像为空，无法测试"));
+}
+
+void LinePresenceDialog::applyAdaptiveWindowSize()
+{
+    PlanDialogUtils::applyLargeWindow(this);
+}
+
+void LinePresenceDialog::fitPreview()
+{
+    if (m_previewHelper)
+        m_previewHelper->fitToView();
+}
+
+void LinePresenceDialog::showReferenceImage()
+{
+    if (!m_previewHelper)
+        return;
+
+    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    if (image.isNull()) {
+        m_previewHelper->clear();
+        ui->viewerTitleLabel->setText(tr("请先设置基准图"));
+        return;
+    }
+
+    ui->viewerTitleLabel->setText(tr("基准图"));
+    m_previewHelper->setImage(image);
+    m_previewHelper->clearRoi();
+    m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+}
+
+void LinePresenceDialog::showFrameForRoiEditing()
+{
+    if (!m_previewHelper)
+        return;
+
+    QImage image = ReferenceImageProvider::instance().referenceImage();
+    QString title = tr("基准图");
+    if (image.isNull()) {
+        image = CameraFrameProvider::instance().currentImage();
+        title = tr("当前图像");
+    }
+
+    if (image.isNull()) {
+        m_previewHelper->setLineBandDrawingEnabled(false);
+        m_previewHelper->clear();
+        ui->viewerTitleLabel->setText(tr("当前无图像"));
+        const QString text = tr("请先设置基准图或提供当前图像后再选择检测区域");
+        setViewerStatusText(text, text);
+        return;
+    }
+
+    ui->viewerTitleLabel->setText(title);
+    m_previewHelper->setImage(image);
+    m_previewHelper->clearToolOverlays();
+    m_previewHelper->clearRoi();
+    m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+}
+
+void LinePresenceDialog::startDetectRoiEditing()
+{
+    if (!m_previewHelper)
+        return;
+
+    showFrameForRoiEditing();
+    if (m_previewHelper->imageSize().isEmpty())
+        return;
+
+    ui->basicDetectionRectButton->setChecked(true);
+    ui->detectionRectButton->setChecked(true);
+    m_previewHelper->setLineBandDrawingEnabled(true);
+    const QString text = tr("拖拽中心线，移动鼠标拉出搜索带宽度，再次左键确认");
+    setViewerStatusText(text, text);
+}
+
+void LinePresenceDialog::showDetectRoiTodo(const QString &message)
+{
+    ui->basicDetectionRectButton->setChecked(true);
+    ui->detectionRectButton->setChecked(true);
+    if (m_previewHelper) {
+        m_previewHelper->setLineBandDrawingEnabled(false);
+        m_previewHelper->clearRoi();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+    }
+    setViewerStatusText(message, message);
+}
+
+void LinePresenceDialog::handleLineBandChanged(const LineBandRoi &roi)
+{
+    m_lineBandRoi = roi;
+    if (m_previewHelper) {
+        m_roiNormalized = m_previewHelper->lineBandBoundingRectNormalized(roi);
+        m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearRoi();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+    }
+    const QString text = detectRoiStatusText();
+    setViewerStatusText(text, text);
+    qDebug() << "[LinePresenceDialog] line-band ROI"
+             << "p1=" << m_lineBandRoi.p1Normalized
+             << "p2=" << m_lineBandRoi.p2Normalized
+             << "width=" << m_lineBandRoi.widthNormalized
+             << "bounding=" << m_roiNormalized;
+}
+
+void LinePresenceDialog::handleLineBandSelectionRejected()
+{
+    const QString text = tr("线型搜索 ROI 无效，请拖拽一条有效中心线");
+    setViewerStatusText(text, text);
+    if (m_previewHelper)
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+}
+
+void LinePresenceDialog::handleRoiChanged(const QRectF &roi)
+{
+    m_roiNormalized = roi;
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+    }
+    const QString roiText = detectRoiStatusText();
+    setViewerStatusText(roiText, roiText);
+    qDebug() << "[LinePresenceDialog] ROI normalized:" << m_roiNormalized;
+}
+
+void LinePresenceDialog::handleRoiSelectionRejected()
+{
+    const QString text = tr("线型搜索 ROI 无效，请拖拽一条有效中心线");
+    setViewerStatusText(text, text);
+    if (m_previewHelper)
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+}
+
+void LinePresenceDialog::runLinePresenceOnFrame(const cv::Mat &frame,
+                                                const cv::Mat &referenceImage,
+                                                const QString &imageTitle,
+                                                const QString &emptyFrameMessage,
+                                                bool referenceTest)
+{
+    if (m_linePresenceRunning)
+        return;
+
+    if (frame.empty()) {
+        displayLinePresenceError(QStringLiteral("image_empty"), emptyFrameMessage);
+        return;
+    }
+
+    m_linePresenceRunning = true;
+
+    ToolConfig config = toToolConfig();
+    config.roiNormalized = effectiveRoiNormalized();
+
+    ToolRequest request;
+    request.config = config;
+    request.image = frame.clone();
+    request.referenceImage = referenceImage.empty() ? cv::Mat() : referenceImage.clone();
+
+    const ToolResult result = m_testToolEngine.runTool(request);
+    if (!imageTitle.isEmpty())
+        ui->viewerTitleLabel->setText(imageTitle);
+    displayLinePresenceResult(result);
+    if (referenceTest)
+        m_referencePreviewSnapshot = makeReferenceToolPreviewSnapshot(config, result, effectiveRoiNormalized());
+
+    m_linePresenceRunning = false;
+}
+
+void LinePresenceDialog::displayLinePresenceResult(const ToolResult &result)
+{
+    qDebug() << "[LinePresenceDialog] ToolResult"
+             << "status=" << result.status
+             << "message=" << result.message
+             << "score=" << result.score
+             << "value=" << result.value
+             << "count=" << result.count
+             << "ok=" << result.ok;
+
+    const QString displayText = result.success
+            ? tr("%1 | count:%2 | length:%3 | %4")
+              .arg(result.status,
+                   QString::number(result.count),
+                   QString::number(result.value, 'f', 1),
+                   result.ok ? QStringLiteral("OK") : QStringLiteral("NG"))
+            : tr("%1 | %2").arg(result.status, result.message);
+    setViewerStatusText(displayText, makeLinePresenceStatusTooltipText(result));
+
+    if (m_previewHelper) {
+        m_previewHelper->clearRoi();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+        m_previewHelper->setToolOverlays(result.overlays);
+    }
+}
+
+void LinePresenceDialog::displayLinePresenceError(const QString &status, const QString &message)
+{
+    qDebug() << "[LinePresenceDialog] ToolResult"
+             << "status=" << status
+             << "message=" << message
+             << "score=" << 0.0
+             << "value=" << 0.0
+             << "count=" << 0
+             << "ok=" << false;
+
+    const QString displayText = tr("LinePresence: %1 | %2").arg(status, message);
+    setViewerStatusText(displayText, makeLinePresenceErrorTooltipText(status, message));
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        m_previewHelper->clearRoi();
+        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+    }
+}
+
+void LinePresenceDialog::setViewerStatusText(const QString &displayText, const QString &tooltipText)
+{
+    if (!ui || !ui->viewerStatusLabel)
+        return;
+
+    QLabel *label = ui->viewerStatusLabel;
+    const QString elidedText = label->fontMetrics().elidedText(displayText,
+                                                               Qt::ElideRight,
+                                                               labelDisplayWidth(label));
+    label->setText(elidedText);
+    label->setToolTip(tooltipText.isEmpty() ? displayText : tooltipText);
+}
+
+QString LinePresenceDialog::detectRoiStatusText() const
+{
+    const LineBandRoi roi = effectiveLineBandRoi();
+    const QRectF bounds = effectiveRoiNormalized();
+    return tr("线型 ROI p1=(%1,%2) p2=(%3,%4) width=%5 bounds=(%6,%7,%8,%9)")
+            .arg(roi.p1Normalized.x(), 0, 'f', 3)
+            .arg(roi.p1Normalized.y(), 0, 'f', 3)
+            .arg(roi.p2Normalized.x(), 0, 'f', 3)
+            .arg(roi.p2Normalized.y(), 0, 'f', 3)
+            .arg(roi.widthNormalized, 0, 'f', 3)
+            .arg(bounds.x(), 0, 'f', 3)
+            .arg(bounds.y(), 0, 'f', 3)
+            .arg(bounds.width(), 0, 'f', 3)
+            .arg(bounds.height(), 0, 'f', 3);
+}
+
+QRectF LinePresenceDialog::effectiveRoiNormalized() const
+{
+    if (m_roiNormalized.width() <= 0.0 || m_roiNormalized.height() <= 0.0)
+        return QRectF(0.0, 0.0, 1.0, 1.0);
+
+    const QRectF roi = m_roiNormalized.normalized().intersected(QRectF(0.0, 0.0, 1.0, 1.0));
+    if (roi.width() <= 0.0 || roi.height() <= 0.0)
+        return QRectF(0.0, 0.0, 1.0, 1.0);
+
+    return roi;
+}
+
+LineBandRoi LinePresenceDialog::effectiveLineBandRoi() const
+{
+    return validLineBandRoi(m_lineBandRoi) ? m_lineBandRoi : defaultLineBandRoi();
+}

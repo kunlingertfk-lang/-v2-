@@ -1,0 +1,39 @@
+{
+  "captureSourceIndex": 0,
+  "camera1": {
+    "name": "左侧相机",
+    "device": "/dev/video0",
+    "preferredWidth": 1920,
+    "preferredHeight": 1080,
+    "preferredFps": 30,
+    "fallbackWidth": 640,
+    "fallbackHeight": 480,
+    "fallbackFps": 30,
+    "preferHardwareDecode": true,
+    "preferredDecoder": "mppjpegdec"
+  },
+  "camera2": {
+    "name": "右侧相机",
+    "device": "/dev/video2",
+    "preferredWidth": 1920,
+    "preferredHeight": 1080,
+    "preferredFps": 30,
+    "fallbackWidth": 640,
+    "fallbackHeight": 480,
+    "fallbackFps": 30,
+    "preferHardwareDecode": true,
+    "preferredDecoder": "mppjpegdec"
+  },
+  "yolo": {
+    "enabled": true,
+    "sourceRoot": "/home/cat/YOLOv8_RK3588_object_detect-main",
+    "modelPath": "/home/cat/model/yolov8_red_black.rknn",
+    "labelPath": "/home/cat/红黑线标签.txt",
+    "outputDir": "runtime/results",
+    "buildDir": "runtime/rknn_build",
+    "scriptPath": "scripts/run_rknn_demo.sh",
+    "classCount": 2,
+    "boxThreshold": 0.02,
+    "timeoutMs": 120000
+  }
+}
