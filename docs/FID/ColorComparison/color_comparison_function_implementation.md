@@ -234,6 +234,14 @@ Color comparison V2 licensed smoke failed with 1 failure(s).
 - 主工程 clean qmake/make exit `0`，最终可执行文件存在。
 - `git diff --check`、目标 smoke 链接隔离和 HALCON-only 静态门禁均通过。
 
+### 2026-07-13 - 恢复检测区域结果文字
+
+- 根因：V2 `detectionOverlays()` 只保留检测几何，遗漏了旧版 `color_result_text`，且 smoke 的固定数量断言把该回归固化。
+- 修复：成功且测量有效的结果按“检测几何、可选检测 Mask、结果文字”顺序输出 overlay；文字显示 `OK/NG score:x.x`，矩形使用检测框、圆形使用像素外接矩形作为 `anchorRect`。
+- 边界：未修改 HALCON H/S 二维直方图、直方图交集评分、灵敏度、阈值、模板模型和失败状态。
+- 验证：licensed Runner smoke 覆盖 OK、NG、矩形、圆形、非方形圆和检测 Mask；Model、Dialog smoke 与完整 Qt 工程继续通过。
+- 人工检查：仍需在图形界面确认小 ROI 的框外文字位置以及 OK/NG 颜色。
+
 ### 未人工验证和剩余能力
 
 - 本轮未在真实相机和图形桌面环境中人工执行完整 UI 验收；工具库入口、新建/保存/重新打开、sync/custom 切换、ROI/Mask 实际鼠标拖拽、单次/连续/停止/退出以及长时间连续运行均标记为“未人工验证”。offscreen smoke 不能替代上述人工验证。
