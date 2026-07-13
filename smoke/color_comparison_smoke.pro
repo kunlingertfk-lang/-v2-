@@ -24,7 +24,7 @@ INCLUDEPATH += $$HALCON_ROOT/include
 SOURCES += \
     color_comparison_smoke.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
-    ../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
+    ../src/algorithms/recognition/ColorComparisonModel.cpp \
     ../src/algorithms/recognition/ColorComparisonHalconRunner.cpp
 
 LIBS += -L$$OPENCV_ROOT/lib
