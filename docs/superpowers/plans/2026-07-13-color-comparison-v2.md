@@ -8,12 +8,14 @@
 
 **Tech Stack:** C++17、Qt 5.15.2 Core/Gui/Widgets/Concurrent/JSON、HALCON 24.11.1 C API 动态加载、OpenCV 4.8 `cv::Mat` 桥接与测试图生成、qmake smoke 工程。
 
+> **实施后说明（2026-07-13）：** 下文各 TDD 步骤的 `Expected` 保留当时 RED/GREEN 执行语境；其中“仍保留 H/S 轴与红色回绕失败”等文字属于修正前历史预期，不代表当前状态。最终合同与验证结果以本文 Global Constraints、`颜色比较V2设计说明.md` 和 `color_comparison_function_implementation.md` 的最新记录为准；当前有效 license 数值 smoke 已通过。
+
 ## Global Constraints
 
 - 设计依据为 `docs/FID/ColorComparison/颜色比较V2设计说明.md` 和 `docs/superpowers/specs/2026-07-13-color-comparison-v2-design.md`。
 - 核心视觉与相似度必须使用 HALCON；OpenCV 只用于 `cv::Mat`、显示、格式桥接和测试 fixture。
 - 正式模型固定为 `version=2`、`featureType="histogram_hs_2d"`、`algorithm="histogram_intersection"`、`hueBins=32`、`saturationBins=32`、`layout="hue_major"`。
-- `histo_2dim(Region, H, S)` 固定解释为 row=Hue、column=Saturation，索引为 `hueBin*32+saturationBin`。
+- `histo_2dim(Region, H, S)` 固定使用 `ImageCol=Hue`、`ImageRow=Saturation`；按 `row=Saturation,column=Hue` 读取，外部索引仍为 `hueBin*32+saturationBin`。
 - 同一归一化分布必须得到 100 分；不得保留 C++ Gaussian kernel、主峰经验权重、伪 Bhattacharyya 或 OpenCV `compareHist` 生产旁路。
 - 光照补偿是受限亮度归一化，不把 V 通道差异直接加入扣分；范围和截断门槛必须由 licensed/现场数据标定。
 - V1 裸模型只允许 stale/unsupported 后重新取样，不允许转置、静默迁移或继续使用旧评分。
@@ -23,7 +25,7 @@
 - 本轮不修改 `ColorRecognitionHalconRunner` 的算法或既有评分行为；其 H/S 轴问题另立任务。
 - 不修改用户现有改动：`docs/FID/RegisteredClassification/tempFunc.md`、`projects/scheme_0d5611a7/reference.png`、`projects/scheme_0d5611a7/scheme.json` 和本地智能相机手册 PDF。
 - 所有手工修改使用 `apply_patch`；构建使用 `build/` 影子目录；构建产物不入库。
-- 显式 `RUN_HALCON_LICENSED_SMOKE=1` 时，HALCON license 缺失必须使测试失败。当前环境已知可能报 `#2036`，通过前不得宣称 V2 数值验证完成。
+- 显式 `RUN_HALCON_LICENSED_SMOKE=1` 时，HALCON license 缺失必须使测试失败。当前有效 license 的数值 smoke 已通过；强制无效 license 路径仍必须以 `#2036` 非零退出。
 
 ---
 
@@ -527,7 +529,7 @@ gen_image_interleaved, decompose3, compose3, trans_from_rgb,
 gen_rectangle1, gen_circle, T_gen_region_polygon_filled,
 difference, T_area_center, T_histo_2dim, T_get_grayval,
 T_intensity, T_scale_image, T_tuple_select, T_tuple_min2,
-T_tuple_sum, T_tuple_div, clear_obj
+T_tuple_sum, T_tuple_max, T_tuple_div, clear_obj
 ```
 
 H/S 使用 `scale_image(...,31.0/255.0,0.0)` 量化，再对显式 Region 调用 `histo_2dim(Region,H,S)`。展平固定：
@@ -537,7 +539,8 @@ QVector<double> feature(32 * 32, 0.0);
 for (int hueBin = 0; hueBin < 32; ++hueBin) {
     for (int saturationBin = 0; saturationBin < 32; ++saturationBin) {
         feature[hueBin * 32 + saturationBin] =
-                halconHistogramValue(hueBin, saturationBin);
+                halconHistogramValue(/* row */ saturationBin,
+                                     /* column */ hueBin);
     }
 }
 ```
@@ -559,7 +562,7 @@ const double similarity = qBound(0.0, tupleScalar(intersection), 1.0);
 const double score = similarity * 100.0;
 ```
 
-高档只比较 `deltaH=0,deltaS=0`；中档枚举 `deltaH=-1..1,deltaS=-1..1`；低档枚举 `deltaH=-2..2,deltaS=-2..2`。H 模 32 回绕，S 越界填 0；候选使用 `tuple_select + tuple_min2 + tuple_sum`，取最大 intersection。不得加入纯度、主峰或固定权重。
+高档只比较 `deltaH=0,deltaS=0`；中档枚举 `deltaH=-1..1,deltaS=-1..1`；低档枚举 `deltaH=-2..2,deltaS=-2..2`。H 模 32 回绕，S 越界填 0；候选使用 `tuple_select + tuple_min2 + tuple_sum`，再由 `tuple_max` 取最大 intersection。不得加入纯度、主峰或固定权重。
 
 补偿用 `intensity` 得检测 V 均值，计算模板/检测 scale，对 RGB 三通道分别调用相同 `scale_image` 并 `compose3`，重新转 HSV。V2 初始常量固定为 `kMinBrightnessMean=8.0`、`kMaxBrightnessMean=247.0`、`kMinBrightnessScale=0.75`、`kMaxBrightnessScale=1.3333333333`、`kMaxClippedRatio=0.02`；越界返回 `invalid_illumination`。payload 输出 templateMean、detectMeanBefore/After、scale、clippedRatio。现场调整这些常量时必须改变 `extractParamsHash` 并重新取样验证。
 
@@ -988,7 +991,7 @@ Expected: 四个 smoke 均为 0；算法 smoke 明确 licensed 未执行。
 RUN_HALCON_LICENSED_SMOKE=1 ./build/smoke/color_comparison/bin/color_comparison_smoke
 ```
 
-有效 license 下输出 `V2 HALCON checks passed`。当前环境若仍为 `#2036`，非零退出并记录阻塞；不能改成跳过成功。
+有效 license 下输出 `Color comparison V2 licensed smoke passed.`。当前环境若仍为 `#2036`，非零退出并记录阻塞；不能改成跳过成功。
 
 - [ ] **Step 4: 影子构建和静态检查**
 

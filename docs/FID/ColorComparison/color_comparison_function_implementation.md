@@ -24,7 +24,7 @@
 
 ### 当前状态和实现范围
 
-- 实现提交范围：`21f774a..90af1cd`。
+- 设计与实现提交范围：`21f774a..326b911`（本文档最终收口提交除外）。
 - V2 已完成模型合同、原始输入元数据、HALCON Runner、Adapter、Dialog 保存回显和异步测试链路。
 - 新增文件：
   - `src/frame/FrameInputMetadata.{h,cpp}`
@@ -122,7 +122,7 @@ V2 核心算法实际动态解析并调用以下 HALCON C 接口：
 1. `gen_image_interleaved` 将连续 BGR/BGRA `cv::Mat` 桥接成 HALCON image。
 2. `decompose3` 和 `trans_from_rgb(..., "hsv")` 得到 H/S/V。
 3. `gen_rectangle1`、`gen_circle` 或 `T_gen_region_polygon_filled` 构造 ROI/Mask；`difference` 扣除 Mask；`T_area_center` 检查最终有效像素数。
-4. `T_scale_image` 将 H/S 量化到 32 bins；`T_histo_2dim(Region, H, S)` 生成联合直方图；`T_get_grayval` 按官方合同 row=Hue、column=Saturation 读取 `hueBin*32+saturationBin`。
+4. `T_scale_image` 将 H/S 量化到 32 bins；`T_histo_2dim(Region, H, S)` 以 `ImageCol=H`、`ImageRow=S` 生成联合直方图；`T_get_grayval` 按 `row=Saturation,column=Hue` 读取，再组织为 `hueBin*32+saturationBin` 的 hue-major 外部模型。
 5. `T_tuple_sum + T_tuple_div` 归一化 HS 与 V 直方图。
 6. 灵敏度只控制有限位移搜索半径：high=0、medium=1、low=2；Hue 位移循环回绕，Saturation 位移不回绕。
 7. 每个位移使用 `T_tuple_select + T_tuple_min2 + T_tuple_sum` 计算直方图交集，取最大值，`score=clamp(intersection*100,0,100)`。
@@ -195,7 +195,7 @@ color_comparison_dialog_smoke: V2 Dialog checks passed
 
 其中算法 smoke 使用 `env -u RUN_HALCON_LICENSED_SMOKE`，上述结果仅证明无 license 合同和 preflight 通过，不代表 HALCON 数值测试通过。
 
-有效 license 下显式运行 `RUN_HALCON_LICENSED_SMOKE=1`，binary exit `1`，恰好保留两项本机 HALCON 文档/运行时差异：
+修正前首次在有效 license 下显式运行 `RUN_HALCON_LICENSED_SMOKE=1`，binary exit `1`，暴露两项轴解释相关失败：
 
 ```text
 axis diagnostic: maxIndex=1002 hueBin=31 saturationBin=10
@@ -205,7 +205,9 @@ FAIL: medium tolerance must wrap hue across red bin 31/0
 Color comparison V2 licensed smoke failed with 2 failure(s).
 ```
 
-本实现继续以 HALCON 官方 `histo_2dim(Region,H,S)` 的 row=H、column=S 合同为准，不按本机观测转置模型、不删除或放宽断言。除上述两项外，licensed 用例没有新增失败；在两项差异解决前，不得宣称 V2 HALCON 数值验证完整通过。
+后续使用同一 HALCON 24.11.1 头文件、`libhalconc.so.24.11.1` 和有效 license 编写最小 C canary，确认 `T_histo_2dim(first=10,second=31)` 的非零频数位于 `row=31,column=10`。结合 C API 的 `ImageCol/ImageRow` 参数名、官方 `class_2dim_sup` 和 MVTec Classification Solution Guide，确定算子单页“第一通道映射行”的正文与可执行接口语义冲突。
+
+Runner 保持输入 `histo_2dim(Region,H,S)` 不变，将读取修正为 `row=S,column=H`，外部模型仍为 hue-major；同时加入 `histogramCoordinateContract` 提取哈希字段，使按旧坐标合同生成的 V2 模型自动 stale。修正后有效 license 算法 smoke exit `0`，上述 H/S 峰值和红色回绕断言均转绿，未通过删除或放宽测试掩盖问题。
 
 使用 `HALCON_LICENSE_FILE=/tmp RUN_HALCON_LICENSED_SMOKE=1` 强制验证缺 license，binary exit `1`：
 
@@ -215,6 +217,22 @@ Color comparison V2 licensed smoke failed with 1 failure(s).
 ```
 
 主工程重新执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro -o build/Makefile` 和 `make -C build -j8`，exit `0`，`build/qt_ui_test/bin/qt_ui_test` 存在且可执行。提交前 `git diff --check` 无输出；构建产物均位于已忽略的 `build/`。
+
+### 独立复审后的合同修正
+
+整分支复审发现的问题按职责拆分修正，并分别提交：
+
+- `44856b6`：Adapter/Model 增加当前参考图哈希 freshness 门禁、严格 lifecycle 来源恢复、非方形图像圆形 ROI 的 max-dimension 边界合同、最少 4 个有效像素、亮度统计 `[0,255]` 校验和稳定失败 payload。
+- `6c723e4`：Runner 按 HALCON 可执行坐标合同修正 H/S 读取，使用 `T_tuple_max` 求候选最大值，统一圆形 ROI/overlay/payload 半径语义，并把坐标合同写入 `extractParamsHash` 以淘汰旧轴合同模型。
+- `ff6e0ce`：Dialog 对外层整数 `version=2` 的非法原始配置进入只读保真状态，阻止完成、取样和测试覆盖原数据；同时修正 lifecycle 回显与圆形 ROI 预览语义，并补齐非法枚举、ROI、Mask、非有限数值、比较、亮度、位置和 judgeRule 用例。
+- `326b911`：最终复审补齐 ready 输入签名的彩色 8-bit 枚举合同、原生 stale 非空 payload 的完整校验及 legacy placeholder 受限豁免；缺失/非对象 envelope 与畸形 version 只读保真；加载即核对参考图哈希；拒绝越界圆并按参考图宽高比重算 sync 预览；输入合同失败 payload 保留实际配置并合并位置修正 warning。
+
+四组修正后重新 qmake/make 四个 smoke 工程，编译均 exit `0`；Model 与 Dialog smoke 均通过，并在最终提交前再次连续回归。最终验证还确认：
+
+- 默认算法 preflight exit `0`；有效 license 算法 smoke exit `0`。
+- 强制无效 license 返回 HALCON `#2036` 且 exit `1`，未被误报为跳过成功。
+- 主工程 clean qmake/make exit `0`，最终可执行文件存在。
+- `git diff --check`、目标 smoke 链接隔离和 HALCON-only 静态门禁均通过。
 
 ### 未人工验证和剩余能力
 
