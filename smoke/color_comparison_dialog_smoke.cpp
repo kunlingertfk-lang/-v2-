@@ -29,6 +29,7 @@
 
 #include <functional>
 #include <iostream>
+#include <limits>
 
 #include <opencv2/core.hpp>
 
@@ -41,6 +42,14 @@ void check(bool condition, const char *message)
     if (condition)
         return;
     std::cerr << "FAIL: " << message << std::endl;
+    ++g_failures;
+}
+
+void check(bool condition, const QString &message)
+{
+    if (condition)
+        return;
+    std::cerr << "FAIL: " << message.toStdString() << std::endl;
     ++g_failures;
 }
 
@@ -861,6 +870,371 @@ int main(int argc, char **argv)
         check(saved.params == savedAgain.params
                       && saved.judgeRule == savedAgain.judgeRule,
               "ready nested V2 fields must survive save/reopen round-trip");
+    }
+
+    {
+        const double radius = 0.10;
+        const double shortAxisRadius = radius * 1920.0 / 515.0;
+        ToolConfig aspectCircle = v2Config(
+                    QStringLiteral("sync"),
+                    readyModel(QStringLiteral("aspect-circle")));
+        aspectCircle.roiNormalized = QRectF(0.40,
+                                             0.50 - shortAxisRadius,
+                                             0.20,
+                                             shortAxisRadius * 2.0);
+        QJsonObject root = aspectCircle.params;
+        QJsonObject params = root.value(QStringLiteral("colorComparison"))
+                .toObject();
+        params.insert(QStringLiteral("detectRegionType"),
+                      QStringLiteral("circle"));
+        params.insert(QStringLiteral("detectRoiNormalized"),
+                      rectJson(0.40,
+                               0.50 - shortAxisRadius,
+                               0.20,
+                               shortAxisRadius * 2.0));
+        params.insert(
+                QStringLiteral("detectCircleNormalized"),
+                QJsonObject{{QStringLiteral("center"), pointJson(0.50, 0.50)},
+                            {QStringLiteral("radius"), radius},
+                            {QStringLiteral("boundingRect"),
+                             rectJson(0.40,
+                                      0.50 - shortAxisRadius,
+                                      0.20,
+                                      shortAxisRadius * 2.0)},
+                            {QStringLiteral("valid"), true}});
+        root.insert(QStringLiteral("colorComparison"), params);
+        aspectCircle.params = root;
+
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(aspectCircle);
+        QPushButton *finish = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonFinishButton"),
+                "aspect-correct circle needs the Finish button");
+        check(modelState(dialog) == QStringLiteral("ready")
+                      && finish && finish->isEnabled(),
+              "1920x515 aspect-correct circle bounding boxes must remain valid V2 input");
+        const ToolConfig saved = dialog.toolConfig();
+        ColorComparisonDialog reopened;
+        reopened.loadFromConfig(saved);
+        QPushButton *reopenedFinish = requiredChild<QPushButton>(
+                reopened, QStringLiteral("colorComparisonFinishButton"),
+                "reopened aspect-correct circle needs the Finish button");
+        check(modelState(reopened) == QStringLiteral("ready")
+                      && reopenedFinish && reopenedFinish->isEnabled(),
+              "1920x515 aspect-correct circle must survive save/reopen");
+    }
+
+    {
+        ToolConfig oldCircleWithoutBounds = v2Config(
+                    QStringLiteral("sync"),
+                    readyModel(QStringLiteral("circle-without-bounds")));
+        QJsonObject root = oldCircleWithoutBounds.params;
+        QJsonObject params = root.value(QStringLiteral("colorComparison"))
+                .toObject();
+        params.insert(QStringLiteral("detectRegionType"),
+                      QStringLiteral("circle"));
+        params.insert(
+                QStringLiteral("detectCircleNormalized"),
+                QJsonObject{{QStringLiteral("center"), pointJson(0.95, 0.95)},
+                            {QStringLiteral("radius"), 0.10},
+                            {QStringLiteral("valid"), true}});
+        root.insert(QStringLiteral("colorComparison"), params);
+        oldCircleWithoutBounds.params = root;
+
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(oldCircleWithoutBounds);
+        QPushButton *finish = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonFinishButton"),
+                "old circle without boundingRect needs the Finish button");
+        check(modelState(dialog) == QStringLiteral("ready")
+                      && finish && finish->isEnabled(),
+              "old valid V2 circles without boundingRect must defer image-bound checks to execution");
+    }
+
+    {
+        ToolConfig invalid = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-enums")));
+        invalid.schemaVersion = 9;
+        invalid.toolName = QStringLiteral("ColorComparisonPreserveMe");
+        invalid.displayName = QStringLiteral("invalid V2 display name");
+        invalid.enabled = false;
+        invalid.summary = QStringLiteral("invalid V2 summary must survive");
+        QJsonObject root = invalid.params;
+        root.insert(QStringLiteral("unrelatedRootField"),
+                    QStringLiteral("must survive"));
+        QJsonObject params = root.value(QStringLiteral("colorComparison"))
+                .toObject();
+        params.insert(QStringLiteral("templateRegionMode"),
+                      QStringLiteral("future-template-mode"));
+        params.insert(QStringLiteral("detectRegionType"),
+                      QStringLiteral("capsule"));
+        QJsonObject comparison = params.value(QStringLiteral("comparison"))
+                .toObject();
+        comparison.insert(QStringLiteral("sensitivity"),
+                          QStringLiteral("future-sensitivity"));
+        params.insert(QStringLiteral("comparison"), comparison);
+        root.insert(QStringLiteral("colorComparison"), params);
+        invalid.params = root;
+        invalid.judgeRule.insert(QStringLiteral("futureJudgeField"), 17);
+
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(invalid);
+        QLabel *stateLabel = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonModelStateLabel"),
+                "invalid V2 enum guard needs the model-state label");
+        QLabel *status = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonStatusLabel"),
+                "invalid V2 enum guard needs the status label");
+        QPushButton *finish = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonFinishButton"),
+                "invalid V2 enum guard needs the Finish button");
+        QPushButton *rebuild = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonRebuildModelButton"),
+                "invalid V2 enum guard needs the rebuild button");
+        QPushButton *referenceTest = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonReferenceTestButton"),
+                "invalid V2 enum guard needs the reference-test button");
+        QPushButton *testRun = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonTestRunButton"),
+                "invalid V2 enum guard needs the test-run button");
+
+        check(dialog.toolConfig().toJson() == invalid.toJson(),
+              "invalid V2 enums must preserve the complete original ToolConfig exactly");
+        check(stateLabel && stateLabel->text().contains(QStringLiteral("invalid"),
+                                                        Qt::CaseInsensitive)
+                      && status
+                      && status->text().contains(QStringLiteral("invalid"),
+                                                 Qt::CaseInsensitive),
+              "invalid V2 load must expose a clear invalid status and message");
+        check(finish && rebuild && referenceTest && testRun
+                      && !finish->isEnabled() && !rebuild->isEnabled()
+                      && !referenceTest->isEnabled() && !testRun->isEnabled(),
+              "invalid V2 load must disable Finish, rebuild, and both test actions");
+        if (finish)
+            finish->click();
+        check(dialog.result() != QDialog::Accepted,
+              "Finish must not accept an invalid V2 configuration");
+        dialog.accept();
+        check(dialog.result() != QDialog::Accepted,
+              "direct accept must not close an invalid V2 configuration");
+        check(dialog.toolConfig().toJson() == invalid.toJson(),
+              "blocked invalid V2 actions must not overwrite the original ToolConfig");
+
+        const ToolConfig recovered = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("recovered-valid")));
+        dialog.loadFromConfig(recovered);
+        check(modelState(dialog) == QStringLiteral("ready")
+                      && modelReferenceHash(dialog)
+                         == QStringLiteral("reference-hash-recovered-valid")
+                      && finish && rebuild && referenceTest && testRun
+                      && finish->isEnabled() && rebuild->isEnabled()
+                      && referenceTest->isEnabled() && testRun->isEnabled(),
+              "loading a valid V2 config must leave the invalid read-only state");
+        check(status
+                      && !status->text().contains(QStringLiteral("invalid"),
+                                                 Qt::CaseInsensitive)
+                      && !status->text().contains(QStringLiteral("只读")),
+              "valid V2 recovery must clear the previous invalid read-only status");
+    }
+
+    {
+        ToolConfig invalidMask = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-mask")));
+        QJsonObject root = invalidMask.params;
+        QJsonObject params = root.value(QStringLiteral("colorComparison"))
+                .toObject();
+        params.insert(QStringLiteral("detectMaskPolygon"),
+                      QJsonArray{pointJson(0.10, 0.10),
+                                 QJsonObject{{QStringLiteral("x"), 0.30}},
+                                 pointJson(0.42, 0.38)});
+        root.insert(QStringLiteral("colorComparison"), params);
+        invalidMask.params = root;
+
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(invalidMask);
+        QPushButton *finish = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonFinishButton"),
+                "malformed V2 mask guard needs the Finish button");
+        check(dialog.toolConfig().toJson() == invalidMask.toJson(),
+              "malformed V2 mask points must not be dropped or repaired on load/save");
+        check(finish && !finish->isEnabled(),
+              "malformed V2 masks must enter the read-only invalid state");
+    }
+
+    {
+        QVector<QPair<QString, ToolConfig>> invalidCases;
+
+        ToolConfig invalidRect = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-rect")));
+        QJsonObject rectRoot = invalidRect.params;
+        QJsonObject rectParams = rectRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        rectParams.insert(QStringLiteral("detectRoiNormalized"),
+                          rectJson(0.80, 0.20, 0.40, 0.30));
+        rectRoot.insert(QStringLiteral("colorComparison"), rectParams);
+        invalidRect.params = rectRoot;
+        invalidCases.append(qMakePair(QStringLiteral("out-of-range rectangle"),
+                                      invalidRect));
+
+        ToolConfig nonFiniteRect = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("nonfinite-rect")));
+        QJsonObject nonFiniteRoot = nonFiniteRect.params;
+        QJsonObject nonFiniteParams = nonFiniteRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        nonFiniteParams.insert(
+                    QStringLiteral("detectRoiNormalized"),
+                    rectJson(std::numeric_limits<double>::infinity(),
+                             0.20, 0.40, 0.30));
+        nonFiniteRoot.insert(QStringLiteral("colorComparison"),
+                             nonFiniteParams);
+        nonFiniteRect.params = nonFiniteRoot;
+        invalidCases.append(qMakePair(QStringLiteral("non-finite rectangle"),
+                                      nonFiniteRect));
+
+        ToolConfig invalidDetectEnum = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-detect-enum")));
+        QJsonObject detectEnumRoot = invalidDetectEnum.params;
+        QJsonObject detectEnumParams = detectEnumRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        detectEnumParams.insert(QStringLiteral("detectRegionType"),
+                                QStringLiteral("capsule"));
+        detectEnumRoot.insert(QStringLiteral("colorComparison"),
+                              detectEnumParams);
+        invalidDetectEnum.params = detectEnumRoot;
+        invalidCases.append(qMakePair(QStringLiteral("unknown detect-region enum"),
+                                      invalidDetectEnum));
+
+        ToolConfig invalidSensitivity = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-sensitivity")));
+        QJsonObject sensitivityRoot = invalidSensitivity.params;
+        QJsonObject sensitivityParams = sensitivityRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        QJsonObject comparison = sensitivityParams.value(
+                    QStringLiteral("comparison")).toObject();
+        comparison.insert(QStringLiteral("sensitivity"),
+                          QStringLiteral("future-sensitivity"));
+        sensitivityParams.insert(QStringLiteral("comparison"), comparison);
+        sensitivityRoot.insert(QStringLiteral("colorComparison"),
+                               sensitivityParams);
+        invalidSensitivity.params = sensitivityRoot;
+        invalidCases.append(qMakePair(QStringLiteral("unknown sensitivity enum"),
+                                      invalidSensitivity));
+
+        ToolConfig outOfRangeMask = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("out-of-range-mask")));
+        QJsonObject maskRoot = outOfRangeMask.params;
+        QJsonObject maskParams = maskRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        maskParams.insert(QStringLiteral("templateMaskPolygon"),
+                          QJsonArray{pointJson(0.10, 0.10),
+                                     pointJson(1.20, 0.10),
+                                     pointJson(0.40, 0.40)});
+        maskRoot.insert(QStringLiteral("colorComparison"), maskParams);
+        outOfRangeMask.params = maskRoot;
+        invalidCases.append(qMakePair(QStringLiteral("out-of-range mask point"),
+                                      outOfRangeMask));
+
+        const double radius = 0.10;
+        const double shortAxisRadius = radius * 1920.0 / 515.0;
+        ToolConfig invalidCircle = v2Config(
+                    QStringLiteral("sync"),
+                    readyModel(QStringLiteral("invalid-circle")));
+        QJsonObject circleRoot = invalidCircle.params;
+        QJsonObject circleParams = circleRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        circleParams.insert(QStringLiteral("detectRegionType"),
+                            QStringLiteral("circle"));
+        circleParams.insert(
+                QStringLiteral("detectCircleNormalized"),
+                QJsonObject{{QStringLiteral("center"), pointJson(0.50, 0.80)},
+                            {QStringLiteral("radius"), radius},
+                            {QStringLiteral("boundingRect"),
+                             rectJson(0.40,
+                                      0.80 - shortAxisRadius,
+                                      0.20,
+                                      shortAxisRadius * 2.0)},
+                            {QStringLiteral("valid"), true}});
+        circleRoot.insert(QStringLiteral("colorComparison"), circleParams);
+        invalidCircle.params = circleRoot;
+        invalidCases.append(qMakePair(QStringLiteral("short-axis out-of-range circle"),
+                                      invalidCircle));
+
+        ToolConfig invalidComparison = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-comparison")));
+        QJsonObject comparisonRoot = invalidComparison.params;
+        QJsonObject comparisonParams = comparisonRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        comparisonParams.insert(QStringLiteral("comparison"),
+                                QStringLiteral("not-an-object"));
+        comparisonRoot.insert(QStringLiteral("colorComparison"),
+                              comparisonParams);
+        invalidComparison.params = comparisonRoot;
+        invalidCases.append(qMakePair(QStringLiteral("malformed comparison"),
+                                      invalidComparison));
+
+        ToolConfig invalidBrightness = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-brightness")));
+        QJsonObject brightnessRoot = invalidBrightness.params;
+        QJsonObject brightnessParams = brightnessRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        QJsonObject brightnessComparison = brightnessParams.value(
+                    QStringLiteral("comparison")).toObject();
+        brightnessComparison.insert(
+                    QStringLiteral("brightnessCompensation"), 1);
+        brightnessParams.insert(QStringLiteral("comparison"),
+                                brightnessComparison);
+        brightnessRoot.insert(QStringLiteral("colorComparison"),
+                              brightnessParams);
+        invalidBrightness.params = brightnessRoot;
+        invalidCases.append(qMakePair(QStringLiteral("malformed brightness"),
+                                      invalidBrightness));
+
+        ToolConfig invalidPosition = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-position")));
+        QJsonObject positionRoot = invalidPosition.params;
+        QJsonObject positionParams = positionRoot.value(
+                    QStringLiteral("colorComparison")).toObject();
+        positionParams.insert(
+                    QStringLiteral("positionCorrection"),
+                    QJsonObject{{QStringLiteral("enabled"), false},
+                                {QStringLiteral("sourceId"), QString()},
+                                {QStringLiteral("interfaceVersion"), 2}});
+        positionRoot.insert(QStringLiteral("colorComparison"), positionParams);
+        invalidPosition.params = positionRoot;
+        invalidCases.append(qMakePair(QStringLiteral("illegal position interface"),
+                                      invalidPosition));
+
+        ToolConfig invalidJudge = v2Config(
+                    QStringLiteral("custom"),
+                    readyModel(QStringLiteral("invalid-judge")));
+        invalidJudge.judgeRule.insert(QStringLiteral("minScore"), 101);
+        invalidCases.append(qMakePair(QStringLiteral("out-of-range judge rule"),
+                                      invalidJudge));
+
+        for (const auto &invalidCase : invalidCases) {
+            ColorComparisonDialog dialog;
+            dialog.loadFromConfig(invalidCase.second);
+            QPushButton *finish = dialog.findChild<QPushButton *>(
+                        QStringLiteral("colorComparisonFinishButton"));
+            check(dialog.toolConfig().toJson()
+                          == invalidCase.second.toJson(),
+                  QStringLiteral("%1 must preserve the original V2 ToolConfig")
+                  .arg(invalidCase.first));
+            check(finish && !finish->isEnabled(),
+                  QStringLiteral("%1 must enter read-only invalid state")
+                  .arg(invalidCase.first));
+        }
     }
 
     {

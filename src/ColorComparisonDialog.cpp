@@ -62,6 +62,445 @@ bool strictJsonInteger(const QJsonValue &value, int *parsed)
     return true;
 }
 
+struct V2DialogConfigValidation
+{
+    bool success = true;
+    QString status;
+    QString message;
+};
+
+V2DialogConfigValidation invalidV2DialogConfig(const QString &status,
+                                                const QString &message)
+{
+    V2DialogConfigValidation validation;
+    validation.success = false;
+    validation.status = status;
+    validation.message = message;
+    return validation;
+}
+
+bool strictJsonNumber(const QJsonValue &value, double *parsed)
+{
+    if (!value.isDouble())
+        return false;
+    const double number = value.toDouble();
+    if (!std::isfinite(number))
+        return false;
+    if (parsed)
+        *parsed = number;
+    return true;
+}
+
+bool strictNormalizedRect(const QJsonValue &value,
+                          QRectF *parsed,
+                          bool allowEmpty = false)
+{
+    if (!value.isObject())
+        return false;
+
+    const QJsonObject object = value.toObject();
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+    if (!strictJsonNumber(object.value(QStringLiteral("x")), &x)
+            || !strictJsonNumber(object.value(QStringLiteral("y")), &y)
+            || !strictJsonNumber(object.value(QStringLiteral("width")), &width)
+            || !strictJsonNumber(object.value(QStringLiteral("height")), &height)
+            || x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) {
+        return false;
+    }
+
+    const bool empty = width == 0.0 && height == 0.0;
+    if (empty && allowEmpty) {
+        if (parsed)
+            *parsed = QRectF(x, y, width, height);
+        return true;
+    }
+    if (width <= 0.0 || height <= 0.0
+            || x + width > 1.0 || y + height > 1.0) {
+        return false;
+    }
+
+    if (parsed)
+        *parsed = QRectF(x, y, width, height);
+    return true;
+}
+
+bool strictNormalizedPoint(const QJsonValue &value, QPointF *parsed)
+{
+    if (!value.isObject())
+        return false;
+    const QJsonObject object = value.toObject();
+    double x = 0.0;
+    double y = 0.0;
+    if (!strictJsonNumber(object.value(QStringLiteral("x")), &x)
+            || !strictJsonNumber(object.value(QStringLiteral("y")), &y)
+            || x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) {
+        return false;
+    }
+    if (parsed)
+        *parsed = QPointF(x, y);
+    return true;
+}
+
+bool strictNormalizedPolygon(const QJsonValue &value)
+{
+    if (!value.isArray())
+        return false;
+
+    const QJsonArray array = value.toArray();
+    if (!array.isEmpty() && array.size() < 3)
+        return false;
+
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &entry : array) {
+        QPointF point;
+        if (!strictNormalizedPoint(entry, &point))
+            return false;
+        points.append(point);
+    }
+    if (points.isEmpty())
+        return true;
+
+    double twiceArea = 0.0;
+    for (int index = 0; index < points.size(); ++index) {
+        const QPointF &point = points.at(index);
+        const QPointF &next = points.at((index + 1) % points.size());
+        twiceArea += point.x() * next.y() - next.x() * point.y();
+    }
+    return std::abs(twiceArea) > 1e-12;
+}
+
+bool sameRect(const QRectF &left, const QRectF &right)
+{
+    constexpr double epsilon = 1e-9;
+    return std::abs(left.x() - right.x()) <= epsilon
+            && std::abs(left.y() - right.y()) <= epsilon
+            && std::abs(left.width() - right.width()) <= epsilon
+            && std::abs(left.height() - right.height()) <= epsilon;
+}
+
+V2DialogConfigValidation validateV2DialogConfig(const ToolConfig &config)
+{
+    const QJsonObject colorComparison = config.params
+            .value(QStringLiteral("colorComparison")).toObject();
+
+    QString templateRegionMode = QStringLiteral("custom");
+    if (colorComparison.contains(QStringLiteral("templateRegionMode"))) {
+        const QJsonValue value = colorComparison
+                .value(QStringLiteral("templateRegionMode"));
+        if (!value.isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_template_roi"),
+                        QStringLiteral("templateRegionMode must be a string."));
+        }
+        templateRegionMode = value.toString().trimmed().toLower();
+    }
+    if (templateRegionMode != QStringLiteral("custom")
+            && templateRegionMode != QStringLiteral("sync")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_template_roi"),
+                    QStringLiteral("templateRegionMode must be custom or sync."));
+    }
+
+    if (colorComparison.contains(QStringLiteral("templateRoiNormalized"))
+            && !strictNormalizedRect(
+                colorComparison.value(QStringLiteral("templateRoiNormalized")),
+                nullptr)) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_template_roi"),
+                    QStringLiteral("Template ROI is malformed or out of range."));
+    }
+    if (colorComparison.contains(QStringLiteral("templateMaskPolygon"))
+            && !strictNormalizedPolygon(
+                colorComparison.value(QStringLiteral("templateMaskPolygon")))) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_template_mask"),
+                    QStringLiteral("Template mask is malformed or degenerate."));
+    }
+
+    QString detectRegionType = QStringLiteral("rectangle");
+    if (colorComparison.contains(QStringLiteral("detectRegionType"))) {
+        const QJsonValue value = colorComparison
+                .value(QStringLiteral("detectRegionType"));
+        if (!value.isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("detectRegionType must be a string."));
+        }
+        detectRegionType = value.toString().trimmed().toLower();
+    }
+    if (detectRegionType != QStringLiteral("rectangle")
+            && detectRegionType != QStringLiteral("circle")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("detectRegionType must be rectangle or circle."));
+    }
+
+    QRectF detectRoi;
+    const bool hasDetectRoi = colorComparison.contains(
+                QStringLiteral("detectRoiNormalized"));
+    if (hasDetectRoi
+            && !strictNormalizedRect(
+                colorComparison.value(QStringLiteral("detectRoiNormalized")),
+                &detectRoi)) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("Detection ROI is malformed or out of range."));
+    }
+
+    bool detectGlobal = false;
+    if (colorComparison.contains(QStringLiteral("detectGlobal"))) {
+        const QJsonValue value = colorComparison
+                .value(QStringLiteral("detectGlobal"));
+        if (!value.isBool()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("detectGlobal must be boolean."));
+        }
+        detectGlobal = value.toBool();
+    }
+    if (detectGlobal
+            && (detectRegionType != QStringLiteral("rectangle")
+                || (hasDetectRoi
+                    && !sameRect(detectRoi, QRectF(0.0, 0.0, 1.0, 1.0))))) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("Global detection requires rectangle/full-image ROI."));
+    }
+
+    const bool hasCircle = colorComparison.contains(
+                QStringLiteral("detectCircleNormalized"));
+    if (hasCircle) {
+        const QJsonValue circleValue = colorComparison
+                .value(QStringLiteral("detectCircleNormalized"));
+        if (!circleValue.isObject()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Detection circle must be an object."));
+        }
+
+        const QJsonObject circle = circleValue.toObject();
+        QPointF center;
+        double radius = 0.0;
+        if (!strictNormalizedPoint(circle.value(QStringLiteral("center")),
+                                   &center)
+                || !strictJsonNumber(circle.value(QStringLiteral("radius")),
+                                     &radius)
+                || radius < 0.0) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Detection circle is malformed."));
+        }
+
+        bool valid = radius > 0.0;
+        if (circle.contains(QStringLiteral("valid"))) {
+            if (!circle.value(QStringLiteral("valid")).isBool()) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_detect_roi"),
+                            QStringLiteral("Detection circle valid flag must be boolean."));
+            }
+            valid = circle.value(QStringLiteral("valid")).toBool();
+        }
+        if (valid != (radius > 0.0)) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Detection circle valid flag and radius disagree."));
+        }
+
+        if (circle.contains(QStringLiteral("boundingRect"))) {
+            QRectF boundingRect;
+            if (!strictNormalizedRect(
+                    circle.value(QStringLiteral("boundingRect")),
+                    &boundingRect,
+                    radius == 0.0)) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_detect_roi"),
+                            QStringLiteral("Detection circle bounding rectangle is malformed."));
+            }
+            constexpr double epsilon = 1e-9;
+            const bool centerMatches =
+                    std::abs(boundingRect.center().x() - center.x()) <= epsilon
+                    && std::abs(boundingRect.center().y() - center.y()) <= epsilon;
+            const bool radiusMatches = radius == 0.0
+                    ? boundingRect.width() == 0.0
+                      && boundingRect.height() == 0.0
+                    : std::abs(qMin(boundingRect.width(),
+                                    boundingRect.height()) / 2.0 - radius)
+                      <= epsilon;
+            if (!centerMatches || !radiusMatches) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_detect_roi"),
+                            QStringLiteral("Detection circle geometry is inconsistent."));
+            }
+        }
+        if (detectRegionType == QStringLiteral("circle")
+                && (!valid || radius <= 0.0)) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Active detection circle is invalid."));
+        }
+    } else if (detectRegionType == QStringLiteral("circle")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("Active detection circle is missing."));
+    }
+
+    if (colorComparison.contains(QStringLiteral("detectMaskPolygon"))
+            && !strictNormalizedPolygon(
+                colorComparison.value(QStringLiteral("detectMaskPolygon")))) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_mask"),
+                    QStringLiteral("Detection mask is malformed or degenerate."));
+    }
+
+    const QJsonValue comparisonValue = colorComparison
+            .value(QStringLiteral("comparison"));
+    if (!comparisonValue.isUndefined()) {
+        if (!comparisonValue.isObject()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_sensitivity"),
+                        QStringLiteral("comparison must be an object."));
+        }
+        const QJsonObject comparison = comparisonValue.toObject();
+        if (comparison.contains(QStringLiteral("sensitivity"))) {
+            const QJsonValue value = comparison
+                    .value(QStringLiteral("sensitivity"));
+            if (!value.isString()) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_sensitivity"),
+                            QStringLiteral("sensitivity must be a string."));
+            }
+            const QString sensitivity = value.toString().trimmed().toLower();
+            if (sensitivity != QStringLiteral("high")
+                    && sensitivity != QStringLiteral("medium")
+                    && sensitivity != QStringLiteral("low")) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_sensitivity"),
+                            QStringLiteral("sensitivity must be high, medium, or low."));
+            }
+        }
+        if (comparison.contains(QStringLiteral("brightnessCompensation"))
+                && !comparison.value(
+                    QStringLiteral("brightnessCompensation")).isBool()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_illumination"),
+                        QStringLiteral("brightnessCompensation must be boolean."));
+        }
+    }
+
+    if (colorComparison.contains(QStringLiteral("sensitivity"))) {
+        const QJsonValue value = colorComparison.value(QStringLiteral("sensitivity"));
+        if (!value.isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_sensitivity"),
+                        QStringLiteral("Legacy sensitivity must be a string."));
+        }
+        const QString sensitivity = value.toString().trimmed().toLower();
+        if (sensitivity != QStringLiteral("high")
+                && sensitivity != QStringLiteral("medium")
+                && sensitivity != QStringLiteral("low")) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_sensitivity"),
+                        QStringLiteral("Legacy sensitivity is unsupported."));
+        }
+    }
+    if (colorComparison.contains(QStringLiteral("brightnessEnabled"))
+            && !colorComparison.value(
+                QStringLiteral("brightnessEnabled")).isBool()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_illumination"),
+                    QStringLiteral("brightnessEnabled must be boolean."));
+    }
+
+    const QJsonValue positionValue = colorComparison
+            .value(QStringLiteral("positionCorrection"));
+    if (!positionValue.isUndefined()) {
+        if (!positionValue.isObject()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_position_correction"),
+                        QStringLiteral("positionCorrection must be an object."));
+        }
+        const QJsonObject position = positionValue.toObject();
+        if (position.contains(QStringLiteral("enabled"))
+                && !position.value(QStringLiteral("enabled")).isBool()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_position_correction"),
+                        QStringLiteral("positionCorrection.enabled must be boolean."));
+        }
+        if (position.contains(QStringLiteral("sourceId"))
+                && !position.value(QStringLiteral("sourceId")).isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_position_correction"),
+                        QStringLiteral("positionCorrection.sourceId must be a string."));
+        }
+        if (position.contains(QStringLiteral("interfaceVersion"))) {
+            int interfaceVersion = 0;
+            if (!strictJsonInteger(
+                    position.value(QStringLiteral("interfaceVersion")),
+                    &interfaceVersion)
+                    || interfaceVersion != 1) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_position_correction"),
+                            QStringLiteral("Only position-correction interface version 1 is reserved."));
+            }
+        }
+    }
+    if (colorComparison.contains(QStringLiteral("enablePositionCorrection"))
+            && !colorComparison.value(
+                QStringLiteral("enablePositionCorrection")).isBool()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_position_correction"),
+                    QStringLiteral("enablePositionCorrection must be boolean."));
+    }
+    if (colorComparison.contains(QStringLiteral("positionCorrectionSource"))
+            && !colorComparison.value(
+                QStringLiteral("positionCorrectionSource")).isString()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_position_correction"),
+                    QStringLiteral("positionCorrectionSource must be a string."));
+    }
+
+    const QJsonObject judgeRule = config.judgeRule;
+    if (!judgeRule.value(QStringLiteral("mode")).isString()
+            || judgeRule.value(QStringLiteral("mode"))
+               .toString().trimmed().toLower() != QStringLiteral("min_score")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_judge_rule"),
+                    QStringLiteral("judgeRule.mode must be min_score."));
+    }
+    int minScore = 0;
+    if (!strictJsonInteger(judgeRule.value(QStringLiteral("minScore")),
+                           &minScore)
+            || minScore < 0 || minScore > 100) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_judge_rule"),
+                    QStringLiteral("judgeRule.minScore must be an integer in [0,100]."));
+    }
+
+    const QJsonValue halconPath = colorComparison
+            .value(QStringLiteral("halconSoPath"));
+    if (!halconPath.isUndefined() && !halconPath.isString()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("halcon_load_failed"),
+                    QStringLiteral("halconSoPath must be a string."));
+    }
+
+    const ColorComparisonModelReadResult modelRead =
+            readColorComparisonModel(colorComparison, false);
+    if (modelRead.status == QStringLiteral("model_invalid")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("model_invalid"),
+                    modelRead.message.isEmpty()
+                    ? QStringLiteral("Color comparison model is invalid.")
+                    : modelRead.message);
+    }
+
+    return V2DialogConfigValidation();
+}
+
 bool restoreDialogLifecycle(const QJsonObject &colorComparison,
                             ColorComparisonModelState modelState,
                             int *originVersion,
@@ -1422,6 +1861,9 @@ QJsonObject ColorComparisonDialog::colorComparisonParams() const
 
 ToolConfig ColorComparisonDialog::toToolConfig() const
 {
+    if (m_invalidConfigReadOnly)
+        return m_originalInvalidConfig;
+
     ToolConfig config;
     config.toolId = m_toolId.isEmpty()
             ? QUuid::createUuid().toString(QUuid::WithoutBraces)
@@ -1455,10 +1897,117 @@ ToolPreviewSnapshot ColorComparisonDialog::referencePreviewSnapshot() const
     return m_referencePreviewSnapshot;
 }
 
+void ColorComparisonDialog::updateInvalidConfigReadOnlyUi()
+{
+    const bool editable = !m_invalidConfigReadOnly;
+    if (m_basicButton)
+        m_basicButton->setEnabled(editable);
+    if (m_allButton)
+        m_allButton->setEnabled(editable);
+    if (m_paramsStack)
+        m_paramsStack->setEnabled(editable);
+    if (m_referenceTestButton)
+        m_referenceTestButton->setEnabled(editable);
+    if (m_testRunButton)
+        m_testRunButton->setEnabled(editable);
+    if (m_finishButton)
+        m_finishButton->setEnabled(editable);
+    if (m_exitTestButton)
+        m_exitTestButton->setEnabled(editable);
+    if (m_rebuildModelButton) {
+        m_rebuildModelButton->setEnabled(
+                    editable
+                    && (!m_modelBuildWatcher
+                        || !m_modelBuildWatcher->isRunning()));
+    }
+    if (m_positionCorrectionPanel)
+        m_positionCorrectionPanel->setEnabled(false);
+}
+
+void ColorComparisonDialog::enterInvalidConfigReadOnly(
+        const ToolConfig &config,
+        const QString &status,
+        const QString &message)
+{
+    if (m_continuousTimer)
+        m_continuousTimer->stop();
+    invalidateAsyncWork();
+    invalidateModelBuild();
+
+    m_loadingConfig = true;
+    m_invalidConfigReadOnly = true;
+    m_originalInvalidConfig = config;
+    m_invalidConfigStatus = status.isEmpty()
+            ? QStringLiteral("invalid_v2_config") : status;
+    m_invalidConfigMessage = tr("V2 配置无效，已只读打开，原始配置保持不变：%1")
+            .arg(message.isEmpty() ? tr("配置字段不符合合同") : message);
+    if (!config.toolId.isEmpty())
+        m_toolId = config.toolId;
+    m_enabled = config.enabled;
+    m_model = ColorComparisonModelV2();
+    m_model.state = ColorComparisonModelState::Invalid;
+    m_modelOriginVersion = 2;
+    m_modelStatus = m_invalidConfigStatus;
+    m_modelReason = m_invalidConfigMessage;
+    m_testUiMode = TestUiMode::Edit;
+    m_liveTestSource = LiveTestSource::None;
+    m_liveTestFrameSnapshot.release();
+    m_referencePreviewSnapshot = ToolPreviewSnapshot();
+    setEditState(EditState::None);
+    m_loadingConfig = false;
+
+    updateBottomButtons();
+    updateInvalidConfigReadOnlyUi();
+    updateModelStateUi();
+    displayError(m_invalidConfigStatus, m_invalidConfigMessage);
+}
+
+void ColorComparisonDialog::leaveInvalidConfigReadOnly()
+{
+    if (!m_invalidConfigReadOnly)
+        return;
+
+    m_invalidConfigReadOnly = false;
+    m_originalInvalidConfig = ToolConfig();
+    m_invalidConfigStatus.clear();
+    m_invalidConfigMessage.clear();
+    updateInvalidConfigReadOnlyUi();
+}
+
+bool ColorComparisonDialog::blockInvalidConfigAction()
+{
+    if (!m_invalidConfigReadOnly)
+        return false;
+    displayError(m_invalidConfigStatus, m_invalidConfigMessage);
+    return true;
+}
+
 void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
 {
     if (config.toolType != ToolType::Unknown && config.toolType != ToolType::ColorComparison)
         return;
+
+    const QJsonValue colorComparisonValue = config.params
+            .value(QStringLiteral("colorComparison"));
+    const QJsonObject colorComparison = colorComparisonValue.toObject();
+    int serializedVersion = 0;
+    const bool hasIntegerVersion = strictJsonInteger(
+                colorComparison.value(QStringLiteral("version")),
+                &serializedVersion);
+    if (colorComparisonValue.isObject()
+            && hasIntegerVersion && serializedVersion == 2) {
+        const V2DialogConfigValidation validation =
+                validateV2DialogConfig(config);
+        if (!validation.success) {
+            enterInvalidConfigReadOnly(config,
+                                       validation.status,
+                                       validation.message);
+            return;
+        }
+    }
+
+    const bool recoveredFromInvalidConfig = m_invalidConfigReadOnly;
+    leaveInvalidConfigReadOnly();
 
     const bool buildWasActive = invalidateModelBuild();
     invalidateAsyncWork();
@@ -1466,11 +2015,6 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     if (!config.toolId.isEmpty())
         m_toolId = config.toolId;
     m_enabled = config.enabled;
-    const QJsonObject colorComparison =
-            config.params.value(QStringLiteral("colorComparison")).toObject();
-    int serializedVersion = 0;
-    strictJsonInteger(colorComparison.value(QStringLiteral("version")),
-                      &serializedVersion);
     m_modelOriginVersion = serializedVersion;
 
     m_templateRegionMode = colorComparison
@@ -1570,7 +2114,7 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     refreshRoiOverlay();
     m_loadingConfig = false;
     updateModelStateUi();
-    if (buildWasActive) {
+    if (buildWasActive || recoveredFromInvalidConfig) {
         if (m_model.state == ColorComparisonModelState::Ready)
             updateStatus(tr("模型已加载，可直接测试"));
         else
@@ -1585,6 +2129,9 @@ QString ColorComparisonDialog::summaryText() const
 
 void ColorComparisonDialog::runTest()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_testUiMode == TestUiMode::Continuous) {
         stopContinuousRun();
         m_testUiMode = TestUiMode::TestPaused;
@@ -1599,6 +2146,9 @@ void ColorComparisonDialog::runTest()
 
 void ColorComparisonDialog::runReferenceTest()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     stopContinuousRun();
     m_liveTestSource = LiveTestSource::Reference;
     m_testUiMode = TestUiMode::Edit;
@@ -1625,6 +2175,9 @@ void ColorComparisonDialog::runReferenceTest()
 
 void ColorComparisonDialog::startContinuousRun()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     invalidateAsyncWork();
     m_testUiMode = TestUiMode::Continuous;
     m_liveTestSource = LiveTestSource::Camera;
@@ -1644,6 +2197,9 @@ void ColorComparisonDialog::stopContinuousRun()
 
 void ColorComparisonDialog::runContinuousTick()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_testUiMode != TestUiMode::Continuous)
         return;
 
@@ -1663,6 +2219,9 @@ void ColorComparisonDialog::runContinuousTick()
 
 void ColorComparisonDialog::runSingleShotTest()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     stopContinuousRun();
     m_testUiMode = TestUiMode::TestPaused;
     m_liveTestSource = LiveTestSource::Camera;
@@ -1687,6 +2246,9 @@ void ColorComparisonDialog::runSingleShotTest()
 
 void ColorComparisonDialog::rerunLiveComparison()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_liveTestSource == LiveTestSource::None)
         return;
 
@@ -1769,6 +2331,9 @@ void ColorComparisonDialog::runComparisonOnFrame(const cv::Mat &frame,
                                                  const QString &imageTitle,
                                                  bool referenceSource)
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (frame.empty()) {
         displayError(QStringLiteral("image_empty"), tr("当前图像为空"));
         return;
@@ -1916,6 +2481,14 @@ bool ColorComparisonDialog::rebuildTemplateModelFromFrame(
         QString *status,
         QString *message)
 {
+    if (m_invalidConfigReadOnly) {
+        if (status)
+            *status = m_invalidConfigStatus;
+        if (message)
+            *message = m_invalidConfigMessage;
+        return false;
+    }
+
     if (!m_modelBuildWatcher || m_modelBuildWatcher->isRunning()) {
         if (status)
             *status = QStringLiteral("model_build_busy");
@@ -1977,6 +2550,9 @@ bool ColorComparisonDialog::rebuildTemplateModelFromFrame(
 
 void ColorComparisonDialog::startExplicitModelRebuild()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (!m_modelBuildWatcher || m_modelBuildWatcher->isRunning())
         return;
 
@@ -2009,7 +2585,7 @@ void ColorComparisonDialog::handleModelBuildFinished()
     if (!m_modelBuildWatcher)
         return;
     if (m_rebuildModelButton)
-        m_rebuildModelButton->setEnabled(true);
+        m_rebuildModelButton->setEnabled(!m_invalidConfigReadOnly);
 
     const ColorComparisonTemplateBuildResult result =
             m_modelBuildWatcher->result();
@@ -2041,6 +2617,9 @@ void ColorComparisonDialog::handleModelBuildFinished()
 
 void ColorComparisonDialog::finishConfiguration()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_testUiMode != TestUiMode::Edit) {
         runSingleShotTest();
         return;
@@ -2052,6 +2631,9 @@ void ColorComparisonDialog::finishConfiguration()
 
 void ColorComparisonDialog::accept()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_continuousTimer)
         m_continuousTimer->stop();
     invalidateAsyncWork();

@@ -119,6 +119,12 @@ private:
     void displayResult(const ToolResult &result, bool referenceSource);
     void displayError(const QString &status, const QString &message);
     void displayStoredModelInstruction();
+    bool blockInvalidConfigAction();
+    void enterInvalidConfigReadOnly(const ToolConfig &config,
+                                    const QString &status,
+                                    const QString &message);
+    void leaveInvalidConfigReadOnly();
+    void updateInvalidConfigReadOnlyUi();
     QRectF normalizedRoiOrDefault(const QRectF &roi) const;
     QImage templateRoiImage() const;
     void refreshEditControls();
@@ -167,6 +173,10 @@ private:
     FrameInputMetadata m_liveTestFrameMetadata;
     QTimer *m_continuousTimer = nullptr;
     bool m_loadingConfig = false;
+    bool m_invalidConfigReadOnly = false;
+    ToolConfig m_originalInvalidConfig;
+    QString m_invalidConfigStatus;
+    QString m_invalidConfigMessage;
 
     QFutureWatcher<ToolResult> *m_testWatcher = nullptr;
     QFutureWatcher<ColorComparisonTemplateBuildResult> *m_modelBuildWatcher = nullptr;
