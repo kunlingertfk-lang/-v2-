@@ -73,6 +73,7 @@ SOURCES += \
     src/algorithms/halcon/HalconRuntimePaths.cpp \
     src/algorithms/ocr/OcrHalconRunner.cpp \
     src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
+    src/algorithms/recognition/ColorComparisonModel.cpp \
     src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
@@ -146,6 +147,7 @@ HEADERS += \
     src/algorithms/halcon/HalconRuntimePaths.h \
     src/algorithms/ocr/OcrHalconRunner.h \
     src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+    src/algorithms/recognition/ColorComparisonModel.h \
     src/algorithms/recognition/ColorComparisonHalconRunner.h \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
     src/algorithms/recognition/RegisteredClassificationModelPackage.h \
