@@ -126,6 +126,7 @@ private:
     void refreshPositionCorrectionControls();
     void handleDetectionConfigChanged(const QString &reason);
     void invalidateAsyncWork();
+    bool invalidateModelBuild();
     void markModelStale(const QString &reason);
     bool rebuildTemplateModelFromFrame(const cv::Mat &frame,
                                        const FrameInputMetadata &metadata,
@@ -146,6 +147,7 @@ private:
     QRectF m_templateRoi = QRectF(0.05, 0.05, 0.25, 0.25);
     QVector<QPointF> m_templateMask;
     ColorComparisonModelV2 m_model;
+    int m_modelOriginVersion = 2;
     QString m_modelStatus = QStringLiteral("model_empty");
     QString m_modelReason = QStringLiteral("尚未取样，请点击重新取样");
     QRectF m_detectRoi = QRectF(0.35, 0.05, 0.3, 0.3);
@@ -170,7 +172,9 @@ private:
     QFutureWatcher<ColorComparisonTemplateBuildResult> *m_modelBuildWatcher = nullptr;
     quint64 m_testGeneration = 0;
     quint64 m_activeTestGeneration = 0;
+    quint64 m_modelBuildGeneration = 0;
     quint64 m_activeModelBuildGeneration = 0;
+    bool m_modelBuildUiActive = false;
     bool m_pendingContinuousRun = false;
     ToolRequest m_pendingTestRequest;
     QString m_pendingImageTitle;

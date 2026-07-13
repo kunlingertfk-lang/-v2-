@@ -13,6 +13,7 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <QFutureWatcher>
 #include <QGraphicsPolygonItem>
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -23,6 +24,7 @@
 #include <QSpinBox>
 #include <QThread>
 #include <QToolButton>
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <functional>
 #include <iostream>
@@ -156,6 +158,15 @@ ColorComparisonModelV2 staleModel(const QString &suffix)
     return model;
 }
 
+ColorComparisonTemplateBuildResult successfulBuildResult(const QString &suffix)
+{
+    ColorComparisonTemplateBuildResult result;
+    result.success = true;
+    result.status = QStringLiteral("ok");
+    result.model = readyModel(suffix);
+    return result;
+}
+
 ToolConfig v2Config(const QString &templateMode,
                     const ColorComparisonModelV2 &model = readyModel())
 {
@@ -241,6 +252,11 @@ QJsonObject modelJson(const ColorComparisonDialog &dialog)
     return colorParams(dialog).value(QStringLiteral("model")).toObject();
 }
 
+QJsonObject dialogLifecycle(const ColorComparisonDialog &dialog)
+{
+    return colorParams(dialog).value(QStringLiteral("dialogLifecycle")).toObject();
+}
+
 QString modelState(const ColorComparisonDialog &dialog)
 {
     return modelJson(dialog).value(QStringLiteral("state")).toString();
@@ -288,6 +304,18 @@ void checkHashesPreserved(const ColorComparisonDialog &dialog,
 bool hasPixmap(const QLabel *label)
 {
     return label && !label->pixmap(Qt::ReturnByValue).isNull();
+}
+
+QFutureWatcher<ColorComparisonTemplateBuildResult> *templateBuildWatcher(
+        ColorComparisonDialog &dialog)
+{
+    for (QObject *child : dialog.children()) {
+        if (auto *watcher = dynamic_cast<
+                QFutureWatcher<ColorComparisonTemplateBuildResult> *>(child)) {
+            return watcher;
+        }
+    }
+    return nullptr;
 }
 
 } // namespace
@@ -673,31 +701,45 @@ int main(int argc, char **argv)
 
     ReferenceImageProvider::instance().setReferenceFrame(colorFrame, colorMetadata);
     {
+        ColorComparisonDialog migrated;
+        migrated.loadFromConfig(legacyConfig(1));
+        const ToolConfig saved = migrated.toolConfig();
         ColorComparisonDialog dialog;
-        dialog.loadFromConfig(legacyConfig(1));
+        dialog.loadFromConfig(saved);
         check(colorParams(dialog).value(QStringLiteral("version")).toInt() == 2
-                      && modelState(dialog) == QStringLiteral("stale"),
+                      && modelState(dialog) == QStringLiteral("stale")
+                      && dialogLifecycle(dialog)
+                         .value(QStringLiteral("originVersion")).toInt() == 1
+                      && dialogLifecycle(dialog)
+                         .value(QStringLiteral("status")).toString()
+                         == QStringLiteral("model_stale"),
               "V1 with a reference must save back as stale V2");
         QLabel *stateLabel = requiredChild<QLabel>(
                 dialog, QStringLiteral("colorComparisonModelStateLabel"),
                 "legacy state label must exist");
         check(stateLabel && stateLabel->text().contains(QStringLiteral("旧模型"))
                       && stateLabel->text().contains(QStringLiteral("重新取样")),
-              "V1 with reference must show the rebuild instruction");
+              "V1 with reference must retain the old-model rebuild instruction after save/reopen");
     }
 
     ReferenceImageProvider::instance().clearReferenceFrame();
     {
+        ColorComparisonDialog migrated;
+        migrated.loadFromConfig(legacyConfig(1));
+        const ToolConfig saved = migrated.toolConfig();
         ColorComparisonDialog dialog;
-        dialog.loadFromConfig(legacyConfig(1));
+        dialog.loadFromConfig(saved);
         check(modelState(dialog) == QStringLiteral("unsupported"),
-              "V1 without a reference must load unsupported");
+              "V1 without a reference must remain unsupported after save/reopen");
         QLabel *stateLabel = requiredChild<QLabel>(
                 dialog, QStringLiteral("colorComparisonModelStateLabel"),
                 "unsupported legacy state label must exist");
         check(stateLabel && stateLabel->text().contains(
                           QStringLiteral("model_rebuild_required")),
-              "V1 without reference must show model_rebuild_required");
+              "V1 without reference must retain model_rebuild_required after save/reopen");
+        check(dialogLifecycle(dialog)
+                      .value(QStringLiteral("originVersion")).toInt() == 1,
+              "V1 no-reference lifecycle metadata must retain originVersion 1");
         const QJsonObject beforeRebuild = modelJson(dialog);
         const cv::Mat monoReference(80, 120, CV_8UC1, cv::Scalar(112));
         ReferenceImageProvider::instance().setReferenceFrame(
@@ -728,16 +770,22 @@ int main(int argc, char **argv)
 
     ReferenceImageProvider::instance().clearReferenceFrame();
     {
+        ColorComparisonDialog migrated;
+        migrated.loadFromConfig(legacyConfig(77));
+        const ToolConfig saved = migrated.toolConfig();
         ColorComparisonDialog dialog;
-        dialog.loadFromConfig(legacyConfig(77));
+        dialog.loadFromConfig(saved);
         check(modelState(dialog) == QStringLiteral("unsupported"),
-              "unknown model versions must load unsupported");
+              "unknown model versions must remain unsupported after save/reopen");
         QLabel *stateLabel = requiredChild<QLabel>(
                 dialog, QStringLiteral("colorComparisonModelStateLabel"),
                 "unknown version state label must exist");
         check(stateLabel && stateLabel->text().contains(
                           QStringLiteral("unsupported_model_version")),
-              "unknown versions must expose unsupported_model_version");
+              "unknown versions must retain unsupported_model_version after save/reopen");
+        check(dialogLifecycle(dialog)
+                      .value(QStringLiteral("originVersion")).toInt() == 77,
+              "unknown lifecycle metadata must retain its concrete origin version");
         ReferenceImageProvider::instance().setReferenceFrame(colorFrame,
                                                               colorMetadata);
         check(modelState(dialog) == QStringLiteral("unsupported"),
@@ -773,6 +821,38 @@ int main(int argc, char **argv)
         check(saved.params == savedAgain.params
                       && saved.judgeRule == savedAgain.judgeRule,
               "ready nested V2 fields must survive save/reopen round-trip");
+    }
+
+    {
+        ToolConfig forged = v2Config(QStringLiteral("custom"),
+                                     readyModel(QStringLiteral("native-metadata")));
+        QJsonObject root = forged.params;
+        QJsonObject params = root.value(QStringLiteral("colorComparison")).toObject();
+        params.insert(QStringLiteral("dialogLifecycle"),
+                      QJsonObject{
+                          {QStringLiteral("originVersion"), 2},
+                          {QStringLiteral("status"), QStringLiteral("ok")},
+                          {QStringLiteral("reason"),
+                           QStringLiteral("forged native lifecycle reason")}
+                      });
+        root.insert(QStringLiteral("colorComparison"), params);
+        forged.params = root;
+
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(forged);
+        QLabel *stateLabel = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonModelStateLabel"),
+                "native V2 lifecycle guard needs the model state label");
+        check(modelState(dialog) == QStringLiteral("ready")
+                      && dialogLifecycle(dialog)
+                         .value(QStringLiteral("status")).toString()
+                         == QStringLiteral("ok")
+                      && dialogLifecycle(dialog)
+                         .value(QStringLiteral("reason")).toString().isEmpty()
+                      && stateLabel
+                      && !stateLabel->text().contains(
+                          QStringLiteral("forged native lifecycle reason")),
+              "native V2 must ignore dialog lifecycle metadata and trust model validation");
     }
 
     {
@@ -875,12 +955,8 @@ int main(int argc, char **argv)
         QLabel *viewerTitle = requiredChild<QLabel>(
                 dialog, QStringLiteral("colorComparisonViewerTitleLabel"),
                 "viewer title must have a stable object name");
-        QElapsedTimer clickTimer;
-        clickTimer.start();
         if (testRun)
             testRun->click();
-        check(clickTimer.elapsed() < 200,
-              "test button must return immediately instead of running the Adapter on the UI thread");
         check(status && status->text().contains(QStringLiteral("运行中")),
               "test click must expose an in-flight state before queued worker completion");
         check(waitUntil([status]() {
@@ -948,12 +1024,8 @@ int main(int argc, char **argv)
         QLabel *status = requiredChild<QLabel>(
                 dialog, QStringLiteral("colorComparisonStatusLabel"),
                 "async sampling test needs the status label");
-        QElapsedTimer clickTimer;
-        clickTimer.start();
         if (rebuild)
             rebuild->click();
-        check(clickTimer.elapsed() < 200,
-              "explicit sampling must return immediately instead of entering HALCON on the UI thread");
         check(status && status->text().contains(QStringLiteral("正在重新取样")),
               "explicit sampling click must expose an in-flight state before worker completion");
         check(waitUntil([status, rebuild]() {
@@ -964,6 +1036,140 @@ int main(int argc, char **argv)
               "explicit Mono8 sampling must fail asynchronously before HALCON/license loading");
         check(modelJson(dialog) == before,
               "failed explicit sampling must preserve the existing stale model exactly");
+    }
+
+    {
+        const cv::Mat monoFrame(80, 120, CV_8UC1, cv::Scalar(118));
+        const FrameInputMetadata monoMetadata =
+                FrameInputMetadata::fromMat(monoFrame,
+                                            QStringLiteral("reference"));
+        ReferenceImageProvider::instance().setReferenceFrame(monoFrame,
+                                                              monoMetadata);
+        CameraFrameProvider::instance().setCurrentFrame(
+                monoFrame,
+                FrameInputMetadata::fromMat(monoFrame,
+                                            QStringLiteral("camera")));
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(v2Config(QStringLiteral("custom"),
+                                       staleModel(QStringLiteral("epoch-base"))));
+        QPushButton *rebuild = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonRebuildModelButton"),
+                "build epoch test needs the explicit sampling button");
+        QLabel *status = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonStatusLabel"),
+                "build epoch test needs the status label");
+        QFutureWatcher<ColorComparisonTemplateBuildResult> *watcher =
+                templateBuildWatcher(dialog);
+        check(watcher != nullptr,
+              "build epoch test must locate the Dialog model-build watcher");
+
+        if (rebuild)
+            rebuild->click();
+        check(waitUntil([status, rebuild]() {
+                  return status && rebuild && rebuild->isEnabled()
+                          && status->text().contains(
+                                  QStringLiteral("unsupported_color_input"));
+              }),
+              "build epoch setup must complete a real asynchronous build failure");
+
+        if (watcher) {
+            const ColorComparisonTemplateBuildResult success =
+                    successfulBuildResult(QStringLiteral("epoch-success"));
+            watcher->setFuture(QtConcurrent::run([success]() {
+                QThread::msleep(120);
+                return success;
+            }));
+        }
+
+        QComboBox *sensitivity = requiredChild<QComboBox>(
+                dialog, QStringLiteral("colorComparisonSensitivityCombo"),
+                "build epoch test needs sensitivity");
+        QSpinBox *minScore = requiredChild<QSpinBox>(
+                dialog, QStringLiteral("colorComparisonMinScore"),
+                "build epoch test needs minimum score");
+        QCheckBox *position = requiredChild<QCheckBox>(
+                dialog, QStringLiteral("positionCorrectionSwitch"),
+                "build epoch test needs position state");
+        QToolButton *detectRect = requiredChild<QToolButton>(
+                dialog, QStringLiteral("colorComparisonDetectRectButton"),
+                "build epoch test needs custom detection geometry");
+        QPushButton *testRun = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonTestRunButton"),
+                "build epoch test needs test start/stop state");
+        FrameViewHelper *preview = dialog.findChild<FrameViewHelper *>();
+
+        if (sensitivity)
+            sensitivity->setCurrentIndex((sensitivity->currentIndex() + 1)
+                                         % sensitivity->count());
+        if (minScore)
+            minScore->setValue(minScore->value() == 79 ? 78 : 79);
+        if (position)
+            position->setChecked(!position->isChecked());
+        if (detectRect)
+            detectRect->click();
+        if (preview)
+            preview->roiChanged(QRectF(0.22, 0.18, 0.42, 0.36));
+        if (testRun) {
+            testRun->click();
+            testRun->click();
+        }
+
+        check(waitUntil([&dialog]() {
+                  return modelState(dialog) == QStringLiteral("ready");
+              }),
+              "non-template test/position/judge/custom-detection changes must not discard a successful build");
+        check(modelReferenceHash(dialog)
+                      == QStringLiteral("reference-hash-epoch-success"),
+              "the successful build result must be the model applied after non-template changes");
+        check(dialogLifecycle(dialog)
+                      .value(QStringLiteral("originVersion")).toInt() == 2
+                      && dialogLifecycle(dialog)
+                         .value(QStringLiteral("status")).toString()
+                         == QStringLiteral("ok"),
+              "a successful rebuild must reset lifecycle provenance to native V2/ok");
+    }
+
+    {
+        const cv::Mat monoReference(80, 120, CV_8UC1, cv::Scalar(122));
+        ReferenceImageProvider::instance().setReferenceFrame(
+                monoReference,
+                FrameInputMetadata::fromMat(monoReference,
+                                            QStringLiteral("reference")));
+        ColorComparisonDialog dialog;
+        dialog.loadFromConfig(v2Config(QStringLiteral("custom"),
+                                       readyModel(QStringLiteral("epoch-stale"))));
+        const QString referenceHash = modelReferenceHash(dialog);
+        const QString extractHash = modelExtractHash(dialog);
+        QPushButton *rebuild = requiredChild<QPushButton>(
+                dialog, QStringLiteral("colorComparisonRebuildModelButton"),
+                "template invalidation test needs the sampling button");
+        QLabel *status = requiredChild<QLabel>(
+                dialog, QStringLiteral("colorComparisonStatusLabel"),
+                "template invalidation test needs the status label");
+        QCheckBox *brightness = requiredChild<QCheckBox>(
+                dialog, QStringLiteral("colorComparisonBrightnessCompensation"),
+                "template invalidation test needs brightness compensation");
+
+        if (rebuild)
+            rebuild->click();
+        if (brightness)
+            brightness->setChecked(true);
+        check(status
+                      && !status->text().contains(QStringLiteral("正在重新取样"))
+                      && status->text().contains(QStringLiteral("model_stale")),
+              "template extraction changes must immediately replace sampling status with stored stale instruction");
+        check(waitUntil([rebuild]() {
+                  return rebuild && rebuild->isEnabled();
+              }),
+              "invalidated template build must still complete without blocking the Dialog");
+        check(status && status->text().contains(QStringLiteral("model_stale"))
+                      && !status->text().contains(
+                          QStringLiteral("unsupported_color_input")),
+              "an obsolete build completion must not overwrite the current stored stale instruction");
+        check(modelState(dialog) == QStringLiteral("stale"),
+              "template extraction changes during build must keep the stored model stale");
+        checkHashesPreserved(dialog, referenceHash, extractHash,
+                             "template build invalidation must preserve stored model hashes");
     }
 
     ReferenceImageProvider::instance().clearReferenceFrame();

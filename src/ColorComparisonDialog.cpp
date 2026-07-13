@@ -36,6 +36,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 
 #include <cmath>
+#include <limits>
 
 namespace {
 
@@ -44,6 +45,70 @@ constexpr int kActionButtonFlashMs = 120;
 bool finiteValue(qreal value)
 {
     return std::isfinite(static_cast<double>(value));
+}
+
+bool strictJsonInteger(const QJsonValue &value, int *parsed)
+{
+    if (!value.isDouble())
+        return false;
+    const double number = value.toDouble();
+    if (!std::isfinite(number) || std::floor(number) != number
+            || number < std::numeric_limits<int>::min()
+            || number > std::numeric_limits<int>::max()) {
+        return false;
+    }
+    if (parsed)
+        *parsed = static_cast<int>(number);
+    return true;
+}
+
+bool restoreDialogLifecycle(const QJsonObject &colorComparison,
+                            ColorComparisonModelState modelState,
+                            int *originVersion,
+                            QString *status,
+                            QString *reason)
+{
+    const QJsonValue lifecycleValue =
+            colorComparison.value(QStringLiteral("dialogLifecycle"));
+    if (!lifecycleValue.isObject())
+        return false;
+
+    const QJsonObject lifecycle = lifecycleValue.toObject();
+    int origin = 0;
+    if (!strictJsonInteger(lifecycle.value(QStringLiteral("originVersion")),
+                           &origin)
+            || !lifecycle.value(QStringLiteral("status")).isString()
+            || !lifecycle.value(QStringLiteral("reason")).isString()) {
+        return false;
+    }
+
+    const QString storedStatus =
+            lifecycle.value(QStringLiteral("status")).toString();
+    const QString storedReason =
+            lifecycle.value(QStringLiteral("reason")).toString();
+    if (storedReason.size() > 1024)
+        return false;
+
+    const bool legacyRebuild = origin == 1
+            && modelState == ColorComparisonModelState::Unsupported
+            && storedStatus == QStringLiteral("model_rebuild_required");
+    const bool legacyStale = origin == 1
+            && modelState == ColorComparisonModelState::Stale
+            && storedStatus == QStringLiteral("model_stale");
+    const bool unknownUnsupported = origin != 1 && origin != 2
+            && modelState == ColorComparisonModelState::Unsupported
+            && storedStatus == QStringLiteral("unsupported_model_version");
+    if (!legacyRebuild && !legacyStale && !unknownUnsupported) {
+        return false;
+    }
+
+    if (originVersion)
+        *originVersion = origin;
+    if (status)
+        *status = storedStatus;
+    if (reason)
+        *reason = storedReason;
+    return true;
 }
 
 QJsonObject rectToJson(const QRectF &rect)
@@ -235,6 +300,7 @@ ColorComparisonDialog::~ColorComparisonDialog()
     if (m_continuousTimer)
         m_continuousTimer->stop();
     invalidateAsyncWork();
+    invalidateModelBuild();
     if (m_testWatcher)
         disconnect(m_testWatcher, nullptr, this, nullptr);
     if (m_modelBuildWatcher)
@@ -1178,11 +1244,20 @@ void ColorComparisonDialog::invalidateAsyncWork()
     m_pendingTestGeneration = 0;
 }
 
+bool ColorComparisonDialog::invalidateModelBuild()
+{
+    ++m_modelBuildGeneration;
+    const bool wasActive = m_modelBuildUiActive;
+    m_modelBuildUiActive = false;
+    return wasActive;
+}
+
 void ColorComparisonDialog::markModelStale(const QString &reason)
 {
     if (m_loadingConfig)
         return;
 
+    const bool buildWasActive = invalidateModelBuild();
     invalidateAsyncWork();
     if (m_model.state == ColorComparisonModelState::Ready
             || m_model.state == ColorComparisonModelState::Stale) {
@@ -1194,6 +1269,8 @@ void ColorComparisonDialog::markModelStale(const QString &reason)
         m_modelReason = tr("尚未取样，请点击重新取样");
     }
     updateModelStateUi();
+    if (buildWasActive)
+        displayStoredModelInstruction();
 }
 
 void ColorComparisonDialog::updateModelStateUi()
@@ -1304,6 +1381,12 @@ QJsonObject ColorComparisonDialog::colorComparisonParams() const
     params.insert(QStringLiteral("templateRoiNormalized"), rectToJson(m_templateRoi));
     params.insert(QStringLiteral("templateMaskPolygon"), pointsToJson(m_templateMask));
     params.insert(QStringLiteral("model"), colorComparisonModelToJson(m_model));
+    params.insert(QStringLiteral("dialogLifecycle"),
+                  QJsonObject{
+                      {QStringLiteral("originVersion"), m_modelOriginVersion},
+                      {QStringLiteral("status"), m_modelStatus},
+                      {QStringLiteral("reason"), m_modelReason}
+                  });
 
     params.insert(QStringLiteral("detectRegionType"),
                   m_globalDetection ? QStringLiteral("rectangle")
@@ -1377,6 +1460,7 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     if (config.toolType != ToolType::Unknown && config.toolType != ToolType::ColorComparison)
         return;
 
+    const bool buildWasActive = invalidateModelBuild();
     invalidateAsyncWork();
     m_loadingConfig = true;
     if (!config.toolId.isEmpty())
@@ -1384,6 +1468,10 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     m_enabled = config.enabled;
     const QJsonObject colorComparison =
             config.params.value(QStringLiteral("colorComparison")).toObject();
+    int serializedVersion = 0;
+    strictJsonInteger(colorComparison.value(QStringLiteral("version")),
+                      &serializedVersion);
+    m_modelOriginVersion = serializedVersion;
 
     m_templateRegionMode = colorComparison
             .value(QStringLiteral("templateRegionMode"))
@@ -1441,6 +1529,13 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     m_model = modelRead.model;
     m_modelStatus = modelRead.status;
     m_modelReason = modelRead.message;
+    if (serializedVersion == 2) {
+        restoreDialogLifecycle(colorComparison,
+                               m_model.state,
+                               &m_modelOriginVersion,
+                               &m_modelStatus,
+                               &m_modelReason);
+    }
 
     if (m_templateRegionModeComboBox) {
         const QSignalBlocker blocker(m_templateRegionModeComboBox);
@@ -1475,6 +1570,8 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
     refreshRoiOverlay();
     m_loadingConfig = false;
     updateModelStateUi();
+    if (buildWasActive)
+        displayStoredModelInstruction();
 }
 
 QString ColorComparisonDialog::summaryText() const
@@ -1863,7 +1960,8 @@ bool ColorComparisonDialog::rebuildTemplateModelFromFrame(
                                   metadata.toJson());
 
     invalidateAsyncWork();
-    m_activeModelBuildGeneration = m_testGeneration;
+    m_activeModelBuildGeneration = ++m_modelBuildGeneration;
+    m_modelBuildUiActive = true;
     m_rebuildModelButton->setEnabled(false);
     updateStatus(tr("正在重新取样…"));
     m_modelBuildWatcher->setFuture(QtConcurrent::run([request]() {
@@ -1911,8 +2009,9 @@ void ColorComparisonDialog::handleModelBuildFinished()
 
     const ColorComparisonTemplateBuildResult result =
             m_modelBuildWatcher->result();
-    if (m_activeModelBuildGeneration != m_testGeneration)
+    if (m_activeModelBuildGeneration != m_modelBuildGeneration)
         return;
+    m_modelBuildUiActive = false;
 
     if (!result.success) {
         displayError(result.status, result.message);
@@ -1920,6 +2019,7 @@ void ColorComparisonDialog::handleModelBuildFinished()
     }
 
     m_model = result.model;
+    m_modelOriginVersion = 2;
     m_modelStatus = result.status.isEmpty()
             ? QStringLiteral("ok") : result.status;
     m_modelReason = tr("取样完成");
@@ -1950,6 +2050,7 @@ void ColorComparisonDialog::accept()
     if (m_continuousTimer)
         m_continuousTimer->stop();
     invalidateAsyncWork();
+    invalidateModelBuild();
     QDialog::accept();
 }
 
@@ -1958,6 +2059,7 @@ void ColorComparisonDialog::reject()
     if (m_continuousTimer)
         m_continuousTimer->stop();
     invalidateAsyncWork();
+    invalidateModelBuild();
     QDialog::reject();
 }
 
@@ -1966,5 +2068,6 @@ void ColorComparisonDialog::closeEvent(QCloseEvent *event)
     if (m_continuousTimer)
         m_continuousTimer->stop();
     invalidateAsyncWork();
+    invalidateModelBuild();
     QDialog::closeEvent(event);
 }
