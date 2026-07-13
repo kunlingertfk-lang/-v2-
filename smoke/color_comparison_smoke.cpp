@@ -84,6 +84,50 @@ ColorComparisonHalconConfig baseConfig()
     return config;
 }
 
+QJsonArray legacyPointsToJson(const QVector<QPointF> &points)
+{
+    QJsonArray array;
+    for (const QPointF &point : points) {
+        array.append(QJsonObject{
+            {QStringLiteral("x"), point.x()},
+            {QStringLiteral("y"), point.y()}
+        });
+    }
+    return array;
+}
+
+QJsonObject legacyCustomExtractParams(const QVector<QPointF> &templateMask)
+{
+    return {
+        {QStringLiteral("featureType"), QStringLiteral("histogram_hs_2d")},
+        {QStringLiteral("algorithm"), QStringLiteral("histogram_intersection")},
+        {QStringLiteral("colorSpace"), QStringLiteral("hsv")},
+        {QStringLiteral("hueBins"), 32},
+        {QStringLiteral("saturationBins"), 32},
+        {QStringLiteral("layout"), QStringLiteral("hue_major")},
+        {QStringLiteral("minimumEffectivePixels"), 4.0},
+        {QStringLiteral("templateRegionMode"), QStringLiteral("custom")},
+        {QStringLiteral("templateGeometry"), QJsonObject{
+             {QStringLiteral("type"), QStringLiteral("rectangle")},
+             {QStringLiteral("rect"), QJsonObject{
+                  {QStringLiteral("x"), 0.0},
+                  {QStringLiteral("y"), 0.0},
+                  {QStringLiteral("width"), 1.0},
+                  {QStringLiteral("height"), 1.0}
+              }}
+         }},
+        {QStringLiteral("templateMaskPolygon"), legacyPointsToJson(templateMask)},
+        {QStringLiteral("brightnessCompensation"), false},
+        {QStringLiteral("brightnessConstants"), QJsonObject{
+             {QStringLiteral("minMean"), 8.0},
+             {QStringLiteral("maxMean"), 247.0},
+             {QStringLiteral("minScale"), 0.75},
+             {QStringLiteral("maxScale"), 1.3333333333},
+             {QStringLiteral("maxClippedRatio"), 0.02}
+         }}
+    };
+}
+
 int maximumFeatureIndex(const QVector<double> &feature)
 {
     int bestIndex = -1;
@@ -457,13 +501,31 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
         custom.detectMaskPolygonNormalized.clear();
         const ColorComparisonTemplateBuildResult customBuilt =
                 runner->buildTemplateModel(referenceImage, custom);
-        custom.model = customBuilt.model;
-        custom.detectMaskPolygonNormalized = sync.detectMaskPolygonNormalized;
-        custom.halconSoPath = QCoreApplication::applicationFilePath();
-        const ColorComparisonHalconResult customResult =
-                runner->run(referenceImage, custom);
-        check(customResult.status != QStringLiteral("model_stale"),
-              "custom detection mask changes must not stale the model");
+        check(customBuilt.success,
+              "custom compatibility fixture must build before model validation");
+        const QJsonObject customExtractParams = customBuilt.payload
+                .value(QStringLiteral("extractParams")).toObject();
+        const QString legacyCustomHash = colorComparisonExtractParamsHash(
+                    legacyCustomExtractParams(custom.templateMaskPolygonNormalized));
+        check(customBuilt.success &&
+              customBuilt.model.extractParamsHash == legacyCustomHash,
+              "custom builds must retain the pre-sync V2 extract hash");
+        check(customBuilt.success &&
+              customBuilt.payload.value(QStringLiteral("extractParams")).isObject() &&
+              !customExtractParams.contains(
+                  QStringLiteral("syncDetectionMaskPolygon")),
+              "custom extract payload must omit the sync detection mask key");
+
+        if (customBuilt.success) {
+            custom.model = customBuilt.model;
+            custom.detectMaskPolygonNormalized = sync.detectMaskPolygonNormalized;
+            custom.halconSoPath = QCoreApplication::applicationFilePath();
+            const ColorComparisonHalconResult customResult =
+                    runner->run(referenceImage, custom);
+            check(!customResult.success &&
+                  customResult.status == QStringLiteral("halcon_load_failed"),
+                  "custom detection mask changes must pass validation before forced load failure");
+        }
     }
 
     const QVector<QPointF> rightHalfMask = {
