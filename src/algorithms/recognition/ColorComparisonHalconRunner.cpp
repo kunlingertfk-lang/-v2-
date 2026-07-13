@@ -1500,11 +1500,32 @@ QVector<QPointF> normalizedPointsToPixels(const QVector<QPointF> &points,
     return pixels;
 }
 
+ToolOverlay resultTextOverlay(const QRectF &anchorRect,
+                              double score,
+                              bool passed)
+{
+    ToolOverlay overlay;
+    overlay.type = ToolOverlayType::Text;
+    overlay.label = QStringLiteral("color_result_text");
+    overlay.text = QStringLiteral("%1 score:%2")
+            .arg(passed ? QStringLiteral("OK") : QStringLiteral("NG"),
+                 QString::number(score, 'f', 1));
+    overlay.score = score;
+    overlay.p1 = anchorRect.topLeft();
+    overlay.extra.insert(QStringLiteral("status"),
+                         passed ? QStringLiteral("OK") : QStringLiteral("NG"));
+    overlay.extra.insert(QStringLiteral("anchorRect"), rectToJson(anchorRect));
+    return overlay;
+}
+
 QVector<ToolOverlay> detectionOverlays(const ColorComparisonHalconConfig &config,
-                                       const cv::Mat &image)
+                                       const cv::Mat &image,
+                                       double score,
+                                       bool passed)
 {
     QVector<ToolOverlay> overlays;
     ToolOverlay roi;
+    QRectF anchorRect;
     if (normalizedDetectRegionType(config.detectRegionType)
             == QStringLiteral("circle")) {
         const CirclePixelGeometry geometry = circlePixelGeometry(
@@ -1515,9 +1536,14 @@ QVector<ToolOverlay> detectionOverlays(const ColorComparisonHalconConfig &config
         roi.type = ToolOverlayType::Circle;
         roi.center = geometry.center;
         roi.radius = geometry.radius;
+        anchorRect = QRectF(geometry.center.x() - geometry.radius,
+                            geometry.center.y() - geometry.radius,
+                            geometry.radius * 2.0,
+                            geometry.radius * 2.0);
     } else {
         roi.type = ToolOverlayType::Rect;
         roi.rect = normalizedRectToPixels(config.detectRoiNormalized, image);
+        anchorRect = roi.rect;
     }
     roi.label = QStringLiteral("Detection ROI");
     roi.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
@@ -1531,6 +1557,7 @@ QVector<ToolOverlay> detectionOverlays(const ColorComparisonHalconConfig &config
         mask.extra.insert(QStringLiteral("role"), QStringLiteral("detect_mask"));
         overlays.append(mask);
     }
+    overlays.append(resultTextOverlay(anchorRect, score, passed));
     return overlays;
 }
 
@@ -1827,7 +1854,7 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.similarity = similarity;
         result.elapsedMs = timer.elapsed();
         result.detectFeature = extracted.hsHistogram;
-        result.overlays = detectionOverlays(config, image);
+        result.overlays = detectionOverlays(config, image, score, passed);
         result.payload = baseRunPayload(config, warnings, image.cols, image.rows);
         result.payload.insert(QStringLiteral("status"), result.status);
         result.payload.insert(QStringLiteral("message"), result.message);

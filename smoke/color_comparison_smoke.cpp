@@ -30,6 +30,44 @@ bool near(double actual, double expected, double tolerance)
     return std::abs(actual - expected) <= tolerance;
 }
 
+void checkResultTextOverlay(const QVector<ToolOverlay> &overlays,
+                            int index,
+                            double expectedScore,
+                            bool expectedOk,
+                            const QRectF &expectedAnchor,
+                            const char *message)
+{
+    if (index < 0 || index >= overlays.size()) {
+        check(false, message);
+        return;
+    }
+
+    const ToolOverlay &overlay = overlays.at(index);
+    const QJsonObject anchor = overlay.extra
+            .value(QStringLiteral("anchorRect")).toObject();
+    const QString expectedStatus = expectedOk
+            ? QStringLiteral("OK") : QStringLiteral("NG");
+    const QString expectedText = QStringLiteral("%1 score:%2")
+            .arg(expectedStatus, QString::number(expectedScore, 'f', 1));
+    check(overlay.type == ToolOverlayType::Text
+          && overlay.label == QStringLiteral("color_result_text")
+          && overlay.text == expectedText
+          && near(overlay.score, expectedScore, 1e-9)
+          && overlay.extra.value(QStringLiteral("status")).toString()
+                 == expectedStatus
+          && near(overlay.p1.x(), expectedAnchor.x(), 1e-9)
+          && near(overlay.p1.y(), expectedAnchor.y(), 1e-9)
+          && near(anchor.value(QStringLiteral("x")).toDouble(),
+                  expectedAnchor.x(), 1e-9)
+          && near(anchor.value(QStringLiteral("y")).toDouble(),
+                  expectedAnchor.y(), 1e-9)
+          && near(anchor.value(QStringLiteral("width")).toDouble(),
+                  expectedAnchor.width(), 1e-9)
+          && near(anchor.value(QStringLiteral("height")).toDouble(),
+                  expectedAnchor.height(), 1e-9),
+          message);
+}
+
 cv::Vec3b hsvFullToBgr(unsigned char hue,
                        unsigned char saturation,
                        unsigned char value)
@@ -477,6 +515,9 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
         check(ratio.success && ratio.measurementValid && !ratio.ok &&
               ratio.score > 45.0 && ratio.score < 55.0,
               "multi-color area-ratio changes must reduce histogram intersection");
+        checkResultTextOverlay(ratio.overlays, 1, ratio.score, false,
+                               QRectF(0.0, 0.0, 64.0, 64.0),
+                               "NG comparison must expose score text at the detection ROI");
     }
 
     ColorComparisonHalconConfig rectangleConfig = baseConfig();
@@ -491,9 +532,12 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
         const ColorComparisonHalconResult rectangle =
                 runner->run(rectangleDetection, rectangleConfig);
         check(rectangle.success && near(rectangle.score, 100.0, 1e-6) &&
-              rectangle.overlays.size() == 1 &&
-              rectangle.overlays.first().type == ToolOverlayType::Rect,
+              rectangle.overlays.size() == 2 &&
+              rectangle.overlays.at(0).type == ToolOverlayType::Rect,
               "custom template rectangle and independent detection rectangle must match");
+        checkResultTextOverlay(rectangle.overlays, 1, rectangle.score, true,
+                               QRectF(32.0, 0.0, 32.0, 64.0),
+                               "rectangle comparison must anchor score text to the detection rectangle");
     }
 
     ColorComparisonHalconConfig circleConfig = baseConfig();
@@ -509,10 +553,17 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
                       "sync circle")) {
         circleConfig.model = circleBuilt.model;
         const ColorComparisonHalconResult circle = runner->run(circleImage, circleConfig);
+        const double circleRadiusPixels = 0.24 * 64.0;
         check(circle.success && near(circle.score, 100.0, 1e-6) &&
-              circle.overlays.size() == 1 &&
-              circle.overlays.first().type == ToolOverlayType::Circle,
+              circle.overlays.size() == 2 &&
+              circle.overlays.at(0).type == ToolOverlayType::Circle,
               "sync mode must build and run with the actual circular region");
+        checkResultTextOverlay(circle.overlays, 1, circle.score, true,
+                               QRectF(32.0 - circleRadiusPixels,
+                                      32.0 - circleRadiusPixels,
+                                      circleRadiusPixels * 2.0,
+                                      circleRadiusPixels * 2.0),
+                               "circle comparison must anchor score text to the circle bounds");
     }
 
     {
@@ -548,12 +599,18 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
                                .value(QStringLiteral("effectiveDetectionPixels"))
                                .toDouble() - expectedArea) <= expectedArea * 0.03,
                   "landscape circle detection area must preserve the user-drawn pixel radius");
-            check(landscape.success && landscape.overlays.size() == 1 &&
-                  landscape.overlays.first().type == ToolOverlayType::Circle &&
-                  near(landscape.overlays.first().center.x(), imageWidth * 0.5, 1e-9) &&
-                  near(landscape.overlays.first().center.y(), imageHeight * 0.5, 1e-9) &&
-                  near(landscape.overlays.first().radius, radiusPixels, 1e-9),
+            check(landscape.success && landscape.overlays.size() == 2 &&
+                  landscape.overlays.at(0).type == ToolOverlayType::Circle &&
+                  near(landscape.overlays.at(0).center.x(), imageWidth * 0.5, 1e-9) &&
+                  near(landscape.overlays.at(0).center.y(), imageHeight * 0.5, 1e-9) &&
+                  near(landscape.overlays.at(0).radius, radiusPixels, 1e-9),
                   "landscape circle overlay must use the same pixel center and maximum-side radius");
+            checkResultTextOverlay(landscape.overlays, 1, landscape.score, true,
+                                   QRectF(imageWidth * 0.5 - radiusPixels,
+                                          imageHeight * 0.5 - radiusPixels,
+                                          radiusPixels * 2.0,
+                                          radiusPixels * 2.0),
+                                   "landscape circle score text must use the same pixel geometry");
 
             const QJsonObject detectionRoi = landscape.payload
                     .value(QStringLiteral("detectionRoi")).toObject();
@@ -678,10 +735,13 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
     const ColorComparisonHalconResult detectMasked =
             runner->run(detectMaskedImage, detectMaskConfig);
     check(detectMasked.success && detectMasked.score > 99.0 &&
-          detectMasked.overlays.size() == 2 &&
+          detectMasked.overlays.size() == 3 &&
           detectMasked.overlays.at(0).type == ToolOverlayType::Rect &&
           detectMasked.overlays.at(1).type == ToolOverlayType::Polygon,
-          "detection mask must affect scoring and overlays must contain detection geometry only");
+          "detection mask overlays must retain geometry before the result text");
+    checkResultTextOverlay(detectMasked.overlays, 2, detectMasked.score, true,
+                           QRectF(0.0, 0.0, 64.0, 64.0),
+                           "masked comparison must keep score text after detection geometry");
 
     ColorComparisonHalconConfig fullyMaskedConfig = runConfig;
     fullyMaskedConfig.detectMaskPolygonNormalized = {
