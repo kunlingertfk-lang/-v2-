@@ -7,12 +7,14 @@
 #include <QJsonValue>
 #include <QPointF>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
 namespace {
 
 constexpr double kGeometryEpsilon = 1e-12;
+constexpr double kMaxExactJsonInteger = 9007199254740991.0;
 
 struct ParseResult
 {
@@ -53,6 +55,51 @@ bool integerNumber(const QJsonValue &value, int *number)
     if (number)
         *number = static_cast<int>(parsed);
     return true;
+}
+
+struct DialogLifecycleFailure
+{
+    bool recognized = false;
+    QString status;
+    QString message;
+};
+
+DialogLifecycleFailure restoredDialogLifecycleFailure(
+        const QJsonObject &colorComparison,
+        ColorComparisonModelState modelState)
+{
+    const QJsonValue lifecycleValue =
+            colorComparison.value(QStringLiteral("dialogLifecycle"));
+    if (!lifecycleValue.isObject())
+        return {};
+
+    const QJsonObject lifecycle = lifecycleValue.toObject();
+    int originVersion = 0;
+    if (!integerNumber(lifecycle.value(QStringLiteral("originVersion")),
+                       &originVersion)
+            || !lifecycle.value(QStringLiteral("status")).isString()
+            || !lifecycle.value(QStringLiteral("reason")).isString()) {
+        return {};
+    }
+
+    const QString status = lifecycle.value(QStringLiteral("status")).toString();
+    const QString reason = lifecycle.value(QStringLiteral("reason")).toString();
+    if (reason.size() > 1024)
+        return {};
+
+    const bool legacyRebuild = originVersion == 1
+            && modelState == ColorComparisonModelState::Unsupported
+            && status == QStringLiteral("model_rebuild_required");
+    const bool legacyStale = originVersion == 1
+            && modelState == ColorComparisonModelState::Stale
+            && status == QStringLiteral("model_stale");
+    const bool unknownUnsupported = originVersion != 1 && originVersion != 2
+            && modelState == ColorComparisonModelState::Unsupported
+            && status == QStringLiteral("unsupported_model_version");
+    if (!legacyRebuild && !legacyStale && !unknownUnsupported)
+        return {};
+
+    return {true, status, reason};
 }
 
 bool validNormalizedRect(const QRectF &rect)
@@ -103,6 +150,28 @@ bool parsePoint(const QJsonValue &value, QPointF *point)
     if (point)
         *point = QPointF(x, y);
     return true;
+}
+
+bool validCircleForImage(const QPointF &center,
+                         double radius,
+                         const cv::Mat &image)
+{
+    if (image.cols <= 0 || image.rows <= 0 || !std::isfinite(center.x())
+            || !std::isfinite(center.y()) || !std::isfinite(radius)
+            || radius <= 0.0) {
+        return false;
+    }
+
+    const double centerX = center.x() * static_cast<double>(image.cols);
+    const double centerY = center.y() * static_cast<double>(image.rows);
+    const double radiusPixels = radius
+            * static_cast<double>(std::max(image.cols, image.rows));
+    return centerX - radiusPixels >= -kGeometryEpsilon
+            && centerX + radiusPixels
+                <= static_cast<double>(image.cols) + kGeometryEpsilon
+            && centerY - radiusPixels >= -kGeometryEpsilon
+            && centerY + radiusPixels
+                <= static_cast<double>(image.rows) + kGeometryEpsilon;
 }
 
 bool validPolygon(const QVector<QPointF> &points)
@@ -233,8 +302,122 @@ bool parseInputSignature(const QJsonObject &runtimeContext,
 
 ToolResult makeError(const ToolConfig &config,
                      const QString &status,
-                     const QString &message)
+                     const QString &message,
+                     const cv::Mat &targetImage,
+                     const QJsonObject &payloadPatch = QJsonObject())
 {
+    int threshold = 0;
+    const QJsonValue thresholdValue =
+            config.judgeRule.value(QStringLiteral("minScore"));
+    if (!integerNumber(thresholdValue, &threshold)
+            || threshold < 0 || threshold > 100) {
+        threshold = 0;
+    }
+
+    const QJsonValue colorComparisonValue =
+            config.params.value(QStringLiteral("colorComparison"));
+    const QJsonObject colorComparison = colorComparisonValue.isObject()
+            ? colorComparisonValue.toObject() : QJsonObject();
+
+    double effectiveTemplatePixels = 0.0;
+    const QJsonValue modelValue =
+            colorComparison.value(QStringLiteral("model"));
+    if (modelValue.isObject()) {
+        const QJsonValue countValue = modelValue.toObject().value(
+                    QStringLiteral("effectivePixelCount"));
+        double count = 0.0;
+        if (finiteNumber(countValue, &count) && std::floor(count) == count
+                && count >= 0.0 && count <= kMaxExactJsonInteger) {
+            effectiveTemplatePixels = count;
+        }
+    }
+
+    bool brightnessEnabled = false;
+    const QJsonValue comparisonValue =
+            colorComparison.value(QStringLiteral("comparison"));
+    if (comparisonValue.isObject()) {
+        const QJsonValue enabledValue = comparisonValue.toObject().value(
+                    QStringLiteral("brightnessCompensation"));
+        if (enabledValue.isBool())
+            brightnessEnabled = enabledValue.toBool();
+    }
+
+    bool positionRequested = false;
+    QString positionSource;
+    const QJsonValue positionValue =
+            colorComparison.value(QStringLiteral("positionCorrection"));
+    if (positionValue.isObject()) {
+        const QJsonObject position = positionValue.toObject();
+        if (position.value(QStringLiteral("enabled")).isBool()) {
+            positionRequested =
+                    position.value(QStringLiteral("enabled")).toBool();
+        }
+        if (position.value(QStringLiteral("sourceId")).isString()) {
+            positionSource =
+                    position.value(QStringLiteral("sourceId")).toString();
+        }
+    }
+
+    QJsonObject detectionRoi{
+        {QStringLiteral("type"), QStringLiteral("rectangle")},
+        {QStringLiteral("angle"), 0.0},
+        {QStringLiteral("centerX"), 0.5},
+        {QStringLiteral("centerY"), 0.5},
+        {QStringLiteral("width"), 0.0},
+        {QStringLiteral("height"), 0.0}
+    };
+    const QJsonValue detectTypeValue =
+            colorComparison.value(QStringLiteral("detectRegionType"));
+    const QString detectType = detectTypeValue.isString()
+            ? detectTypeValue.toString().trimmed().toLower() : QString();
+    if (detectType == QStringLiteral("rectangle")) {
+        QRectF rect;
+        if (parseRect(colorComparison.value(QStringLiteral("detectRoiNormalized")),
+                      &rect)) {
+            detectionRoi.insert(QStringLiteral("centerX"),
+                                rect.x() + rect.width() * 0.5);
+            detectionRoi.insert(QStringLiteral("centerY"),
+                                rect.y() + rect.height() * 0.5);
+            detectionRoi.insert(QStringLiteral("width"), rect.width());
+            detectionRoi.insert(QStringLiteral("height"), rect.height());
+        }
+    } else if (detectType == QStringLiteral("circle")) {
+        const QJsonValue circleValue = colorComparison.value(
+                    QStringLiteral("detectCircleNormalized"));
+        if (circleValue.isObject()) {
+            const QJsonObject circle = circleValue.toObject();
+            QPointF center;
+            double radius = 0.0;
+            if (parsePoint(circle.value(QStringLiteral("center")), &center)
+                    && finiteNumber(circle.value(QStringLiteral("radius")),
+                                    &radius)
+                    && radius > 0.0) {
+                const double radiusPixels = targetImage.cols > 0
+                        && targetImage.rows > 0
+                        ? radius * static_cast<double>(
+                              std::max(targetImage.cols, targetImage.rows))
+                        : 0.0;
+                const double normalizedWidth = targetImage.cols > 0
+                        ? radiusPixels * 2.0
+                          / static_cast<double>(targetImage.cols)
+                        : radius * 2.0;
+                const double normalizedHeight = targetImage.rows > 0
+                        ? radiusPixels * 2.0
+                          / static_cast<double>(targetImage.rows)
+                        : radius * 2.0;
+                detectionRoi.insert(QStringLiteral("type"),
+                                    QStringLiteral("circle"));
+                detectionRoi.insert(QStringLiteral("centerX"), center.x());
+                detectionRoi.insert(QStringLiteral("centerY"), center.y());
+                detectionRoi.insert(QStringLiteral("width"), normalizedWidth);
+                detectionRoi.insert(QStringLiteral("height"), normalizedHeight);
+                detectionRoi.insert(QStringLiteral("radius"), radius);
+                detectionRoi.insert(QStringLiteral("radiusNormalized"), radius);
+                detectionRoi.insert(QStringLiteral("radiusPixels"), radiusPixels);
+            }
+        }
+    }
+
     ToolResult result;
     result.toolId = config.toolId;
     result.toolType = ToolType::ColorComparison;
@@ -246,8 +429,36 @@ ToolResult makeError(const ToolConfig &config,
         {QStringLiteral("message"), message},
         {QStringLiteral("measurementValid"), false},
         {QStringLiteral("passed"), false},
-        {QStringLiteral("warnings"), QJsonArray()}
+        {QStringLiteral("algorithm"), QStringLiteral("histogram_intersection")},
+        {QStringLiteral("featureType"), QStringLiteral("histogram_hs_2d")},
+        {QStringLiteral("modelVersion"), 2},
+        {QStringLiteral("score"), 0.0},
+        {QStringLiteral("similarity"), 0.0},
+        {QStringLiteral("threshold"), static_cast<double>(threshold)},
+        {QStringLiteral("effectiveTemplatePixels"), effectiveTemplatePixels},
+        {QStringLiteral("effectiveDetectionPixels"), 0.0},
+        {QStringLiteral("brightnessCompensation"), QJsonObject{
+             {QStringLiteral("enabled"), brightnessEnabled},
+             {QStringLiteral("applied"), false},
+             {QStringLiteral("templateMean"), 0.0},
+             {QStringLiteral("detectMeanBefore"), 0.0},
+             {QStringLiteral("detectMeanAfter"), 0.0},
+             {QStringLiteral("scale"), 1.0},
+             {QStringLiteral("clippedRatio"), 0.0}
+         }},
+        {QStringLiteral("positionCorrection"), QJsonObject{
+             {QStringLiteral("requested"), positionRequested},
+             {QStringLiteral("applied"), false},
+             {QStringLiteral("sourceId"), positionSource}
+         }},
+        {QStringLiteral("detectionRoi"), detectionRoi},
+        {QStringLiteral("warnings"), QJsonArray()},
+        {QStringLiteral("elapsedMs"), 0.0}
     };
+    for (auto iterator = payloadPatch.constBegin();
+         iterator != payloadPatch.constEnd(); ++iterator) {
+        result.payload.insert(iterator.key(), iterator.value());
+    }
     return result;
 }
 
@@ -372,6 +583,7 @@ bool inputContractFailure(const cv::Mat &image,
 
 ParseResult parseConfig(const ToolRequest &request,
                         bool templateBuild,
+                        const cv::Mat &targetImage,
                         const QJsonObject &colorComparison,
                         int version,
                         const ColorComparisonInputSignature &inputSignature)
@@ -455,11 +667,9 @@ ParseResult parseConfig(const ToolRequest &request,
     if (config.detectRegionType == QStringLiteral("circle")) {
         const QPointF center = config.detectCircleCenterNormalized;
         const double radius = config.detectCircleRadiusNormalized;
-        if (!(radius > 0.0) || center.x() - radius < 0.0
-                || center.x() + radius > 1.0 || center.y() - radius < 0.0
-                || center.y() + radius > 1.0) {
+        if (!validCircleForImage(center, radius, targetImage)) {
             return parseFailure(QStringLiteral("invalid_detect_roi"),
-                                QStringLiteral("Detection circle is out of range."));
+                                QStringLiteral("Detection circle is outside the target image."));
         }
     }
 
@@ -512,14 +722,23 @@ ParseResult parseConfig(const ToolRequest &request,
 
         const ColorComparisonModelReadResult modelRead = readColorComparisonModel(
                     colorComparison, !request.referenceImage.empty());
+        QString modelStatus = modelRead.status;
+        QString modelMessage = modelRead.message;
+        const DialogLifecycleFailure lifecycle =
+                restoredDialogLifecycleFailure(colorComparison,
+                                                modelRead.model.state);
+        if (lifecycle.recognized) {
+            modelStatus = lifecycle.status;
+            modelMessage = lifecycle.message;
+        }
         const bool buildableState = templateBuild
-                && (modelRead.status == QStringLiteral("model_empty")
-                    || modelRead.status == QStringLiteral("model_stale"));
+                && (modelStatus == QStringLiteral("model_empty")
+                    || modelStatus == QStringLiteral("model_stale"));
         if (!modelRead.success && !buildableState) {
             const QString status =
-                    modelRead.status == QStringLiteral("model_unsupported")
-                    ? QStringLiteral("model_rebuild_required") : modelRead.status;
-            return parseFailure(status, modelRead.message);
+                    modelStatus == QStringLiteral("model_unsupported")
+                    ? QStringLiteral("model_rebuild_required") : modelStatus;
+            return parseFailure(status, modelMessage);
         }
         config.model = modelRead.model;
     }
@@ -667,6 +886,7 @@ ColorComparisonTemplateBuildResult ColorComparisonAdapter::buildTemplateModel(
 
     const ParseResult parsed = parseConfig(request,
                                            true,
+                                           request.referenceImage,
                                            colorComparison,
                                            version,
                                            inputSignature);
@@ -681,12 +901,14 @@ ToolResult ColorComparisonAdapter::run(const ToolRequest &request)
     if (config.toolType != ToolType::ColorComparison) {
         return makeError(config,
                          QStringLiteral("invalid_tool_type"),
-                         QStringLiteral("ColorComparisonAdapter only supports ToolType::ColorComparison."));
+                         QStringLiteral("ColorComparisonAdapter only supports ToolType::ColorComparison."),
+                         request.image);
     }
     if (request.image.empty()) {
         return makeError(config,
                          QStringLiteral("image_empty"),
-                         QStringLiteral("Input image is empty."));
+                         QStringLiteral("Input image is empty."),
+                         request.image);
     }
 
     QString status;
@@ -697,7 +919,7 @@ ToolResult ColorComparisonAdapter::run(const ToolRequest &request)
                              &inputSignature,
                              &status,
                              &message)) {
-        return makeError(config, status, message);
+        return makeError(config, status, message, request.image);
     }
     if (inputContractFailure(request.image,
                              inputSignature,
@@ -712,15 +934,35 @@ ToolResult ColorComparisonAdapter::run(const ToolRequest &request)
     QJsonObject colorComparison;
     int version = 0;
     if (!parseVersion(request, &colorComparison, &version, &status, &message))
-        return makeError(config, status, message);
+        return makeError(config, status, message, request.image);
 
     const ParseResult parsed = parseConfig(request,
                                            false,
+                                           request.image,
                                            colorComparison,
                                            version,
                                            inputSignature);
     if (!parsed.success)
-        return makeError(config, parsed.status, parsed.message);
+        return makeError(config, parsed.status, parsed.message, request.image);
+
+    if (parsed.config.model.state == ColorComparisonModelState::Ready) {
+        const QString actualReferenceHash = request.referenceImage.empty()
+                ? QString()
+                : colorComparisonReferenceHash(request.referenceImage);
+        if (actualReferenceHash != parsed.config.model.referenceImageHash) {
+            return makeError(
+                        config,
+                        QStringLiteral("model_stale"),
+                        QStringLiteral("Current reference image does not match the sampled model."),
+                        request.image,
+                        QJsonObject{
+                            {QStringLiteral("expectedReferenceImageHash"),
+                             parsed.config.model.referenceImageHash},
+                            {QStringLiteral("actualReferenceImageHash"),
+                             actualReferenceHash}
+                        });
+        }
+    }
 
     const ColorComparisonHalconResult runnerResult =
             m_runner.run(request.image, parsed.config);

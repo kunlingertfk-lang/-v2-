@@ -348,11 +348,17 @@ ColorComparisonModelValidation validateColorComparisonModel(
                                  QStringLiteral("颜色比较模型未归一化"));
     }
     if (model.referenceImageHash.isEmpty() || model.extractParamsHash.isEmpty()
-            || model.effectivePixelCount <= 0
+            || model.effectivePixelCount
+                < kColorComparisonMinimumEffectivePixels
             || model.effectivePixelCount > kMaxExactJsonInteger
             || !std::isfinite(model.brightnessReference.mean)
             || !std::isfinite(model.brightnessReference.deviation)
-            || model.brightnessReference.deviation < 0.0) {
+            || model.brightnessReference.mean < 0.0
+            || model.brightnessReference.mean
+                > kColorComparisonMaximumByteValue
+            || model.brightnessReference.deviation < 0.0
+            || model.brightnessReference.deviation
+                > kColorComparisonMaximumByteValue) {
         return validationFailure(QStringLiteral("model_invalid"),
                                  QStringLiteral("颜色比较模型元数据无效"));
     }

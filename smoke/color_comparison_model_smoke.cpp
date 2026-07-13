@@ -85,6 +85,8 @@ QString defaultAdapterExtractHash()
         {QStringLiteral("hueBins"), 32},
         {QStringLiteral("saturationBins"), 32},
         {QStringLiteral("layout"), QStringLiteral("hue_major")},
+        {QStringLiteral("histogramCoordinateContract"),
+         QStringLiteral("image_col_h_image_row_s_row_s_column_h")},
         {QStringLiteral("minimumEffectivePixels"), 4.0},
         {QStringLiteral("templateRegionMode"), QStringLiteral("custom")},
         {QStringLiteral("templateGeometry"), QJsonObject{
@@ -104,9 +106,16 @@ QString defaultAdapterExtractHash()
     return colorComparisonExtractParamsHash(extractParams);
 }
 
+cv::Mat adapterReferenceImage()
+{
+    return cv::Mat(16, 16, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+}
+
 ColorComparisonModelV2 readyAdapterModel()
 {
     ColorComparisonModelV2 model = readyModel();
+    model.referenceImageHash =
+            colorComparisonReferenceHash(adapterReferenceImage());
     model.extractParamsHash = defaultAdapterExtractHash();
     return model;
 }
@@ -161,6 +170,7 @@ ToolRequest adapterRequest(const QJsonObject &colorComparison)
     request.config.category = ToolCategory::Recognition;
     request.config.enabled = true;
     request.image = cv::Mat(16, 16, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    request.referenceImage = adapterReferenceImage();
     request.config.params.insert(QStringLiteral("colorComparison"), colorComparison);
     request.config.judgeRule.insert(QStringLiteral("mode"),
                                     QStringLiteral("min_score"));
@@ -182,6 +192,32 @@ bool warningsContain(const QJsonObject &payload, const QString &warning)
             return true;
     }
     return false;
+}
+
+bool hasStableAdapterErrorSchema(const ToolResult &result)
+{
+    const QJsonObject payload = result.payload;
+    return payload.value(QStringLiteral("status")).isString()
+            && payload.value(QStringLiteral("status")).toString() == result.status
+            && payload.value(QStringLiteral("message")).isString()
+            && payload.value(QStringLiteral("message")).toString() == result.message
+            && payload.value(QStringLiteral("measurementValid")).isBool()
+            && !payload.value(QStringLiteral("measurementValid")).toBool(true)
+            && payload.value(QStringLiteral("passed")).isBool()
+            && !payload.value(QStringLiteral("passed")).toBool(true)
+            && payload.value(QStringLiteral("algorithm")).isString()
+            && payload.value(QStringLiteral("featureType")).isString()
+            && payload.value(QStringLiteral("modelVersion")).isDouble()
+            && payload.value(QStringLiteral("score")).isDouble()
+            && payload.value(QStringLiteral("similarity")).isDouble()
+            && payload.value(QStringLiteral("threshold")).isDouble()
+            && payload.value(QStringLiteral("effectiveTemplatePixels")).isDouble()
+            && payload.value(QStringLiteral("effectiveDetectionPixels")).isDouble()
+            && payload.value(QStringLiteral("brightnessCompensation")).isObject()
+            && payload.value(QStringLiteral("positionCorrection")).isObject()
+            && payload.value(QStringLiteral("detectionRoi")).isObject()
+            && payload.value(QStringLiteral("warnings")).isArray()
+            && payload.value(QStringLiteral("elapsedMs")).isDouble();
 }
 
 void checkAdapterContract()
@@ -283,6 +319,21 @@ void checkAdapterContract()
                   && unsupportedVersion.status
                           == QStringLiteral("unsupported_model_version"),
           "unknown versions must not fall back to V1 or V2 defaults");
+    check(hasStableAdapterErrorSchema(unsupportedVersion),
+          "unknown-version preflight failures must expose the stable Adapter payload schema");
+
+    ToolRequest malformedEnvelope = adapterRequest(QJsonObject());
+    malformedEnvelope.config.params.insert(
+            QStringLiteral("colorComparison"),
+            QJsonArray{QStringLiteral("not-an-object")});
+    malformedEnvelope.config.judgeRule.insert(QStringLiteral("minScore"),
+                                              QStringLiteral("not-a-number"));
+    const ToolResult malformedEnvelopeResult = adapter.run(malformedEnvelope);
+    check(!malformedEnvelopeResult.success
+                  && malformedEnvelopeResult.status
+                          == QStringLiteral("unsupported_model_version")
+                  && hasStableAdapterErrorSchema(malformedEnvelopeResult),
+          "malformed JSON types must return the stable schema without unsafe conversion");
 
     QJsonObject unknownSpectrumVersion{
         {QStringLiteral("version"), 99},
@@ -329,6 +380,7 @@ void checkAdapterContract()
         {QStringLiteral("templateFeature"), QJsonArray{1.0, 0.0}}
     };
     ToolRequest legacyWithoutReference = adapterRequest(legacy);
+    legacyWithoutReference.referenceImage.release();
     const ToolResult rebuildRequired = adapter.run(legacyWithoutReference);
     check(!rebuildRequired.success
                   && rebuildRequired.status
@@ -374,6 +426,82 @@ void checkAdapterContract()
                           == QStringLiteral("model_rebuild_required"),
           "unsupported V2 model state must preserve the runner rebuild status");
 
+    const QString unknownVersionReason =
+            QStringLiteral("saved unknown model version requires a compatible reader");
+    QJsonObject unknownProvenance = validAdapterParams(unsupportedStateModel);
+    unknownProvenance.insert(
+            QStringLiteral("dialogLifecycle"),
+            QJsonObject{{QStringLiteral("originVersion"), 77},
+                        {QStringLiteral("status"),
+                         QStringLiteral("unsupported_model_version")},
+                        {QStringLiteral("reason"), unknownVersionReason}});
+    const ToolResult savedUnknown = adapter.run(adapterRequest(unknownProvenance));
+    check(!savedUnknown.success
+                  && savedUnknown.status
+                          == QStringLiteral("unsupported_model_version")
+                  && savedUnknown.message == unknownVersionReason,
+          "Dialog-saved unknown provenance must preserve unsupported_model_version when run");
+
+    const ColorComparisonTemplateBuildResult savedUnknownBuild =
+            adapter.buildTemplateModel(adapterRequest(unknownProvenance));
+    check(!savedUnknownBuild.success
+                  && savedUnknownBuild.status
+                          == QStringLiteral("unsupported_model_version")
+                  && savedUnknownBuild.message == unknownVersionReason,
+          "Dialog-saved unknown provenance must preserve unsupported_model_version when built");
+
+    QJsonObject savedLegacyUnsupported =
+            validAdapterParams(unsupportedStateModel);
+    savedLegacyUnsupported.insert(
+            QStringLiteral("dialogLifecycle"),
+            QJsonObject{{QStringLiteral("originVersion"), 1},
+                        {QStringLiteral("status"),
+                         QStringLiteral("model_rebuild_required")},
+                        {QStringLiteral("reason"),
+                         QStringLiteral("legacy reference is unavailable")}});
+    const ToolResult savedLegacy =
+            adapter.run(adapterRequest(savedLegacyUnsupported));
+    check(!savedLegacy.success
+                  && savedLegacy.status
+                          == QStringLiteral("model_rebuild_required"),
+          "Dialog-saved V1 provenance must retain rebuild-required semantics");
+
+    QJsonObject forgedNative = unknownProvenance;
+    QJsonObject forgedNativeLifecycle =
+            forgedNative.value(QStringLiteral("dialogLifecycle")).toObject();
+    forgedNativeLifecycle.insert(QStringLiteral("originVersion"), 2);
+    forgedNative.insert(QStringLiteral("dialogLifecycle"), forgedNativeLifecycle);
+    const ToolResult forgedNativeResult =
+            adapter.run(adapterRequest(forgedNative));
+    check(!forgedNativeResult.success
+                  && forgedNativeResult.status
+                          == QStringLiteral("model_rebuild_required"),
+          "native V2 provenance must not forge unsupported_model_version");
+
+    QJsonObject fractionalOrigin = unknownProvenance;
+    QJsonObject fractionalLifecycle =
+            fractionalOrigin.value(QStringLiteral("dialogLifecycle")).toObject();
+    fractionalLifecycle.insert(QStringLiteral("originVersion"), 77.5);
+    fractionalOrigin.insert(QStringLiteral("dialogLifecycle"), fractionalLifecycle);
+    const ToolResult fractionalOriginResult =
+            adapter.run(adapterRequest(fractionalOrigin));
+    check(!fractionalOriginResult.success
+                  && fractionalOriginResult.status
+                          == QStringLiteral("model_rebuild_required"),
+          "non-integer provenance must not override native Unsupported semantics");
+
+    QJsonObject invalidReason = unknownProvenance;
+    QJsonObject invalidReasonLifecycle =
+            invalidReason.value(QStringLiteral("dialogLifecycle")).toObject();
+    invalidReasonLifecycle.insert(QStringLiteral("reason"), QJsonArray());
+    invalidReason.insert(QStringLiteral("dialogLifecycle"), invalidReasonLifecycle);
+    const ToolResult invalidReasonResult =
+            adapter.run(adapterRequest(invalidReason));
+    check(!invalidReasonResult.success
+                  && invalidReasonResult.status
+                          == QStringLiteral("model_rebuild_required"),
+          "non-string provenance reasons must not override native Unsupported semantics");
+
     QJsonObject spectrumModel = colorComparisonModelToJson(model);
     spectrumModel.insert(QStringLiteral("featureType"),
                          QStringLiteral("spectrum"));
@@ -411,6 +539,101 @@ void checkAdapterContract()
     check(!badCircle.success
                   && badCircle.status == QStringLiteral("invalid_detect_roi"),
           "zero-radius detection circles must be rejected");
+
+    QJsonObject wideOverflowCircle = validAdapterParams(model);
+    wideOverflowCircle.insert(QStringLiteral("detectRegionType"),
+                              QStringLiteral("circle"));
+    wideOverflowCircle.insert(
+            QStringLiteral("detectCircleNormalized"),
+            QJsonObject{{QStringLiteral("center"), pointJson(0.5, 0.5)},
+                        {QStringLiteral("radius"), 0.14}});
+    wideOverflowCircle.insert(QStringLiteral("halconSoPath"),
+                              QCoreApplication::applicationFilePath());
+    ToolRequest wideOverflowRun = adapterRequest(wideOverflowCircle);
+    wideOverflowRun.image =
+            cv::Mat(515, 1920, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    wideOverflowRun.referenceImage.at<cv::Vec3b>(0, 0)[0] += 1;
+    const ToolResult wideOverflowRunResult = adapter.run(wideOverflowRun);
+    check(!wideOverflowRunResult.success
+                  && wideOverflowRunResult.status
+                          == QStringLiteral("invalid_detect_roi"),
+          "run must reject a max-dimension circle that crosses the 1920x515 short edge before reference staleness");
+    const QJsonObject wideOverflowPayload = wideOverflowRunResult.payload
+            .value(QStringLiteral("detectionRoi")).toObject();
+    const double wideOverflowRadiusPixels = 0.14 * 1920.0;
+    check(wideOverflowPayload.value(QStringLiteral("type")).toString()
+                      == QStringLiteral("circle")
+                  && std::abs(wideOverflowPayload.value(QStringLiteral("width"))
+                              .toDouble() - wideOverflowRadiusPixels * 2.0 / 1920.0)
+                         < 1e-12
+                  && std::abs(wideOverflowPayload.value(QStringLiteral("height"))
+                              .toDouble() - wideOverflowRadiusPixels * 2.0 / 515.0)
+                         < 1e-12
+                  && std::abs(wideOverflowPayload
+                              .value(QStringLiteral("radiusPixels")).toDouble()
+                              - wideOverflowRadiusPixels) < 1e-12,
+          "Adapter circle error payloads must use max-dimension aspect-correct geometry");
+
+    QJsonObject wideValidCircle = validAdapterParams(model);
+    wideValidCircle.insert(QStringLiteral("detectRegionType"),
+                           QStringLiteral("circle"));
+    wideValidCircle.insert(
+            QStringLiteral("detectCircleNormalized"),
+            QJsonObject{{QStringLiteral("center"), pointJson(0.5, 0.5)},
+                        {QStringLiteral("radius"), 0.10}});
+    wideValidCircle.insert(QStringLiteral("halconSoPath"),
+                           QCoreApplication::applicationFilePath());
+    ToolRequest wideValidRun = adapterRequest(wideValidCircle);
+    wideValidRun.image =
+            cv::Mat(515, 1920, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    const ToolResult wideValidRunResult = adapter.run(wideValidRun);
+    check(!wideValidRunResult.success
+                  && wideValidRunResult.status
+                          == QStringLiteral("halcon_load_failed"),
+          "run must accept an in-bounds max-dimension circle and reach forced HALCON loading");
+
+    ColorComparisonModelV2 unsupportedCircleModel = model;
+    unsupportedCircleModel.state = ColorComparisonModelState::Unsupported;
+    QJsonObject wideOverflowBuildParams =
+            validAdapterParams(unsupportedCircleModel);
+    wideOverflowBuildParams.insert(QStringLiteral("templateRegionMode"),
+                                   QStringLiteral("sync"));
+    wideOverflowBuildParams.insert(QStringLiteral("detectRegionType"),
+                                   QStringLiteral("circle"));
+    wideOverflowBuildParams.insert(
+            QStringLiteral("detectCircleNormalized"),
+            QJsonObject{{QStringLiteral("center"), pointJson(0.5, 0.5)},
+                        {QStringLiteral("radius"), 0.14}});
+    ToolRequest wideOverflowBuild = adapterRequest(wideOverflowBuildParams);
+    wideOverflowBuild.referenceImage =
+            cv::Mat(515, 1920, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    const ColorComparisonTemplateBuildResult wideOverflowBuildResult =
+            adapter.buildTemplateModel(wideOverflowBuild);
+    check(!wideOverflowBuildResult.success
+                  && wideOverflowBuildResult.status
+                          == QStringLiteral("invalid_detect_roi"),
+          "build must validate a max-dimension circle against the 1920x515 reference before model state");
+
+    QJsonObject wideValidBuildParams = validAdapterParams(model);
+    wideValidBuildParams.insert(QStringLiteral("templateRegionMode"),
+                                QStringLiteral("sync"));
+    wideValidBuildParams.insert(QStringLiteral("detectRegionType"),
+                                QStringLiteral("circle"));
+    wideValidBuildParams.insert(
+            QStringLiteral("detectCircleNormalized"),
+            QJsonObject{{QStringLiteral("center"), pointJson(0.5, 0.5)},
+                        {QStringLiteral("radius"), 0.10}});
+    wideValidBuildParams.insert(QStringLiteral("halconSoPath"),
+                                QCoreApplication::applicationFilePath());
+    ToolRequest wideValidBuild = adapterRequest(wideValidBuildParams);
+    wideValidBuild.referenceImage =
+            cv::Mat(515, 1920, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    const ColorComparisonTemplateBuildResult wideValidBuildResult =
+            adapter.buildTemplateModel(wideValidBuild);
+    check(!wideValidBuildResult.success
+                  && wideValidBuildResult.status
+                          == QStringLiteral("halcon_load_failed"),
+          "build must accept an in-bounds max-dimension circle and reach forced HALCON loading");
 
     QJsonObject invalidMask = validAdapterParams(model);
     invalidMask.insert(
@@ -485,7 +708,49 @@ void checkAdapterContract()
                               .toObject().value(QStringLiteral("applied")).toBool(true),
           "position request must remain unapplied and emit its warning before a forced load failure");
 
+    QJsonObject referenceParams = validAdapterParams(model);
+    referenceParams.insert(QStringLiteral("halconSoPath"),
+                           QCoreApplication::applicationFilePath());
+    const ToolResult matchingReference =
+            adapter.run(adapterRequest(referenceParams));
+    check(!matchingReference.success
+                  && matchingReference.status == QStringLiteral("halcon_load_failed"),
+          "an unchanged reference image must reach the forced HALCON load failure");
+
+    ToolRequest changedReference = adapterRequest(referenceParams);
+    changedReference.referenceImage.at<cv::Vec3b>(0, 0)[0] += 1;
+    const QString changedReferenceHash =
+            colorComparisonReferenceHash(changedReference.referenceImage);
+    const ToolResult changedReferenceResult = adapter.run(changedReference);
+    check(!changedReferenceResult.success
+                  && changedReferenceResult.status == QStringLiteral("model_stale")
+                  && hasStableAdapterErrorSchema(changedReferenceResult)
+                  && changedReferenceResult.payload
+                         .value(QStringLiteral("expectedReferenceImageHash"))
+                         .toString() == model.referenceImageHash
+                  && changedReferenceResult.payload
+                         .value(QStringLiteral("actualReferenceImageHash"))
+                         .toString() == changedReferenceHash
+                  && changedReferenceResult.payload
+                         .value(QStringLiteral("effectiveTemplatePixels"))
+                         .toDouble() == static_cast<double>(model.effectivePixelCount),
+          "a changed current reference must stale the ready model with both hashes");
+
+    ToolRequest clearedReference = adapterRequest(referenceParams);
+    clearedReference.referenceImage.release();
+    const ToolResult clearedReferenceResult = adapter.run(clearedReference);
+    check(!clearedReferenceResult.success
+                  && clearedReferenceResult.status == QStringLiteral("model_stale")
+                  && clearedReferenceResult.payload
+                         .value(QStringLiteral("expectedReferenceImageHash"))
+                         .toString() == model.referenceImageHash
+                  && clearedReferenceResult.payload
+                         .value(QStringLiteral("actualReferenceImageHash"))
+                         .toString().isEmpty(),
+          "a cleared current reference must stale the ready model with diagnostics");
+
     ToolRequest missingReference = adapterRequest(validAdapterParams(model));
+    missingReference.referenceImage.release();
     const ColorComparisonTemplateBuildResult missing =
             adapter.buildTemplateModel(missingReference);
     check(!missing.success && missing.status == QStringLiteral("image_empty"),
@@ -754,6 +1019,45 @@ int main(int argc, char **argv)
     invalid = model;
     invalid.effectivePixelCount = -1;
     checkInvalid(invalid, "negative effective pixel count must be invalid");
+
+    invalid = model;
+    invalid.effectivePixelCount = 1;
+    checkInvalid(invalid,
+                 "effective pixel counts below the Runner minimum must be invalid");
+
+    invalid = model;
+    invalid.effectivePixelCount = 3;
+    checkInvalid(invalid,
+                 "three effective pixels must remain below the Runner contract");
+
+    ColorComparisonModelV2 minimumPhysicalModel = model;
+    minimumPhysicalModel.effectivePixelCount = 4;
+    minimumPhysicalModel.brightnessReference.mean = 0.0;
+    minimumPhysicalModel.brightnessReference.deviation = 0.0;
+    check(validateColorComparisonModel(minimumPhysicalModel).success,
+          "four pixels and zero byte-V statistics must be valid boundaries");
+
+    ColorComparisonModelV2 maximumPhysicalModel = model;
+    maximumPhysicalModel.brightnessReference.mean = 255.0;
+    maximumPhysicalModel.brightnessReference.deviation = 255.0;
+    check(validateColorComparisonModel(maximumPhysicalModel).success,
+          "255 byte-V statistics must be valid boundaries");
+
+    invalid = model;
+    invalid.brightnessReference.mean = -0.001;
+    checkInvalid(invalid, "negative byte-V means must be invalid");
+
+    invalid = model;
+    invalid.brightnessReference.mean = 255.001;
+    checkInvalid(invalid, "byte-V means above 255 must be invalid");
+
+    invalid = model;
+    invalid.brightnessReference.deviation = -0.001;
+    checkInvalid(invalid, "negative byte-V deviations must be invalid");
+
+    invalid = model;
+    invalid.brightnessReference.deviation = 255.001;
+    checkInvalid(invalid, "unreasonable byte-V deviations above 255 must be invalid");
 
     invalid = model;
     invalid.valueHistogram.resize(31);

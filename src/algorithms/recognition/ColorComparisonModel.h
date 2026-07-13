@@ -8,6 +8,9 @@
 
 #include <opencv2/core/mat.hpp>
 
+constexpr qint64 kColorComparisonMinimumEffectivePixels = 4;
+constexpr double kColorComparisonMaximumByteValue = 255.0;
+
 enum class ColorComparisonModelState { Empty, Stale, Ready, Invalid, Unsupported };
 
 struct ColorComparisonInputSignature {
