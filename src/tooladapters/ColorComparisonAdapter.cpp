@@ -180,6 +180,9 @@ bool parseInputSignature(const QJsonObject &runtimeContext,
         signature->colorMode = mode;
     }
 
+    if (signature->colorMode == QStringLiteral("mono"))
+        return true;
+
     if (metadata.contains(QStringLiteral("pixelFormat"))) {
         const QJsonValue value = metadata.value(QStringLiteral("pixelFormat"));
         if (!value.isString()) {
@@ -264,53 +267,118 @@ ColorComparisonTemplateBuildResult makeBuildError(const QString &status,
     return result;
 }
 
-ParseResult parseConfig(const ToolRequest &request, bool templateBuild)
+ToolResult mapRunnerResult(const ToolConfig &config,
+                           const ColorComparisonHalconResult &runnerResult)
+{
+    ToolResult result;
+    result.toolId = config.toolId;
+    result.toolType = ToolType::ColorComparison;
+    result.success = runnerResult.success;
+    result.ok = runnerResult.ok;
+    result.status = runnerResult.status;
+    result.message = runnerResult.message;
+    result.score = runnerResult.score;
+    result.value = runnerResult.similarity;
+    result.count = runnerResult.measurementValid ? 1 : 0;
+    result.elapsedMs = runnerResult.elapsedMs;
+    result.text = QString::number(runnerResult.score, 'f', 2);
+    result.overlays = runnerResult.overlays;
+    result.payload = runnerResult.payload;
+    return result;
+}
+
+bool parseVersion(const ToolRequest &request,
+                  QJsonObject *colorComparison,
+                  int *version,
+                  QString *status,
+                  QString *message)
 {
     const QJsonValue colorComparisonValue =
             request.config.params.value(QStringLiteral("colorComparison"));
     if (!colorComparisonValue.isObject()) {
-        return parseFailure(QStringLiteral("unsupported_model_version"),
-                            QStringLiteral("Color comparison V2 parameters are missing."));
+        if (status)
+            *status = QStringLiteral("unsupported_model_version");
+        if (message)
+            *message = QStringLiteral("Color comparison parameters are missing.");
+        return false;
     }
-    const QJsonObject colorComparison = colorComparisonValue.toObject();
-
-    const ColorComparisonModelReadResult modelRead = readColorComparisonModel(
-                colorComparison, !request.referenceImage.empty());
-    if (modelRead.requiresRebuild)
-        return parseFailure(modelRead.status, modelRead.message);
-
-    const QJsonObject modelObject =
-            colorComparison.value(QStringLiteral("model")).toObject();
-    const QJsonValue featureValue = modelObject.value(QStringLiteral("featureType"));
-    if (featureValue.isString()
-            && featureValue.toString() != QStringLiteral("histogram_hs_2d")) {
-        return parseFailure(QStringLiteral("unsupported_feature"),
-                            QStringLiteral("Only histogram_hs_2d is implemented."));
+    const QJsonObject parsedObject = colorComparisonValue.toObject();
+    int parsedVersion = 0;
+    if (!integerNumber(parsedObject.value(QStringLiteral("version")),
+                       &parsedVersion)
+            || (parsedVersion != 1 && parsedVersion != 2)) {
+        if (status)
+            *status = QStringLiteral("unsupported_model_version");
+        if (message)
+            *message = QStringLiteral("Unsupported color comparison model version.");
+        return false;
     }
+    if (colorComparison)
+        *colorComparison = parsedObject;
+    if (version)
+        *version = parsedVersion;
+    return true;
+}
 
-    const bool buildableState = templateBuild
-            && (modelRead.status == QStringLiteral("model_empty")
-                || modelRead.status == QStringLiteral("model_stale"));
-    if (!modelRead.success && !buildableState) {
-        const QString status = modelRead.status == QStringLiteral("model_unsupported")
-                ? QStringLiteral("model_rebuild_required") : modelRead.status;
-        return parseFailure(status, modelRead.message);
+bool supportedOriginalPixelFormat(
+        const ColorComparisonInputSignature &signature)
+{
+    const QString pixelFormat = signature.pixelFormat.trimmed();
+    if (pixelFormat.isEmpty())
+        return true;
+
+    static const QStringList formats = {
+        QStringLiteral("BGR8"),
+        QStringLiteral("BGRA8"),
+        QStringLiteral("UYVY8"),
+        QStringLiteral("NV12"),
+        QStringLiteral("RGB8"),
+        QStringLiteral("RGBX8"),
+        QStringLiteral("ARGB8"),
+        QStringLiteral("ARGB8_Premultiplied"),
+        QStringLiteral("RGBA8"),
+        QStringLiteral("RGBA8_Premultiplied")
+    };
+    return formats.contains(pixelFormat);
+}
+
+bool inputContractFailure(const cv::Mat &image,
+                          const ColorComparisonInputSignature &signature,
+                          QString *status,
+                          QString *message)
+{
+    if (signature.colorMode == QStringLiteral("mono")) {
+        if (status)
+            *status = QStringLiteral("unsupported_color_input");
+        if (message) {
+            *message = QStringLiteral(
+                        "Original input is monochrome; color comparison is invalid.");
+        }
+        return true;
     }
+    if ((signature.bitDepth != -1 && signature.bitDepth != 8)
+            || !supportedOriginalPixelFormat(signature)
+            || (image.type() != CV_8UC3 && image.type() != CV_8UC4)) {
+        if (status)
+            *status = QStringLiteral("unsupported_pixel_format");
+        if (message) {
+            *message = QStringLiteral(
+                        "Only original 8-bit CV_8UC3 and CV_8UC4 inputs are supported.");
+        }
+        return true;
+    }
+    return false;
+}
 
+ParseResult parseConfig(const ToolRequest &request,
+                        bool templateBuild,
+                        const QJsonObject &colorComparison,
+                        int version,
+                        const ColorComparisonInputSignature &inputSignature)
+{
     ParseResult result;
     ColorComparisonHalconConfig &config = result.config;
-    config.model = modelRead.model;
-
-    const QJsonValue halconPathValue =
-            colorComparison.value(QStringLiteral("halconSoPath"));
-    if (!halconPathValue.isUndefined() && !halconPathValue.isNull()
-            && !halconPathValue.isString()) {
-        return parseFailure(QStringLiteral("halcon_load_failed"),
-                            QStringLiteral("halconSoPath must be a string."));
-    }
-    const QString requestedHalconPath = halconPathValue.toString().trimmed();
-    config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
-                requestedHalconPath, &config.halconSoPathCandidates);
+    config.inputSignature = inputSignature;
 
     if (colorComparison.contains(QStringLiteral("templateRegionMode"))) {
         const QJsonValue modeValue =
@@ -402,6 +470,60 @@ ParseResult parseConfig(const ToolRequest &request, bool templateBuild)
                             QStringLiteral("Detection mask is malformed or degenerate."));
     }
 
+    if (version == 1) {
+        QString featureType = QStringLiteral("histogram");
+        if (colorComparison.contains(QStringLiteral("featureType"))) {
+            const QJsonValue featureValue =
+                    colorComparison.value(QStringLiteral("featureType"));
+            if (!featureValue.isString()) {
+                return parseFailure(QStringLiteral("unsupported_feature"),
+                                    QStringLiteral("Legacy featureType must be a string."));
+            }
+            featureType = featureValue.toString().trimmed().toLower();
+        }
+        if (featureType == QStringLiteral("spectrum")) {
+            return parseFailure(QStringLiteral("unsupported_feature"),
+                                QStringLiteral("Spectrum color comparison is not implemented."));
+        }
+        if (featureType != QStringLiteral("histogram")
+                && featureType != QStringLiteral("histogram_2dim_hs")
+                && featureType != QStringLiteral("histogram_hs_2d")) {
+            return parseFailure(QStringLiteral("unsupported_feature"),
+                                QStringLiteral("Legacy color comparison feature is unsupported."));
+        }
+
+        config.model = ColorComparisonModelV2();
+        if (!templateBuild) {
+            const ColorComparisonModelReadResult modelRead =
+                    readColorComparisonModel(colorComparison,
+                                             !request.referenceImage.empty());
+            return parseFailure(modelRead.status, modelRead.message);
+        }
+    } else {
+        const QJsonObject modelObject =
+                colorComparison.value(QStringLiteral("model")).toObject();
+        const QJsonValue featureValue =
+                modelObject.value(QStringLiteral("featureType"));
+        if (featureValue.isString()
+                && featureValue.toString() != QStringLiteral("histogram_hs_2d")) {
+            return parseFailure(QStringLiteral("unsupported_feature"),
+                                QStringLiteral("Only histogram_hs_2d is implemented."));
+        }
+
+        const ColorComparisonModelReadResult modelRead = readColorComparisonModel(
+                    colorComparison, !request.referenceImage.empty());
+        const bool buildableState = templateBuild
+                && (modelRead.status == QStringLiteral("model_empty")
+                    || modelRead.status == QStringLiteral("model_stale"));
+        if (!modelRead.success && !buildableState) {
+            const QString status =
+                    modelRead.status == QStringLiteral("model_unsupported")
+                    ? QStringLiteral("model_rebuild_required") : modelRead.status;
+            return parseFailure(status, modelRead.message);
+        }
+        config.model = modelRead.model;
+    }
+
     const QJsonValue comparisonValue =
             colorComparison.value(QStringLiteral("comparison"));
     if (!comparisonValue.isUndefined() && !comparisonValue.isNull()) {
@@ -486,16 +608,16 @@ ParseResult parseConfig(const ToolRequest &request, bool templateBuild)
     }
     config.minScore = minScore;
 
-    QString metadataStatus;
-    QString metadataMessage;
-    if (!parseInputSignature(request.runtimeContext,
-                             templateBuild ? QStringLiteral("referenceInput")
-                                           : QStringLiteral("input"),
-                             &config.inputSignature,
-                             &metadataStatus,
-                             &metadataMessage)) {
-        return parseFailure(metadataStatus, metadataMessage);
+    const QJsonValue halconPathValue =
+            colorComparison.value(QStringLiteral("halconSoPath"));
+    if (!halconPathValue.isUndefined() && !halconPathValue.isNull()
+            && !halconPathValue.isString()) {
+        return parseFailure(QStringLiteral("halcon_load_failed"),
+                            QStringLiteral("halconSoPath must be a string."));
     }
+    const QString requestedHalconPath = halconPathValue.toString().trimmed();
+    config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                requestedHalconPath, &config.halconSoPathCandidates);
 
     result.success = true;
     return result;
@@ -521,7 +643,33 @@ ColorComparisonTemplateBuildResult ColorComparisonAdapter::buildTemplateModel(
                               QStringLiteral("Reference image is empty."));
     }
 
-    const ParseResult parsed = parseConfig(request, true);
+    QString status;
+    QString message;
+    ColorComparisonInputSignature inputSignature;
+    if (!parseInputSignature(request.runtimeContext,
+                             QStringLiteral("referenceInput"),
+                             &inputSignature,
+                             &status,
+                             &message)) {
+        return makeBuildError(status, message);
+    }
+    if (inputContractFailure(request.referenceImage,
+                             inputSignature,
+                             &status,
+                             &message)) {
+        return makeBuildError(status, message);
+    }
+
+    QJsonObject colorComparison;
+    int version = 0;
+    if (!parseVersion(request, &colorComparison, &version, &status, &message))
+        return makeBuildError(status, message);
+
+    const ParseResult parsed = parseConfig(request,
+                                           true,
+                                           colorComparison,
+                                           version,
+                                           inputSignature);
     if (!parsed.success)
         return makeBuildError(parsed.status, parsed.message);
     return m_runner.buildTemplateModel(request.referenceImage, parsed.config);
@@ -541,26 +689,40 @@ ToolResult ColorComparisonAdapter::run(const ToolRequest &request)
                          QStringLiteral("Input image is empty."));
     }
 
-    const ParseResult parsed = parseConfig(request, false);
+    QString status;
+    QString message;
+    ColorComparisonInputSignature inputSignature;
+    if (!parseInputSignature(request.runtimeContext,
+                             QStringLiteral("input"),
+                             &inputSignature,
+                             &status,
+                             &message)) {
+        return makeError(config, status, message);
+    }
+    if (inputContractFailure(request.image,
+                             inputSignature,
+                             &status,
+                             &message)) {
+        ColorComparisonHalconConfig preflightConfig;
+        preflightConfig.inputSignature = inputSignature;
+        return mapRunnerResult(config,
+                               m_runner.run(request.image, preflightConfig));
+    }
+
+    QJsonObject colorComparison;
+    int version = 0;
+    if (!parseVersion(request, &colorComparison, &version, &status, &message))
+        return makeError(config, status, message);
+
+    const ParseResult parsed = parseConfig(request,
+                                           false,
+                                           colorComparison,
+                                           version,
+                                           inputSignature);
     if (!parsed.success)
         return makeError(config, parsed.status, parsed.message);
 
     const ColorComparisonHalconResult runnerResult =
             m_runner.run(request.image, parsed.config);
-
-    ToolResult result;
-    result.toolId = config.toolId;
-    result.toolType = ToolType::ColorComparison;
-    result.success = runnerResult.success;
-    result.ok = runnerResult.ok;
-    result.status = runnerResult.status;
-    result.message = runnerResult.message;
-    result.score = runnerResult.score;
-    result.value = runnerResult.similarity;
-    result.count = runnerResult.measurementValid ? 1 : 0;
-    result.elapsedMs = runnerResult.elapsedMs;
-    result.text = QString::number(runnerResult.score, 'f', 2);
-    result.overlays = runnerResult.overlays;
-    result.payload = runnerResult.payload;
-    return result;
+    return mapRunnerResult(config, runnerResult);
 }

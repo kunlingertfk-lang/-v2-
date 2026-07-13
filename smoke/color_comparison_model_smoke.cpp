@@ -217,6 +217,66 @@ void checkAdapterContract()
                   && mono.elapsedMs >= 0,
           "Adapter must map runner score, similarity, text, and elapsed time");
 
+    QJsonObject monoBadModelParams{
+        {QStringLiteral("version"), 2},
+        {QStringLiteral("model"), QJsonObject{
+             {QStringLiteral("state"), QStringLiteral("ready")}
+         }}
+    };
+    ToolRequest monoBadModel = adapterRequest(monoBadModelParams);
+    monoBadModel.runtimeContext.insert(
+            QStringLiteral("input"),
+            inputMetadata(QStringLiteral("mono"), QStringLiteral("Mono8"), 1, 8));
+    const ToolResult monoBeforeBadModel = adapter.run(monoBadModel);
+    check(monoBeforeBadModel.success && !monoBeforeBadModel.ok
+                  && monoBeforeBadModel.status
+                          == QStringLiteral("unsupported_color_input"),
+          "mono input status must take precedence over malformed V2 model data");
+
+    QJsonObject monoBadRoiParams = validAdapterParams(model);
+    monoBadRoiParams.insert(QStringLiteral("detectRoiNormalized"),
+                            rectJson(-0.1, 0.0, 0.5, 0.5));
+    ToolRequest monoBadRoi = adapterRequest(monoBadRoiParams);
+    monoBadRoi.runtimeContext.insert(
+            QStringLiteral("input"),
+            inputMetadata(QStringLiteral("mono"), QStringLiteral("Mono8"), 1, 8));
+    const ToolResult monoBeforeBadRoi = adapter.run(monoBadRoi);
+    check(monoBeforeBadRoi.success && !monoBeforeBadRoi.ok
+                  && monoBeforeBadRoi.status
+                          == QStringLiteral("unsupported_color_input"),
+          "mono input status must take precedence over invalid ROI data");
+
+    ToolRequest monoMalformedDepth = adapterRequest(monoBadModelParams);
+    QJsonObject malformedMonoMetadata =
+            inputMetadata(QStringLiteral("mono"), QStringLiteral("Mono8"), 1, 8);
+    malformedMonoMetadata.insert(QStringLiteral("originalDepth"),
+                                 QStringLiteral("not-an-integer"));
+    monoMalformedDepth.runtimeContext.insert(QStringLiteral("input"),
+                                             malformedMonoMetadata);
+    const ToolResult monoBeforeMalformedDepth = adapter.run(monoMalformedDepth);
+    check(monoBeforeMalformedDepth.success && !monoBeforeMalformedDepth.ok
+                  && monoBeforeMalformedDepth.status
+                          == QStringLiteral("unsupported_color_input"),
+          "mono color mode must take precedence over malformed depth metadata");
+
+    ToolRequest bitDepthBeforeModel = adapterRequest(monoBadModelParams);
+    bitDepthBeforeModel.runtimeContext.insert(
+            QStringLiteral("input"),
+            inputMetadata(QStringLiteral("color"), QStringLiteral("BGR8"), 3, 16));
+    const ToolResult badDepthBeforeBadModel = adapter.run(bitDepthBeforeModel);
+    check(!badDepthBeforeBadModel.success
+                  && badDepthBeforeBadModel.status
+                          == QStringLiteral("unsupported_pixel_format"),
+          "unsupported original bit depth must take precedence over malformed model data");
+
+    ToolRequest matTypeBeforeModel = adapterRequest(monoBadModelParams);
+    matTypeBeforeModel.image = cv::Mat(16, 16, CV_16UC3);
+    const ToolResult badMatBeforeBadModel = adapter.run(matTypeBeforeModel);
+    check(!badMatBeforeBadModel.success
+                  && badMatBeforeBadModel.status
+                          == QStringLiteral("unsupported_pixel_format"),
+          "unsupported actual Mat type must take precedence over malformed model data");
+
     QJsonObject unknownVersion{{QStringLiteral("version"), 99}};
     const ToolResult unsupportedVersion = adapter.run(adapterRequest(unknownVersion));
     check(!unsupportedVersion.success
@@ -237,6 +297,25 @@ void checkAdapterContract()
                           == QStringLiteral("unsupported_model_version"),
           "unknown model version status must take precedence over feature parsing");
 
+    ToolRequest monoUnknownVersion = adapterRequest(unknownVersion);
+    monoUnknownVersion.runtimeContext.insert(
+            QStringLiteral("input"),
+            inputMetadata(QStringLiteral("mono"), QStringLiteral("Mono8"), 1, 8));
+    const ToolResult monoBeforeUnknownVersion = adapter.run(monoUnknownVersion);
+    check(monoBeforeUnknownVersion.success && !monoBeforeUnknownVersion.ok
+                  && monoBeforeUnknownVersion.status
+                          == QStringLiteral("unsupported_color_input"),
+          "mono input must take precedence over unknown model version");
+
+    ToolRequest badMatUnknownVersion = adapterRequest(unknownVersion);
+    badMatUnknownVersion.image = cv::Mat(16, 16, CV_16UC3);
+    const ToolResult badMatBeforeUnknownVersion =
+            adapter.run(badMatUnknownVersion);
+    check(!badMatBeforeUnknownVersion.success
+                  && badMatBeforeUnknownVersion.status
+                          == QStringLiteral("unsupported_pixel_format"),
+          "unsupported actual Mat type must take precedence over unknown model version");
+
     ToolRequest emptyImage = adapterRequest(unknownVersion);
     emptyImage.image.release();
     const ToolResult emptyBeforeConfig = adapter.run(emptyImage);
@@ -246,6 +325,7 @@ void checkAdapterContract()
 
     QJsonObject legacy{
         {QStringLiteral("version"), 1},
+        {QStringLiteral("featureType"), QStringLiteral("histogram")},
         {QStringLiteral("templateFeature"), QJsonArray{1.0, 0.0}}
     };
     ToolRequest legacyWithoutReference = adapterRequest(legacy);
@@ -262,6 +342,18 @@ void checkAdapterContract()
     check(!staleLegacy.success
                   && staleLegacy.status == QStringLiteral("model_stale"),
           "V1 with a reference must remain stale until explicit sampling");
+
+    QJsonObject legacySpectrum = legacy;
+    legacySpectrum.insert(QStringLiteral("featureType"),
+                          QStringLiteral("spectrum"));
+    ToolRequest legacySpectrumRun = adapterRequest(legacySpectrum);
+    legacySpectrumRun.referenceImage =
+            cv::Mat(16, 16, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    const ToolResult unsupportedLegacySpectrum = adapter.run(legacySpectrumRun);
+    check(!unsupportedLegacySpectrum.success
+                  && unsupportedLegacySpectrum.status
+                          == QStringLiteral("unsupported_feature"),
+          "legacy root spectrum feature must not be misclassified as stale");
 
     QJsonObject malformedV2{
         {QStringLiteral("version"), 2},
@@ -358,7 +450,8 @@ void checkAdapterContract()
     ToolRequest invalidThreshold = adapterRequest(validAdapterParams(model));
     invalidThreshold.config.judgeRule.insert(QStringLiteral("minScore"), 101);
     const ToolResult badThreshold = adapter.run(invalidThreshold);
-    check(!badThreshold.success,
+    check(!badThreshold.success
+                  && badThreshold.status == QStringLiteral("invalid_judge_rule"),
           "out-of-range score thresholds must be rejected rather than clamped");
 
     QJsonObject badPosition = validAdapterParams(model);
@@ -368,7 +461,9 @@ void checkAdapterContract()
                         {QStringLiteral("sourceId"), QStringLiteral("pose-1")},
                         {QStringLiteral("interfaceVersion"), 2}});
     const ToolResult badPositionInterface = adapter.run(adapterRequest(badPosition));
-    check(!badPositionInterface.success,
+    check(!badPositionInterface.success
+                  && badPositionInterface.status
+                          == QStringLiteral("invalid_position_correction"),
           "unknown position-correction interface versions must be rejected");
 
     QJsonObject positionParams = validAdapterParams(model);
@@ -380,13 +475,15 @@ void checkAdapterContract()
     positionParams.insert(QStringLiteral("halconSoPath"),
                           QCoreApplication::applicationFilePath());
     const ToolResult position = adapter.run(adapterRequest(positionParams));
-    check(warningsContain(position.payload,
+    check(!position.success
+                  && position.status == QStringLiteral("halcon_load_failed")
+                  && warningsContain(position.payload,
                           QStringLiteral("position_correction_not_implemented"))
                   && position.payload.value(QStringLiteral("positionCorrection"))
                              .toObject().value(QStringLiteral("requested")).toBool()
                   && !position.payload.value(QStringLiteral("positionCorrection"))
                               .toObject().value(QStringLiteral("applied")).toBool(true),
-          "reserved position correction must run uncorrected and emit its warning");
+          "position request must remain unapplied and emit its warning before a forced load failure");
 
     ToolRequest missingReference = adapterRequest(validAdapterParams(model));
     const ColorComparisonTemplateBuildResult missing =
@@ -405,6 +502,66 @@ void checkAdapterContract()
     check(!monoBuild.success
                   && monoBuild.status == QStringLiteral("unsupported_color_input"),
           "template build must map runtimeContext.referenceInput, not detection input");
+
+    ToolRequest explicitLegacyBuild = adapterRequest(legacy);
+    explicitLegacyBuild.referenceImage =
+            cv::Mat(16, 16, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    QJsonObject explicitLegacyParams = explicitLegacyBuild.config.params
+            .value(QStringLiteral("colorComparison")).toObject();
+    explicitLegacyParams.insert(QStringLiteral("halconSoPath"),
+                                QCoreApplication::applicationFilePath());
+    explicitLegacyBuild.config.params.insert(QStringLiteral("colorComparison"),
+                                             explicitLegacyParams);
+    const ColorComparisonTemplateBuildResult rebuiltLegacy =
+            adapter.buildTemplateModel(explicitLegacyBuild);
+    check(!rebuiltLegacy.success
+                  && rebuiltLegacy.status == QStringLiteral("halcon_load_failed"),
+          "explicit V1 template build must pass migration and reach the V2 runner");
+
+    ToolRequest legacySpectrumBuild = explicitLegacyBuild;
+    legacySpectrumBuild.config.params.insert(QStringLiteral("colorComparison"),
+                                             legacySpectrum);
+    const ColorComparisonTemplateBuildResult unsupportedSpectrumBuild =
+            adapter.buildTemplateModel(legacySpectrumBuild);
+    check(!unsupportedSpectrumBuild.success
+                  && unsupportedSpectrumBuild.status
+                          == QStringLiteral("unsupported_feature"),
+          "explicit V1 spectrum build must remain unsupported");
+
+    ToolRequest unknownBuild = adapterRequest(unknownVersion);
+    unknownBuild.referenceImage =
+            cv::Mat(16, 16, CV_8UC3, cv::Scalar(20, 120, 200)).clone();
+    const ColorComparisonTemplateBuildResult unsupportedUnknownBuild =
+            adapter.buildTemplateModel(unknownBuild);
+    check(!unsupportedUnknownBuild.success
+                  && unsupportedUnknownBuild.status
+                          == QStringLiteral("unsupported_model_version"),
+          "explicit build must still reject unknown model versions");
+
+    ToolRequest monoUnknownBuild = unknownBuild;
+    monoUnknownBuild.runtimeContext.insert(
+            QStringLiteral("referenceInput"),
+            inputMetadata(QStringLiteral("mono"), QStringLiteral("Mono8"), 1, 8));
+    const ColorComparisonTemplateBuildResult monoBeforeUnknownBuild =
+            adapter.buildTemplateModel(monoUnknownBuild);
+    check(!monoBeforeUnknownBuild.success
+                  && monoBeforeUnknownBuild.status
+                          == QStringLiteral("unsupported_color_input"),
+          "mono reference input must take precedence over unknown build version");
+
+    ToolRequest monoMalformedBuild = unknownBuild;
+    QJsonObject malformedMonoReference =
+            inputMetadata(QStringLiteral("mono"), QStringLiteral("Mono8"), 1, 8);
+    malformedMonoReference.insert(QStringLiteral("originalDepth"),
+                                  QStringLiteral("not-an-integer"));
+    monoMalformedBuild.runtimeContext.insert(QStringLiteral("referenceInput"),
+                                             malformedMonoReference);
+    const ColorComparisonTemplateBuildResult monoBeforeMalformedBuild =
+            adapter.buildTemplateModel(monoMalformedBuild);
+    check(!monoBeforeMalformedBuild.success
+                  && monoBeforeMalformedBuild.status
+                          == QStringLiteral("unsupported_color_input"),
+          "mono reference mode must precede malformed depth and unknown build version");
 }
 
 void checkInvalid(const ColorComparisonModelV2 &model, const char *message)
