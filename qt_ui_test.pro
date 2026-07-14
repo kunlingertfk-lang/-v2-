@@ -14,15 +14,29 @@ UI_DIR = $$BUILD_ROOT/ui
 system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 
 INCLUDEPATH += src
-OPENCV_ROOT = /home/tt/.local/opencv-4.8.0
-INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
+# 可选：每开发者可在 local_paths.pri（已 gitignore）中覆盖 OPENCV_ROOT / HALCON_ROOT
+exists($$_PRO_FILE_PWD_/local_paths.pri): include($$_PRO_FILE_PWD_/local_paths.pri)
+
+# OpenCV：设了 OPENCV_ROOT 用自编译安装(prefix+rpath)；否则用系统安装(apt libopencv-dev，头文件在 /usr/include/opencv4)
+OPENCV_ROOT = $$(OPENCV_ROOT)
+!isEmpty(OPENCV_ROOT) {
+    INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
+    LIBS += -L$$OPENCV_ROOT/lib -Wl,-rpath,$$OPENCV_ROOT/lib
+} else {
+    INCLUDEPATH += /usr/include/opencv4
+    message("OPENCV_ROOT 未设置，使用系统 OpenCV (/usr/include/opencv4)")
+}
+
+# HALCON：必须设 HALCONROOT 指向 HALCON 安装目录(含 include/HalconC.h)。运行期 dlopen，无需链接 -lhalconc
 HALCON_ROOT = $$(HALCONROOT)
+isEmpty(HALCON_ROOT) {
+    error("未设置环境变量 HALCONROOT。请 export HALCONROOT=<HALCON 安装目录>(含 include/HalconC.h)，例如 /opt/halcon/24.11。详见 README.md。")
+}
 !exists($$HALCON_ROOT/include/HalconC.h) {
-    HALCON_ROOT = /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady
-    message("Using bundled HALCON root: $$HALCON_ROOT")
+    error("HALCONROOT=$$HALCON_ROOT 下找不到 include/HalconC.h，请确认 HALCON 安装路径。详见 README.md。")
 }
 INCLUDEPATH += $$HALCON_ROOT/include
-
+message("HALCON root: $$HALCON_ROOT")
 
 SOURCES += \
     src/main.cpp \
@@ -189,7 +203,6 @@ RESOURCES += \
     resources/resources.qrc
 
 # OpenCV库链接（移植自旧项目 qtt5_project_bak_327_10nrs_260328he/qtt5.pro）
-LIBS += -L$$OPENCV_ROOT/lib
-LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
+# -L/-rpath 已在上方 OPENCV_ROOT 分支按需添加；系统 OpenCV 无需指定库路径
 LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs
 LIBS += -ldl

@@ -9,21 +9,6 @@
 
 namespace {
 
-const QString kLocalHalconRoot =
-        QStringLiteral("/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady");
-const QString kLegacySuperheHalconRoot =
-        QStringLiteral("/home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady");
-const QString kLegacySuperheRuntimeRoot =
-        kLegacySuperheHalconRoot + QStringLiteral("/halcon-24.11.2.0-runtime-x64-linux");
-const QString kLegacySuperheRuntimeGeneralRoot =
-        kLegacySuperheHalconRoot + QStringLiteral("/halcon-24.11.2.0-runtime-general-x64-linux_aarch64-linux_armv7a-linux");
-const QString kLegacySuperheLicenseRoot =
-        kLegacySuperheRuntimeGeneralRoot + QStringLiteral("/license");
-const QString kLocalHalconLicenseRoot =
-        kLocalHalconRoot + QStringLiteral("/license");
-const QString kOcrModelRelativePath =
-        QStringLiteral("ocr/OCRB_0-9A-Z_NoRej.omc");
-
 QString cleanPath(const QString &path)
 {
     return QDir::cleanPath(path.trimmed());
@@ -37,6 +22,16 @@ QString halconRootFromEnvironment()
 QString halconLicenseFromEnvironment()
 {
     return QString::fromLocal8Bit(qgetenv("HALCON_LICENSE_FILE")).trimmed();
+}
+
+// HALCON 安装目录统一由环境变量 HALCONROOT 提供；license 与 OCR 模型都相对它定位。
+const QString kOcrModelRelativePath =
+        QStringLiteral("ocr/OCRB_0-9A-Z_NoRej.omc");
+
+QString halconLicenseRootForEnv()
+{
+    const QString root = halconRootFromEnvironment();
+    return root.isEmpty() ? QString() : cleanPath(root + QStringLiteral("/license"));
 }
 
 void appendUnique(QStringList *paths, const QString &path)
@@ -83,10 +78,10 @@ QString resolveFirstExisting(const QStringList &candidates)
 
 QString resolveBundledLicense()
 {
-    const QVector<QString> licenseRoots = {
-        kLocalHalconLicenseRoot,
-        kLegacySuperheLicenseRoot
-    };
+    const QString envLicenseRoot = halconLicenseRootForEnv();
+    const QVector<QString> licenseRoots = envLicenseRoot.isEmpty()
+            ? QVector<QString>()
+            : QVector<QString>{envLicenseRoot};
 
     for (const QString &licenseRoot : licenseRoots) {
         const QDir licenseDir(licenseRoot);
@@ -145,8 +140,7 @@ QString initializeHalconEnvironment()
 
 QString defaultHalconRoot()
 {
-    const QString envRoot = halconRootFromEnvironment();
-    return envRoot.isEmpty() ? kLocalHalconRoot : cleanPath(envRoot);
+    return cleanPath(halconRootFromEnvironment());
 }
 
 QStringList halconLibCandidates(const QString &explicitPath)
@@ -158,8 +152,6 @@ QStringList halconLibCandidates(const QString &explicitPath)
     if (!envRoot.isEmpty())
         appendHalconLibCandidatesForRoot(&candidates, envRoot);
 
-    appendHalconLibCandidatesForRoot(&candidates, kLocalHalconRoot);
-    appendHalconLibCandidatesForRoot(&candidates, kLegacySuperheRuntimeRoot);
     return candidates;
 }
 
@@ -180,8 +172,6 @@ QStringList ocrModelCandidates(const QString &explicitPath)
     if (!envRoot.isEmpty())
         appendOcrModelCandidateForRoot(&candidates, envRoot);
 
-    appendOcrModelCandidateForRoot(&candidates, kLocalHalconRoot);
-    appendOcrModelCandidateForRoot(&candidates, kLegacySuperheRuntimeGeneralRoot);
     return candidates;
 }
 

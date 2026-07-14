@@ -39,8 +39,8 @@ build/
 moc_predefs.h
 /qt_ui_test
 
-# smoke / tests 子工程的构建产物（可执行、Makefile 变体、对象）
-# 源码 .cpp/.pro 入库，产物一律不入库
+# smoke / tests 子工程整体不入库（源码与产物均不上传）
+smoke/
 *_smoke
 *_smoke.Makefile
 *.Makefile
@@ -55,3 +55,9 @@ AGENTS.*
 .claude/
 .superpowers/
 .worktrees/
+
+# 便携化:每开发者本地路径覆盖，不入库
+local_paths.pri
+
+# AI 训练数据(纯开发资料，非构建/运行所需)，不入库
+rk_ai_materials/
