@@ -1,0 +1,70 @@
+<h2>首期架构：公共底座 + 三个标杆工具</h2>
+<p class="subtitle">目标工况：固定相机与光源，目标允许平移/旋转；使用已有现场标注图验收。</p>
+
+<div class="section">
+  <div class="label">统一数据流</div>
+  <div style="display:grid;grid-template-columns:1fr auto 1.45fr auto 2fr auto 1.25fr;gap:10px;align-items:stretch;margin-top:10px">
+    <div style="padding:16px;border:2px solid #60a5fa;border-radius:10px;background:#eff6ff">
+      <h3 style="margin-top:0">彩色图像输入</h3>
+      <p>像素格式、位深、尺寸、帧号</p>
+      <p>曝光/白平衡基线检查</p>
+    </div>
+    <div style="display:flex;align-items:center;font-size:28px;color:#64748b">→</div>
+    <div style="padding:16px;border:2px solid #f59e0b;border-radius:10px;background:#fff7ed">
+      <h3 style="margin-top:0">公共工业化底座</h3>
+      <p><strong>位置修正：</strong>平移 + 旋转，统一变换 ROI、屏蔽区和结果图形</p>
+      <p><strong>模型契约：</strong>版本、参数签名、输入格式、失效与回滚</p>
+      <p><strong>批量验证：</strong>标注集、历史结果、阈值推荐、回归报告</p>
+    </div>
+    <div style="display:flex;align-items:center;font-size:28px;color:#64748b">→</div>
+    <div style="display:grid;gap:10px">
+      <div style="padding:12px 16px;border:2px solid #22c55e;border-radius:10px;background:#f0fdf4">
+        <h3 style="margin:0 0 4px">颜色比较</h3>
+        <p style="margin:0">单基准模板 → 相似度/容差 → OK/NG</p>
+      </div>
+      <div style="padding:12px 16px;border:2px solid #06b6d4;border-radius:10px;background:#ecfeff">
+        <h3 style="margin:0 0 4px">颜色识别</h3>
+        <p style="margin:0">多标签多样本 → 类别、可信度、真实颜色覆盖率</p>
+      </div>
+      <div style="padding:12px 16px;border:2px solid #8b5cf6;border-radius:10px;background:#f5f3ff">
+        <h3 style="margin:0 0 4px">注册分类</h3>
+        <p style="margin:0">少样本注册 → Top-K、拒识、分割诊断</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;font-size:28px;color:#64748b">→</div>
+    <div style="padding:16px;border:2px solid #334155;border-radius:10px;background:#f8fafc">
+      <h3 style="margin-top:0">统一 ToolResult</h3>
+      <p>OK/NG/ERROR 三态</p>
+      <p>类别、分数、Top-K、ROI</p>
+      <p>耗时、错误码、诊断字段</p>
+      <p>当前结果 + 批量历史</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">边界原则</div>
+  <div class="cards" style="margin-top:10px">
+    <div class="card">
+      <div class="card-body"><h3>共用基础，不共用判定语义</h3><p>颜色特征提取可复用；“比较”“识别”“分类”保留各自明确结果定义。</p></div>
+    </div>
+    <div class="card">
+      <div class="card-body"><h3>参数变化必须可追踪</h3><p>灵敏度、亮度、色彩空间、ROI 或输入格式变化后，模型明确失效并提示重建，禁止静默兼容。</p></div>
+    </div>
+    <div class="card">
+      <div class="card-body"><h3>先支持平移/旋转</h3><p>首期不承诺尺度变化、透视和复杂光照鲁棒性，但接口保留后续扩展能力。</p></div>
+    </div>
+  </div>
+</div>
+
+<h3>这一层架构是否符合你的方向？</h3>
+<div class="options">
+  <div class="option" data-choice="approve_architecture" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>认可，继续细化三个工具</h3><p>下一步展开颜色比较、颜色识别和注册分类各自的算法与交互设计。</p></div>
+  </div>
+  <div class="option" data-choice="revise_architecture" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content"><h3>需要调整</h3><p>请在终端说明希望增加、删除或改变的部分。</p></div>
+  </div>
+</div>

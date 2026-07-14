@@ -1,0 +1,143 @@
+{
+    "canonicalization": {
+        "height": 128,
+        "nearEqualAxisThreshold": 0.05,
+        "occupancyOrientationGridColumns": 4,
+        "occupancyOrientationGridRows": 4,
+        "paddingRatio": 0.08,
+        "width": 128
+    },
+    "classLabels": [
+        {
+            "id": 0,
+            "name": "yuuanhaun"
+        },
+        {
+            "id": 1,
+            "name": "duobianxing"
+        },
+        {
+            "id": 2,
+            "name": "chilun"
+        }
+    ],
+    "featureGroups": {
+        "dimensions": [
+            13,
+            16,
+            18,
+            6,
+            6
+        ],
+        "names": [
+            "shape",
+            "occupancy",
+            "gray",
+            "lab",
+            "texture"
+        ],
+        "weights": [
+            0.35,
+            0.25,
+            0.15,
+            0.15,
+            0.1
+        ]
+    },
+    "featureLength": 59,
+    "featureNames": [
+        "shapeAspectShortLong",
+        "shapeFillRatio",
+        "shapeCircularity",
+        "shapeCompactnessReciprocal",
+        "shapeConvexity",
+        "shapeRectangularity",
+        "shapeAnisometryReciprocal",
+        "shapeBulkiness",
+        "shapeStructureFactor",
+        "shapeMomentPsi1",
+        "shapeMomentPsi2",
+        "shapeMomentPsi3",
+        "shapeMomentPsi4",
+        "occupancyR0C0",
+        "occupancyR0C1",
+        "occupancyR0C2",
+        "occupancyR0C3",
+        "occupancyR1C0",
+        "occupancyR1C1",
+        "occupancyR1C2",
+        "occupancyR1C3",
+        "occupancyR2C0",
+        "occupancyR2C1",
+        "occupancyR2C2",
+        "occupancyR2C3",
+        "occupancyR3C0",
+        "occupancyR3C1",
+        "occupancyR3C2",
+        "occupancyR3C3",
+        "grayMean",
+        "grayDeviation",
+        "grayHist00",
+        "grayHist01",
+        "grayHist02",
+        "grayHist03",
+        "grayHist04",
+        "grayHist05",
+        "grayHist06",
+        "grayHist07",
+        "grayHist08",
+        "grayHist09",
+        "grayHist10",
+        "grayHist11",
+        "grayHist12",
+        "grayHist13",
+        "grayHist14",
+        "grayHist15",
+        "labMeanL",
+        "labMeanA",
+        "labMeanB",
+        "labDeviationL",
+        "labDeviationA",
+        "labDeviationB",
+        "textureEntropy",
+        "textureAnisotropy",
+        "coocEnergy",
+        "coocCorrelation",
+        "coocHomogeneity",
+        "coocContrast"
+    ],
+    "featureVersion": "halcon_registered_feature_v2",
+    "halconVersion": "24.11.1",
+    "knn": {
+        "centerWeight": 0.3,
+        "epsilon": 0,
+        "method": "classes_distance",
+        "normalization": false,
+        "numChecks": 0,
+        "numTrees": 4,
+        "sampleWeight": 0.7
+    },
+    "modelType": "halcon_knn_registered_classification",
+    "schemaVersion": 2,
+    "segmentation": {
+        "borderBandRatio": 0.01,
+        "borderTouchDivisor": 0.05,
+        "candidateAreaRatioMax": 0.98,
+        "candidateAreaRatioMin": 0.02,
+        "morphologyRadiusMinimum": 1,
+        "morphologyRadiusRoiScale": 0.005,
+        "objectScoreAreaWeight": 0.15,
+        "objectScoreBorderWeight": 0.3,
+        "objectScoreCenterWeight": 0.55,
+        "thresholdMethod": "max_separability",
+        "thresholdPolarities": [
+            "light",
+            "dark"
+        ]
+    },
+    "thresholds": {
+        "minMargin": 8,
+        "minSimilarity": 80
+    },
+    "trainingSampleCount": 23
+}

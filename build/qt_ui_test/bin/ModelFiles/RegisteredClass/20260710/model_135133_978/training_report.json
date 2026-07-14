@@ -1,0 +1,44 @@
+{
+    "centerKnnBuildMs": 0,
+    "classStats": {
+        "0": {
+            "maxDistance": 0.2018591215580021,
+            "meanDistance": 0.06298778811197366,
+            "radius": 0.22204503371380233,
+            "radiusEnabled": true,
+            "sampleCount": 7,
+            "stdDevDistance": 0.056972146250900274
+        },
+        "1": {
+            "maxDistance": 0.05495393218570592,
+            "meanDistance": 0.037358257691505845,
+            "radius": 0.1,
+            "radiusEnabled": true,
+            "sampleCount": 9,
+            "stdDevDistance": 0.011919822886728184
+        },
+        "2": {
+            "maxDistance": 0.1576481252173197,
+            "meanDistance": 0.12482201483044715,
+            "radius": 0.17443768288270448,
+            "radiusEnabled": true,
+            "sampleCount": 7,
+            "stdDevDistance": 0.019846267220902932
+        }
+    },
+    "elapsedMs": 2,
+    "invalidSamplesByClass": {
+        "chilun": 0,
+        "duobianxing": 0,
+        "yuuanhaun": 0
+    },
+    "sampleCount": 23,
+    "sampleKnnBuildMs": 1,
+    "validSamplesByClass": {
+        "chilun": 7,
+        "duobianxing": 9,
+        "yuuanhaun": 7
+    },
+    "warnings": [
+    ]
+}

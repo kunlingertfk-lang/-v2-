@@ -1,0 +1,93 @@
+{
+    "classes": [
+        "Widget",
+        "Classification1"
+    ],
+    "images": [
+        {
+            "height": 64,
+            "marksByClass": {
+                "0": [
+                    {
+                        "classId": 0,
+                        "rect": [
+                            0,
+                            0,
+                            1,
+                            1
+                        ],
+                        "type": "full"
+                    },
+                    {
+                        "classId": 0,
+                        "rect": [
+                            0.05,
+                            0.12,
+                            0.28,
+                            0.32
+                        ],
+                        "type": "rect"
+                    },
+                    {
+                        "classId": 0,
+                        "polygon": [
+                            [
+                                0.58,
+                                0.12
+                            ],
+                            [
+                                0.88,
+                                0.16
+                            ],
+                            [
+                                0.72,
+                                0.46
+                            ]
+                        ],
+                        "rect": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        "type": "polygon"
+                    },
+                    {
+                        "classId": 0,
+                        "rect": [
+                            0.08,
+                            0.2,
+                            0.18,
+                            0.18
+                        ],
+                        "type": "rect"
+                    }
+                ],
+                "1": [
+                    {
+                        "classId": 1,
+                        "rect": [
+                            0.1,
+                            0.1,
+                            0.45,
+                            0.45
+                        ],
+                        "type": "rect"
+                    }
+                ]
+            },
+            "name": "基准图1",
+            "relativePath": "images/image_0000.png",
+            "width": 64
+        },
+        {
+            "height": 64,
+            "marksByClass": {
+            },
+            "name": "基准图2",
+            "relativePath": "images/image_0001.png",
+            "width": 64
+        }
+    ],
+    "schemaVersion": 1
+}

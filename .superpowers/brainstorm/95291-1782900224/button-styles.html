@@ -1,0 +1,116 @@
+<h2>测试按钮族 · 样式与点击反馈方向</h2>
+<p class="subtitle">每个方向都含完整 4 个按钮，可悬停 / 点击 / 切换连续运行态。当前线上是「白底黑边、点击硬反色闪一下」，缺 hover、running、disabled 视觉。</p>
+
+<style>
+  .btn-demo { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px; background:#f4f5f7; border-radius:8px; margin-top:8px; }
+  .btn { min-width:120px; height:48px; border-radius:4px; font-size:15px; cursor:pointer; border:1px solid; display:inline-flex; align-items:center; justify-content:center; user-select:none; transition: background .12s, color .12s, border-color .12s, box-shadow .12s; }
+
+  /* ===== 方向 A：补全黑白极简（最小改动，填齐 hover/running/disabled） ===== */
+  .a-primary { background:#111827; color:#fff; border-color:#111827; }
+  .a-primary:hover { background:#000; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  .a-primary:active { background:#000; transform:translateY(1px); }
+  .a-secondary { background:#fff; color:#111827; border-color:#111827; }
+  .a-secondary:hover { background:#f3f4f6; }
+  .a-secondary:active, .a-secondary.flash { background:#111827; color:#fff; }
+  .a-secondary.running { background:#111827; color:#fff; border-color:#111827; box-shadow:0 0 0 3px rgba(17,24,39,.18); }
+  .a-secondary.disabled { background:#f3f4f6; color:#9ca3af; border-color:#e5e7eb; cursor:not-allowed; }
+
+  /* ===== 方向 B：橙色调主操作（品牌色 #ff7a00 用于主操作 + running 态） ===== */
+  .b-primary { background:#ff7a00; color:#fff; border-color:#ff7a00; }
+  .b-primary:hover { background:#e66e00; box-shadow:0 1px 4px rgba(255,122,0,.4); }
+  .b-primary:active { background:#cc6300; transform:translateY(1px); }
+  .b-secondary { background:#fff; color:#111827; border-color:#cfd6df; }
+  .b-secondary:hover { background:#fff3e6; border-color:#ff7a00; color:#ff7a00; }
+  .b-secondary:active, .b-secondary.flash { background:#ffe1bf; color:#ff7a00; border-color:#ff7a00; }
+  .b-secondary.running { background:#ff7a00; color:#fff; border-color:#ff7a00; animation:b-pulse 1.4s ease-in-out infinite; }
+  @keyframes b-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,122,0,.45)} 50%{box-shadow:0 0 0 6px rgba(255,122,0,0)} }
+  .b-secondary.disabled { background:#f3f4f6; color:#9ca3af; border-color:#e5e7eb; cursor:not-allowed; }
+
+  /* ===== 方向 C：分层权重（主操作深色实心 / 次操作浅描边 / 退出更弱） ===== */
+  .c-primary { background:#111827; color:#fff; border-color:#111827; }
+  .c-primary:hover { background:#000; box-shadow:0 2px 6px rgba(0,0,0,.3); }
+  .c-primary:active { transform:translateY(1px); }
+  .c-action { background:#fff; color:#111827; border-color:#9ca3af; }
+  .c-action:hover { background:#f9fafb; border-color:#111827; }
+  .c-action:active, .c-action.flash { background:#111827; color:#fff; }
+  .c-action.running { background:#1f2937; color:#fff; border-color:#1f2937; position:relative; }
+  .c-action.running::after { content:''; position:absolute; left:10px; width:7px; height:7px; border-radius:50%; background:#ff7a00; animation:c-blink 1s steps(2) infinite; }
+  @keyframes c-blink { 50%{opacity:.25} }
+  .c-exit { background:transparent; color:#6b7280; border-color:#d1d5db; }
+  .c-exit:hover { background:#fef2f2; color:#dc2626; border-color:#dc2626; }
+  .c-exit:active, .c-exit.flash { background:#dc2626; color:#fff; border-color:#dc2626; }
+  .c-disabled { background:#f3f4f6; color:#9ca3af; border-color:#e5e7eb; cursor:not-allowed; }
+
+  .role-tag { font-size:11px; color:#6b7280; margin-left:6px; }
+  .hint { font-size:12px; color:#6b7280; margin-top:6px; }
+</style>
+
+<div class="options" style="flex-direction:column; gap:14px;">
+
+  <!-- 方向 A -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)" style="display:block;">
+    <div style="display:flex; align-items:center;">
+      <div class="letter">A</div>
+      <div class="content" style="flex:1;">
+        <h3>补全黑白极简 <span class="role-tag">最小改动 · 仅填齐缺失状态</span></h3>
+        <p>沿用现有白底黑边，补 hover（浅灰/加深）、running（反色+外发光环）、disabled（灰化）。flash 仍是反色，但加 120ms 过渡更顺滑。</p>
+      </div>
+    </div>
+    <div class="btn-demo">
+      <div class="btn a-primary">完成</div>
+      <div class="btn a-secondary" onmouseover="" onclick="flash(this)">测试运行</div>
+      <div class="btn a-secondary" onclick="toggleRun(this,'a-secondary')">切换连续运行</div>
+      <div class="btn a-secondary disabled">退出测试</div>
+    </div>
+    <p class="hint">悬停测试运行→浅灰；点击→反色闪一下；点「切换连续运行」→反色+外环；退出测试为 disabled 灰化示例。</p>
+  </div>
+
+  <!-- 方向 B -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)" style="display:block;">
+    <div style="display:flex; align-items:center;">
+      <div class="letter">B</div>
+      <div class="content" style="flex:1;">
+        <h3>橙色调主操作 <span class="role-tag">品牌色强调 · running 呼吸</span></h3>
+        <p>主操作（完成）用品牌橙实心；测试类按钮白底，hover/press 走橙色描边；连续运行态橙色实心 + 呼吸光晕，最醒目。</p>
+      </div>
+    </div>
+    <div class="btn-demo">
+      <div class="btn b-primary">完成</div>
+      <div class="btn b-secondary" onclick="flash(this)">测试运行</div>
+      <div class="btn b-secondary" onclick="toggleRun(this,'b-secondary')">切换连续运行</div>
+      <div class="btn b-secondary disabled">退出测试</div>
+    </div>
+    <p class="hint">点「切换连续运行」看橙色呼吸光晕；悬停测试运行→橙描边+橙字。</p>
+  </div>
+
+  <!-- 方向 C -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)" style="display:block;">
+    <div style="display:flex; align-items:center;">
+      <div class="letter">C</div>
+      <div class="content" style="flex:1;">
+        <h3>分层权重 <span class="role-tag">主/次/退出三档视觉</span></h3>
+        <p>完成=深色实心（最强）；测试运行=白底灰描边（中）；退出测试=透明描边（最弱，hover 变红警示）。连续运行态文字旁加橙色呼吸点。</p>
+      </div>
+    </div>
+    <div class="btn-demo">
+      <div class="btn c-primary">完成</div>
+      <div class="btn c-action" onclick="flash(this)">测试运行</div>
+      <div class="btn c-action" onclick="toggleRun(this,'c-action')">切换连续运行</div>
+      <div class="btn c-exit" onclick="flash(this)">退出测试</div>
+    </div>
+    <p class="hint">点「切换连续运行」看左侧橙色呼吸点；退出测试 hover 会变红。</p>
+  </div>
+
+</div>
+
+<script>
+  function flash(el){
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'), 180);
+  }
+  function toggleRun(el, baseCls){
+    // 找同组里的"测试运行"（第一个非切换按钮）来切换更直观，这里直接切自身演示
+    const running = el.classList.toggle('running');
+    el.textContent = running ? '连续运行中…' : '切换连续运行';
+  }
+</script>

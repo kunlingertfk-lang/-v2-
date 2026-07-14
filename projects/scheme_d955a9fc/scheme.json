@@ -1,0 +1,2442 @@
+{
+    "output": {
+        "resultOutputEnabled": false,
+        "timedOutputEnabled": false,
+        "timedOutputMs": 100
+    },
+    "previews": {
+        "blob_presence_b3fee2f4-c5a4-4cf1-b8ed-077a2fdf5261": {
+            "count": 51,
+            "ok": true,
+            "payload": {
+                "areaMax": 999999,
+                "areaMin": 10,
+                "blobAreas": [
+                    68001,
+                    11,
+                    11,
+                    23,
+                    57,
+                    14,
+                    29,
+                    13,
+                    17,
+                    13,
+                    15,
+                    27,
+                    25,
+                    22,
+                    10,
+                    13,
+                    19,
+                    11,
+                    12,
+                    17,
+                    23,
+                    14,
+                    12,
+                    16,
+                    45,
+                    21,
+                    20,
+                    14,
+                    20,
+                    12,
+                    12,
+                    26,
+                    12,
+                    14,
+                    19,
+                    11,
+                    15,
+                    15,
+                    16,
+                    12,
+                    16,
+                    11,
+                    13,
+                    11,
+                    16,
+                    20,
+                    10,
+                    29,
+                    19,
+                    13,
+                    12
+                ],
+                "blobCount": 51,
+                "blobRects": [
+                    {
+                        "height": 290,
+                        "width": 407,
+                        "x": 37,
+                        "y": 113
+                    },
+                    {
+                        "height": 6,
+                        "width": 2,
+                        "x": 440,
+                        "y": 118
+                    },
+                    {
+                        "height": 6,
+                        "width": 6,
+                        "x": 453,
+                        "y": 118
+                    },
+                    {
+                        "height": 15,
+                        "width": 5,
+                        "x": 252,
+                        "y": 120
+                    },
+                    {
+                        "height": 26,
+                        "width": 9,
+                        "x": 434,
+                        "y": 122
+                    },
+                    {
+                        "height": 9,
+                        "width": 3,
+                        "x": 447,
+                        "y": 125
+                    },
+                    {
+                        "height": 15,
+                        "width": 6,
+                        "x": 444,
+                        "y": 126
+                    },
+                    {
+                        "height": 8,
+                        "width": 5,
+                        "x": 235,
+                        "y": 131
+                    },
+                    {
+                        "height": 6,
+                        "width": 6,
+                        "x": 241,
+                        "y": 135
+                    },
+                    {
+                        "height": 8,
+                        "width": 5,
+                        "x": 201,
+                        "y": 139
+                    },
+                    {
+                        "height": 11,
+                        "width": 2,
+                        "x": 448,
+                        "y": 139
+                    },
+                    {
+                        "height": 9,
+                        "width": 12,
+                        "x": 208,
+                        "y": 145
+                    },
+                    {
+                        "height": 8,
+                        "width": 9,
+                        "x": 438,
+                        "y": 146
+                    },
+                    {
+                        "height": 12,
+                        "width": 6,
+                        "x": 187,
+                        "y": 153
+                    },
+                    {
+                        "height": 5,
+                        "width": 3,
+                        "x": 435,
+                        "y": 160
+                    },
+                    {
+                        "height": 6,
+                        "width": 5,
+                        "x": 439,
+                        "y": 163
+                    },
+                    {
+                        "height": 11,
+                        "width": 5,
+                        "x": 164,
+                        "y": 165
+                    },
+                    {
+                        "height": 11,
+                        "width": 1,
+                        "x": 453,
+                        "y": 167
+                    },
+                    {
+                        "height": 7,
+                        "width": 2,
+                        "x": 154,
+                        "y": 187
+                    },
+                    {
+                        "height": 9,
+                        "width": 6,
+                        "x": 144,
+                        "y": 196
+                    },
+                    {
+                        "height": 15,
+                        "width": 5,
+                        "x": 414,
+                        "y": 205
+                    },
+                    {
+                        "height": 9,
+                        "width": 2,
+                        "x": 420,
+                        "y": 205
+                    },
+                    {
+                        "height": 8,
+                        "width": 3,
+                        "x": 420,
+                        "y": 219
+                    },
+                    {
+                        "height": 5,
+                        "width": 9,
+                        "x": 83,
+                        "y": 231
+                    },
+                    {
+                        "height": 10,
+                        "width": 15,
+                        "x": 67,
+                        "y": 234
+                    },
+                    {
+                        "height": 6,
+                        "width": 8,
+                        "x": 37,
+                        "y": 236
+                    },
+                    {
+                        "height": 6,
+                        "width": 10,
+                        "x": 59,
+                        "y": 242
+                    },
+                    {
+                        "height": 6,
+                        "width": 5,
+                        "x": 40,
+                        "y": 246
+                    },
+                    {
+                        "height": 12,
+                        "width": 6,
+                        "x": 415,
+                        "y": 264
+                    },
+                    {
+                        "height": 5,
+                        "width": 5,
+                        "x": 44,
+                        "y": 267
+                    },
+                    {
+                        "height": 5,
+                        "width": 6,
+                        "x": 37,
+                        "y": 268
+                    },
+                    {
+                        "height": 9,
+                        "width": 10,
+                        "x": 44,
+                        "y": 274
+                    },
+                    {
+                        "height": 6,
+                        "width": 7,
+                        "x": 430,
+                        "y": 276
+                    },
+                    {
+                        "height": 5,
+                        "width": 9,
+                        "x": 55,
+                        "y": 288
+                    },
+                    {
+                        "height": 9,
+                        "width": 5,
+                        "x": 406,
+                        "y": 292
+                    },
+                    {
+                        "height": 5,
+                        "width": 5,
+                        "x": 389,
+                        "y": 299
+                    },
+                    {
+                        "height": 12,
+                        "width": 3,
+                        "x": 372,
+                        "y": 307
+                    },
+                    {
+                        "height": 9,
+                        "width": 6,
+                        "x": 339,
+                        "y": 336
+                    },
+                    {
+                        "height": 9,
+                        "width": 3,
+                        "x": 67,
+                        "y": 346
+                    },
+                    {
+                        "height": 3,
+                        "width": 9,
+                        "x": 336,
+                        "y": 346
+                    },
+                    {
+                        "height": 8,
+                        "width": 6,
+                        "x": 326,
+                        "y": 357
+                    },
+                    {
+                        "height": 5,
+                        "width": 5,
+                        "x": 65,
+                        "y": 360
+                    },
+                    {
+                        "height": 6,
+                        "width": 5,
+                        "x": 303,
+                        "y": 365
+                    },
+                    {
+                        "height": 6,
+                        "width": 2,
+                        "x": 186,
+                        "y": 384
+                    },
+                    {
+                        "height": 8,
+                        "width": 5,
+                        "x": 67,
+                        "y": 387
+                    },
+                    {
+                        "height": 15,
+                        "width": 2,
+                        "x": 162,
+                        "y": 387
+                    },
+                    {
+                        "height": 7,
+                        "width": 2,
+                        "x": 231,
+                        "y": 391
+                    },
+                    {
+                        "height": 11,
+                        "width": 6,
+                        "x": 76,
+                        "y": 392
+                    },
+                    {
+                        "height": 5,
+                        "width": 11,
+                        "x": 269,
+                        "y": 392
+                    },
+                    {
+                        "height": 4,
+                        "width": 8,
+                        "x": 180,
+                        "y": 393
+                    },
+                    {
+                        "height": 6,
+                        "width": 5,
+                        "x": 238,
+                        "y": 396
+                    }
+                ],
+                "detectMaskApplied": false,
+                "detectRegionType": "rect",
+                "detectRoi": {
+                    "height": 290,
+                    "width": 442,
+                    "x": 37,
+                    "y": 113
+                },
+                "detectRoiPixelH": 290,
+                "detectRoiPixelW": 442,
+                "detectRoiPixelX": 37,
+                "detectRoiPixelY": 113,
+                "detectRoiPixels": {
+                    "height": 290,
+                    "width": 442,
+                    "x": 37,
+                    "y": 113
+                },
+                "elapsedMs": 3,
+                "enablePositionCorrection": true,
+                "existOk": true,
+                "found": true,
+                "grayMax": 250,
+                "grayMin": 180,
+                "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                "hasImage": true,
+                "imageHeight": 480,
+                "imageWidth": 640,
+                "invertRange": false,
+                "judgeBasis": "presence",
+                "maskOutputEnabled": false,
+                "maskOutputWritten": false,
+                "positionCorrectionApplied": false,
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "roiMode": "rectangle",
+                "roiNormalized": {
+                    "height": 0.6021765417170497,
+                    "width": 0.6892382103990327,
+                    "x": 0.05894800483675937,
+                    "y": 0.23700120918984283
+                },
+                "text": "found",
+                "timeoutExceeded": false,
+                "timeoutMs": 1000
+            },
+            "result": {
+                "count": 51,
+                "elapsedMs": 3,
+                "message": "BlobPresence: found count=51",
+                "ok": true,
+                "overlays": [
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "ROI",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 290,
+                            "width": 442,
+                            "x": 37,
+                            "y": 113
+                        },
+                        "score": 0,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 290,
+                            "width": 407,
+                            "x": 37,
+                            "y": 113
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 2,
+                            "x": 440,
+                            "y": 118
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 6,
+                            "x": 453,
+                            "y": 118
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 15,
+                            "width": 5,
+                            "x": 252,
+                            "y": 120
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 26,
+                            "width": 9,
+                            "x": 434,
+                            "y": 122
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 3,
+                            "x": 447,
+                            "y": 125
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 15,
+                            "width": 6,
+                            "x": 444,
+                            "y": 126
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 8,
+                            "width": 5,
+                            "x": 235,
+                            "y": 131
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 6,
+                            "x": 241,
+                            "y": 135
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 8,
+                            "width": 5,
+                            "x": 201,
+                            "y": 139
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 11,
+                            "width": 2,
+                            "x": 448,
+                            "y": 139
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 12,
+                            "x": 208,
+                            "y": 145
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 8,
+                            "width": 9,
+                            "x": 438,
+                            "y": 146
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 12,
+                            "width": 6,
+                            "x": 187,
+                            "y": 153
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 3,
+                            "x": 435,
+                            "y": 160
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 5,
+                            "x": 439,
+                            "y": 163
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 11,
+                            "width": 5,
+                            "x": 164,
+                            "y": 165
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 11,
+                            "width": 1,
+                            "x": 453,
+                            "y": 167
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 7,
+                            "width": 2,
+                            "x": 154,
+                            "y": 187
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 6,
+                            "x": 144,
+                            "y": 196
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 15,
+                            "width": 5,
+                            "x": 414,
+                            "y": 205
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 2,
+                            "x": 420,
+                            "y": 205
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 8,
+                            "width": 3,
+                            "x": 420,
+                            "y": 219
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 9,
+                            "x": 83,
+                            "y": 231
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 10,
+                            "width": 15,
+                            "x": 67,
+                            "y": 234
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 8,
+                            "x": 37,
+                            "y": 236
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 10,
+                            "x": 59,
+                            "y": 242
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 5,
+                            "x": 40,
+                            "y": 246
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 12,
+                            "width": 6,
+                            "x": 415,
+                            "y": 264
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 5,
+                            "x": 44,
+                            "y": 267
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 6,
+                            "x": 37,
+                            "y": 268
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 10,
+                            "x": 44,
+                            "y": 274
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 7,
+                            "x": 430,
+                            "y": 276
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 9,
+                            "x": 55,
+                            "y": 288
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 5,
+                            "x": 406,
+                            "y": 292
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 5,
+                            "x": 389,
+                            "y": 299
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 12,
+                            "width": 3,
+                            "x": 372,
+                            "y": 307
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 6,
+                            "x": 339,
+                            "y": 336
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 9,
+                            "width": 3,
+                            "x": 67,
+                            "y": 346
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 3,
+                            "width": 9,
+                            "x": 336,
+                            "y": 346
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 8,
+                            "width": 6,
+                            "x": 326,
+                            "y": 357
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 5,
+                            "x": 65,
+                            "y": 360
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 5,
+                            "x": 303,
+                            "y": 365
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 2,
+                            "x": 186,
+                            "y": 384
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 8,
+                            "width": 5,
+                            "x": 67,
+                            "y": 387
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 15,
+                            "width": 2,
+                            "x": 162,
+                            "y": 387
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 7,
+                            "width": 2,
+                            "x": 231,
+                            "y": 391
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 11,
+                            "width": 6,
+                            "x": 76,
+                            "y": 392
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 5,
+                            "width": 11,
+                            "x": 269,
+                            "y": 392
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 4,
+                            "width": 8,
+                            "x": 180,
+                            "y": 393
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 6,
+                            "width": 5,
+                            "x": 238,
+                            "y": 396
+                        },
+                        "score": 1,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                        },
+                        "label": "blob_count",
+                        "p1": {
+                            "x": 41,
+                            "y": 117
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 1,
+                        "text": "count=51",
+                        "type": "Text"
+                    }
+                ],
+                "payload": {
+                    "areaMax": 999999,
+                    "areaMin": 10,
+                    "blobAreas": [
+                        68001,
+                        11,
+                        11,
+                        23,
+                        57,
+                        14,
+                        29,
+                        13,
+                        17,
+                        13,
+                        15,
+                        27,
+                        25,
+                        22,
+                        10,
+                        13,
+                        19,
+                        11,
+                        12,
+                        17,
+                        23,
+                        14,
+                        12,
+                        16,
+                        45,
+                        21,
+                        20,
+                        14,
+                        20,
+                        12,
+                        12,
+                        26,
+                        12,
+                        14,
+                        19,
+                        11,
+                        15,
+                        15,
+                        16,
+                        12,
+                        16,
+                        11,
+                        13,
+                        11,
+                        16,
+                        20,
+                        10,
+                        29,
+                        19,
+                        13,
+                        12
+                    ],
+                    "blobCount": 51,
+                    "blobRects": [
+                        {
+                            "height": 290,
+                            "width": 407,
+                            "x": 37,
+                            "y": 113
+                        },
+                        {
+                            "height": 6,
+                            "width": 2,
+                            "x": 440,
+                            "y": 118
+                        },
+                        {
+                            "height": 6,
+                            "width": 6,
+                            "x": 453,
+                            "y": 118
+                        },
+                        {
+                            "height": 15,
+                            "width": 5,
+                            "x": 252,
+                            "y": 120
+                        },
+                        {
+                            "height": 26,
+                            "width": 9,
+                            "x": 434,
+                            "y": 122
+                        },
+                        {
+                            "height": 9,
+                            "width": 3,
+                            "x": 447,
+                            "y": 125
+                        },
+                        {
+                            "height": 15,
+                            "width": 6,
+                            "x": 444,
+                            "y": 126
+                        },
+                        {
+                            "height": 8,
+                            "width": 5,
+                            "x": 235,
+                            "y": 131
+                        },
+                        {
+                            "height": 6,
+                            "width": 6,
+                            "x": 241,
+                            "y": 135
+                        },
+                        {
+                            "height": 8,
+                            "width": 5,
+                            "x": 201,
+                            "y": 139
+                        },
+                        {
+                            "height": 11,
+                            "width": 2,
+                            "x": 448,
+                            "y": 139
+                        },
+                        {
+                            "height": 9,
+                            "width": 12,
+                            "x": 208,
+                            "y": 145
+                        },
+                        {
+                            "height": 8,
+                            "width": 9,
+                            "x": 438,
+                            "y": 146
+                        },
+                        {
+                            "height": 12,
+                            "width": 6,
+                            "x": 187,
+                            "y": 153
+                        },
+                        {
+                            "height": 5,
+                            "width": 3,
+                            "x": 435,
+                            "y": 160
+                        },
+                        {
+                            "height": 6,
+                            "width": 5,
+                            "x": 439,
+                            "y": 163
+                        },
+                        {
+                            "height": 11,
+                            "width": 5,
+                            "x": 164,
+                            "y": 165
+                        },
+                        {
+                            "height": 11,
+                            "width": 1,
+                            "x": 453,
+                            "y": 167
+                        },
+                        {
+                            "height": 7,
+                            "width": 2,
+                            "x": 154,
+                            "y": 187
+                        },
+                        {
+                            "height": 9,
+                            "width": 6,
+                            "x": 144,
+                            "y": 196
+                        },
+                        {
+                            "height": 15,
+                            "width": 5,
+                            "x": 414,
+                            "y": 205
+                        },
+                        {
+                            "height": 9,
+                            "width": 2,
+                            "x": 420,
+                            "y": 205
+                        },
+                        {
+                            "height": 8,
+                            "width": 3,
+                            "x": 420,
+                            "y": 219
+                        },
+                        {
+                            "height": 5,
+                            "width": 9,
+                            "x": 83,
+                            "y": 231
+                        },
+                        {
+                            "height": 10,
+                            "width": 15,
+                            "x": 67,
+                            "y": 234
+                        },
+                        {
+                            "height": 6,
+                            "width": 8,
+                            "x": 37,
+                            "y": 236
+                        },
+                        {
+                            "height": 6,
+                            "width": 10,
+                            "x": 59,
+                            "y": 242
+                        },
+                        {
+                            "height": 6,
+                            "width": 5,
+                            "x": 40,
+                            "y": 246
+                        },
+                        {
+                            "height": 12,
+                            "width": 6,
+                            "x": 415,
+                            "y": 264
+                        },
+                        {
+                            "height": 5,
+                            "width": 5,
+                            "x": 44,
+                            "y": 267
+                        },
+                        {
+                            "height": 5,
+                            "width": 6,
+                            "x": 37,
+                            "y": 268
+                        },
+                        {
+                            "height": 9,
+                            "width": 10,
+                            "x": 44,
+                            "y": 274
+                        },
+                        {
+                            "height": 6,
+                            "width": 7,
+                            "x": 430,
+                            "y": 276
+                        },
+                        {
+                            "height": 5,
+                            "width": 9,
+                            "x": 55,
+                            "y": 288
+                        },
+                        {
+                            "height": 9,
+                            "width": 5,
+                            "x": 406,
+                            "y": 292
+                        },
+                        {
+                            "height": 5,
+                            "width": 5,
+                            "x": 389,
+                            "y": 299
+                        },
+                        {
+                            "height": 12,
+                            "width": 3,
+                            "x": 372,
+                            "y": 307
+                        },
+                        {
+                            "height": 9,
+                            "width": 6,
+                            "x": 339,
+                            "y": 336
+                        },
+                        {
+                            "height": 9,
+                            "width": 3,
+                            "x": 67,
+                            "y": 346
+                        },
+                        {
+                            "height": 3,
+                            "width": 9,
+                            "x": 336,
+                            "y": 346
+                        },
+                        {
+                            "height": 8,
+                            "width": 6,
+                            "x": 326,
+                            "y": 357
+                        },
+                        {
+                            "height": 5,
+                            "width": 5,
+                            "x": 65,
+                            "y": 360
+                        },
+                        {
+                            "height": 6,
+                            "width": 5,
+                            "x": 303,
+                            "y": 365
+                        },
+                        {
+                            "height": 6,
+                            "width": 2,
+                            "x": 186,
+                            "y": 384
+                        },
+                        {
+                            "height": 8,
+                            "width": 5,
+                            "x": 67,
+                            "y": 387
+                        },
+                        {
+                            "height": 15,
+                            "width": 2,
+                            "x": 162,
+                            "y": 387
+                        },
+                        {
+                            "height": 7,
+                            "width": 2,
+                            "x": 231,
+                            "y": 391
+                        },
+                        {
+                            "height": 11,
+                            "width": 6,
+                            "x": 76,
+                            "y": 392
+                        },
+                        {
+                            "height": 5,
+                            "width": 11,
+                            "x": 269,
+                            "y": 392
+                        },
+                        {
+                            "height": 4,
+                            "width": 8,
+                            "x": 180,
+                            "y": 393
+                        },
+                        {
+                            "height": 6,
+                            "width": 5,
+                            "x": 238,
+                            "y": 396
+                        }
+                    ],
+                    "detectMaskApplied": false,
+                    "detectRegionType": "rect",
+                    "detectRoi": {
+                        "height": 290,
+                        "width": 442,
+                        "x": 37,
+                        "y": 113
+                    },
+                    "detectRoiPixelH": 290,
+                    "detectRoiPixelW": 442,
+                    "detectRoiPixelX": 37,
+                    "detectRoiPixelY": 113,
+                    "detectRoiPixels": {
+                        "height": 290,
+                        "width": 442,
+                        "x": 37,
+                        "y": 113
+                    },
+                    "elapsedMs": 3,
+                    "enablePositionCorrection": true,
+                    "existOk": true,
+                    "found": true,
+                    "grayMax": 250,
+                    "grayMin": 180,
+                    "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                    "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                    "hasImage": true,
+                    "imageHeight": 480,
+                    "imageWidth": 640,
+                    "invertRange": false,
+                    "judgeBasis": "presence",
+                    "maskOutputEnabled": false,
+                    "maskOutputWritten": false,
+                    "positionCorrectionApplied": false,
+                    "positionCorrectionSource": "1 基准图.位置修正信息",
+                    "roiMode": "rectangle",
+                    "roiNormalized": {
+                        "height": 0.6021765417170497,
+                        "width": 0.6892382103990327,
+                        "x": 0.05894800483675937,
+                        "y": 0.23700120918984283
+                    },
+                    "text": "found",
+                    "timeoutExceeded": false,
+                    "timeoutMs": 1000
+                },
+                "schemaVersion": 1,
+                "score": 1,
+                "status": "BlobPresence: found count=51",
+                "success": true,
+                "text": "found",
+                "toolId": "blob_presence_b3fee2f4-c5a4-4cf1-b8ed-077a2fdf5261",
+                "toolType": "BlobPresence",
+                "value": 51
+            },
+            "roiNormalized": {
+                "height": 0.6021765417170497,
+                "width": 0.6892382103990327,
+                "x": 0.05894800483675937,
+                "y": 0.23700120918984283
+            },
+            "score": 1,
+            "sourceType": "referenceImage",
+            "statusText": "BlobPresence: found count=51 | BlobPresence: found count=51",
+            "timestamp": "2026-05-24T18:46:00",
+            "toolId": "blob_presence_b3fee2f4-c5a4-4cf1-b8ed-077a2fdf5261",
+            "toolType": "BlobPresence",
+            "valid": true
+        }
+    },
+    "referenceImage": "reference.png",
+    "schemaVersion": 1,
+    "schemeId": "scheme_d955a9fc",
+    "schemeName": "斑点524",
+    "tools": [
+        {
+            "category": "Presence",
+            "displayName": "斑点有无",
+            "enabled": true,
+            "judgeRule": {
+                "existOk": true,
+                "mode": "presence"
+            },
+            "params": {
+                "areaMax": 999999,
+                "areaMin": 10,
+                "detectRegionType": "rect",
+                "enablePositionCorrection": true,
+                "existOk": true,
+                "grayMax": 250,
+                "grayMin": 180,
+                "invertRange": false,
+                "judgeBasis": "presence",
+                "maskOutputEnabled": false,
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "timeoutMs": 1000
+            },
+            "roiNormalized": {
+                "height": 0.6021765417170497,
+                "width": 0.6892382103990327,
+                "x": 0.05894800483675937,
+                "y": 0.23700120918984283
+            },
+            "schemaVersion": 1,
+            "summary": "灰度: 180-250, 面积: 10-999999, 存在OK",
+            "toolId": "blob_presence_b3fee2f4-c5a4-4cf1-b8ed-077a2fdf5261",
+            "toolName": "斑点有无",
+            "toolType": "BlobPresence"
+        }
+    ],
+    "updatedAt": "2026-06-10T14:39:44"
+}

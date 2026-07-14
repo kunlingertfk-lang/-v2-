@@ -1,0 +1,37 @@
+<h2>首期架构：公共底座 + 三个标杆工具</h2>
+<p class="subtitle">固定相机与光源，目标允许平移/旋转；使用已有现场标注图验收。</p>
+
+<div style="display:grid;grid-template-columns:1fr auto 1.5fr auto 2fr auto 1.2fr;gap:10px;align-items:stretch;margin:22px 0">
+  <div style="padding:16px;border:2px solid #60a5fa;border-radius:10px;background:#eff6ff">
+    <h3>彩色图像输入</h3><p>格式、位深、帧元数据</p><p>曝光/白平衡基线</p>
+  </div>
+  <div style="display:flex;align-items:center;font-size:28px">→</div>
+  <div style="padding:16px;border:2px solid #f59e0b;border-radius:10px;background:#fff7ed">
+    <h3>公共工业化底座</h3>
+    <p><strong>位置修正：</strong>统一变换 ROI、屏蔽区和 overlay</p>
+    <p><strong>模型契约：</strong>版本、参数签名、失效、回滚</p>
+    <p><strong>批量验证：</strong>标注集、阈值推荐、回归报告</p>
+  </div>
+  <div style="display:flex;align-items:center;font-size:28px">→</div>
+  <div style="display:grid;gap:10px">
+    <div style="padding:12px 16px;border:2px solid #22c55e;border-radius:10px;background:#f0fdf4"><h3>颜色比较</h3><p>单基准模板 → 相似度/容差 → OK/NG</p></div>
+    <div style="padding:12px 16px;border:2px solid #06b6d4;border-radius:10px;background:#ecfeff"><h3>颜色识别</h3><p>多标签样本 → 类别、可信度、真实覆盖率</p></div>
+    <div style="padding:12px 16px;border:2px solid #8b5cf6;border-radius:10px;background:#f5f3ff"><h3>注册分类</h3><p>少样本注册 → Top-K、拒识、分割诊断</p></div>
+  </div>
+  <div style="display:flex;align-items:center;font-size:28px">→</div>
+  <div style="padding:16px;border:2px solid #334155;border-radius:10px;background:#f8fafc">
+    <h3>统一 ToolResult</h3><p>OK/NG/ERROR</p><p>类别、分数、ROI</p><p>耗时、错误、诊断</p><p>当前 + 历史结果</p>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="card-body"><h3>共用基础，不共用判定语义</h3><p>颜色特征可复用；比较、识别、分类保留独立定义。</p></div></div>
+  <div class="card"><div class="card-body"><h3>参数变化可追踪</h3><p>影响特征的参数变化后明确要求重建，不静默兼容。</p></div></div>
+  <div class="card"><div class="card-body"><h3>首期只承诺平移/旋转</h3><p>尺度、透视和复杂光照鲁棒性留到后续阶段。</p></div></div>
+</div>
+
+<h3>这一层架构是否符合你的方向？</h3>
+<div class="options">
+  <div class="option" data-choice="approve_architecture" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>认可，继续细化</h3><p>下一步展开三个工具各自的算法和交互。</p></div></div>
+  <div class="option" data-choice="revise_architecture" onclick="toggleSelect(this)"><div class="letter">↺</div><div class="content"><h3>需要调整</h3><p>请在终端说明希望调整的部分。</p></div></div>
+</div>

@@ -1,0 +1,823 @@
+{
+    "output": {
+        "resultOutputEnabled": false,
+        "timedOutputEnabled": false,
+        "timedOutputMs": 100
+    },
+    "previews": {
+        "contour_presence_912aaf29-a576-4cc4-9000-5238967b815d": {
+            "count": 1,
+            "ok": true,
+            "payload": {
+                "algorithm": "halcon_shape_model_contour_like_first_version",
+                "angleApplied": true,
+                "angleExtent": 90,
+                "angleStart": -45,
+                "bestAngle": -3.4409802597653555e-09,
+                "bestAngleDeg": -1.9715364627238455e-07,
+                "bestScore": 0.9202923362063302,
+                "chainMode": "auto",
+                "chainModeApplied": false,
+                "circleDetectRoiApplied": false,
+                "contourModelFromImagePatch": true,
+                "contourPointsOverlayApplied": false,
+                "contourPointsShown": false,
+                "contourXldModelApplied": false,
+                "delegatedRunnerMessage": "PatternPresence: found score=0.920 count=1",
+                "delegatedRunnerStatus": "found score=0.920",
+                "detectMaskApplied": false,
+                "detectRegionType": "rect",
+                "detectRoi": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                },
+                "detectRoiCoordinates": "original_image_pixels",
+                "detectRoiPixelH": 480,
+                "detectRoiPixelW": 640,
+                "detectRoiPixelX": 0,
+                "detectRoiPixelY": 0,
+                "detectRoiPixels": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                },
+                "elapsedMs": 1178,
+                "enablePositionCorrection": true,
+                "existOk": true,
+                "featureScale": 1,
+                "featureScaleApplied": false,
+                "found": true,
+                "foundCount": 1,
+                "freeDrawDetectRoiApplied": false,
+                "globalMatchCol": 296.00000237643656,
+                "globalMatchRow": 223.99999799257992,
+                "grayThreshold": 15,
+                "grayThresholdApplied": false,
+                "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                "hasImage": true,
+                "hasReferenceImage": true,
+                "imageHeight": 480,
+                "imagePatchShapeModelPayload": {
+                    "angleExtent": 90,
+                    "angleStart": -45,
+                    "bestAngle": -3.4409802597653555e-09,
+                    "bestAngleDeg": -1.9715364627238455e-07,
+                    "bestColumn": 296.00000237643656,
+                    "bestRow": 223.99999799257992,
+                    "bestScore": 0.9202923362063302,
+                    "convertMs": 2,
+                    "detectMaskApplied": false,
+                    "detectRegionType": "rect",
+                    "detectRoi": {
+                        "height": 480,
+                        "width": 640,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "detectRoiCoordinates": "original_image_pixels",
+                    "detectRoiPixelH": 480,
+                    "detectRoiPixelW": 640,
+                    "detectRoiPixelX": 0,
+                    "detectRoiPixelY": 0,
+                    "detectRoiPixels": {
+                        "height": 480,
+                        "width": 640,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "detectSmallerThanTemplate": false,
+                    "effectiveModelCacheKey": "_shape_model|toolId=|source=referenceImage|ref=640x480|template=587x441:type16:hash1a1488ce7b627a3|templateRoi=0.0054413542926239431,0.0084643288996372433,0.91596130592503022,0.91777509068923824|polarity=考虑极性|angle=-45:90|scale=100:100|halcon=/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                    "elapsedMs": 1178,
+                    "enablePositionCorrection": true,
+                    "existOk": true,
+                    "expectedCount": 1,
+                    "findMs": 20,
+                    "found": true,
+                    "foundCount": 1,
+                    "globalMatchCol": 296.00000237643656,
+                    "globalMatchRow": 223.99999799257992,
+                    "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                    "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                    "hasImage": true,
+                    "hasReferenceImage": true,
+                    "imageHeight": 480,
+                    "imageWidth": 640,
+                    "judgeBasis": "presence",
+                    "matchRectH": 441,
+                    "matchRectW": 587,
+                    "matchRectX": 2.500002376436555,
+                    "matchRectY": 3.499997992579921,
+                    "matchScores": [
+                        0.9202923362063302
+                    ],
+                    "matches": [
+                        {
+                            "angle": -3.4409802597653555e-09,
+                            "column": 296.00000237643656,
+                            "localColumn": 296.00000237643656,
+                            "localRow": 223.99999799257992,
+                            "row": 223.99999799257992,
+                            "score": 0.9202923362063302
+                        }
+                    ],
+                    "maxCount": 1,
+                    "minScore": 50,
+                    "modelAutoCreate": true,
+                    "modelBuildMs": 1146,
+                    "modelCacheHit": false,
+                    "modelCacheKey": "",
+                    "modelPath": "",
+                    "modelRebuildReason": "cache_miss",
+                    "polarity": "考虑极性",
+                    "positionCorrectionApplied": false,
+                    "positionCorrectionSource": "1 基准图.位置修正信息",
+                    "rawMatchCol": 296.00000237643656,
+                    "rawMatchRow": 223.99999799257992,
+                    "referenceImageHeight": 480,
+                    "referenceImageWidth": 640,
+                    "roiMode": "rectangle",
+                    "roiNormalized": {
+                        "height": 1,
+                        "width": 1,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "scaleApplied": false,
+                    "scaleMax": 100,
+                    "scaleMin": 100,
+                    "scoreThreshold": 50,
+                    "shapeModelOperator": "create_shape_model/find_shape_model",
+                    "shapeModelOrigin": "created_and_cached",
+                    "showContourPoints": false,
+                    "sortMode": "按得分从小到大排序",
+                    "templateHash": "1a1488ce7b627a3",
+                    "templateImagePath": "",
+                    "templateMaskApplied": false,
+                    "templateNearFullImage": false,
+                    "templateRoi": {
+                        "height": 441,
+                        "width": 587,
+                        "x": 3,
+                        "y": 4
+                    },
+                    "templateRoiCoordinates": "reference_image_pixels",
+                    "templateRoiNormalized": {
+                        "height": 0.9177750906892382,
+                        "width": 0.9159613059250302,
+                        "x": 0.005441354292623943,
+                        "y": 0.008464328899637243
+                    },
+                    "templateRoiPixelH": 441,
+                    "templateRoiPixelW": 587,
+                    "templateRoiPixelX": 3,
+                    "templateRoiPixelY": 4,
+                    "templateRoiPixels": {
+                        "height": 441,
+                        "width": 587,
+                        "x": 3,
+                        "y": 4
+                    },
+                    "templateSensitivity": 2,
+                    "templateSensitivityMode": "auto",
+                    "templateShapeType": "rect",
+                    "templateSource": "referenceImage",
+                    "text": "found",
+                    "timeoutExceeded": false,
+                    "timeoutMs": 2000,
+                    "toolId": "",
+                    "usedAngleExtentRad": 1.5707963267948966,
+                    "usedAngleStartRad": -0.7853981633974483,
+                    "usedMetric": "use_polarity",
+                    "usedMinScore": 0.5,
+                    "usedNumMatches": 1,
+                    "usedScoreThreshold": 0.5
+                },
+                "imageWidth": 640,
+                "judgeBasis": "presence",
+                "matchOverlayShown": true,
+                "matchRectH": 441,
+                "matchRectW": 587,
+                "matchRectX": 2.500002376436555,
+                "matchRectY": 3.499997992579921,
+                "minChainLength": 4,
+                "minChainLengthApplied": false,
+                "minScore": 0.5,
+                "overlayClearedBeforeRun": true,
+                "polarity": "考虑极性",
+                "polygonTemplateApplied": false,
+                "positionCorrectionApplied": false,
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "rawMatchCol": 296.00000237643656,
+                "rawMatchRow": 223.99999799257992,
+                "referenceImageHeight": 480,
+                "referenceImageWidth": 640,
+                "referenceTest": true,
+                "requestedScaleMax": 100,
+                "requestedScaleMin": 100,
+                "roiNormalized": {
+                    "height": 1,
+                    "width": 1,
+                    "x": 0,
+                    "y": 0
+                },
+                "scaleApplied": false,
+                "scaleMax": 100,
+                "scaleMin": 100,
+                "scaleMode": "auto",
+                "scoreThreshold": 0.5,
+                "shapeModelGreedinessInternalDefault": 0.8,
+                "shapeModelMaxOverlapInternalDefault": 0.5,
+                "shapeModelOperator": "create_shape_model/find_shape_model",
+                "shapeModelOrigin": "reference_image_template_rect_patch",
+                "shapeModelSubPixelInternalDefault": "least_squares",
+                "showContourPoints": false,
+                "sortApplied": false,
+                "sortMode": "按得分从小到大排序",
+                "speedScale": 5,
+                "speedScaleApplied": false,
+                "templateMaskApplied": false,
+                "templateRoi": {
+                    "height": 441,
+                    "width": 587,
+                    "x": 3,
+                    "y": 4
+                },
+                "templateRoiCoordinates": "reference_image_pixels",
+                "templateRoiNormalized": {
+                    "height": 0.9177750906892382,
+                    "width": 0.9159613059250302,
+                    "x": 0.005441354292623943,
+                    "y": 0.008464328899637243
+                },
+                "templateRoiPixelH": 441,
+                "templateRoiPixelW": 587,
+                "templateRoiPixelX": 3,
+                "templateRoiPixelY": 4,
+                "templateRoiPixels": {
+                    "height": 441,
+                    "width": 587,
+                    "x": 3,
+                    "y": 4
+                },
+                "templateShapeType": "rect",
+                "templateSource": "referenceImage",
+                "thresholdMode": "auto",
+                "thresholdModeApplied": false,
+                "thresholdType": "自动阈值",
+                "thresholdTypeApplied": false,
+                "timeoutApplied": false,
+                "timeoutExceeded": false,
+                "timeoutMs": 2000,
+                "usedMinScore": 0.5,
+                "usedScaleMax": 100,
+                "usedScaleMin": 100,
+                "usedScoreThreshold": 0.5,
+                "xldContourModelApplied": false
+            },
+            "result": {
+                "count": 1,
+                "elapsedMs": 1178,
+                "message": "ContourPresence: found score=0.920 count=1",
+                "ok": true,
+                "overlays": [
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                            "overlayName": "detect_roi"
+                        },
+                        "label": "detect_roi",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 480,
+                            "width": 640,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                            "overlayName": "template_roi"
+                        },
+                        "label": "template_roi",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 441,
+                            "width": 587,
+                            "x": 3,
+                            "y": 4
+                        },
+                        "score": 0.9202923362063302,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                            "overlayName": "match_result"
+                        },
+                        "label": "match_result",
+                        "p1": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 441,
+                            "width": 587,
+                            "x": 2.500002376436555,
+                            "y": 3.499997992579921
+                        },
+                        "score": 0.9202923362063302,
+                        "text": "",
+                        "type": "Rect"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                            "overlayName": "match_result"
+                        },
+                        "label": "match_result",
+                        "p1": {
+                            "x": 272.00000237643656,
+                            "y": 223.99999799257992
+                        },
+                        "p2": {
+                            "x": 320.00000237643656,
+                            "y": 223.99999799257992
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0.9202923362063302,
+                        "text": "",
+                        "type": "Line"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                            "overlayName": "match_result"
+                        },
+                        "label": "match_result",
+                        "p1": {
+                            "x": 296.00000237643656,
+                            "y": 199.99999799257992
+                        },
+                        "p2": {
+                            "x": 296.00000237643656,
+                            "y": 247.99999799257992
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0.9202923362063302,
+                        "text": "",
+                        "type": "Line"
+                    },
+                    {
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "extra": {
+                            "overlayName": "score_text"
+                        },
+                        "label": "score_text",
+                        "p1": {
+                            "x": 322.00000237643656,
+                            "y": 249.99999799257992
+                        },
+                        "p2": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "points": [
+                        ],
+                        "radius": 0,
+                        "rect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "score": 0.9202923362063302,
+                        "text": "0.920",
+                        "type": "Text"
+                    }
+                ],
+                "payload": {
+                    "algorithm": "halcon_shape_model_contour_like_first_version",
+                    "angleApplied": true,
+                    "angleExtent": 90,
+                    "angleStart": -45,
+                    "bestAngle": -3.4409802597653555e-09,
+                    "bestAngleDeg": -1.9715364627238455e-07,
+                    "bestScore": 0.9202923362063302,
+                    "chainMode": "auto",
+                    "chainModeApplied": false,
+                    "circleDetectRoiApplied": false,
+                    "contourModelFromImagePatch": true,
+                    "contourPointsOverlayApplied": false,
+                    "contourPointsShown": false,
+                    "contourXldModelApplied": false,
+                    "delegatedRunnerMessage": "PatternPresence: found score=0.920 count=1",
+                    "delegatedRunnerStatus": "found score=0.920",
+                    "detectMaskApplied": false,
+                    "detectRegionType": "rect",
+                    "detectRoi": {
+                        "height": 480,
+                        "width": 640,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "detectRoiCoordinates": "original_image_pixels",
+                    "detectRoiPixelH": 480,
+                    "detectRoiPixelW": 640,
+                    "detectRoiPixelX": 0,
+                    "detectRoiPixelY": 0,
+                    "detectRoiPixels": {
+                        "height": 480,
+                        "width": 640,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "elapsedMs": 1178,
+                    "enablePositionCorrection": true,
+                    "existOk": true,
+                    "featureScale": 1,
+                    "featureScaleApplied": false,
+                    "found": true,
+                    "foundCount": 1,
+                    "freeDrawDetectRoiApplied": false,
+                    "globalMatchCol": 296.00000237643656,
+                    "globalMatchRow": 223.99999799257992,
+                    "grayThreshold": 15,
+                    "grayThresholdApplied": false,
+                    "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                    "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                    "hasImage": true,
+                    "hasReferenceImage": true,
+                    "imageHeight": 480,
+                    "imagePatchShapeModelPayload": {
+                        "angleExtent": 90,
+                        "angleStart": -45,
+                        "bestAngle": -3.4409802597653555e-09,
+                        "bestAngleDeg": -1.9715364627238455e-07,
+                        "bestColumn": 296.00000237643656,
+                        "bestRow": 223.99999799257992,
+                        "bestScore": 0.9202923362063302,
+                        "convertMs": 2,
+                        "detectMaskApplied": false,
+                        "detectRegionType": "rect",
+                        "detectRoi": {
+                            "height": 480,
+                            "width": 640,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "detectRoiCoordinates": "original_image_pixels",
+                        "detectRoiPixelH": 480,
+                        "detectRoiPixelW": 640,
+                        "detectRoiPixelX": 0,
+                        "detectRoiPixelY": 0,
+                        "detectRoiPixels": {
+                            "height": 480,
+                            "width": 640,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "detectSmallerThanTemplate": false,
+                        "effectiveModelCacheKey": "_shape_model|toolId=|source=referenceImage|ref=640x480|template=587x441:type16:hash1a1488ce7b627a3|templateRoi=0.0054413542926239431,0.0084643288996372433,0.91596130592503022,0.91777509068923824|polarity=考虑极性|angle=-45:90|scale=100:100|halcon=/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                        "elapsedMs": 1178,
+                        "enablePositionCorrection": true,
+                        "existOk": true,
+                        "expectedCount": 1,
+                        "findMs": 20,
+                        "found": true,
+                        "foundCount": 1,
+                        "globalMatchCol": 296.00000237643656,
+                        "globalMatchRow": 223.99999799257992,
+                        "halconSoPath": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so",
+                        "halconSoPathCandidates": "/home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so; /home/hjl-ubuntu/MVTec/HALCON-24.11-Progress-Steady/lib/x64-linux/libhalconc.so.24.11.2; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so; /home/superhe/桌面/som-halcon/repository/packages.mvtec.com/halcon/halcon-24.11-progress-steady/halcon-24.11.2.0-runtime-x64-linux/lib/x64-linux/libhalconc.so.24.11.2",
+                        "hasImage": true,
+                        "hasReferenceImage": true,
+                        "imageHeight": 480,
+                        "imageWidth": 640,
+                        "judgeBasis": "presence",
+                        "matchRectH": 441,
+                        "matchRectW": 587,
+                        "matchRectX": 2.500002376436555,
+                        "matchRectY": 3.499997992579921,
+                        "matchScores": [
+                            0.9202923362063302
+                        ],
+                        "matches": [
+                            {
+                                "angle": -3.4409802597653555e-09,
+                                "column": 296.00000237643656,
+                                "localColumn": 296.00000237643656,
+                                "localRow": 223.99999799257992,
+                                "row": 223.99999799257992,
+                                "score": 0.9202923362063302
+                            }
+                        ],
+                        "maxCount": 1,
+                        "minScore": 50,
+                        "modelAutoCreate": true,
+                        "modelBuildMs": 1146,
+                        "modelCacheHit": false,
+                        "modelCacheKey": "",
+                        "modelPath": "",
+                        "modelRebuildReason": "cache_miss",
+                        "polarity": "考虑极性",
+                        "positionCorrectionApplied": false,
+                        "positionCorrectionSource": "1 基准图.位置修正信息",
+                        "rawMatchCol": 296.00000237643656,
+                        "rawMatchRow": 223.99999799257992,
+                        "referenceImageHeight": 480,
+                        "referenceImageWidth": 640,
+                        "roiMode": "rectangle",
+                        "roiNormalized": {
+                            "height": 1,
+                            "width": 1,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "scaleApplied": false,
+                        "scaleMax": 100,
+                        "scaleMin": 100,
+                        "scoreThreshold": 50,
+                        "shapeModelOperator": "create_shape_model/find_shape_model",
+                        "shapeModelOrigin": "created_and_cached",
+                        "showContourPoints": false,
+                        "sortMode": "按得分从小到大排序",
+                        "templateHash": "1a1488ce7b627a3",
+                        "templateImagePath": "",
+                        "templateMaskApplied": false,
+                        "templateNearFullImage": false,
+                        "templateRoi": {
+                            "height": 441,
+                            "width": 587,
+                            "x": 3,
+                            "y": 4
+                        },
+                        "templateRoiCoordinates": "reference_image_pixels",
+                        "templateRoiNormalized": {
+                            "height": 0.9177750906892382,
+                            "width": 0.9159613059250302,
+                            "x": 0.005441354292623943,
+                            "y": 0.008464328899637243
+                        },
+                        "templateRoiPixelH": 441,
+                        "templateRoiPixelW": 587,
+                        "templateRoiPixelX": 3,
+                        "templateRoiPixelY": 4,
+                        "templateRoiPixels": {
+                            "height": 441,
+                            "width": 587,
+                            "x": 3,
+                            "y": 4
+                        },
+                        "templateSensitivity": 2,
+                        "templateSensitivityMode": "auto",
+                        "templateShapeType": "rect",
+                        "templateSource": "referenceImage",
+                        "text": "found",
+                        "timeoutExceeded": false,
+                        "timeoutMs": 2000,
+                        "toolId": "",
+                        "usedAngleExtentRad": 1.5707963267948966,
+                        "usedAngleStartRad": -0.7853981633974483,
+                        "usedMetric": "use_polarity",
+                        "usedMinScore": 0.5,
+                        "usedNumMatches": 1,
+                        "usedScoreThreshold": 0.5
+                    },
+                    "imageWidth": 640,
+                    "judgeBasis": "presence",
+                    "matchOverlayShown": true,
+                    "matchRectH": 441,
+                    "matchRectW": 587,
+                    "matchRectX": 2.500002376436555,
+                    "matchRectY": 3.499997992579921,
+                    "minChainLength": 4,
+                    "minChainLengthApplied": false,
+                    "minScore": 0.5,
+                    "overlayClearedBeforeRun": true,
+                    "polarity": "考虑极性",
+                    "polygonTemplateApplied": false,
+                    "positionCorrectionApplied": false,
+                    "positionCorrectionSource": "1 基准图.位置修正信息",
+                    "rawMatchCol": 296.00000237643656,
+                    "rawMatchRow": 223.99999799257992,
+                    "referenceImageHeight": 480,
+                    "referenceImageWidth": 640,
+                    "referenceTest": true,
+                    "requestedScaleMax": 100,
+                    "requestedScaleMin": 100,
+                    "roiNormalized": {
+                        "height": 1,
+                        "width": 1,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "scaleApplied": false,
+                    "scaleMax": 100,
+                    "scaleMin": 100,
+                    "scaleMode": "auto",
+                    "scoreThreshold": 0.5,
+                    "shapeModelGreedinessInternalDefault": 0.8,
+                    "shapeModelMaxOverlapInternalDefault": 0.5,
+                    "shapeModelOperator": "create_shape_model/find_shape_model",
+                    "shapeModelOrigin": "reference_image_template_rect_patch",
+                    "shapeModelSubPixelInternalDefault": "least_squares",
+                    "showContourPoints": false,
+                    "sortApplied": false,
+                    "sortMode": "按得分从小到大排序",
+                    "speedScale": 5,
+                    "speedScaleApplied": false,
+                    "templateMaskApplied": false,
+                    "templateRoi": {
+                        "height": 441,
+                        "width": 587,
+                        "x": 3,
+                        "y": 4
+                    },
+                    "templateRoiCoordinates": "reference_image_pixels",
+                    "templateRoiNormalized": {
+                        "height": 0.9177750906892382,
+                        "width": 0.9159613059250302,
+                        "x": 0.005441354292623943,
+                        "y": 0.008464328899637243
+                    },
+                    "templateRoiPixelH": 441,
+                    "templateRoiPixelW": 587,
+                    "templateRoiPixelX": 3,
+                    "templateRoiPixelY": 4,
+                    "templateRoiPixels": {
+                        "height": 441,
+                        "width": 587,
+                        "x": 3,
+                        "y": 4
+                    },
+                    "templateShapeType": "rect",
+                    "templateSource": "referenceImage",
+                    "thresholdMode": "auto",
+                    "thresholdModeApplied": false,
+                    "thresholdType": "自动阈值",
+                    "thresholdTypeApplied": false,
+                    "timeoutApplied": false,
+                    "timeoutExceeded": false,
+                    "timeoutMs": 2000,
+                    "usedMinScore": 0.5,
+                    "usedScaleMax": 100,
+                    "usedScaleMin": 100,
+                    "usedScoreThreshold": 0.5,
+                    "xldContourModelApplied": false
+                },
+                "schemaVersion": 1,
+                "score": 0.9202923362063302,
+                "status": "ContourPresence: found score=0.920 count=1",
+                "success": true,
+                "text": "found",
+                "toolId": "contour_presence_912aaf29-a576-4cc4-9000-5238967b815d",
+                "toolType": "ContourPresence",
+                "value": 0.9202923362063302
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "score": 0.9202923362063302,
+            "sourceType": "referenceImage",
+            "statusText": "ContourPresence: found score=0.920 count=1 | ContourPresence: found score=0.920 count=1",
+            "timestamp": "2026-05-24T18:54:59",
+            "toolId": "contour_presence_912aaf29-a576-4cc4-9000-5238967b815d",
+            "toolType": "ContourPresence",
+            "valid": true
+        }
+    },
+    "referenceImage": "reference.png",
+    "schemaVersion": 1,
+    "schemeId": "scheme_25e68a4c",
+    "schemeName": "轮廓524",
+    "tools": [
+        {
+            "category": "Presence",
+            "displayName": "轮廓有无",
+            "enabled": true,
+            "judgeRule": {
+                "existOk": true,
+                "mode": "presence",
+                "scoreThreshold": 0.5
+            },
+            "params": {
+                "angleExtent": 90,
+                "angleStart": -45,
+                "chainMode": "auto",
+                "detectRegionType": "rect",
+                "enablePositionCorrection": true,
+                "existOk": true,
+                "featureScale": 1,
+                "grayThreshold": 15,
+                "judgeBasis": "presence",
+                "minChainLength": 4,
+                "minScore": 0.5,
+                "polarity": "考虑极性",
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "scaleMax": 100,
+                "scaleMin": 100,
+                "scaleMode": "auto",
+                "scoreThreshold": 0.5,
+                "showContourPoints": false,
+                "sortMode": "按得分从小到大排序",
+                "speedScale": 5,
+                "templateRoiNormalized": {
+                    "height": 0.9177750906892382,
+                    "width": 0.9159613059250302,
+                    "x": 0.005441354292623943,
+                    "y": 0.008464328899637243
+                },
+                "templateShapeType": "rect",
+                "templateSource": "referenceImage",
+                "thresholdMode": "auto",
+                "thresholdType": "自动阈值",
+                "timeoutMs": 2000
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "模板: 矩形, 检测区: 矩形, 判断: 存在OK, 最小得分: 0.50",
+            "toolId": "contour_presence_912aaf29-a576-4cc4-9000-5238967b815d",
+            "toolName": "轮廓有无",
+            "toolType": "ContourPresence"
+        }
+    ],
+    "updatedAt": "2026-06-10T14:39:31"
+}

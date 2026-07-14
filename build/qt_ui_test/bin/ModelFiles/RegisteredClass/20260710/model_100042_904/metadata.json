@@ -1,0 +1,67 @@
+{
+    "classLabels": [
+        {
+            "id": 0,
+            "name": "Circle"
+        },
+        {
+            "id": 1,
+            "name": "Rectangle"
+        },
+        {
+            "id": 2,
+            "name": "Polay"
+        }
+    ],
+    "featureLength": 28,
+    "featureNames": [
+        "roiAspect",
+        "roiAreaRatio",
+        "foregroundAreaRatio",
+        "foregroundCenterX",
+        "foregroundCenterY",
+        "momentRa",
+        "momentRb",
+        "momentPhi",
+        "grayMean",
+        "grayMin",
+        "grayMax",
+        "grayDeviation",
+        "grayHist00",
+        "grayHist01",
+        "grayHist02",
+        "grayHist03",
+        "grayHist04",
+        "grayHist05",
+        "grayHist06",
+        "grayHist07",
+        "grayHist08",
+        "grayHist09",
+        "grayHist10",
+        "grayHist11",
+        "grayHist12",
+        "grayHist13",
+        "grayHist14",
+        "grayHist15"
+    ],
+    "featureVersion": "halcon_mlp_roi_stats_v1",
+    "halconVersion": "24.11",
+    "mlp": {
+        "maxIterations": 200,
+        "numHidden": 16,
+        "randSeed": 42
+    },
+    "modelType": "halcon_mlp_registered_classification",
+    "preprocess": {
+        "halconPreprocessing": "normalization",
+        "normalizeGray": true,
+        "smooth": true
+    },
+    "schemaVersion": 1,
+    "thresholds": {
+        "minScore": 80,
+        "rejectScore": 60,
+        "top2Gap": 0
+    },
+    "trainingSampleCount": 7
+}

@@ -1,0 +1,2048 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ReferenceImageDialog</class>
+ <widget class="QDialog" name="ReferenceImageDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1760</width>
+    <height>980</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>方案编辑 - 设置基准图</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QDialog#CameraParamsDialog,
+QDialog#ReferenceImageDialog {
+    background: #eef2f6;
+    color: #314968;
+    font-family: &quot;Noto Sans CJK SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif;
+    font-size: 14px;
+}
+
+QFrame#setupTopBar {
+    background: #4b4f5b;
+}
+
+QLabel#setupWindowTitleLabel {
+    background: transparent;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QToolButton#headerMaximizeButton,
+QToolButton#headerCloseButton,
+QToolButton#closeButton {
+    min-width: 34px;
+    min-height: 34px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #f5f6f8;
+    font-size: 20px;
+}
+
+QToolButton#headerMaximizeButton:hover,
+QToolButton#headerCloseButton:hover,
+QToolButton#closeButton:hover {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+QToolButton#headerCloseButton:hover,
+QToolButton#closeButton:hover {
+    background: #ff4b4b;
+}
+
+QFrame#setupToolbar {
+    background: #ffffff;
+    border-bottom: 1px solid #dfe3ea;
+}
+
+QLabel#setupPageCodeLabel,
+QLabel[pageCode=&quot;true&quot;] {
+    background: transparent;
+    color: #4c5970;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+QFrame#toolbarDivider {
+    background: #dfe3ea;
+}
+
+QFrame#setupBodyFrame,
+QFrame#toolLibraryBody {
+    background: #eef2f6;
+}
+
+QFrame#setupStepRail {
+    background: #d6dae1;
+    border-right: 1px solid #c6ccd6;
+}
+
+QToolButton#cameraStepButton,
+QToolButton#referenceStepButton,
+QToolButton#toolsStepButton,
+QToolButton#outputStepButton {
+    min-width: 84px;
+    min-height: 74px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #6f7787;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 8px 6px;
+}
+
+QToolButton#cameraStepButton:hover,
+QToolButton#referenceStepButton:hover,
+QToolButton#toolsStepButton:hover,
+QToolButton#outputStepButton:hover {
+    background: rgba(255, 255, 255, 0.45);
+    color: #50586a;
+}
+
+QToolButton#cameraStepButton:checked,
+QToolButton#referenceStepButton:checked,
+QToolButton#toolsStepButton:checked,
+QToolButton#outputStepButton:checked {
+    background: #f8fafc;
+    color: #ff830f;
+    border-left: 3px solid #ff830f;
+}
+
+QLabel[stepArrow=&quot;true&quot;],
+QLabel[role=&quot;stepDivider&quot;] {
+    background: transparent;
+    color: #bbc2ce;
+    font-size: 18px;
+    qproperty-alignment: AlignCenter;
+}
+
+QFrame#setupEditorPanel,
+QFrame[editorPanel=&quot;true&quot;] {
+    background: #eef2f6;
+}
+
+
+QStackedWidget#cameraParamsStack,
+QWidget#basicParamsPage,
+QWidget#allParamsPage,
+QWidget#basicParamsScrollContent,
+QWidget#allParamsScrollContent,
+QWidget#referenceParamsScrollContent {
+    background: transparent;
+}
+
+QLabel#editorTitleLabel,
+QLabel[editorTitle=&quot;true&quot;] {
+    background: transparent;
+    color: #324969;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+
+QFrame[card=&quot;true&quot;] QFrame {
+    background: transparent;
+    border: none;
+}
+
+QFrame#segmentFrame,
+QFrame[segmented=&quot;true&quot;] {
+    background: #dde2ea;
+    border: 1px solid #cfd5de;
+    border-radius: 22px;
+}
+
+QFrame#segmentFrame QPushButton,
+QFrame[segmented=&quot;true&quot;] QPushButton {
+    min-height: 38px;
+    border: none;
+    border-radius: 18px;
+    background: transparent;
+    color: #6f7887;
+    padding: 0 22px;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+QFrame#segmentFrame QPushButton:checked,
+QFrame[segmented=&quot;true&quot;] QPushButton:checked {
+    background: #ffffff;
+    color: #ff830f;
+}
+
+QFrame#configCard,
+QFrame[panelRole=&quot;configCard&quot;],
+QFrame[card=&quot;true&quot;] {
+    background: #ffffff;
+    border: 1px solid #e1e5eb;
+    border-radius: 8px;
+}
+
+QLabel#cardTitleLabel,
+QLabel[role=&quot;cardTitle&quot;],
+QLabel[cardTitle=&quot;true&quot;] {
+    background: transparent;
+    color: #314968;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+QLabel#cardHintLabel,
+QLabel[role=&quot;cardHint&quot;],
+QLabel[hint=&quot;true&quot;] {
+    background: transparent;
+    color: #8992a1;
+    font-size: 14px;
+}
+
+QLabel#rowFieldLabel,
+QLabel[role=&quot;rowField&quot;],
+QLabel[formLabel=&quot;true&quot;] {
+    background: transparent;
+    color: #314968;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QPushButton[softButton=&quot;true&quot;],
+QPushButton#historyImageButton,
+QPushButton#pcImportButton,
+QPushButton#grayActionButton,
+QPushButton[actionRole=&quot;gray&quot;],
+QPushButton[actionRole=&quot;secondary&quot;] {
+    min-height: 42px;
+    border-radius: 4px;
+    border: 1px solid #c9d1db;
+    background: #dfe6ef;
+    color: #536274;
+    padding: 0 18px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QPushButton[softButton=&quot;true&quot;]:hover,
+QPushButton#historyImageButton:hover,
+QPushButton#pcImportButton:hover,
+QPushButton[actionRole=&quot;gray&quot;]:hover,
+QPushButton[actionRole=&quot;secondary&quot;]:hover {
+    background: #edf2f7;
+}
+
+QPushButton[orangeButton=&quot;true&quot;],
+QPushButton#confirmButton,
+QPushButton#currentImageButton,
+QPushButton#captureImageButton,
+QPushButton#highlightActionButton,
+QPushButton[actionRole=&quot;highlight&quot;] {
+    min-height: 46px;
+    border: none;
+    border-radius: 4px;
+    background: #ff830f;
+    color: #ffffff;
+    padding: 0 18px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QPushButton[orangeButton=&quot;true&quot;]:hover,
+QPushButton#confirmButton:hover,
+QPushButton#currentImageButton:hover,
+QPushButton#captureImageButton:hover,
+QPushButton#highlightActionButton:hover,
+QPushButton[actionRole=&quot;highlight&quot;]:hover {
+    background: #ff972f;
+}
+
+QPushButton#previousButton,
+QPushButton#nextButton,
+QPushButton#finishButton {
+    min-width: 110px;
+    min-height: 48px;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+QPushButton#previousButton {
+    background: #ffffff;
+    color: #4f5a6d;
+    border: 1px solid #d1d8e1;
+}
+
+QPushButton#previousButton:disabled {
+    color: #bfc6d0;
+    background: #ffffff;
+}
+
+QPushButton#nextButton,
+QPushButton#finishButton {
+    background: #ff830f;
+    color: #ffffff;
+    border: none;
+}
+
+QPushButton#nextButton:hover,
+QPushButton#finishButton:hover {
+    background: #ff972f;
+}
+
+QComboBox,
+QLineEdit {
+    min-height: 38px;
+    border: 1px solid #d1d8e1;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #536274;
+    padding: 0 12px;
+    font-size: 15px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 28px;
+}
+
+QCheckBox {
+    spacing: 0;
+    color: #314968;
+    background: transparent;
+}
+
+QCheckBox::indicator {
+    width: 48px;
+    height: 24px;
+    border-radius: 12px;
+    border: 1px solid #c8ced8;
+    background: #d5dae2;
+}
+
+QCheckBox::indicator:checked {
+    background: #ff830f;
+    border-color: #ff830f;
+}
+
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+
+QScrollArea &gt; QWidget &gt; QWidget {
+    background: transparent;
+}
+
+QScrollBar:vertical {
+    width: 10px;
+    background: transparent;
+    margin: 4px 0 4px 0;
+}
+
+QScrollBar::handle:vertical {
+    background: #6c7280;
+    min-height: 28px;
+    border-radius: 5px;
+}
+
+QScrollBar:horizontal {
+    height: 0px;
+    background: transparent;
+    margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+    background: transparent;
+}
+
+QFrame[table=&quot;true&quot;] QLabel[tableCell=&quot;true&quot;] {
+    min-height: 34px;
+    padding-left: 10px;
+    background: #ffffff;
+    color: #314968;
+    border: 1px solid #d1d8e1;
+}
+
+QLabel[devicePreview=&quot;true&quot;] {
+    color: #49d45b;
+    background: #24262b;
+    border: 1px solid #cfd5de;
+    font-size: 36px;
+    qproperty-alignment: AlignCenter;
+}
+
+QLabel[centerText=&quot;true&quot;] {
+    qproperty-alignment: AlignCenter;
+}
+
+QLabel[greenText=&quot;true&quot;] {
+    background: transparent;
+    color: #20c933;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QLabel[redText=&quot;true&quot;] {
+    background: transparent;
+    color: #ff2020;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QFrame[examplePanel=&quot;true&quot;] {
+    background: #eef2f6;
+    border: 0;
+}
+
+QLabel[correctionPreview=&quot;true&quot;] {
+    background: transparent;
+    color: #28d83d;
+    font-size: 44px;
+    qproperty-alignment: AlignCenter;
+}
+
+QFrame#setupViewerFrame,
+QFrame[viewerPanel=&quot;true&quot;] {
+    background: #101215;
+}
+
+QFrame#viewerHeader,
+QFrame#viewerStatusBar {
+    background: #24262b;
+}
+
+QLabel#viewerTitleLabel,
+QLabel#viewerZoomLabel,
+QLabel#viewerStatusLabel,
+QLabel#viewerCursorLabel,
+QLabel[viewerTitle=&quot;true&quot;],
+QLabel[viewerZoom=&quot;true&quot;],
+QLabel[viewerStatus=&quot;true&quot;] {
+    background: transparent;
+    color: #ffffff;
+}
+
+QLabel#viewerTitleLabel,
+QLabel[viewerTitle=&quot;true&quot;] {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+QToolButton#viewerGridButton,
+QToolButton#viewerZoomSearchButton,
+QToolButton#viewerZoomOutButton,
+QToolButton#viewerZoomInButton,
+QToolButton#viewerFullButton,
+QToolButton#viewerIconButton,
+QToolButton#viewerTextButton {
+    min-width: 28px;
+    min-height: 28px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #f0f2f5;
+}
+
+QToolButton#viewerGridButton:hover,
+QToolButton#viewerZoomSearchButton:hover,
+QToolButton#viewerZoomOutButton:hover,
+QToolButton#viewerZoomInButton:hover,
+QToolButton#viewerFullButton:hover,
+QToolButton#viewerIconButton:hover,
+QToolButton#viewerTextButton:hover {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+QGraphicsView#previewGraphicsView,
+QGraphicsView[viewerCanvas=&quot;true&quot;],
+QVideoWidget[viewerCanvas=&quot;true&quot;],
+QWidget[viewerCanvas=&quot;true&quot;] {
+    background: #000000;
+    border: none;
+}
+</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_root">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="setupTopBar">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>54</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>54</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_topBar">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <property name="leftMargin">
+       <number>18</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>10</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="setupWindowTitleLabel">
+        <property name="text">
+         <string>方案编辑</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_topBar">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QToolButton" name="headerMaximizeButton">
+        <property name="minimumSize">
+         <size>
+          <width>34</width>
+          <height>34</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>□</string>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="headerCloseButton">
+        <property name="minimumSize">
+         <size>
+          <width>34</width>
+          <height>34</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>×</string>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="setupToolbar">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>72</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>72</height>
+      </size>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_toolbar">
+      <property name="spacing">
+       <number>18</number>
+      </property>
+      <property name="leftMargin">
+       <number>24</number>
+      </property>
+      <property name="topMargin">
+       <number>8</number>
+      </property>
+      <property name="rightMargin">
+       <number>24</number>
+      </property>
+      <property name="bottomMargin">
+       <number>8</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="setupPageCodeLabel">
+        <property name="text">
+         <string>422</string>
+        </property>
+        <property name="pageCode" stdset="0">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="setupExternalEditButton">
+        <property name="minimumSize">
+         <size>
+          <width>42</width>
+          <height>42</height>
+         </size>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset resource="../resources/resources.qrc">
+          <normaloff>:/icons/external-link.svg</normaloff>:/icons/external-link.svg</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_toolbar">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QToolButton" name="setupSaveButton">
+        <property name="minimumSize">
+         <size>
+          <width>66</width>
+          <height>56</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>保存</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../resources/resources.qrc">
+          <normaloff>:/icons/save.svg</normaloff>:/icons/save.svg</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonTextUnderIcon</enum>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="setupSaveAsButton">
+        <property name="minimumSize">
+         <size>
+          <width>72</width>
+          <height>56</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>另存为</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../resources/resources.qrc">
+          <normaloff>:/icons/save-as.svg</normaloff>:/icons/save-as.svg</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonTextUnderIcon</enum>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="toolbarDivider">
+        <property name="minimumSize">
+         <size>
+          <width>1</width>
+          <height>36</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>1</width>
+          <height>36</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="setupExportButton">
+        <property name="minimumSize">
+         <size>
+          <width>72</width>
+          <height>56</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>IO输出</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../resources/resources.qrc">
+          <normaloff>:/icons/io.svg</normaloff>:/icons/io.svg</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonTextUnderIcon</enum>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="setupQuickCalibrateButton">
+        <property name="minimumSize">
+         <size>
+          <width>82</width>
+          <height>56</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>快速标定</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../resources/resources.qrc">
+          <normaloff>:/icons/fit.svg</normaloff>:/icons/fit.svg</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonTextUnderIcon</enum>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="setupBodyFrame">
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_body">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QFrame" name="setupStepRail">
+       <property name="minimumSize">
+        <size>
+          <width>92</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>96</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_steps">
+         <property name="spacing">
+          <number>12</number>
+         </property>
+         <property name="leftMargin">
+          <number>8</number>
+         </property>
+         <property name="topMargin">
+          <number>18</number>
+         </property>
+         <property name="rightMargin">
+          <number>8</number>
+         </property>
+         <property name="bottomMargin">
+          <number>18</number>
+         </property>
+         <item>
+          <widget class="QToolButton" name="cameraStepButton">
+           <property name="minimumSize">
+            <size>
+             <width>84</width>
+             <height>74</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>相机参数</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources/resources.qrc">
+             <normaloff>:/icons/sliders.svg</normaloff>:/icons/sliders.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>34</width>
+             <height>34</height>
+            </size>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonTextUnderIcon</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="stepDividerLabel1">
+           <property name="text">
+            <string>▾</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+           <property name="stepArrow" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="referenceStepButton">
+           <property name="minimumSize">
+            <size>
+             <width>84</width>
+             <height>74</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>基准图</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources/resources.qrc">
+             <normaloff>:/icons/reference.svg</normaloff>:/icons/reference.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>34</width>
+             <height>34</height>
+            </size>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonTextUnderIcon</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="stepDividerLabel2">
+           <property name="text">
+            <string>▾</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+           <property name="stepArrow" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="toolsStepButton">
+           <property name="minimumSize">
+            <size>
+             <width>84</width>
+             <height>74</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>工具</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources/resources.qrc">
+             <normaloff>:/icons/tool.svg</normaloff>:/icons/tool.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>34</width>
+             <height>34</height>
+            </size>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonTextUnderIcon</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="stepDividerLabel3">
+           <property name="text">
+            <string>▾</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+           <property name="stepArrow" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="outputStepButton">
+           <property name="minimumSize">
+            <size>
+             <width>84</width>
+             <height>74</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>输出</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../resources/resources.qrc">
+             <normaloff>:/icons/output.svg</normaloff>:/icons/output.svg</iconset>
+           </property>
+           <property name="iconSize">
+            <size>
+             <width>34</width>
+             <height>34</height>
+            </size>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonTextUnderIcon</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer_steps">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="setupEditorPanel">
+       <property name="minimumSize">
+        <size>
+          <width>360</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <property name="editorPanel" stdset="0">
+         <bool>true</bool>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="QFrame" name="editorHeaderFrame">
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_editorHeader">
+            <property name="spacing">
+             <number>0</number>
+            </property>
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>14</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="editorTitleLabel">
+              <property name="text">
+               <string>2 / 设置基准图</string>
+              </property>
+              <property name="editorTitle" stdset="0">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_editorHeader">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QFrame" name="segmentFrame">
+              <property name="minimumSize">
+               <size>
+                <width>212</width>
+                <height>34</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>16777215</width>
+                <height>34</height>
+               </size>
+              </property>
+              <property name="frameShape">
+               <enum>QFrame::NoFrame</enum>
+              </property>
+              <property name="segmented" stdset="0">
+               <bool>true</bool>
+              </property>
+              <layout class="QHBoxLayout" name="horizontalLayout_segmentFrame">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <property name="leftMargin">
+                <number>0</number>
+               </property>
+               <property name="topMargin">
+                <number>0</number>
+               </property>
+               <property name="rightMargin">
+                <number>0</number>
+               </property>
+               <property name="bottomMargin">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QPushButton" name="basicModeButton">
+                 <property name="minimumSize">
+                  <size>
+                   <width>106</width>
+                   <height>38</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>基础</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="allModeButton">
+                 <property name="minimumSize">
+                  <size>
+                   <width>106</width>
+                   <height>38</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>全部</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QScrollArea" name="referenceParamsScrollArea">
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <property name="verticalScrollBarPolicy">
+            <enum>Qt::ScrollBarAsNeeded</enum>
+           </property>
+           <property name="horizontalScrollBarPolicy">
+            <enum>Qt::ScrollBarAlwaysOff</enum>
+           </property>
+           <property name="widgetResizable">
+            <bool>true</bool>
+           </property>
+           <widget class="QWidget" name="referenceParamsScrollContent">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>592</width>
+              <height>612</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_2">
+             <item>
+              <widget class="QFrame" name="multiReferenceCard">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="card" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QVBoxLayout" name="verticalLayout_multiReferenceCard">
+                <property name="spacing">
+                 <number>14</number>
+                </property>
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>18</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>18</number>
+                </property>
+                <item>
+                 <widget class="QFrame" name="multiReferenceCardHeaderFrame">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_multiReferenceCardHeader">
+                   <property name="spacing">
+                    <number>0</number>
+                   </property>
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="multiReferenceCardTitleLabel">
+                     <property name="text">
+                      <string>多基准</string>
+                     </property>
+                     <property name="cardTitle" stdset="0">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <spacer name="horizontalSpacer_multiReferenceCardHeader">
+                     <property name="orientation">
+                      <enum>Qt::Horizontal</enum>
+                     </property>
+                     <property name="sizeHint" stdset="0">
+                      <size>
+                       <width>40</width>
+                       <height>20</height>
+                      </size>
+                     </property>
+                    </spacer>
+                   </item>
+                   <item>
+                    <widget class="QCheckBox" name="multiReferenceCheckBox">
+                     <property name="minimumSize">
+                      <size>
+                       <width>58</width>
+                       <height>28</height>
+                      </size>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="multiReferenceCardCollapseButton">
+                     <property name="minimumSize">
+                      <size>
+                       <width>28</width>
+                       <height>28</height>
+                      </size>
+                     </property>
+                     <property name="visible">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string>⌄</string>
+                     </property>
+                     <property name="autoRaise">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="referenceCard">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="card" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QVBoxLayout" name="verticalLayout_referenceCard">
+                <property name="spacing">
+                 <number>14</number>
+                </property>
+                <property name="leftMargin">
+                 <number>18</number>
+                </property>
+                <property name="topMargin">
+                 <number>18</number>
+                </property>
+                <property name="rightMargin">
+                 <number>18</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>18</number>
+                </property>
+                <item>
+                 <widget class="QFrame" name="referenceCardHeaderFrame">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_referenceCardHeader">
+                   <property name="spacing">
+                    <number>0</number>
+                   </property>
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="referenceCardTitleLabel">
+                     <property name="text">
+                      <string>基准图</string>
+                     </property>
+                     <property name="cardTitle" stdset="0">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <spacer name="horizontalSpacer_referenceCardHeader">
+                     <property name="orientation">
+                      <enum>Qt::Horizontal</enum>
+                     </property>
+                     <property name="sizeHint" stdset="0">
+                      <size>
+                       <width>40</width>
+                       <height>20</height>
+                      </size>
+                     </property>
+                    </spacer>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="referenceCardCollapseButton">
+                     <property name="minimumSize">
+                      <size>
+                       <width>28</width>
+                       <height>28</height>
+                      </size>
+                     </property>
+                     <property name="text">
+                      <string>⌄</string>
+                     </property>
+                     <property name="autoRaise">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="referenceHintLabel">
+                  <property name="text">
+                   <string>把需要作为判断依据的图像设置为基准图</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
+                  </property>
+                  <property name="hint" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QFrame" name="referenceButtonFrame">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_referenceButtons">
+                   <property name="spacing">
+                    <number>10</number>
+                   </property>
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <item>
+                    <widget class="QPushButton" name="currentImageButton">
+                     <property name="minimumSize">
+                      <size>
+                       <width>150</width>
+                       <height>46</height>
+                      </size>
+                     </property>
+                     <property name="text">
+                      <string>当前图像</string>
+                     </property>
+                     <property name="icon">
+                      <iconset resource="../resources/resources.qrc">
+                       <normaloff>:/icons/camera.svg</normaloff>:/icons/camera.svg</iconset>
+                     </property>
+                     <property name="iconSize">
+                      <size>
+                       <width>24</width>
+                       <height>24</height>
+                      </size>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="historyImageButton">
+                     <property name="minimumSize">
+                      <size>
+                       <width>150</width>
+                       <height>44</height>
+                      </size>
+                     </property>
+                     <property name="text">
+                      <string>历史图像</string>
+                     </property>
+                     <property name="icon">
+                      <iconset resource="../resources/resources.qrc">
+                       <normaloff>:/icons/add.svg</normaloff>:/icons/add.svg</iconset>
+                     </property>
+                     <property name="iconSize">
+                      <size>
+                       <width>24</width>
+                       <height>24</height>
+                      </size>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="pcImportButton">
+                     <property name="minimumSize">
+                      <size>
+                       <width>150</width>
+                       <height>44</height>
+                      </size>
+                     </property>
+                     <property name="text">
+                      <string>PC导入</string>
+                     </property>
+                     <property name="icon">
+                      <iconset resource="../resources/resources.qrc">
+                       <normaloff>:/icons/add.svg</normaloff>:/icons/add.svg</iconset>
+                     </property>
+                     <property name="iconSize">
+                      <size>
+                       <width>24</width>
+                       <height>24</height>
+                      </size>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QFrame" name="positionCorrectionCard">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="card" stdset="0">
+                <bool>true</bool>
+               </property>
+               <layout class="QVBoxLayout" name="verticalLayout">
+                <item>
+                 <widget class="QFrame" name="positionCorrectionCardHeaderFrame">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_positionCorrectionCardHeader">
+                   <property name="spacing">
+                    <number>0</number>
+                   </property>
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="positionCorrectionCardTitleLabel">
+                     <property name="text">
+                      <string>位置修正</string>
+                     </property>
+                     <property name="cardTitle" stdset="0">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <spacer name="horizontalSpacer_positionCorrectionCardHeader">
+                     <property name="orientation">
+                      <enum>Qt::Horizontal</enum>
+                     </property>
+                     <property name="sizeHint" stdset="0">
+                      <size>
+                       <width>40</width>
+                       <height>20</height>
+                      </size>
+                     </property>
+                    </spacer>
+                   </item>
+                   <item>
+                    <widget class="QCheckBox" name="positionCorrectionCheckBox">
+                     <property name="minimumSize">
+                      <size>
+                       <width>58</width>
+                       <height>28</height>
+                      </size>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="positionCorrectionCardCollapseButton">
+                     <property name="minimumSize">
+                      <size>
+                       <width>28</width>
+                       <height>28</height>
+                      </size>
+                     </property>
+                     <property name="visible">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string>⌄</string>
+                     </property>
+                     <property name="autoRaise">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="positionCorrectionHintLabel">
+                  <property name="text">
+                   <string>建立检测基准，修正视觉工具检测区域相对偏移，跟随基准移动。</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
+                  </property>
+                  <property name="hint" stdset="0">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QFrame" name="correctionExampleFrame">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout">
+                   <item>
+                    <widget class="QFrame" name="enabledCorrectionPreview">
+                     <property name="frameShape">
+                      <enum>QFrame::NoFrame</enum>
+                     </property>
+                     <property name="examplePanel" stdset="0">
+                      <bool>true</bool>
+                     </property>
+                     <layout class="QGridLayout" name="gridLayout">
+                      <item row="0" column="0">
+                       <widget class="QLabel" name="enabledCorrectionTitleLabel">
+                        <property name="text">
+                         <string>启用位置修正</string>
+                        </property>
+                        <property name="greenText" stdset="0">
+                         <bool>true</bool>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="1" column="0">
+                       <widget class="QLabel" name="enabledCorrectionImageLabel">
+                        <property name="text">
+                         <string>□  ◇
+▣  ◇</string>
+                        </property>
+                        <property name="correctionPreview" stdset="0">
+                         <bool>true</bool>
+                        </property>
+                       </widget>
+                      </item>
+                     </layout>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QFrame" name="disabledCorrectionPreview">
+                     <property name="frameShape">
+                      <enum>QFrame::NoFrame</enum>
+                     </property>
+                     <property name="examplePanel" stdset="0">
+                      <bool>true</bool>
+                     </property>
+                     <layout class="QGridLayout" name="gridLayout_2">
+                      <item row="0" column="0">
+                       <widget class="QLabel" name="disabledCorrectionTitleLabel">
+                        <property name="text">
+                         <string>未启用位置修正</string>
+                        </property>
+                        <property name="redText" stdset="0">
+                         <bool>true</bool>
+                        </property>
+                       </widget>
+                      </item>
+                      <item row="1" column="0">
+                       <widget class="QLabel" name="disabledCorrectionImageLabel">
+                        <property name="text">
+                         <string>□  ◇
+□  ◇</string>
+                        </property>
+                        <property name="correctionPreview" stdset="0">
+                         <bool>true</bool>
+                        </property>
+                       </widget>
+                      </item>
+                     </layout>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_referenceParams">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_nav">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>14</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QPushButton" name="previousButton">
+             <property name="minimumSize">
+              <size>
+               <width>112</width>
+               <height>50</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>‹ 上一步</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_nav">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="nextButton">
+             <property name="minimumSize">
+              <size>
+               <width>110</width>
+               <height>48</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>下一步 ›</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="setupViewerFrame">
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <property name="viewerPanel" stdset="0">
+         <bool>true</bool>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_viewer">
+         <property name="spacing">
+          <number>0</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QFrame" name="viewerHeader">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>54</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>54</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_viewerHeader">
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <property name="leftMargin">
+             <number>18</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>14</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="viewerTitleLabel">
+              <property name="text">
+               <string>基准图</string>
+              </property>
+              <property name="viewerTitle" stdset="0">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_viewerHeader">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QToolButton" name="viewerGridButton">
+              <property name="minimumSize">
+               <size>
+                <width>28</width>
+                <height>28</height>
+               </size>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="../resources/resources.qrc">
+                <normaloff>:/icons/grid.svg</normaloff>:/icons/grid.svg</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="autoRaise">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="viewerZoomSearchButton">
+              <property name="minimumSize">
+               <size>
+                <width>28</width>
+                <height>28</height>
+               </size>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="../resources/resources.qrc">
+                <normaloff>:/icons/zoom.svg</normaloff>:/icons/zoom.svg</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="autoRaise">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="viewerZoomOutButton">
+              <property name="minimumSize">
+               <size>
+                <width>28</width>
+                <height>28</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>-</string>
+              </property>
+              <property name="autoRaise">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="viewerZoomLabel">
+              <property name="text">
+               <string>39%</string>
+              </property>
+              <property name="viewerZoom" stdset="0">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="viewerZoomInButton">
+              <property name="minimumSize">
+               <size>
+                <width>28</width>
+                <height>28</height>
+               </size>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="../resources/resources.qrc">
+                <normaloff>:/icons/fit.svg</normaloff>:/icons/fit.svg</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="autoRaise">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="viewerFullButton">
+              <property name="minimumSize">
+               <size>
+                <width>28</width>
+                <height>28</height>
+               </size>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="../resources/resources.qrc">
+                <normaloff>:/icons/fullscreen.svg</normaloff>:/icons/fullscreen.svg</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="autoRaise">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGraphicsView" name="previewGraphicsView">
+           <property name="viewerCanvas" stdset="0">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="viewerStatusBar">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>42</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>42</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_viewerStatus">
+            <property name="spacing">
+             <number>10</number>
+            </property>
+            <property name="leftMargin">
+             <number>18</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>16</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="viewerStatusLabel">
+              <property name="text">
+               <string>算法耗时: 0ms   工具耗时: 0ms</string>
+              </property>
+              <property name="viewerStatus" stdset="0">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_viewerStatus">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QLabel" name="viewerCursorLabel">
+              <property name="text">
+               <string>X: --  Y: --   |   R: --  G: --  B: --</string>
+              </property>
+              <property name="viewerStatus" stdset="0">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="../resources/resources.qrc"/>
+  <include location="../resources/resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>
