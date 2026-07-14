@@ -1,5 +1,6 @@
 #include "algorithms/recognition/RegisteredClassificationTrainingRunner.h"
 
+#include "algorithms/halcon/HalconRuntimePaths.h"
 #include "algorithms/recognition/RegisteredClassificationFeatureExtractor.h"
 #include "algorithms/recognition/RegisteredClassificationKnnRuntime.h"
 
@@ -209,7 +210,7 @@ RegisteredClassificationTrainingResult RegisteredClassificationTrainingRunner::t
     metadata.modelType = registeredClassificationKnnModelType();
     metadata.schemaVersion = 2;
     metadata.featureVersion = registeredClassificationFeatureVersionV2();
-    metadata.halconVersion = QStringLiteral("24.11.1");
+    metadata.halconVersion = HalconRuntimePaths::expectedHalconVersion();
     metadata.classLabels = request.classLabels;
     metadata.featureNames = registeredClassificationFeatureNamesV2();
     metadata.featureLength = registeredClassificationFeatureNamesV2().size();

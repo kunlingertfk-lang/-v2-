@@ -22,6 +22,7 @@
 #include "SchemeStore.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
+#include "frame/FrameInputMetadata.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/ReferenceImageProvider.h"
 #include "ui_ReferenceImageDialog.h"
@@ -290,7 +291,9 @@ void ReferenceImageDialog::showCurrentImageMode()
 
 void ReferenceImageDialog::captureReferenceImage()
 {
-    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    const CameraFrameSnapshot snapshot =
+            CameraFrameProvider::instance().currentFrameSnapshot();
+    const cv::Mat frame = snapshot.frame;
     if (frame.empty()) {
         qWarning() << "[ReferenceImageDialog] 当前无图像，无法设置基准图。";
         ui->viewerTitleLabel->setText(tr("当前无图像"));
@@ -301,7 +304,7 @@ void ReferenceImageDialog::captureReferenceImage()
     }
 
     QString error;
-    if (!SchemeStore::instance().setReferenceFrame(frame, &error)) {
+    if (!SchemeStore::instance().setReferenceFrame(frame, &error, snapshot.metadata)) {
         qWarning() << "[ReferenceImageDialog] 基准图保存失败:" << error;
         QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
         return;
@@ -337,6 +340,9 @@ void ReferenceImageDialog::importReferenceImageFromPc()
         return;
     }
 
+    const FrameInputMetadata metadata = FrameInputMetadata::fromQImage(
+                image, QStringLiteral("file"));
+
     const QImage rgbImage = image.convertToFormat(QImage::Format_RGB888);
     cv::Mat rgbFrame(rgbImage.height(),
                      rgbImage.width(),
@@ -354,7 +360,7 @@ void ReferenceImageDialog::importReferenceImageFromPc()
     }
 
     QString error;
-    if (!SchemeStore::instance().setReferenceFrame(bgrFrame, &error)) {
+    if (!SchemeStore::instance().setReferenceFrame(bgrFrame, &error, metadata)) {
         qWarning() << "[ReferenceImageDialog] PC 基准图保存失败:" << error;
         QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
         return;

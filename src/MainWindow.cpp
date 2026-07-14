@@ -16,6 +16,7 @@
 #include <QIcon>
 #include <QImage>
 #include <QInputDialog>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -1104,8 +1105,10 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
 
     QElapsedTimer frameCopyTimer;
     frameCopyTimer.start();
-    qint64 actualFrameIndex = -1;
-    const cv::Mat image = CameraFrameProvider::instance().currentFrame(&actualFrameIndex);
+    const CameraFrameSnapshot cameraSnapshot =
+            CameraFrameProvider::instance().currentFrameSnapshot();
+    const cv::Mat image = cameraSnapshot.frame;
+    const qint64 actualFrameIndex = cameraSnapshot.frameIndex;
     const qint64 frameCopyMs = frameCopyTimer.elapsed();
 
     if (continuousRun) {
@@ -1125,8 +1128,16 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
 
     QElapsedTimer referenceCopyTimer;
     referenceCopyTimer.start();
-    const cv::Mat referenceImage = ReferenceImageProvider::instance().referenceFrame();
+    const ReferenceFrameSnapshot referenceSnapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    const cv::Mat referenceImage = referenceSnapshot.frame;
     const qint64 referenceCopyMs = referenceCopyTimer.elapsed();
+
+    QJsonObject runtimeContext;
+    runtimeContext.insert(QStringLiteral("input"),
+                          cameraSnapshot.metadata.toJson());
+    runtimeContext.insert(QStringLiteral("referenceInput"),
+                          referenceSnapshot.metadata.toJson());
 
     QElapsedTimer displayImageTimer;
     displayImageTimer.start();
@@ -1151,6 +1162,7 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
                                      enabledConfigs,
                                      image,
                                      referenceImage,
+                                     runtimeContext,
                                      displayImage,
                                      startedWallMs,
                                      frameCopyMs,
@@ -1180,7 +1192,10 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
 
         QElapsedTimer timer;
         timer.start();
-        output.results = engine->runTools(enabledConfigs, image, referenceImage);
+        output.results = engine->runTools(enabledConfigs,
+                                          image,
+                                          referenceImage,
+                                          runtimeContext);
         output.engineMs = timer.elapsed();
 
         output.overallOk = !output.results.isEmpty();

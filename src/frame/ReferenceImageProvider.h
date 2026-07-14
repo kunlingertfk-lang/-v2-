@@ -7,6 +7,14 @@
 
 #include <opencv2/core.hpp>
 
+#include "frame/FrameInputMetadata.h"
+
+struct ReferenceFrameSnapshot
+{
+    cv::Mat frame;
+    FrameInputMetadata metadata;
+};
+
 class ReferenceImageProvider : public QObject
 {
     Q_OBJECT
@@ -14,8 +22,11 @@ class ReferenceImageProvider : public QObject
 public:
     static ReferenceImageProvider &instance();
 
-    void setReferenceFrame(const cv::Mat &frame);
+    void setReferenceFrame(const cv::Mat &frame,
+                           const FrameInputMetadata &metadata = FrameInputMetadata());
     cv::Mat referenceFrame() const;
+    ReferenceFrameSnapshot referenceFrameSnapshot() const;
+    FrameInputMetadata referenceFrameMetadata() const;
     QImage referenceImage() const;
     bool hasReferenceFrame() const;
     void clearReferenceFrame();
@@ -31,6 +42,7 @@ private:
 
     mutable QMutex m_mutex;
     cv::Mat m_referenceFrame;
+    FrameInputMetadata m_referenceFrameMetadata;
 };
 
 #endif // FRAME_REFERENCEIMAGEPROVIDER_H

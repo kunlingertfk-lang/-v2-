@@ -27,13 +27,17 @@ OPENCV_ROOT = $$(OPENCV_ROOT)
     message("OPENCV_ROOT 未设置，使用系统 OpenCV (/usr/include/opencv4)")
 }
 
-# HALCON：必须设 HALCONROOT 指向 HALCON 安装目录(含 include/HalconC.h)。运行期 dlopen，无需链接 -lhalconc
+# HALCON：优先使用 HALCONROOT；未设置时使用当前部署目录 /opt/halcon。
 HALCON_ROOT = $$(HALCONROOT)
-isEmpty(HALCON_ROOT) {
-    error("未设置环境变量 HALCONROOT。请 export HALCONROOT=<HALCON 安装目录>(含 include/HalconC.h)，例如 /opt/halcon/24.11。详见 README.md。")
-}
+isEmpty(HALCON_ROOT): HALCON_ROOT = /opt/halcon
 !exists($$HALCON_ROOT/include/HalconC.h) {
     error("HALCONROOT=$$HALCON_ROOT 下找不到 include/HalconC.h，请确认 HALCON 安装路径。详见 README.md。")
+}
+!system(grep -Eq "HLIB_MAJOR_NUM[[:space:]]+20" $$HALCON_ROOT/include/HVersNum.h) {
+    error("颜色比较要求 HALCON 20.11，当前 HALCONROOT 不是 20.x：$$HALCON_ROOT")
+}
+!system(grep -Eq "HLIB_MINOR_NUM[[:space:]]+11" $$HALCON_ROOT/include/HVersNum.h) {
+    error("颜色比较要求 HALCON 20.11，当前 HALCONROOT 不是 20.11：$$HALCON_ROOT")
 }
 INCLUDEPATH += $$HALCON_ROOT/include
 message("HALCON root: $$HALCON_ROOT")
@@ -68,6 +72,7 @@ SOURCES += \
     src/ToolsDialog.cpp \
     src/OutputDialog.cpp \
     src/frame/CameraFrameProvider.cpp \
+    src/frame/FrameInputMetadata.cpp \
     src/frame/FrameViewHelper.cpp \
     src/frame/MatImageConverter.cpp \
     src/frame/ReferenceImageProvider.cpp \
@@ -88,6 +93,7 @@ SOURCES += \
     src/algorithms/ocr/OcrHalconRunner.cpp \
     src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
     src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
+    src/algorithms/recognition/ColorComparisonModel.cpp \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
@@ -134,6 +140,7 @@ HEADERS += \
     src/ToolsDialog.h \
     src/OutputDialog.h \
     src/frame/CameraFrameProvider.h \
+    src/frame/FrameInputMetadata.h \
     src/frame/FrameViewHelper.h \
     src/frame/MatImageConverter.h \
     src/frame/ReferenceImageProvider.h \
@@ -161,6 +168,7 @@ HEADERS += \
     src/algorithms/ocr/OcrHalconRunner.h \
     src/algorithms/recognition/ColorRecognitionHalconRunner.h \
     src/algorithms/recognition/ColorComparisonHalconRunner.h \
+    src/algorithms/recognition/ColorComparisonModel.h \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
     src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.h \

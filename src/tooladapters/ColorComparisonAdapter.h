@@ -8,6 +8,8 @@ class ColorComparisonAdapter : public ToolAdapter
 {
 public:
     bool supports(ToolType type) const override;
+    ColorComparisonTemplateBuildResult buildTemplateModel(
+            const ToolRequest &request);
     ToolResult run(const ToolRequest &request) override;
 
 private:

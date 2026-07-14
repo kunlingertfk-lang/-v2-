@@ -8,6 +8,7 @@ namespace HalconRuntimePaths {
 
 QString initializeHalconEnvironment();
 QString defaultHalconRoot();
+QString expectedHalconVersion();
 QStringList halconLibCandidates(const QString &explicitPath = QString());
 QString resolveHalconLibPath(const QString &explicitPath = QString(),
                              QStringList *tried = nullptr);

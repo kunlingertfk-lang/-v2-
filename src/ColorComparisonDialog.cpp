@@ -1,8 +1,6 @@
 #include "ColorComparisonDialog.h"
 
 #include "PlanDialogUtils.h"
-#include "algorithms/halcon/HalconRuntimePaths.h"
-#include "algorithms/recognition/ColorRecognitionHalconRunner.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
@@ -10,28 +8,35 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDateTime>
 #include <QFrame>
+#include <QFutureWatcher>
 #include <QGraphicsView>
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QPainter>
+#include <QPen>
 #include <QPixmap>
+#include <QPolygonF>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QStandardItemModel>
 #include <QToolButton>
 #include <QTimer>
 #include <QUuid>
 #include <QVBoxLayout>
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <cmath>
+#include <limits>
 
 namespace {
 
@@ -40,6 +45,509 @@ constexpr int kActionButtonFlashMs = 120;
 bool finiteValue(qreal value)
 {
     return std::isfinite(static_cast<double>(value));
+}
+
+bool strictJsonInteger(const QJsonValue &value, int *parsed)
+{
+    if (!value.isDouble())
+        return false;
+    const double number = value.toDouble();
+    if (!std::isfinite(number) || std::floor(number) != number
+            || number < std::numeric_limits<int>::min()
+            || number > std::numeric_limits<int>::max()) {
+        return false;
+    }
+    if (parsed)
+        *parsed = static_cast<int>(number);
+    return true;
+}
+
+struct V2DialogConfigValidation
+{
+    bool success = true;
+    QString status;
+    QString message;
+};
+
+V2DialogConfigValidation invalidV2DialogConfig(const QString &status,
+                                                const QString &message)
+{
+    V2DialogConfigValidation validation;
+    validation.success = false;
+    validation.status = status;
+    validation.message = message;
+    return validation;
+}
+
+bool strictJsonNumber(const QJsonValue &value, double *parsed)
+{
+    if (!value.isDouble())
+        return false;
+    const double number = value.toDouble();
+    if (!std::isfinite(number))
+        return false;
+    if (parsed)
+        *parsed = number;
+    return true;
+}
+
+bool strictNormalizedRect(const QJsonValue &value,
+                          QRectF *parsed,
+                          bool allowEmpty = false)
+{
+    if (!value.isObject())
+        return false;
+
+    const QJsonObject object = value.toObject();
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+    if (!strictJsonNumber(object.value(QStringLiteral("x")), &x)
+            || !strictJsonNumber(object.value(QStringLiteral("y")), &y)
+            || !strictJsonNumber(object.value(QStringLiteral("width")), &width)
+            || !strictJsonNumber(object.value(QStringLiteral("height")), &height)
+            || x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) {
+        return false;
+    }
+
+    const bool empty = width == 0.0 && height == 0.0;
+    if (empty && allowEmpty) {
+        if (parsed)
+            *parsed = QRectF(x, y, width, height);
+        return true;
+    }
+    if (width <= 0.0 || height <= 0.0
+            || x + width > 1.0 || y + height > 1.0) {
+        return false;
+    }
+
+    if (parsed)
+        *parsed = QRectF(x, y, width, height);
+    return true;
+}
+
+bool strictNormalizedPoint(const QJsonValue &value, QPointF *parsed)
+{
+    if (!value.isObject())
+        return false;
+    const QJsonObject object = value.toObject();
+    double x = 0.0;
+    double y = 0.0;
+    if (!strictJsonNumber(object.value(QStringLiteral("x")), &x)
+            || !strictJsonNumber(object.value(QStringLiteral("y")), &y)
+            || x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) {
+        return false;
+    }
+    if (parsed)
+        *parsed = QPointF(x, y);
+    return true;
+}
+
+bool strictNormalizedPolygon(const QJsonValue &value)
+{
+    if (!value.isArray())
+        return false;
+
+    const QJsonArray array = value.toArray();
+    if (!array.isEmpty() && array.size() < 3)
+        return false;
+
+    QVector<QPointF> points;
+    points.reserve(array.size());
+    for (const QJsonValue &entry : array) {
+        QPointF point;
+        if (!strictNormalizedPoint(entry, &point))
+            return false;
+        points.append(point);
+    }
+    if (points.isEmpty())
+        return true;
+
+    double twiceArea = 0.0;
+    for (int index = 0; index < points.size(); ++index) {
+        const QPointF &point = points.at(index);
+        const QPointF &next = points.at((index + 1) % points.size());
+        twiceArea += point.x() * next.y() - next.x() * point.y();
+    }
+    return std::abs(twiceArea) > 1e-12;
+}
+
+bool sameRect(const QRectF &left, const QRectF &right)
+{
+    constexpr double epsilon = 1e-9;
+    return std::abs(left.x() - right.x()) <= epsilon
+            && std::abs(left.y() - right.y()) <= epsilon
+            && std::abs(left.width() - right.width()) <= epsilon
+            && std::abs(left.height() - right.height()) <= epsilon;
+}
+
+V2DialogConfigValidation validateV2DialogConfig(const ToolConfig &config)
+{
+    const QJsonObject colorComparison = config.params
+            .value(QStringLiteral("colorComparison")).toObject();
+
+    QString templateRegionMode = QStringLiteral("custom");
+    if (colorComparison.contains(QStringLiteral("templateRegionMode"))) {
+        const QJsonValue value = colorComparison
+                .value(QStringLiteral("templateRegionMode"));
+        if (!value.isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_template_roi"),
+                        QStringLiteral("templateRegionMode must be a string."));
+        }
+        templateRegionMode = value.toString().trimmed().toLower();
+    }
+    if (templateRegionMode != QStringLiteral("custom")
+            && templateRegionMode != QStringLiteral("sync")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_template_roi"),
+                    QStringLiteral("templateRegionMode must be custom or sync."));
+    }
+
+    if (colorComparison.contains(QStringLiteral("templateRoiNormalized"))
+            && !strictNormalizedRect(
+                colorComparison.value(QStringLiteral("templateRoiNormalized")),
+                nullptr)) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_template_roi"),
+                    QStringLiteral("Template ROI is malformed or out of range."));
+    }
+    if (colorComparison.contains(QStringLiteral("templateMaskPolygon"))
+            && !strictNormalizedPolygon(
+                colorComparison.value(QStringLiteral("templateMaskPolygon")))) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_template_mask"),
+                    QStringLiteral("Template mask is malformed or degenerate."));
+    }
+
+    QString detectRegionType = QStringLiteral("rectangle");
+    if (colorComparison.contains(QStringLiteral("detectRegionType"))) {
+        const QJsonValue value = colorComparison
+                .value(QStringLiteral("detectRegionType"));
+        if (!value.isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("detectRegionType must be a string."));
+        }
+        detectRegionType = value.toString().trimmed().toLower();
+    }
+    if (detectRegionType != QStringLiteral("rectangle")
+            && detectRegionType != QStringLiteral("circle")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("detectRegionType must be rectangle or circle."));
+    }
+
+    QRectF detectRoi;
+    const bool hasDetectRoi = colorComparison.contains(
+                QStringLiteral("detectRoiNormalized"));
+    if (hasDetectRoi
+            && !strictNormalizedRect(
+                colorComparison.value(QStringLiteral("detectRoiNormalized")),
+                &detectRoi)) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("Detection ROI is malformed or out of range."));
+    }
+
+    bool detectGlobal = false;
+    if (colorComparison.contains(QStringLiteral("detectGlobal"))) {
+        const QJsonValue value = colorComparison
+                .value(QStringLiteral("detectGlobal"));
+        if (!value.isBool()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("detectGlobal must be boolean."));
+        }
+        detectGlobal = value.toBool();
+    }
+    if (detectGlobal
+            && (detectRegionType != QStringLiteral("rectangle")
+                || (hasDetectRoi
+                    && !sameRect(detectRoi, QRectF(0.0, 0.0, 1.0, 1.0))))) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("Global detection requires rectangle/full-image ROI."));
+    }
+
+    const bool hasCircle = colorComparison.contains(
+                QStringLiteral("detectCircleNormalized"));
+    if (hasCircle) {
+        const QJsonValue circleValue = colorComparison
+                .value(QStringLiteral("detectCircleNormalized"));
+        if (!circleValue.isObject()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Detection circle must be an object."));
+        }
+
+        const QJsonObject circle = circleValue.toObject();
+        QPointF center;
+        double radius = 0.0;
+        if (!strictNormalizedPoint(circle.value(QStringLiteral("center")),
+                                   &center)
+                || !strictJsonNumber(circle.value(QStringLiteral("radius")),
+                                     &radius)
+                || radius < 0.0) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Detection circle is malformed."));
+        }
+
+        bool valid = radius > 0.0;
+        if (circle.contains(QStringLiteral("valid"))) {
+            if (!circle.value(QStringLiteral("valid")).isBool()) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_detect_roi"),
+                            QStringLiteral("Detection circle valid flag must be boolean."));
+            }
+            valid = circle.value(QStringLiteral("valid")).toBool();
+        }
+        if (valid != (radius > 0.0)) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Detection circle valid flag and radius disagree."));
+        }
+
+        if (circle.contains(QStringLiteral("boundingRect"))) {
+            QRectF boundingRect;
+            if (!strictNormalizedRect(
+                    circle.value(QStringLiteral("boundingRect")),
+                    &boundingRect,
+                    radius == 0.0)) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_detect_roi"),
+                            QStringLiteral("Detection circle bounding rectangle is malformed."));
+            }
+            constexpr double epsilon = 1e-9;
+            const bool centerMatches =
+                    std::abs(boundingRect.center().x() - center.x()) <= epsilon
+                    && std::abs(boundingRect.center().y() - center.y()) <= epsilon;
+            const bool radiusMatches = radius == 0.0
+                    ? boundingRect.width() == 0.0
+                      && boundingRect.height() == 0.0
+                    : std::abs(qMin(boundingRect.width(),
+                                    boundingRect.height()) / 2.0 - radius)
+                      <= epsilon;
+            if (!centerMatches || !radiusMatches) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_detect_roi"),
+                            QStringLiteral("Detection circle geometry is inconsistent."));
+            }
+        }
+        if (detectRegionType == QStringLiteral("circle")
+                && (!valid || radius <= 0.0)) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_detect_roi"),
+                        QStringLiteral("Active detection circle is invalid."));
+        }
+    } else if (detectRegionType == QStringLiteral("circle")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_roi"),
+                    QStringLiteral("Active detection circle is missing."));
+    }
+
+    if (colorComparison.contains(QStringLiteral("detectMaskPolygon"))
+            && !strictNormalizedPolygon(
+                colorComparison.value(QStringLiteral("detectMaskPolygon")))) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_detect_mask"),
+                    QStringLiteral("Detection mask is malformed or degenerate."));
+    }
+
+    const QJsonValue comparisonValue = colorComparison
+            .value(QStringLiteral("comparison"));
+    if (!comparisonValue.isUndefined()) {
+        if (!comparisonValue.isObject()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_sensitivity"),
+                        QStringLiteral("comparison must be an object."));
+        }
+        const QJsonObject comparison = comparisonValue.toObject();
+        if (comparison.contains(QStringLiteral("sensitivity"))) {
+            const QJsonValue value = comparison
+                    .value(QStringLiteral("sensitivity"));
+            if (!value.isString()) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_sensitivity"),
+                            QStringLiteral("sensitivity must be a string."));
+            }
+            const QString sensitivity = value.toString().trimmed().toLower();
+            if (sensitivity != QStringLiteral("high")
+                    && sensitivity != QStringLiteral("medium")
+                    && sensitivity != QStringLiteral("low")) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_sensitivity"),
+                            QStringLiteral("sensitivity must be high, medium, or low."));
+            }
+        }
+        if (comparison.contains(QStringLiteral("brightnessCompensation"))
+                && !comparison.value(
+                    QStringLiteral("brightnessCompensation")).isBool()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_illumination"),
+                        QStringLiteral("brightnessCompensation must be boolean."));
+        }
+    }
+
+    if (colorComparison.contains(QStringLiteral("sensitivity"))) {
+        const QJsonValue value = colorComparison.value(QStringLiteral("sensitivity"));
+        if (!value.isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_sensitivity"),
+                        QStringLiteral("Legacy sensitivity must be a string."));
+        }
+        const QString sensitivity = value.toString().trimmed().toLower();
+        if (sensitivity != QStringLiteral("high")
+                && sensitivity != QStringLiteral("medium")
+                && sensitivity != QStringLiteral("low")) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_sensitivity"),
+                        QStringLiteral("Legacy sensitivity is unsupported."));
+        }
+    }
+    if (colorComparison.contains(QStringLiteral("brightnessEnabled"))
+            && !colorComparison.value(
+                QStringLiteral("brightnessEnabled")).isBool()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_illumination"),
+                    QStringLiteral("brightnessEnabled must be boolean."));
+    }
+
+    const QJsonValue positionValue = colorComparison
+            .value(QStringLiteral("positionCorrection"));
+    if (!positionValue.isUndefined()) {
+        if (!positionValue.isObject()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_position_correction"),
+                        QStringLiteral("positionCorrection must be an object."));
+        }
+        const QJsonObject position = positionValue.toObject();
+        if (position.contains(QStringLiteral("enabled"))
+                && !position.value(QStringLiteral("enabled")).isBool()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_position_correction"),
+                        QStringLiteral("positionCorrection.enabled must be boolean."));
+        }
+        if (position.contains(QStringLiteral("sourceId"))
+                && !position.value(QStringLiteral("sourceId")).isString()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_position_correction"),
+                        QStringLiteral("positionCorrection.sourceId must be a string."));
+        }
+        if (position.contains(QStringLiteral("interfaceVersion"))) {
+            int interfaceVersion = 0;
+            if (!strictJsonInteger(
+                    position.value(QStringLiteral("interfaceVersion")),
+                    &interfaceVersion)
+                    || interfaceVersion != 1) {
+                return invalidV2DialogConfig(
+                            QStringLiteral("invalid_position_correction"),
+                            QStringLiteral("Only position-correction interface version 1 is reserved."));
+            }
+        }
+    }
+    if (colorComparison.contains(QStringLiteral("enablePositionCorrection"))
+            && !colorComparison.value(
+                QStringLiteral("enablePositionCorrection")).isBool()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_position_correction"),
+                    QStringLiteral("enablePositionCorrection must be boolean."));
+    }
+    if (colorComparison.contains(QStringLiteral("positionCorrectionSource"))
+            && !colorComparison.value(
+                QStringLiteral("positionCorrectionSource")).isString()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_position_correction"),
+                    QStringLiteral("positionCorrectionSource must be a string."));
+    }
+
+    const QJsonObject judgeRule = config.judgeRule;
+    if (!judgeRule.value(QStringLiteral("mode")).isString()
+            || judgeRule.value(QStringLiteral("mode"))
+               .toString().trimmed().toLower() != QStringLiteral("min_score")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_judge_rule"),
+                    QStringLiteral("judgeRule.mode must be min_score."));
+    }
+    int minScore = 0;
+    if (!strictJsonInteger(judgeRule.value(QStringLiteral("minScore")),
+                           &minScore)
+            || minScore < 0 || minScore > 100) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("invalid_judge_rule"),
+                    QStringLiteral("judgeRule.minScore must be an integer in [0,100]."));
+    }
+
+    const QJsonValue halconPath = colorComparison
+            .value(QStringLiteral("halconSoPath"));
+    if (!halconPath.isUndefined() && !halconPath.isString()) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("halcon_load_failed"),
+                    QStringLiteral("halconSoPath must be a string."));
+    }
+
+    const ColorComparisonModelReadResult modelRead =
+            readColorComparisonModel(colorComparison, false);
+    if (modelRead.status == QStringLiteral("model_invalid")) {
+        return invalidV2DialogConfig(
+                    QStringLiteral("model_invalid"),
+                    modelRead.message.isEmpty()
+                    ? QStringLiteral("Color comparison model is invalid.")
+                    : modelRead.message);
+    }
+
+    return V2DialogConfigValidation();
+}
+
+bool restoreDialogLifecycle(const QJsonObject &colorComparison,
+                            ColorComparisonModelState modelState,
+                            int *originVersion,
+                            QString *status,
+                            QString *reason)
+{
+    const QJsonValue lifecycleValue =
+            colorComparison.value(QStringLiteral("dialogLifecycle"));
+    if (!lifecycleValue.isObject())
+        return false;
+
+    const QJsonObject lifecycle = lifecycleValue.toObject();
+    int origin = 0;
+    if (!strictJsonInteger(lifecycle.value(QStringLiteral("originVersion")),
+                           &origin)
+            || !lifecycle.value(QStringLiteral("status")).isString()
+            || !lifecycle.value(QStringLiteral("reason")).isString()) {
+        return false;
+    }
+
+    const QString storedStatus =
+            lifecycle.value(QStringLiteral("status")).toString();
+    const QString storedReason =
+            lifecycle.value(QStringLiteral("reason")).toString();
+    if (storedReason.size() > 1024)
+        return false;
+
+    const bool legacyRebuild = origin == 1
+            && modelState == ColorComparisonModelState::Unsupported
+            && storedStatus == QStringLiteral("model_rebuild_required");
+    const bool legacyStale = origin == 1
+            && modelState == ColorComparisonModelState::Stale
+            && storedStatus == QStringLiteral("model_stale");
+    const bool unknownUnsupported = origin != 1 && origin != 2
+            && modelState == ColorComparisonModelState::Unsupported
+            && storedStatus == QStringLiteral("unsupported_model_version");
+    if (!legacyRebuild && !legacyStale && !unknownUnsupported) {
+        return false;
+    }
+
+    if (originVersion)
+        *originVersion = origin;
+    if (status)
+        *status = storedStatus;
+    if (reason)
+        *reason = storedReason;
+    return true;
 }
 
 QJsonObject rectToJson(const QRectF &rect)
@@ -98,23 +606,6 @@ QVector<QPointF> pointsFromJson(const QJsonArray &array)
     return points.size() >= 3 ? points : QVector<QPointF>();
 }
 
-QJsonArray featureToJson(const QVector<double> &feature)
-{
-    QJsonArray array;
-    for (const double value : feature)
-        array.append(value);
-    return array;
-}
-
-QVector<double> featureFromJson(const QJsonArray &array)
-{
-    QVector<double> feature;
-    feature.reserve(array.size());
-    for (const QJsonValue &value : array)
-        feature.append(value.toDouble());
-    return feature;
-}
-
 QJsonObject circleToJson(const CircleRoi &circle)
 {
     QJsonObject json;
@@ -138,6 +629,39 @@ CircleRoi circleFromJson(const QJsonObject &json)
                                 circle.radiusNormalized * 2.0));
     circle.valid = json.value(QStringLiteral("valid")).toBool(circle.radiusNormalized > 0.0);
     return circle;
+}
+
+QRectF circleBoundingRectForImage(const CircleRoi &circle,
+                                  int imageWidth,
+                                  int imageHeight)
+{
+    if (!circle.valid || imageWidth <= 0 || imageHeight <= 0
+            || !finiteValue(circle.centerNormalized.x())
+            || !finiteValue(circle.centerNormalized.y())
+            || !finiteValue(circle.radiusNormalized)
+            || circle.radiusNormalized <= 0.0) {
+        return QRectF();
+    }
+
+    const double maxDimension = static_cast<double>(
+                qMax(imageWidth, imageHeight));
+    const double radiusPixels = circle.radiusNormalized * maxDimension;
+    const double xRadius = radiusPixels / static_cast<double>(imageWidth);
+    const double yRadius = radiusPixels / static_cast<double>(imageHeight);
+    return QRectF(circle.centerNormalized.x() - xRadius,
+                  circle.centerNormalized.y() - yRadius,
+                  xRadius * 2.0,
+                  yRadius * 2.0);
+}
+
+bool circleBoundingRectFitsImage(const QRectF &rect)
+{
+    constexpr double epsilon = 1e-9;
+    return rect.isValid()
+            && rect.left() >= -epsilon
+            && rect.top() >= -epsilon
+            && rect.right() <= 1.0 + epsilon
+            && rect.bottom() <= 1.0 + epsilon;
 }
 
 QImage imageFromFrame(const cv::Mat &frame)
@@ -213,20 +737,59 @@ void installActionButtonFlash(QPushButton *button)
 
 ColorComparisonDialog::ColorComparisonDialog(QWidget *parent)
     : QDialog(parent)
+    , m_toolId(QStringLiteral("color_comparison_%1")
+               .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)))
 {
     buildUi();
+
+    m_testWatcher = new QFutureWatcher<ToolResult>(this);
+    m_modelBuildWatcher =
+            new QFutureWatcher<ColorComparisonTemplateBuildResult>(this);
+    connectAsyncWorkers();
+
     m_continuousTimer = new QTimer(this);
     m_continuousTimer->setInterval(500);
     connect(m_continuousTimer, &QTimer::timeout, this, &ColorComparisonDialog::runContinuousTick);
     connectControls();
+    connect(&ReferenceImageProvider::instance(),
+            &ReferenceImageProvider::referenceFrameChanged,
+            this,
+            [this](const QImage &) {
+                markModelStale(QStringLiteral("reference_changed"));
+                if (m_testUiMode == TestUiMode::Edit)
+                    showPreviewImage();
+            });
     setAllParamsMode(false);
     showPreviewImage();
     refreshRoiOverlay();
     updateTemplatePreview();
+    updateModelStateUi();
     updateBottomButtons();
 }
 
-ColorComparisonDialog::~ColorComparisonDialog() = default;
+ColorComparisonDialog::~ColorComparisonDialog()
+{
+    if (m_continuousTimer)
+        m_continuousTimer->stop();
+    invalidateAsyncWork();
+    invalidateModelBuild();
+    if (m_testWatcher)
+        disconnect(m_testWatcher, nullptr, this, nullptr);
+    if (m_modelBuildWatcher)
+        disconnect(m_modelBuildWatcher, nullptr, this, nullptr);
+}
+
+void ColorComparisonDialog::connectAsyncWorkers()
+{
+    connect(m_testWatcher,
+            &QFutureWatcher<ToolResult>::finished,
+            this,
+            &ColorComparisonDialog::handleTestFinished);
+    connect(m_modelBuildWatcher,
+            &QFutureWatcher<ColorComparisonTemplateBuildResult>::finished,
+            this,
+            &ColorComparisonDialog::handleModelBuildFinished);
+}
 
 void ColorComparisonDialog::buildUi()
 {
@@ -274,6 +837,8 @@ void ColorComparisonDialog::buildUi()
     dialogTitle->setProperty("role", QStringLiteral("cardTitle"));
     m_basicButton = new QPushButton(tr("基础"), leftPanel);
     m_allButton = new QPushButton(tr("全部"), leftPanel);
+    m_basicButton->setObjectName(QStringLiteral("colorComparisonBasicButton"));
+    m_allButton->setObjectName(QStringLiteral("colorComparisonAllButton"));
     m_basicButton->setCheckable(true);
     m_allButton->setCheckable(true);
     m_segmentGroup->addButton(m_basicButton, 0);
@@ -295,8 +860,18 @@ void ColorComparisonDialog::buildUi()
 
         QFrame *templateCard = card(page, tr("模板区域"));
         QVBoxLayout *templateLayout = qobject_cast<QVBoxLayout *>(templateCard->layout());
-        QLabel *modeLabel = new QLabel(tr("模板区域：自定义"), templateCard);
-        templateLayout->addWidget(modeLabel);
+        if (!m_templateRegionModeComboBox) {
+            m_templateRegionModeComboBox = new QComboBox(this);
+            m_templateRegionModeComboBox->setObjectName(
+                        QStringLiteral("colorComparisonTemplateRegionModeCombo"));
+            m_templateRegionModeComboBox->addItem(tr("与检测区域同步"),
+                                                   QStringLiteral("sync"));
+            m_templateRegionModeComboBox->addItem(tr("自定义"),
+                                                   QStringLiteral("custom"));
+            m_templateRegionModeComboBox->setCurrentIndex(1);
+        }
+        templateLayout->addLayout(row(tr("模板区域"),
+                                      m_templateRegionModeComboBox));
         QWidget *templateEditRow = new QWidget(templateCard);
         QHBoxLayout *templateEditLayout = new QHBoxLayout(templateEditRow);
         templateEditLayout->setContentsMargins(0, 0, 0, 0);
@@ -304,13 +879,19 @@ void ColorComparisonDialog::buildUi()
         templateEditLayout->addStretch(1);
         if (!m_templateEditButton)
             m_templateEditButton = new QPushButton(tr("编辑"), this);
+        m_templateEditButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateEditButton"));
         if (!m_templateRectButton) {
             m_templateRectButton = new QToolButton(this);
             m_templateRectButton->setText(QStringLiteral("□"));
             m_templateRectButton->setCheckable(true);
         }
+        m_templateRectButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateRectButton"));
         if (!m_templateFinishButton)
             m_templateFinishButton = new QPushButton(tr("完成"), this);
+        m_templateFinishButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateFinishButton"));
         templateEditLayout->addWidget(m_templateEditButton);
         templateEditLayout->addWidget(m_templateRectButton);
         templateEditLayout->addWidget(m_templateFinishButton);
@@ -323,13 +904,19 @@ void ColorComparisonDialog::buildUi()
         maskLayout->addStretch(1);
         if (!m_templateMaskEditButton)
             m_templateMaskEditButton = new QPushButton(tr("编辑"), this);
+        m_templateMaskEditButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateMaskEditButton"));
         if (!m_templateMaskPolygonButton) {
             m_templateMaskPolygonButton = new QToolButton(this);
             m_templateMaskPolygonButton->setText(QStringLiteral("⬡"));
             m_templateMaskPolygonButton->setCheckable(true);
         }
+        m_templateMaskPolygonButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateMaskPolygonButton"));
         if (!m_templateMaskFinishButton)
             m_templateMaskFinishButton = new QPushButton(tr("完成"), this);
+        m_templateMaskFinishButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateMaskFinishButton"));
         maskLayout->addWidget(m_templateMaskEditButton);
         maskLayout->addWidget(m_templateMaskPolygonButton);
         maskLayout->addWidget(m_templateMaskFinishButton);
@@ -340,38 +927,78 @@ void ColorComparisonDialog::buildUi()
         QVBoxLayout *effectLayout = qobject_cast<QVBoxLayout *>(effectCard->layout());
         if (!m_templatePreviewLabel) {
             m_templatePreviewLabel = new QLabel(effectCard);
+            m_templatePreviewLabel->setObjectName(
+                        QStringLiteral("colorComparisonTemplatePreview"));
             m_templatePreviewLabel->setFixedSize(132, 86);
             m_templatePreviewLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
             m_templatePreviewLabel->setAlignment(Qt::AlignCenter);
             m_templatePreviewLabel->setStyleSheet(QStringLiteral("background:#ffffff; border:1px solid #d1d5db;"));
         }
         effectLayout->addWidget(m_templatePreviewLabel, 0, Qt::AlignHCenter);
+        if (!m_rebuildModelButton) {
+            m_rebuildModelButton = new QPushButton(tr("重新取样"), this);
+            m_rebuildModelButton->setObjectName(
+                        QStringLiteral("colorComparisonRebuildModelButton"));
+        }
+        if (!m_modelStateLabel) {
+            m_modelStateLabel = new QLabel(effectCard);
+            m_modelStateLabel->setObjectName(
+                        QStringLiteral("colorComparisonModelStateLabel"));
+            m_modelStateLabel->setWordWrap(true);
+        }
+        effectLayout->addWidget(m_rebuildModelButton, 0, Qt::AlignHCenter);
+        effectLayout->addWidget(m_modelStateLabel);
         layout->addWidget(effectCard);
 
         if (allMode) {
             QFrame *featureCard = card(page, tr("模型色彩特征"));
             m_featureCard = featureCard;
             QVBoxLayout *featureLayout = qobject_cast<QVBoxLayout *>(featureCard->layout());
-            if (!m_comparisonModeComboBox) {
-                m_comparisonModeComboBox = new QComboBox(this);
-                m_comparisonModeComboBox->addItems({tr("模板主色覆盖率"), tr("Bhattacharyya直方图")});
-            }
             if (!m_featureTypeComboBox) {
                 m_featureTypeComboBox = new QComboBox(this);
-                m_featureTypeComboBox->addItems({tr("直方图特征"), tr("色谱特征")});
+                m_featureTypeComboBox->setObjectName(
+                            QStringLiteral("colorComparisonFeatureTypeCombo"));
+                m_featureTypeComboBox->addItem(tr("直方图特征"),
+                                                QStringLiteral("histogram_hs_2d"));
+                m_featureTypeComboBox->addItem(tr("色谱特征（待实现）"),
+                                                QStringLiteral("spectrum"));
+                if (QStandardItemModel *model =
+                        qobject_cast<QStandardItemModel *>(m_featureTypeComboBox->model())) {
+                    if (QStandardItem *item = model->item(1))
+                        item->setEnabled(false);
+                }
             }
             if (!m_brightnessCheckBox) {
-                m_brightnessCheckBox = new QCheckBox(tr("亮度使能"), this);
+                m_brightnessCheckBox = new QCheckBox(
+                            tr("光照补偿（默认关闭）"), this);
+                m_brightnessCheckBox->setObjectName(
+                            QStringLiteral("colorComparisonBrightnessCompensation"));
                 m_brightnessCheckBox->setChecked(false);
             }
-            featureLayout->addLayout(row(tr("比较模式"), m_comparisonModeComboBox));
             featureLayout->addLayout(row(tr("特征类型"), m_featureTypeComboBox));
             featureLayout->addWidget(m_brightnessCheckBox);
-            QLabel *histogramLabel = new QLabel(tr("色相        饱和度        亮度"), featureCard);
-            histogramLabel->setAlignment(Qt::AlignCenter);
-            histogramLabel->setMinimumHeight(72);
-            histogramLabel->setStyleSheet(QStringLiteral("background:#252a31; color:#d1d5db; border:1px solid #111827;"));
-            featureLayout->addWidget(histogramLabel);
+
+            QHBoxLayout *histogramLayout = new QHBoxLayout;
+            auto makeHistogram = [featureCard](const QString &name,
+                                               const QString &text) {
+                QLabel *label = new QLabel(text, featureCard);
+                label->setObjectName(name);
+                label->setAlignment(Qt::AlignCenter);
+                label->setMinimumSize(96, 72);
+                label->setStyleSheet(QStringLiteral(
+                    "background:#252a31;color:#d1d5db;border:1px solid #111827;"));
+                return label;
+            };
+            m_hueHistogramLabel = makeHistogram(
+                        QStringLiteral("colorComparisonHueHistogram"), tr("H"));
+            m_saturationHistogramLabel = makeHistogram(
+                        QStringLiteral("colorComparisonSaturationHistogram"), tr("S"));
+            m_valueHistogramLabel = makeHistogram(
+                        QStringLiteral("colorComparisonValueHistogram"), tr("V"));
+            histogramLayout->addWidget(m_hueHistogramLabel);
+            histogramLayout->addWidget(m_saturationHistogramLabel);
+            histogramLayout->addWidget(m_valueHistogramLabel);
+            featureLayout->addLayout(histogramLayout);
             layout->addWidget(featureCard);
         }
 
@@ -384,12 +1011,18 @@ void ColorComparisonDialog::buildUi()
             m_detectGlobalButton = new QToolButton(this);
             m_detectGlobalButton->setText(QStringLiteral("▣"));
             m_detectGlobalButton->setCheckable(true);
+            m_detectGlobalButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectGlobalButton"));
             m_detectRectButton = new QToolButton(this);
             m_detectRectButton->setText(QStringLiteral("□"));
             m_detectRectButton->setCheckable(true);
+            m_detectRectButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectRectButton"));
             m_detectCircleButton = new QToolButton(this);
             m_detectCircleButton->setText(QStringLiteral("○"));
             m_detectCircleButton->setCheckable(true);
+            m_detectCircleButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectCircleButton"));
             m_detectRegionGroup->addButton(m_detectGlobalButton, 0);
             m_detectRegionGroup->addButton(m_detectRectButton, 1);
             m_detectRegionGroup->addButton(m_detectCircleButton, 2);
@@ -401,7 +1034,13 @@ void ColorComparisonDialog::buildUi()
         detectButtonsLayout->addWidget(m_detectCircleButton);
         detectLayout->addWidget(detectButtons);
 
-        QWidget *positionEnableRow = new QWidget(detectCard);
+        m_positionCorrectionPanel = new QWidget(detectCard);
+        m_positionCorrectionPanel->setObjectName(
+                    QStringLiteral("colorComparisonPositionCorrectionPanel"));
+        QVBoxLayout *positionPanelLayout =
+                new QVBoxLayout(m_positionCorrectionPanel);
+        positionPanelLayout->setContentsMargins(0, 0, 0, 0);
+        QWidget *positionEnableRow = new QWidget(m_positionCorrectionPanel);
         QHBoxLayout *positionEnableLayout = new QHBoxLayout(positionEnableRow);
         positionEnableLayout->setContentsMargins(0, 0, 0, 0);
         positionEnableLayout->addWidget(new QLabel(tr("独立位置修正使能 ⓘ"), positionEnableRow));
@@ -411,10 +1050,9 @@ void ColorComparisonDialog::buildUi()
             m_positionCorrectionCheckBox->setObjectName(QStringLiteral("positionCorrectionSwitch"));
         }
         positionEnableLayout->addWidget(m_positionCorrectionCheckBox);
-        detectLayout->addWidget(positionEnableRow);
 
         if (!m_positionCorrectionSourceRow) {
-            m_positionCorrectionSourceRow = new QWidget(detectCard);
+            m_positionCorrectionSourceRow = new QWidget(m_positionCorrectionPanel);
             QHBoxLayout *positionSourceLayout = new QHBoxLayout(m_positionCorrectionSourceRow);
             positionSourceLayout->setContentsMargins(0, 0, 0, 0);
             QLabel *positionSourceLabel = new QLabel(tr("位置修正"), m_positionCorrectionSourceRow);
@@ -426,7 +1064,13 @@ void ColorComparisonDialog::buildUi()
             m_positionCorrectionComboBox->addItem(QStringLiteral("1 基准图.位置修正信息"));
             positionSourceLayout->addWidget(m_positionCorrectionComboBox);
         }
-        detectLayout->addWidget(m_positionCorrectionSourceRow);
+        positionPanelLayout->addWidget(positionEnableRow);
+        positionPanelLayout->addWidget(m_positionCorrectionSourceRow);
+        QLabel *positionHint = new QLabel(
+                    tr("接口预留，暂未实现"), m_positionCorrectionPanel);
+        positionPanelLayout->addWidget(positionHint);
+        m_positionCorrectionPanel->setEnabled(false);
+        detectLayout->addWidget(m_positionCorrectionPanel);
 
         if (allMode) {
             QWidget *detectMaskRow = new QWidget(detectCard);
@@ -437,13 +1081,19 @@ void ColorComparisonDialog::buildUi()
             detectMaskLayout->addStretch(1);
             if (!m_detectMaskEditButton)
                 m_detectMaskEditButton = new QPushButton(tr("编辑"), this);
+            m_detectMaskEditButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectMaskEditButton"));
             if (!m_detectMaskPolygonButton) {
                 m_detectMaskPolygonButton = new QToolButton(this);
                 m_detectMaskPolygonButton->setText(QStringLiteral("⬡"));
                 m_detectMaskPolygonButton->setCheckable(true);
             }
+            m_detectMaskPolygonButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectMaskPolygonButton"));
             if (!m_detectMaskFinishButton)
                 m_detectMaskFinishButton = new QPushButton(tr("完成"), this);
+            m_detectMaskFinishButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectMaskFinishButton"));
             detectMaskLayout->addWidget(m_detectMaskEditButton);
             detectMaskLayout->addWidget(m_detectMaskPolygonButton);
             detectMaskLayout->addWidget(m_detectMaskFinishButton);
@@ -455,7 +1105,14 @@ void ColorComparisonDialog::buildUi()
         QVBoxLayout *settingsLayout = qobject_cast<QVBoxLayout *>(settingsCard->layout());
         if (!m_sensitivityComboBox) {
             m_sensitivityComboBox = new QComboBox(this);
-            m_sensitivityComboBox->addItems({tr("低"), tr("中"), tr("高")});
+            m_sensitivityComboBox->setObjectName(
+                        QStringLiteral("colorComparisonSensitivityCombo"));
+            m_sensitivityComboBox->addItem(tr("高（严格）"),
+                                            QStringLiteral("high"));
+            m_sensitivityComboBox->addItem(tr("中（标准）"),
+                                            QStringLiteral("medium"));
+            m_sensitivityComboBox->addItem(tr("低（宽松）"),
+                                            QStringLiteral("low"));
             m_sensitivityComboBox->setCurrentIndex(1);
         }
         settingsLayout->addLayout(row(tr("灵敏度"), m_sensitivityComboBox));
@@ -465,8 +1122,10 @@ void ColorComparisonDialog::buildUi()
         QVBoxLayout *judgeLayout = qobject_cast<QVBoxLayout *>(judgeCard->layout());
         if (!m_minScoreSpinBox) {
             m_minScoreSpinBox = new QSpinBox(this);
+            m_minScoreSpinBox->setObjectName(
+                        QStringLiteral("colorComparisonMinScore"));
             m_minScoreSpinBox->setRange(0, 100);
-            m_minScoreSpinBox->setValue(52);
+            m_minScoreSpinBox->setValue(80);
         }
         judgeLayout->addLayout(row(tr("最小得分"), m_minScoreSpinBox));
         layout->addWidget(judgeCard);
@@ -481,6 +1140,12 @@ void ColorComparisonDialog::buildUi()
     m_testRunButton = new QPushButton(tr("测试运行"), leftPanel);
     m_finishButton = new QPushButton(tr("完成"), leftPanel);
     m_exitTestButton = new QPushButton(tr("退出测试"), leftPanel);
+    m_referenceTestButton->setObjectName(
+                QStringLiteral("colorComparisonReferenceTestButton"));
+    m_testRunButton->setObjectName(
+                QStringLiteral("colorComparisonTestRunButton"));
+    m_finishButton->setObjectName(
+                QStringLiteral("colorComparisonFinishButton"));
     applyBottomActionButtonMetrics(m_referenceTestButton);
     applyBottomActionButtonMetrics(m_testRunButton);
     applyBottomActionButtonMetrics(m_finishButton);
@@ -507,10 +1172,14 @@ void ColorComparisonDialog::buildUi()
     QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
     rightLayout->setContentsMargins(0, 0, 0, 0);
     m_viewerTitleLabel = new QLabel(tr("基准图"), rightPanel);
+    m_viewerTitleLabel->setObjectName(
+                QStringLiteral("colorComparisonViewerTitleLabel"));
     m_viewerTitleLabel->setMinimumHeight(48);
     m_viewerTitleLabel->setContentsMargins(18, 0, 0, 0);
     m_previewGraphicsView = new QGraphicsView(rightPanel);
     m_viewerStatusLabel = new QLabel(tr("请编辑模板区域和检测区域"), rightPanel);
+    m_viewerStatusLabel->setObjectName(
+                QStringLiteral("colorComparisonStatusLabel"));
     m_viewerStatusLabel->setMinimumHeight(42);
     m_viewerStatusLabel->setContentsMargins(18, 0, 0, 0);
     rightLayout->addWidget(m_viewerTitleLabel);
@@ -553,6 +1222,17 @@ void ColorComparisonDialog::connectControls()
 {
     connect(m_basicButton, &QPushButton::clicked, this, [this]() { setAllParamsMode(false); });
     connect(m_allButton, &QPushButton::clicked, this, [this]() { setAllParamsMode(true); });
+    connect(m_templateRegionModeComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int index) {
+                if (m_loadingConfig)
+                    return;
+                m_templateRegionMode = m_templateRegionModeComboBox->itemData(index)
+                        .toString();
+                markModelStale(QStringLiteral("template_region_mode_changed"));
+                updateTemplatePreview();
+            });
     connect(m_templateEditButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::TemplateRect); });
     connect(m_templateRectButton, &QToolButton::clicked, this, [this]() { setEditState(EditState::TemplateRect); });
     connect(m_templateFinishButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::None); });
@@ -560,49 +1240,79 @@ void ColorComparisonDialog::connectControls()
     connect(m_templateMaskPolygonButton, &QToolButton::clicked, this, [this]() { setEditState(EditState::TemplateMaskPolygon); });
     connect(m_templateMaskFinishButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::None); });
     connect(m_detectGlobalButton, &QToolButton::clicked, this, [this]() {
-        m_detectRegionType = QStringLiteral("global");
+        m_globalDetection = true;
+        m_detectRegionType = QStringLiteral("rectangle");
         m_detectRoi = QRectF(0.0, 0.0, 1.0, 1.0);
         m_detectCircle = CircleRoi();
         setEditState(EditState::None);
         refreshDetectRegionButtons();
+        handleDetectionConfigChanged(QStringLiteral("detect_region_changed"));
     });
     connect(m_detectRectButton, &QToolButton::clicked, this, [this]() {
+        m_globalDetection = false;
         m_detectRegionType = QStringLiteral("rectangle");
         m_detectCircle = CircleRoi();
         setEditState(EditState::DetectRect);
         refreshDetectRegionButtons();
+        handleDetectionConfigChanged(QStringLiteral("detect_region_changed"));
     });
     connect(m_detectCircleButton, &QToolButton::clicked, this, [this]() {
+        m_globalDetection = false;
         m_detectRegionType = QStringLiteral("circle");
         setEditState(EditState::DetectCircle);
         refreshDetectRegionButtons();
+        handleDetectionConfigChanged(QStringLiteral("detect_region_changed"));
     });
     connect(m_positionCorrectionCheckBox, &QCheckBox::toggled, this, [this](bool checked) {
         m_positionCorrectionEnabled = checked;
         refreshPositionCorrectionControls();
+        invalidateAsyncWork();
     });
     connect(m_positionCorrectionComboBox, &QComboBox::currentTextChanged, this, [this](const QString &text) {
         m_positionCorrectionSource = text;
+        invalidateAsyncWork();
     });
     connect(m_sensitivityComboBox,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
-            [this]() { clearTemplateFeature(); });
+            [this]() {
+                if (m_loadingConfig)
+                    return;
+                invalidateAsyncWork();
+                if (m_liveTestSource != LiveTestSource::None)
+                    rerunLiveComparison();
+            });
     connect(m_featureTypeComboBox,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
-            [this]() { clearTemplateFeature(); });
-    connect(m_comparisonModeComboBox,
-            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            [this]() {
+                if (!m_loadingConfig)
+                    markModelStale(QStringLiteral("feature_type_changed"));
+            });
+    connect(m_brightnessCheckBox, &QCheckBox::toggled, this, [this]() {
+        if (!m_loadingConfig)
+            markModelStale(QStringLiteral("brightness_compensation_changed"));
+    });
+    connect(m_minScoreSpinBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
             this,
-            [this]() { clearTemplateFeature(); });
-    connect(m_brightnessCheckBox, &QCheckBox::toggled, this, [this]() { clearTemplateFeature(); });
+            [this]() {
+                if (m_loadingConfig)
+                    return;
+                invalidateAsyncWork();
+                if (m_liveTestSource != LiveTestSource::None)
+                    rerunLiveComparison();
+            });
     if (m_detectMaskEditButton)
         connect(m_detectMaskEditButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::DetectMaskPolygon); });
     if (m_detectMaskPolygonButton)
         connect(m_detectMaskPolygonButton, &QToolButton::clicked, this, [this]() { setEditState(EditState::DetectMaskPolygon); });
     if (m_detectMaskFinishButton)
         connect(m_detectMaskFinishButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::None); });
+    connect(m_rebuildModelButton,
+            &QPushButton::clicked,
+            this,
+            &ColorComparisonDialog::startExplicitModelRebuild);
     connect(m_referenceTestButton, &QPushButton::clicked, this, &ColorComparisonDialog::runReferenceTest);
     connect(m_testRunButton, &QPushButton::clicked, this, &ColorComparisonDialog::runTest);
     connect(m_exitTestButton, &QPushButton::clicked, this, &ColorComparisonDialog::exitTestMode);
@@ -622,7 +1332,6 @@ void ColorComparisonDialog::resizeEvent(QResizeEvent *event)
 
 void ColorComparisonDialog::setAllParamsMode(bool allMode)
 {
-    const bool wasAllMode = m_allButton && m_allButton->isChecked();
     m_paramsStack->setCurrentIndex(0);
     m_basicButton->setChecked(!allMode);
     m_allButton->setChecked(allMode);
@@ -630,14 +1339,19 @@ void ColorComparisonDialog::setAllParamsMode(bool allMode)
         m_featureCard->setVisible(allMode);
     if (m_detectMaskRow)
         m_detectMaskRow->setVisible(allMode);
-    if (wasAllMode != allMode && !m_loadingConfig)
-        clearTemplateFeature();
-    setEditState(EditState::None);
-    refreshEditControls();
+    if (m_positionCorrectionPanel)
+        m_positionCorrectionPanel->setVisible(allMode);
 }
 
 void ColorComparisonDialog::setEditState(EditState state)
 {
+    const bool templateEdit = state == EditState::TemplateRect
+            || state == EditState::TemplateMaskPolygon;
+    if (templateEdit && m_liveTestSource == LiveTestSource::Camera) {
+        updateStatus(tr("相机测试态不可编辑模板区域，请先退出测试"));
+        return;
+    }
+
     m_editState = state;
     refreshEditControls();
     refreshDetectRegionButtons();
@@ -682,12 +1396,23 @@ void ColorComparisonDialog::setEditState(EditState state)
 
 void ColorComparisonDialog::showPreviewImage()
 {
-    cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+    const ReferenceFrameSnapshot reference =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    cv::Mat frame = reference.frame;
     m_previewUsesReferenceImage = !frame.empty();
-    if (frame.empty())
-        frame = CameraFrameProvider::instance().currentFrame();
+    if (frame.empty()) {
+        const CameraFrameSnapshot camera =
+                CameraFrameProvider::instance().currentFrameSnapshot();
+        frame = camera.frame;
+    }
+    if (m_viewerTitleLabel) {
+        m_viewerTitleLabel->setText(m_previewUsesReferenceImage
+                                    ? tr("基准图") : tr("当前图像"));
+    }
     const QImage image = imageFromFrame(frame);
     m_previewImage = image;
+    if (m_previewHelper)
+        m_previewHelper->clearToolOverlays();
     if (!image.isNull()) {
         m_previewHelper->setImage(image);
         updateTemplatePreview();
@@ -705,10 +1430,17 @@ void ColorComparisonDialog::showFrameImage(const cv::Mat &frame, const QString &
     m_previewImage = image;
     if (m_viewerTitleLabel)
         m_viewerTitleLabel->setText(title);
-    if (!image.isNull() && m_previewHelper) {
+    if (!m_previewHelper)
+        return;
+
+    m_previewHelper->clearToolOverlays();
+    if (!image.isNull()) {
         m_previewHelper->setImage(image);
         updateTemplatePreview();
         refreshRoiOverlay();
+    } else {
+        m_previewHelper->clear();
+        updateTemplatePreview();
     }
 }
 
@@ -716,6 +1448,13 @@ void ColorComparisonDialog::refreshRoiOverlay()
 {
     if (!m_previewHelper)
         return;
+    if (m_liveTestSource == LiveTestSource::Camera
+            && (m_editState == EditState::TemplateRect
+                || m_editState == EditState::TemplateMaskPolygon)) {
+        m_previewHelper->clearRoi();
+        m_previewHelper->clearPolygonRoi();
+        return;
+    }
     if (m_editState == EditState::TemplateRect)
         m_previewHelper->setRoiRectNormalized(m_templateRoi);
     else if (m_editState == EditState::DetectRect)
@@ -764,14 +1503,14 @@ void ColorComparisonDialog::handleRoiChanged(const QRectF &roi)
 {
     if (m_editState == EditState::TemplateRect) {
         m_templateRoi = normalizedRoiOrDefault(roi);
-        clearTemplateFeature();
+        markModelStale(QStringLiteral("template_roi_changed"));
         updateTemplatePreview();
         refreshRoiOverlay();
     } else if (m_editState == EditState::DetectRect) {
         m_detectRoi = normalizedRoiOrDefault(roi);
+        m_globalDetection = false;
         refreshRoiOverlay();
-        if (m_liveTestSource != LiveTestSource::None)
-            rerunLiveComparison();  // 测试态下绘制完成立即以新检测区域重跑比较
+        handleDetectionConfigChanged(QStringLiteral("detect_roi_changed"));
     }
 }
 
@@ -779,22 +1518,35 @@ void ColorComparisonDialog::handleCircleChanged(const CircleRoi &circle)
 {
     if (m_editState != EditState::DetectCircle)
         return;
-    m_detectCircle = circle;
-    if (circle.valid) {
-        m_detectRoi = normalizedRoiOrDefault(circle.boundingRectNormalized);
+
+    const QRectF exactBounds = circleBoundingRectForImage(
+                circle, m_previewImage.width(), m_previewImage.height());
+    if (!circleBoundingRectFitsImage(exactBounds)) {
+        updateStatus(tr("圆形检测区域无效或超出图像范围，请重新绘制"));
+        if (m_previewHelper)
+            m_previewHelper->clearCircleRoi();
         refreshRoiOverlay();
-        if (m_liveTestSource != LiveTestSource::None)
-            rerunLiveComparison();  // 测试态下绘制完成立即以新检测区域重跑比较
+        return;
     }
+
+    m_detectCircle = circle;
+    m_detectCircle.boundingRectNormalized = exactBounds;
+    m_detectCircle.valid = true;
+    m_globalDetection = false;
+    m_detectRoi = exactBounds;
+    refreshRoiOverlay();
+    handleDetectionConfigChanged(QStringLiteral("detect_circle_changed"));
 }
 
 void ColorComparisonDialog::handlePolygonChanged(const QVector<QPointF> &points)
 {
     if (m_editState == EditState::TemplateMaskPolygon) {
         m_templateMask = points.size() >= 3 ? points : QVector<QPointF>();
-        clearTemplateFeature();
+        markModelStale(QStringLiteral("template_mask_changed"));
+        updateTemplatePreview();
     } else if (m_editState == EditState::DetectMaskPolygon) {
         m_detectMask = points.size() >= 3 ? points : QVector<QPointF>();
+        handleDetectionConfigChanged(QStringLiteral("detect_mask_changed"));
     }
     refreshRoiOverlay();
 }
@@ -811,18 +1563,84 @@ QRectF ColorComparisonDialog::normalizedRoiOrDefault(const QRectF &roi) const
 
 QImage ColorComparisonDialog::templateRoiImage() const
 {
-    if (m_previewImage.isNull())
+    const ReferenceFrameSnapshot snapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    const QImage referenceImage = imageFromFrame(snapshot.frame);
+    if (referenceImage.isNull())
         return QImage();
 
-    const QRectF roi = normalizedRoiOrDefault(m_templateRoi);
+    QRectF syncCircleRoi;
+    QRectF effectiveRoi = m_templateRoi;
+    if (m_templateRegionMode == QStringLiteral("sync")) {
+        if (m_globalDetection) {
+            effectiveRoi = QRectF(0.0, 0.0, 1.0, 1.0);
+        } else if (m_detectRegionType == QStringLiteral("circle")
+                   && m_detectCircle.valid) {
+            syncCircleRoi = circleBoundingRectForImage(
+                        m_detectCircle,
+                        referenceImage.width(),
+                        referenceImage.height());
+            if (!circleBoundingRectFitsImage(syncCircleRoi))
+                return QImage();
+            effectiveRoi = syncCircleRoi;
+        } else {
+            effectiveRoi = m_detectRoi;
+        }
+    }
+    const QRectF roi = normalizedRoiOrDefault(effectiveRoi);
     if (roi.width() <= 0.0 || roi.height() <= 0.0)
         return QImage();
 
-    const QRect sourceRect(qBound(0, static_cast<int>(std::floor(roi.x() * m_previewImage.width())), m_previewImage.width() - 1),
-                           qBound(0, static_cast<int>(std::floor(roi.y() * m_previewImage.height())), m_previewImage.height() - 1),
-                           qMax(1, static_cast<int>(std::ceil(roi.width() * m_previewImage.width()))),
-                           qMax(1, static_cast<int>(std::ceil(roi.height() * m_previewImage.height()))));
-    return m_previewImage.copy(sourceRect.intersected(m_previewImage.rect()));
+    QImage annotated = referenceImage.convertToFormat(QImage::Format_ARGB32);
+    QPainter overlayPainter(&annotated);
+    overlayPainter.setRenderHint(QPainter::Antialiasing, true);
+    const auto imageRect = [&annotated](const QRectF &normalized) {
+        return QRectF(normalized.x() * annotated.width(),
+                      normalized.y() * annotated.height(),
+                      normalized.width() * annotated.width(),
+                      normalized.height() * annotated.height());
+    };
+    overlayPainter.setBrush(Qt::NoBrush);
+    overlayPainter.setPen(QPen(QColor(255, 122, 0), 2.0));
+    if (m_templateRegionMode == QStringLiteral("sync")
+            && m_detectRegionType == QStringLiteral("circle")
+            && m_detectCircle.valid) {
+        overlayPainter.drawEllipse(imageRect(syncCircleRoi));
+    } else {
+        overlayPainter.drawRect(imageRect(roi));
+    }
+
+    const auto drawMask = [&annotated, &overlayPainter](
+            const QVector<QPointF> &points) {
+        if (points.size() < 3)
+            return;
+        QPolygonF polygon;
+        polygon.reserve(points.size());
+        for (const QPointF &point : points) {
+            polygon.append(QPointF(point.x() * annotated.width(),
+                                   point.y() * annotated.height()));
+        }
+        overlayPainter.setPen(QPen(QColor(220, 38, 38), 2.0));
+        overlayPainter.setBrush(QColor(220, 38, 38, 120));
+        overlayPainter.drawPolygon(polygon);
+    };
+    if (m_templateRegionMode == QStringLiteral("sync"))
+        drawMask(m_detectMask);
+    drawMask(m_templateMask);
+    overlayPainter.end();
+
+    const QRect sourceRect(
+                qBound(0, static_cast<int>(std::floor(roi.x()
+                                                     * referenceImage.width())),
+                       referenceImage.width() - 1),
+                qBound(0, static_cast<int>(std::floor(roi.y()
+                                                     * referenceImage.height())),
+                       referenceImage.height() - 1),
+                qMax(1, static_cast<int>(std::ceil(roi.width()
+                                                  * referenceImage.width()))),
+                qMax(1, static_cast<int>(std::ceil(roi.height()
+                                                  * referenceImage.height()))));
+    return annotated.copy(sourceRect.intersected(annotated.rect()));
 }
 
 void ColorComparisonDialog::refreshEditControls()
@@ -867,8 +1685,9 @@ void ColorComparisonDialog::refreshDetectRegionButtons()
     const QSignalBlocker blockGlobal(m_detectGlobalButton);
     const QSignalBlocker blockRect(m_detectRectButton);
     const QSignalBlocker blockCircle(m_detectCircleButton);
-    m_detectGlobalButton->setChecked(m_detectRegionType == QStringLiteral("global"));
-    m_detectRectButton->setChecked(m_detectRegionType == QStringLiteral("rectangle"));
+    m_detectGlobalButton->setChecked(m_globalDetection);
+    m_detectRectButton->setChecked(!m_globalDetection
+                                   && m_detectRegionType == QStringLiteral("rectangle"));
     m_detectCircleButton->setChecked(m_detectRegionType == QStringLiteral("circle"));
 }
 
@@ -889,97 +1708,213 @@ void ColorComparisonDialog::refreshPositionCorrectionControls()
     }
 }
 
-void ColorComparisonDialog::clearTemplateFeature()
+void ColorComparisonDialog::handleDetectionConfigChanged(const QString &reason)
 {
     if (m_loadingConfig)
         return;
-    m_templateFeature.clear();
+
+    if (m_templateRegionMode == QStringLiteral("sync")) {
+        markModelStale(reason);
+        updateTemplatePreview();
+    } else {
+        invalidateAsyncWork();
+    }
+
+    if (m_liveTestSource != LiveTestSource::None)
+        rerunLiveComparison();
 }
 
-bool ColorComparisonDialog::refreshTemplateFeatureFromFrame(const cv::Mat &frame,
-                                                            QString *status,
-                                                            QString *message)
+void ColorComparisonDialog::invalidateAsyncWork()
 {
-    if (frame.empty()) {
-        if (status)
-            *status = QStringLiteral("image_empty");
-        if (message)
-            *message = tr("当前图像为空");
-        return false;
+    ++m_testGeneration;
+    m_pendingContinuousRun = false;
+    m_pendingTestRequest = ToolRequest();
+    m_pendingImageTitle.clear();
+    m_pendingReferenceSource = false;
+    m_pendingTestGeneration = 0;
+}
+
+bool ColorComparisonDialog::invalidateModelBuild()
+{
+    ++m_modelBuildGeneration;
+    const bool wasActive = m_modelBuildUiActive;
+    m_modelBuildUiActive = false;
+    return wasActive;
+}
+
+void ColorComparisonDialog::markModelStale(const QString &reason)
+{
+    if (m_loadingConfig)
+        return;
+
+    const bool buildWasActive = invalidateModelBuild();
+    invalidateAsyncWork();
+    if (m_model.state == ColorComparisonModelState::Ready
+            || m_model.state == ColorComparisonModelState::Stale) {
+        m_model.state = ColorComparisonModelState::Stale;
+        m_modelStatus = QStringLiteral("model_stale");
+        m_modelReason = tr("%1，请重新取样").arg(reason);
+    } else if (m_model.state == ColorComparisonModelState::Empty) {
+        m_modelStatus = QStringLiteral("model_empty");
+        m_modelReason = tr("尚未取样，请点击重新取样");
     }
+    updateModelStateUi();
+    if (buildWasActive)
+        displayStoredModelInstruction();
+}
 
-    const QJsonObject params = colorComparisonParams();
-    ColorRecognitionHalconConfig featureConfig;
-    featureConfig.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
-                QString(), &featureConfig.halconSoPathCandidates);
-    featureConfig.roiNormalized = m_templateRoi;
-    featureConfig.detectRegionType = QStringLiteral("rectangle");
-    featureConfig.detectMaskPolygonNormalized = m_templateMask;
-    featureConfig.featureType = params.value(QStringLiteral("featureType"))
-            .toString(QStringLiteral("histogram"));
-    featureConfig.sensitivity = params.value(QStringLiteral("sensitivity"))
-            .toString(QStringLiteral("medium"));
-    featureConfig.brightnessEnabled =
-            params.value(QStringLiteral("brightnessEnabled")).toBool(false);
-
-    ColorRecognitionHalconRunner featureRunner;
-    const ColorRecognitionHalconFeatureResult featureResult =
-            featureRunner.extractFeature(frame, featureConfig);
-    if (!featureResult.success) {
-        if (status) {
-            *status = featureResult.status == QStringLiteral("masked_roi_empty")
-                    ? QStringLiteral("template_masked_empty")
-                    : featureResult.status;
+void ColorComparisonDialog::updateModelStateUi()
+{
+    const QString state = colorComparisonModelStateName(m_model.state);
+    if (m_modelStateLabel) {
+        QString instruction = m_modelReason;
+        if (m_model.state == ColorComparisonModelState::Stale
+                && !instruction.contains(tr("重新取样"))) {
+            instruction += tr("，请重新取样");
         }
-        if (message)
-            *message = featureResult.message;
-        return false;
+        m_modelStateLabel->setText(
+                    tr("模型状态：%1 | %2%3")
+                    .arg(state,
+                         m_modelStatus,
+                         instruction.isEmpty()
+                         ? QString()
+                         : QStringLiteral(" | ") + instruction));
+    }
+    updateFeaturePreview();
+}
+
+void ColorComparisonDialog::updateFeaturePreview()
+{
+    const QList<QLabel *> labels = {m_hueHistogramLabel,
+                                    m_saturationHistogramLabel,
+                                    m_valueHistogramLabel};
+    const QStringList names = {tr("H"), tr("S"), tr("V")};
+    for (int index = 0; index < labels.size(); ++index) {
+        if (!labels.at(index))
+            continue;
+        labels.at(index)->clear();
+        labels.at(index)->setText(names.at(index));
     }
 
-    m_templateFeature = featureResult.feature;
-    return true;
+    if (m_model.state != ColorComparisonModelState::Ready
+            || m_model.hueBins != 32 || m_model.saturationBins != 32
+            || m_model.values.size() != 1024
+            || m_model.valueHistogram.size() != 32) {
+        return;
+    }
+
+    QVector<double> hue(32, 0.0);
+    QVector<double> saturation(32, 0.0);
+    for (int h = 0; h < 32; ++h) {
+        for (int s = 0; s < 32; ++s) {
+            const double value = m_model.values.at(h * 32 + s);
+            hue[h] += value;
+            saturation[s] += value;
+        }
+    }
+
+    auto applyHistogram = [this](QLabel *label,
+                                 const QVector<double> &values,
+                                 const QColor &color) {
+        if (!label)
+            return;
+        QSize size = label->size();
+        if (size.width() < 2 || size.height() < 2)
+            size = QSize(112, 72);
+        label->setText(QString());
+        label->setPixmap(renderHistogram(values, color, size));
+    };
+    applyHistogram(m_hueHistogramLabel, hue, QColor(255, 122, 0));
+    applyHistogram(m_saturationHistogramLabel, saturation, QColor(31, 189, 255));
+    applyHistogram(m_valueHistogramLabel, m_model.valueHistogram,
+                   QColor(164, 224, 75));
+}
+
+QPixmap ColorComparisonDialog::renderHistogram(const QVector<double> &values,
+                                                const QColor &color,
+                                                const QSize &size) const
+{
+    QPixmap pixmap(size.expandedTo(QSize(2, 2)));
+    pixmap.fill(QColor(37, 42, 49));
+    if (values.isEmpty())
+        return pixmap;
+
+    double maximum = 0.0;
+    for (double value : values) {
+        if (std::isfinite(value))
+            maximum = qMax(maximum, qMax(0.0, value));
+    }
+    if (maximum <= 0.0)
+        return pixmap;
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    const double barWidth = static_cast<double>(pixmap.width()) / values.size();
+    for (int index = 0; index < values.size(); ++index) {
+        const double normalized = qBound(0.0, values.at(index) / maximum, 1.0);
+        const double height = normalized * qMax(1, pixmap.height() - 4);
+        painter.drawRect(QRectF(index * barWidth,
+                                pixmap.height() - height,
+                                qMax(1.0, barWidth - 1.0),
+                                height));
+    }
+    return pixmap;
 }
 
 QJsonObject ColorComparisonDialog::colorComparisonParams() const
 {
     QJsonObject params;
-    params.insert(QStringLiteral("version"), 1);
-    params.insert(QStringLiteral("templateRegionMode"), QStringLiteral("custom"));
+    params.insert(QStringLiteral("version"), 2);
+    params.insert(QStringLiteral("templateRegionMode"), m_templateRegionMode);
     params.insert(QStringLiteral("templateRoiNormalized"), rectToJson(m_templateRoi));
     params.insert(QStringLiteral("templateMaskPolygon"), pointsToJson(m_templateMask));
-    params.insert(QStringLiteral("templateFeature"), featureToJson(m_templateFeature));
-    const bool allMode = m_allButton && m_allButton->isChecked();
-    const bool bhattacharyyaMode =
-            allMode && m_comparisonModeComboBox && m_comparisonModeComboBox->currentIndex() == 1;
-    params.insert(QStringLiteral("comparisonMode"),
-                  bhattacharyyaMode
-                  ? QStringLiteral("bhattacharyya_histogram")
-                  : QStringLiteral("dominant_hue_coverage"));
-    params.insert(QStringLiteral("featureType"),
-                  bhattacharyyaMode
-                  ? QStringLiteral("histogram_2dim_hs")
-                  : allMode && m_featureTypeComboBox && m_featureTypeComboBox->currentText().contains(QStringLiteral("色谱"))
-                  ? QStringLiteral("spectrum")
-                  : QStringLiteral("histogram"));
-    const QString sensitivity = m_sensitivityComboBox && m_sensitivityComboBox->currentIndex() == 0
-            ? QStringLiteral("low")
-            : m_sensitivityComboBox && m_sensitivityComboBox->currentIndex() == 2
-              ? QStringLiteral("high")
-              : QStringLiteral("medium");
-    params.insert(QStringLiteral("sensitivity"), sensitivity);
-    params.insert(QStringLiteral("brightnessEnabled"),
-                  !bhattacharyyaMode && allMode && m_brightnessCheckBox && m_brightnessCheckBox->isChecked());
-    params.insert(QStringLiteral("detectRegionType"), m_detectRegionType);
-    params.insert(QStringLiteral("detectRoiNormalized"), rectToJson(m_detectRoi));
+    params.insert(QStringLiteral("model"), colorComparisonModelToJson(m_model));
+    params.insert(QStringLiteral("dialogLifecycle"),
+                  QJsonObject{
+                      {QStringLiteral("originVersion"), m_modelOriginVersion},
+                      {QStringLiteral("status"), m_modelStatus},
+                      {QStringLiteral("reason"), m_modelReason}
+                  });
+
+    params.insert(QStringLiteral("detectRegionType"),
+                  m_globalDetection ? QStringLiteral("rectangle")
+                                    : m_detectRegionType);
+    params.insert(QStringLiteral("detectGlobal"), m_globalDetection);
+    params.insert(QStringLiteral("detectRoiNormalized"),
+                  rectToJson(m_globalDetection
+                             ? QRectF(0.0, 0.0, 1.0, 1.0)
+                             : m_detectRoi));
     params.insert(QStringLiteral("detectCircleNormalized"), circleToJson(m_detectCircle));
     params.insert(QStringLiteral("detectMaskPolygon"), pointsToJson(m_detectMask));
-    params.insert(QStringLiteral("enablePositionCorrection"), m_positionCorrectionEnabled);
-    params.insert(QStringLiteral("positionCorrectionSource"), m_positionCorrectionSource);
+
+    const QString sensitivity = m_sensitivityComboBox
+            ? m_sensitivityComboBox->currentData().toString()
+            : QStringLiteral("medium");
+    params.insert(QStringLiteral("comparison"),
+                  QJsonObject{
+                      {QStringLiteral("sensitivity"),
+                       sensitivity.isEmpty() ? QStringLiteral("medium")
+                                             : sensitivity},
+                      {QStringLiteral("brightnessCompensation"),
+                       m_brightnessCheckBox
+                               && m_brightnessCheckBox->isChecked()}
+                  });
+    params.insert(QStringLiteral("positionCorrection"),
+                  QJsonObject{
+                      {QStringLiteral("enabled"), m_positionCorrectionEnabled},
+                      {QStringLiteral("sourceId"), m_positionCorrectionSource},
+                      {QStringLiteral("interfaceVersion"), 1}
+                  });
     return params;
 }
 
 ToolConfig ColorComparisonDialog::toToolConfig() const
 {
+    if (m_invalidConfigReadOnly)
+        return m_originalInvalidConfig;
+
     ToolConfig config;
     config.toolId = m_toolId.isEmpty()
             ? QUuid::createUuid().toString(QUuid::WithoutBraces)
@@ -989,13 +1924,15 @@ ToolConfig ColorComparisonDialog::toToolConfig() const
     config.toolType = ToolType::ColorComparison;
     config.category = ToolCategory::Recognition;
     config.enabled = m_enabled;
-    config.roiNormalized = m_detectRoi;
+    config.roiNormalized = m_globalDetection
+            ? QRectF(0.0, 0.0, 1.0, 1.0)
+            : m_detectRoi;
     QJsonObject params;
     params.insert(QStringLiteral("colorComparison"), colorComparisonParams());
     config.params = params;
     QJsonObject judge;
     judge.insert(QStringLiteral("mode"), QStringLiteral("min_score"));
-    judge.insert(QStringLiteral("minScore"), m_minScoreSpinBox ? m_minScoreSpinBox->value() : 52);
+    judge.insert(QStringLiteral("minScore"), m_minScoreSpinBox ? m_minScoreSpinBox->value() : 80);
     config.judgeRule = judge;
     config.summary = summaryText();
     return config;
@@ -1011,73 +1948,264 @@ ToolPreviewSnapshot ColorComparisonDialog::referencePreviewSnapshot() const
     return m_referencePreviewSnapshot;
 }
 
+void ColorComparisonDialog::updateInvalidConfigReadOnlyUi()
+{
+    const bool editable = !m_invalidConfigReadOnly;
+    if (m_basicButton)
+        m_basicButton->setEnabled(editable);
+    if (m_allButton)
+        m_allButton->setEnabled(editable);
+    if (m_paramsStack)
+        m_paramsStack->setEnabled(editable);
+    if (m_referenceTestButton)
+        m_referenceTestButton->setEnabled(editable);
+    if (m_testRunButton)
+        m_testRunButton->setEnabled(editable);
+    if (m_finishButton)
+        m_finishButton->setEnabled(editable);
+    if (m_exitTestButton)
+        m_exitTestButton->setEnabled(editable);
+    if (m_rebuildModelButton) {
+        m_rebuildModelButton->setEnabled(
+                    editable
+                    && (!m_modelBuildWatcher
+                        || !m_modelBuildWatcher->isRunning()));
+    }
+    if (m_positionCorrectionPanel)
+        m_positionCorrectionPanel->setEnabled(false);
+}
+
+void ColorComparisonDialog::enterInvalidConfigReadOnly(
+        const ToolConfig &config,
+        const QString &status,
+        const QString &message)
+{
+    if (m_continuousTimer)
+        m_continuousTimer->stop();
+    invalidateAsyncWork();
+    invalidateModelBuild();
+
+    m_loadingConfig = true;
+    m_invalidConfigReadOnly = true;
+    m_originalInvalidConfig = config;
+    m_invalidConfigStatus = status.isEmpty()
+            ? QStringLiteral("invalid_v2_config") : status;
+    m_invalidConfigMessage = tr("V2 配置无效，已只读打开，原始配置保持不变：%1")
+            .arg(message.isEmpty() ? tr("配置字段不符合合同") : message);
+    if (!config.toolId.isEmpty())
+        m_toolId = config.toolId;
+    m_enabled = config.enabled;
+    m_model = ColorComparisonModelV2();
+    m_model.state = ColorComparisonModelState::Invalid;
+    m_modelOriginVersion = 2;
+    m_modelStatus = m_invalidConfigStatus;
+    m_modelReason = m_invalidConfigMessage;
+    m_testUiMode = TestUiMode::Edit;
+    m_liveTestSource = LiveTestSource::None;
+    m_liveTestFrameSnapshot.release();
+    m_referencePreviewSnapshot = ToolPreviewSnapshot();
+    setEditState(EditState::None);
+    m_loadingConfig = false;
+
+    updateBottomButtons();
+    updateInvalidConfigReadOnlyUi();
+    updateModelStateUi();
+    displayError(m_invalidConfigStatus, m_invalidConfigMessage);
+}
+
+void ColorComparisonDialog::leaveInvalidConfigReadOnly()
+{
+    if (!m_invalidConfigReadOnly)
+        return;
+
+    m_invalidConfigReadOnly = false;
+    m_originalInvalidConfig = ToolConfig();
+    m_invalidConfigStatus.clear();
+    m_invalidConfigMessage.clear();
+    updateInvalidConfigReadOnlyUi();
+}
+
+bool ColorComparisonDialog::blockInvalidConfigAction()
+{
+    if (!m_invalidConfigReadOnly)
+        return false;
+    displayError(m_invalidConfigStatus, m_invalidConfigMessage);
+    return true;
+}
+
 void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
 {
     if (config.toolType != ToolType::Unknown && config.toolType != ToolType::ColorComparison)
         return;
+
+    const QJsonValue colorComparisonValue = config.params
+            .value(QStringLiteral("colorComparison"));
+    const QJsonObject colorComparison = colorComparisonValue.toObject();
+    if (!colorComparisonValue.isObject()) {
+        enterInvalidConfigReadOnly(
+                    config,
+                    QStringLiteral("unsupported_model_version"),
+                    tr("颜色比较参数缺失或不是对象；原配置已只读保留"));
+        return;
+    }
+    int serializedVersion = 0;
+    const bool hasIntegerVersion = strictJsonInteger(
+                colorComparison.value(QStringLiteral("version")),
+                &serializedVersion);
+    if (!hasIntegerVersion) {
+        enterInvalidConfigReadOnly(
+                    config,
+                    QStringLiteral("unsupported_model_version"),
+                    tr("颜色比较模型版本必须是 int 范围内的整数；原配置已只读保留"));
+        return;
+    }
+    if (serializedVersion == 2) {
+        const V2DialogConfigValidation validation =
+                validateV2DialogConfig(config);
+        if (!validation.success) {
+            enterInvalidConfigReadOnly(config,
+                                       validation.status,
+                                       validation.message);
+            return;
+        }
+    }
+
+    const bool recoveredFromInvalidConfig = m_invalidConfigReadOnly;
+    leaveInvalidConfigReadOnly();
+
+    const bool buildWasActive = invalidateModelBuild();
+    invalidateAsyncWork();
     m_loadingConfig = true;
-    m_toolId = config.toolId;
+    if (!config.toolId.isEmpty())
+        m_toolId = config.toolId;
     m_enabled = config.enabled;
-    const QJsonObject colorComparison =
-            config.params.value(QStringLiteral("colorComparison")).toObject();
+    m_modelOriginVersion = serializedVersion;
+
+    m_templateRegionMode = colorComparison
+            .value(QStringLiteral("templateRegionMode"))
+            .toString(QStringLiteral("custom")).trimmed().toLower();
+    if (m_templateRegionMode != QStringLiteral("sync")
+            && m_templateRegionMode != QStringLiteral("custom")) {
+        m_templateRegionMode = QStringLiteral("custom");
+    }
     m_templateRoi = normalizedRoiOrDefault(
                 rectFromJson(colorComparison.value(QStringLiteral("templateRoiNormalized")).toObject(),
                              m_templateRoi));
     m_templateMask = pointsFromJson(colorComparison.value(QStringLiteral("templateMaskPolygon")).toArray());
-    m_templateFeature = featureFromJson(colorComparison.value(QStringLiteral("templateFeature")).toArray());
-    m_detectRoi = normalizedRoiOrDefault(config.roiNormalized.width() > 0.0 &&
-                                         config.roiNormalized.height() > 0.0
-                                         ? config.roiNormalized
-                                         : rectFromJson(colorComparison.value(QStringLiteral("detectRoiNormalized")).toObject(),
-                                                        m_detectRoi));
+
+    const QRectF nestedDetectRoi = rectFromJson(
+                colorComparison.value(QStringLiteral("detectRoiNormalized")).toObject(),
+                config.roiNormalized.width() > 0.0
+                && config.roiNormalized.height() > 0.0
+                ? config.roiNormalized : m_detectRoi);
+    m_detectRoi = normalizedRoiOrDefault(nestedDetectRoi);
     m_detectRegionType = colorComparison.value(QStringLiteral("detectRegionType"))
-            .toString(QStringLiteral("rectangle"));
+            .toString(QStringLiteral("rectangle")).trimmed().toLower();
+    m_globalDetection = colorComparison.value(QStringLiteral("detectGlobal"))
+            .toBool(m_detectRegionType == QStringLiteral("global"));
+    if (m_globalDetection)
+        m_detectRegionType = QStringLiteral("rectangle");
     m_detectCircle = circleFromJson(colorComparison.value(QStringLiteral("detectCircleNormalized")).toObject());
     m_detectMask = pointsFromJson(colorComparison.value(QStringLiteral("detectMaskPolygon")).toArray());
-    m_positionCorrectionEnabled = colorComparison.value(QStringLiteral("enablePositionCorrection")).toBool(false);
-    m_positionCorrectionSource = colorComparison.value(QStringLiteral("positionCorrectionSource"))
-            .toString(QStringLiteral("1 基准图.位置修正信息"));
-    const QString sensitivity = colorComparison.value(QStringLiteral("sensitivity")).toString(QStringLiteral("medium"));
-    if (m_sensitivityComboBox)
-        m_sensitivityComboBox->setCurrentIndex(sensitivity == QStringLiteral("low") ? 0 :
-                                               sensitivity == QStringLiteral("high") ? 2 : 1);
-    const QString featureType = colorComparison.value(QStringLiteral("featureType"))
-            .toString(QStringLiteral("histogram"));
-    const QString comparisonMode = colorComparison.value(QStringLiteral("comparisonMode"))
-            .toString(QStringLiteral("dominant_hue_coverage"));
-    if (comparisonMode == QStringLiteral("bhattacharyya_histogram") &&
-            featureType != QStringLiteral("histogram_2dim_hs")) {
-        m_templateFeature.clear();
+
+    const QJsonObject comparison =
+            colorComparison.value(QStringLiteral("comparison")).toObject();
+    const QString sensitivity = comparison
+            .value(QStringLiteral("sensitivity"))
+            .toString(colorComparison.value(QStringLiteral("sensitivity"))
+                      .toString(QStringLiteral("medium")));
+    const bool brightnessEnabled = comparison
+            .value(QStringLiteral("brightnessCompensation"))
+            .toBool(colorComparison.value(QStringLiteral("brightnessEnabled"))
+                    .toBool(false));
+
+    const QJsonObject position =
+            colorComparison.value(QStringLiteral("positionCorrection")).toObject();
+    m_positionCorrectionEnabled = position
+            .value(QStringLiteral("enabled"))
+            .toBool(colorComparison.value(QStringLiteral("enablePositionCorrection"))
+                    .toBool(false));
+    m_positionCorrectionSource = position
+            .value(QStringLiteral("sourceId"))
+            .toString(colorComparison.value(QStringLiteral("positionCorrectionSource"))
+                      .toString(QStringLiteral("1 基准图.位置修正信息")));
+
+    const ReferenceFrameSnapshot reference =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    const ColorComparisonModelReadResult modelRead =
+            readColorComparisonModel(colorComparison, !reference.frame.empty());
+    m_model = modelRead.model;
+    m_modelStatus = modelRead.status;
+    m_modelReason = modelRead.message;
+    if (serializedVersion == 2) {
+        restoreDialogLifecycle(colorComparison,
+                               m_model.state,
+                               &m_modelOriginVersion,
+                               &m_modelStatus,
+                               &m_modelReason);
     }
-    if (m_comparisonModeComboBox)
-        m_comparisonModeComboBox->setCurrentIndex(comparisonMode == QStringLiteral("bhattacharyya_histogram") ? 1 : 0);
-    if (m_featureTypeComboBox)
-        m_featureTypeComboBox->setCurrentIndex(featureType == QStringLiteral("spectrum") ? 1 : 0);
-    const bool brightnessEnabled =
-            colorComparison.value(QStringLiteral("brightnessEnabled")).toBool(false);
-    if (m_brightnessCheckBox)
+    if (m_model.state == ColorComparisonModelState::Ready) {
+        const QString currentReferenceHash = reference.frame.empty()
+                ? QString()
+                : colorComparisonReferenceHash(reference.frame);
+        if (currentReferenceHash != m_model.referenceImageHash) {
+            m_model.state = ColorComparisonModelState::Stale;
+            m_modelStatus = QStringLiteral("model_stale");
+            m_modelReason = tr("基准图已变化，请重新取样");
+        }
+    }
+
+    if (m_templateRegionModeComboBox) {
+        const QSignalBlocker blocker(m_templateRegionModeComboBox);
+        const int index = m_templateRegionModeComboBox->findData(m_templateRegionMode);
+        m_templateRegionModeComboBox->setCurrentIndex(index >= 0 ? index : 1);
+    }
+    if (m_sensitivityComboBox) {
+        const QSignalBlocker blocker(m_sensitivityComboBox);
+        const int index = m_sensitivityComboBox->findData(sensitivity);
+        m_sensitivityComboBox->setCurrentIndex(index >= 0 ? index : 1);
+    }
+    if (m_featureTypeComboBox) {
+        const QSignalBlocker blocker(m_featureTypeComboBox);
+        m_featureTypeComboBox->setCurrentIndex(0);
+    }
+    if (m_brightnessCheckBox) {
+        const QSignalBlocker blocker(m_brightnessCheckBox);
         m_brightnessCheckBox->setChecked(brightnessEnabled);
-    setAllParamsMode(brightnessEnabled ||
-                     comparisonMode == QStringLiteral("bhattacharyya_histogram") ||
-                     featureType == QStringLiteral("spectrum") ||
-                     m_detectMask.size() >= 3);
-    if (m_minScoreSpinBox)
-        m_minScoreSpinBox->setValue(config.judgeRule.value(QStringLiteral("minScore")).toInt(52));
+    }
+    if (m_minScoreSpinBox) {
+        const QSignalBlocker blocker(m_minScoreSpinBox);
+        m_minScoreSpinBox->setValue(
+                    config.judgeRule.value(QStringLiteral("minScore")).toInt(80));
+    }
+
+    setAllParamsMode(brightnessEnabled || m_detectMask.size() >= 3);
     refreshDetectRegionButtons();
     refreshPositionCorrectionControls();
     refreshEditControls();
+    showPreviewImage();
     updateTemplatePreview();
     refreshRoiOverlay();
     m_loadingConfig = false;
+    updateModelStateUi();
+    if (buildWasActive || recoveredFromInvalidConfig) {
+        if (m_model.state == ColorComparisonModelState::Ready)
+            updateStatus(tr("模型已加载，可直接测试"));
+        else
+            displayStoredModelInstruction();
+    }
 }
 
 QString ColorComparisonDialog::summaryText() const
 {
-    return tr("HSV直方图比较；最低分 %1").arg(m_minScoreSpinBox ? m_minScoreSpinBox->value() : 52);
+    return tr("HSV直方图比较；最低分 %1").arg(m_minScoreSpinBox ? m_minScoreSpinBox->value() : 80);
 }
 
 void ColorComparisonDialog::runTest()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_testUiMode == TestUiMode::Continuous) {
         stopContinuousRun();
         m_testUiMode = TestUiMode::TestPaused;
@@ -1092,24 +2220,39 @@ void ColorComparisonDialog::runTest()
 
 void ColorComparisonDialog::runReferenceTest()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     stopContinuousRun();
     m_liveTestSource = LiveTestSource::Reference;
     m_testUiMode = TestUiMode::Edit;
     applyDetectRoiEditState();
     updateBottomButtons();
 
-    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
-    if (frame.empty()) {
+    const ReferenceFrameSnapshot snapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    if (snapshot.frame.empty()) {
         displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
         return;
     }
 
-    showFrameImage(frame, tr("基准图"));
-    runComparisonOnFrame(frame.clone(), tr("基准图"), true);
+    showFrameImage(snapshot.frame, tr("基准图"));
+    if (m_model.state != ColorComparisonModelState::Ready) {
+        displayStoredModelInstruction();
+        return;
+    }
+    runComparisonOnFrame(snapshot.frame,
+                         snapshot.metadata,
+                         tr("基准图"),
+                         true);
 }
 
 void ColorComparisonDialog::startContinuousRun()
 {
+    if (blockInvalidConfigAction())
+        return;
+
+    invalidateAsyncWork();
     m_testUiMode = TestUiMode::Continuous;
     m_liveTestSource = LiveTestSource::Camera;
     applyDetectRoiEditState();
@@ -1123,29 +2266,43 @@ void ColorComparisonDialog::stopContinuousRun()
 {
     if (m_continuousTimer)
         m_continuousTimer->stop();
+    invalidateAsyncWork();
 }
 
 void ColorComparisonDialog::runContinuousTick()
 {
-    if (m_testUiMode != TestUiMode::Continuous || m_comparisonRunning)
+    if (blockInvalidConfigAction())
         return;
 
-    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
-    if (frame.empty()) {
+    if (m_testUiMode != TestUiMode::Continuous)
+        return;
+
+    const CameraFrameSnapshot snapshot =
+            CameraFrameProvider::instance().currentFrameSnapshot();
+    if (snapshot.frame.empty()) {
         displayError(QStringLiteral("image_empty"), tr("当前帧为空"));
         return;
     }
 
-    showFrameImage(frame, tr("测试图像"));
-    runComparisonOnFrame(frame.clone(), tr("测试图像"), false);
+    showFrameImage(snapshot.frame, tr("测试图像"));
+    runComparisonOnFrame(snapshot.frame,
+                         snapshot.metadata,
+                         tr("测试图像"),
+                         false);
 }
 
 void ColorComparisonDialog::runSingleShotTest()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     stopContinuousRun();
     m_testUiMode = TestUiMode::TestPaused;
     m_liveTestSource = LiveTestSource::Camera;
-    m_liveTestFrameSnapshot = CameraFrameProvider::instance().currentFrame();
+    const CameraFrameSnapshot snapshot =
+            CameraFrameProvider::instance().currentFrameSnapshot();
+    m_liveTestFrameSnapshot = snapshot.frame.clone();
+    m_liveTestFrameMetadata = snapshot.metadata;
     applyDetectRoiEditState();
     updateBottomButtons();
 
@@ -1155,19 +2312,29 @@ void ColorComparisonDialog::runSingleShotTest()
     }
 
     showFrameImage(m_liveTestFrameSnapshot, tr("单次测试快照"));
-    runComparisonOnFrame(m_liveTestFrameSnapshot.clone(), tr("单次测试快照"), false);
+    runComparisonOnFrame(m_liveTestFrameSnapshot,
+                         m_liveTestFrameMetadata,
+                         tr("单次测试快照"),
+                         false);
 }
 
 void ColorComparisonDialog::rerunLiveComparison()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_liveTestSource == LiveTestSource::None)
         return;
 
     cv::Mat frame;
+    FrameInputMetadata metadata;
     bool referenceSource = false;
     QString title;
     if (m_liveTestSource == LiveTestSource::Reference) {
-        frame = ReferenceImageProvider::instance().referenceFrame();
+        const ReferenceFrameSnapshot snapshot =
+                ReferenceImageProvider::instance().referenceFrameSnapshot();
+        frame = snapshot.frame;
+        metadata = snapshot.metadata;
         referenceSource = true;
         title = tr("基准图");
         if (frame.empty()) {
@@ -1176,10 +2343,14 @@ void ColorComparisonDialog::rerunLiveComparison()
         }
     } else {
         if (m_testUiMode == TestUiMode::Continuous) {
-            frame = CameraFrameProvider::instance().currentFrame();
+            const CameraFrameSnapshot snapshot =
+                    CameraFrameProvider::instance().currentFrameSnapshot();
+            frame = snapshot.frame;
+            metadata = snapshot.metadata;
             title = tr("测试图像");
         } else {
             frame = m_liveTestFrameSnapshot;
+            metadata = m_liveTestFrameMetadata;
             title = tr("单次测试快照");
         }
         if (frame.empty()) {
@@ -1189,7 +2360,7 @@ void ColorComparisonDialog::rerunLiveComparison()
     }
 
     showFrameImage(frame, title);
-    runComparisonOnFrame(frame.clone(), title, referenceSource);
+    runComparisonOnFrame(frame, metadata, title, referenceSource);
 }
 
 void ColorComparisonDialog::applyDetectRoiEditState()
@@ -1230,10 +2401,11 @@ void ColorComparisonDialog::updateBottomButtons()
 }
 
 void ColorComparisonDialog::runComparisonOnFrame(const cv::Mat &frame,
+                                                 const FrameInputMetadata &metadata,
                                                  const QString &imageTitle,
                                                  bool referenceSource)
 {
-    if (m_comparisonRunning)
+    if (blockInvalidConfigAction())
         return;
 
     if (frame.empty()) {
@@ -1241,36 +2413,114 @@ void ColorComparisonDialog::runComparisonOnFrame(const cv::Mat &frame,
         return;
     }
 
-    m_comparisonRunning = true;
-    if (referenceSource) {
-        QString status;
-        QString message;
-        if (!refreshTemplateFeatureFromFrame(frame, &status, &message)) {
-            displayError(status, message);
-            m_comparisonRunning = false;
-            return;
-        }
-    }
-
-    ToolRequest request;
-    request.config = toToolConfig();
-    request.image = frame.clone();
+    const ToolRequest request = makeTestRequest(frame, metadata);
     if (!imageTitle.isEmpty() && m_viewerTitleLabel)
         m_viewerTitleLabel->setText(imageTitle);
-    if (!referenceSource)
-        m_liveTestFrameSnapshot = frame;  // 缓存为停止态重测的快照帧
-    displayResult(m_testAdapter.run(request), referenceSource);
-    m_comparisonRunning = false;
+    if (!referenceSource) {
+        m_liveTestFrameSnapshot = frame.clone();
+        m_liveTestFrameMetadata = metadata;
+    }
+    queueTestRequest(request, imageTitle, referenceSource);
+}
+
+ToolRequest ColorComparisonDialog::makeTestRequest(
+        const cv::Mat &frame, const FrameInputMetadata &metadata) const
+{
+    ToolRequest request;
+    request.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    request.config = toToolConfig();
+    request.image = frame.clone();
+    request.runtimeContext.insert(QStringLiteral("input"), metadata.toJson());
+
+    const ReferenceFrameSnapshot reference =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    request.referenceImage = reference.frame.clone();
+    request.runtimeContext.insert(QStringLiteral("referenceInput"),
+                                  reference.metadata.toJson());
+    return request;
+}
+
+void ColorComparisonDialog::queueTestRequest(const ToolRequest &request,
+                                             const QString &imageTitle,
+                                             bool referenceSource)
+{
+    // 每个请求拥有独立代次。新帧进入 pending 时会立即使活动帧结果过期，
+    // 防止旧 score/overlay 被应用到已经显示的新帧。
+    const quint64 generation = ++m_testGeneration;
+    if (m_testWatcher && m_testWatcher->isRunning()) {
+        m_pendingTestRequest = request;
+        m_pendingTestRequest.image = request.image.clone();
+        m_pendingTestRequest.referenceImage = request.referenceImage.clone();
+        m_pendingImageTitle = imageTitle;
+        m_pendingReferenceSource = referenceSource;
+        m_pendingTestGeneration = generation;
+        m_pendingContinuousRun = true;
+        return;
+    }
+    launchTestRequest(request, imageTitle, referenceSource, generation);
+}
+
+void ColorComparisonDialog::launchTestRequest(const ToolRequest &inputRequest,
+                                              const QString &imageTitle,
+                                              bool referenceSource,
+                                              quint64 generation)
+{
+    if (!m_testWatcher)
+        return;
+
+    ToolRequest request = inputRequest;
+    request.image = inputRequest.image.clone();
+    request.referenceImage = inputRequest.referenceImage.clone();
+    m_activeTestGeneration = generation;
+    m_activeImageTitle = imageTitle;
+    m_activeReferenceSource = referenceSource;
+    updateStatus(tr("运行中…"));
+    m_testWatcher->setFuture(QtConcurrent::run([request]() {
+        ColorComparisonAdapter adapter;
+        return adapter.run(request);
+    }));
+}
+
+void ColorComparisonDialog::handleTestFinished()
+{
+    if (!m_testWatcher)
+        return;
+
+    const ToolResult result = m_testWatcher->result();
+    const quint64 finishedGeneration = m_activeTestGeneration;
+    const bool finishedReferenceSource = m_activeReferenceSource;
+    if (finishedGeneration == m_testGeneration)
+        displayResult(result, finishedReferenceSource);
+
+    if (!m_pendingContinuousRun)
+        return;
+
+    ToolRequest pending = m_pendingTestRequest;
+    pending.image = m_pendingTestRequest.image.clone();
+    pending.referenceImage = m_pendingTestRequest.referenceImage.clone();
+    const QString pendingTitle = m_pendingImageTitle;
+    const bool pendingReference = m_pendingReferenceSource;
+    const quint64 pendingGeneration = m_pendingTestGeneration;
+    m_pendingContinuousRun = false;
+    m_pendingTestRequest = ToolRequest();
+    m_pendingImageTitle.clear();
+    m_pendingReferenceSource = false;
+    m_pendingTestGeneration = 0;
+
+    if (pendingGeneration == m_testGeneration)
+        launchTestRequest(pending, pendingTitle, pendingReference,
+                          pendingGeneration);
 }
 
 void ColorComparisonDialog::displayResult(const ToolResult &result, bool referenceSource)
 {
     if (m_previewHelper)
         m_previewHelper->setToolOverlays(result.overlays);
-    updateStatus(tr("%1 | score:%2 | %3")
+    updateStatus(tr("%1 | score:%2 | %3 | %4")
                  .arg(result.ok ? QStringLiteral("OK") : QStringLiteral("NG"),
                       QString::number(result.score, 'f', 2),
-                      result.status));
+                      result.status,
+                      result.message));
     if (referenceSource) {
         m_referencePreviewSnapshot =
                 makeReferenceToolPreviewSnapshot(toToolConfig(), result, m_detectRoi);
@@ -1286,22 +2536,204 @@ void ColorComparisonDialog::displayError(const QString &status, const QString &m
     displayResult(result, false);
 }
 
+void ColorComparisonDialog::displayStoredModelInstruction()
+{
+    QString status = m_modelStatus;
+    if (status.isEmpty()) {
+        status = QStringLiteral("model_%1")
+                .arg(colorComparisonModelStateName(m_model.state));
+    }
+    QString message = m_modelReason;
+    if (message.isEmpty())
+        message = tr("模型未就绪，请重新取样");
+    displayError(status, message);
+}
+
+bool ColorComparisonDialog::rebuildTemplateModelFromFrame(
+        const cv::Mat &frame,
+        const FrameInputMetadata &metadata,
+        QString *status,
+        QString *message)
+{
+    if (m_invalidConfigReadOnly) {
+        if (status)
+            *status = m_invalidConfigStatus;
+        if (message)
+            *message = m_invalidConfigMessage;
+        return false;
+    }
+
+    if (!m_modelBuildWatcher || m_modelBuildWatcher->isRunning()) {
+        if (status)
+            *status = QStringLiteral("model_build_busy");
+        if (message)
+            *message = tr("颜色比较模型正在取样");
+        return false;
+    }
+    if (frame.empty()) {
+        if (status)
+            *status = QStringLiteral("image_empty");
+        if (message)
+            *message = tr("Reference image is empty.");
+        return false;
+    }
+
+    ToolRequest request;
+    request.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    request.config = toToolConfig();
+    if (m_model.state == ColorComparisonModelState::Unsupported
+            && m_modelStatus == QStringLiteral("model_rebuild_required")) {
+        ColorComparisonModelV2 buildableModel = m_model;
+        buildableModel.state = ColorComparisonModelState::Stale;
+        QJsonObject params = request.config.params;
+        QJsonObject colorComparison =
+                params.value(QStringLiteral("colorComparison")).toObject();
+        colorComparison.insert(QStringLiteral("model"),
+                               colorComparisonModelToJson(buildableModel));
+        QJsonObject lifecycle = colorComparison.value(
+                    QStringLiteral("dialogLifecycle")).toObject();
+        lifecycle.insert(QStringLiteral("status"),
+                         QStringLiteral("model_stale"));
+        colorComparison.insert(QStringLiteral("dialogLifecycle"), lifecycle);
+        params.insert(QStringLiteral("colorComparison"), colorComparison);
+        request.config.params = params;
+
+        const ColorComparisonModelReadResult migrationRead =
+                readColorComparisonModel(colorComparison, true);
+        if (migrationRead.status != QStringLiteral("model_stale")) {
+            if (status)
+                *status = QStringLiteral("model_rebuild_request_invalid");
+            if (message)
+                *message = tr("旧模型重建请求构造失败");
+            return false;
+        }
+    }
+    request.image = frame.clone();
+    request.referenceImage = frame.clone();
+    request.runtimeContext.insert(QStringLiteral("input"),
+                                  metadata.toJson());
+    request.runtimeContext.insert(QStringLiteral("referenceInput"),
+                                  metadata.toJson());
+
+    invalidateAsyncWork();
+    m_activeModelBuildGeneration = ++m_modelBuildGeneration;
+    m_modelBuildUiActive = true;
+    m_rebuildModelButton->setEnabled(false);
+    updateStatus(tr("正在重新取样…"));
+    m_modelBuildWatcher->setFuture(QtConcurrent::run([request]() {
+        ColorComparisonAdapter adapter;
+        return adapter.buildTemplateModel(request);
+    }));
+    return true;
+}
+
+void ColorComparisonDialog::startExplicitModelRebuild()
+{
+    if (blockInvalidConfigAction())
+        return;
+
+    if (!m_modelBuildWatcher || m_modelBuildWatcher->isRunning())
+        return;
+
+    stopContinuousRun();
+    m_testUiMode = TestUiMode::Edit;
+    m_liveTestSource = LiveTestSource::None;
+    updateBottomButtons();
+
+    if ((m_model.state == ColorComparisonModelState::Unsupported
+         && m_modelStatus != QStringLiteral("model_rebuild_required"))
+            || m_model.state == ColorComparisonModelState::Invalid) {
+        displayStoredModelInstruction();
+        return;
+    }
+
+    const ReferenceFrameSnapshot snapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    QString status;
+    QString message;
+    if (!rebuildTemplateModelFromFrame(snapshot.frame,
+                                       snapshot.metadata,
+                                       &status,
+                                       &message)) {
+        displayError(status, message);
+    }
+}
+
+void ColorComparisonDialog::handleModelBuildFinished()
+{
+    if (!m_modelBuildWatcher)
+        return;
+    if (m_rebuildModelButton)
+        m_rebuildModelButton->setEnabled(!m_invalidConfigReadOnly);
+
+    const ColorComparisonTemplateBuildResult result =
+            m_modelBuildWatcher->result();
+    if (m_activeModelBuildGeneration != m_modelBuildGeneration)
+        return;
+    m_modelBuildUiActive = false;
+
+    if (!result.success) {
+        displayError(result.status, result.message);
+        return;
+    }
+
+    invalidateAsyncWork();
+    m_model = result.model;
+    m_modelOriginVersion = 2;
+    m_modelStatus = result.status.isEmpty()
+            ? QStringLiteral("ok") : result.status;
+    m_modelReason = tr("取样完成");
+    updateModelStateUi();
+
+    ToolResult display;
+    display.toolType = ToolType::ColorComparison;
+    display.success = true;
+    display.ok = true;
+    display.status = m_modelStatus;
+    display.message = m_modelReason;
+    displayResult(display, false);
+}
+
 void ColorComparisonDialog::finishConfiguration()
 {
+    if (blockInvalidConfigAction())
+        return;
+
     if (m_testUiMode != TestUiMode::Edit) {
         runSingleShotTest();
         return;
     }
 
     setEditState(EditState::None);
-    if (m_templateFeature.isEmpty()) {
-        const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
-        QString status;
-        QString message;
-        if (!refreshTemplateFeatureFromFrame(frame, &status, &message)) {
-            displayError(status, message);
-            return;
-        }
-    }
     accept();
+}
+
+void ColorComparisonDialog::accept()
+{
+    if (blockInvalidConfigAction())
+        return;
+
+    if (m_continuousTimer)
+        m_continuousTimer->stop();
+    invalidateAsyncWork();
+    invalidateModelBuild();
+    QDialog::accept();
+}
+
+void ColorComparisonDialog::reject()
+{
+    if (m_continuousTimer)
+        m_continuousTimer->stop();
+    invalidateAsyncWork();
+    invalidateModelBuild();
+    QDialog::reject();
+}
+
+void ColorComparisonDialog::closeEvent(QCloseEvent *event)
+{
+    if (m_continuousTimer)
+        m_continuousTimer->stop();
+    invalidateAsyncWork();
+    invalidateModelBuild();
+    QDialog::closeEvent(event);
 }

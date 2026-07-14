@@ -1205,8 +1205,7 @@ QVector<double> histogram2DimHsFeature(HalconCApi *api,
         checkStatus(api,
                     api->getGrayval(histo2Dim, rowTuple.value(), columnTuple.value(), grayValues.ptr()),
                     QStringLiteral("histo_2dim.get_grayval"));
-        
-        //分bin降维分箱 统计每一bin范围中的像素总个数
+
         QVector<double> jointHistogram(bins * bins, 0.0);
         for (int row = 0; row < 256; ++row) {
             const int saturationBin = qBound(0, row * bins / 256, bins - 1);

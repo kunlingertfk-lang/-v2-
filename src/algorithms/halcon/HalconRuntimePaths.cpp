@@ -28,10 +28,14 @@ QString halconLicenseFromEnvironment()
 const QString kOcrModelRelativePath =
         QStringLiteral("ocr/OCRB_0-9A-Z_NoRej.omc");
 
+const QString kDefaultHalconRoot = QStringLiteral("/opt/halcon");
+
 QString halconLicenseRootForEnv()
 {
-    const QString root = halconRootFromEnvironment();
-    return root.isEmpty() ? QString() : cleanPath(root + QStringLiteral("/license"));
+    const QString configuredRoot = halconRootFromEnvironment();
+    const QString root = configuredRoot.isEmpty()
+            ? kDefaultHalconRoot : configuredRoot;
+    return cleanPath(root + QStringLiteral("/license"));
 }
 
 void appendUnique(QStringList *paths, const QString &path)
@@ -54,7 +58,7 @@ void appendHalconLibCandidatesForRoot(QStringList *paths, const QString &root)
 
     const QDir rootDir(cleanedRoot);
     appendUnique(paths, rootDir.filePath(QStringLiteral("lib/x64-linux/libhalconc.so")));
-    appendUnique(paths, rootDir.filePath(QStringLiteral("lib/x64-linux/libhalconc.so.24.11.2")));
+    appendUnique(paths, rootDir.filePath(QStringLiteral("lib/x64-linux/libhalconc.so.20.11.1")));
 }
 
 void appendOcrModelCandidateForRoot(QStringList *paths, const QString &root)
@@ -87,6 +91,11 @@ QString resolveBundledLicense()
         const QDir licenseDir(licenseRoot);
         if (!licenseDir.exists())
             continue;
+
+        const QString textLicense =
+                licenseDir.filePath(QStringLiteral("license.txt"));
+        if (QFileInfo(textLicense).isReadable())
+            return textLicense;
 
         const QString standardLicense =
                 licenseDir.filePath(QStringLiteral("license.dat"));
@@ -140,7 +149,13 @@ QString initializeHalconEnvironment()
 
 QString defaultHalconRoot()
 {
-    return cleanPath(halconRootFromEnvironment());
+    const QString root = cleanPath(halconRootFromEnvironment());
+    return root.isEmpty() ? kDefaultHalconRoot : root;
+}
+
+QString expectedHalconVersion()
+{
+    return QStringLiteral("20.11.1");
 }
 
 QStringList halconLibCandidates(const QString &explicitPath)
@@ -148,9 +163,7 @@ QStringList halconLibCandidates(const QString &explicitPath)
     QStringList candidates;
     appendUnique(&candidates, explicitPath);
 
-    const QString envRoot = halconRootFromEnvironment();
-    if (!envRoot.isEmpty())
-        appendHalconLibCandidatesForRoot(&candidates, envRoot);
+    appendHalconLibCandidatesForRoot(&candidates, defaultHalconRoot());
 
     return candidates;
 }
@@ -168,9 +181,7 @@ QStringList ocrModelCandidates(const QString &explicitPath)
     QStringList candidates;
     appendUnique(&candidates, explicitPath);
 
-    const QString envRoot = halconRootFromEnvironment();
-    if (!envRoot.isEmpty())
-        appendOcrModelCandidateForRoot(&candidates, envRoot);
+    appendOcrModelCandidateForRoot(&candidates, defaultHalconRoot());
 
     return candidates;
 }
