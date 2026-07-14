@@ -1,4 +1,5 @@
 #include "algorithms/recognition/ColorComparisonHalconRunner.h"
+#include "algorithms/halcon/HalconRuntimePaths.h"
 
 #include <HalconC.h>
 
@@ -18,6 +19,9 @@ namespace {
 
 constexpr int kHistogramBins = 32;
 constexpr int kHistogramLength = kHistogramBins * kHistogramBins;
+constexpr int kPaddedHistogramWidth = 64;
+constexpr int kTiledHistogramHeight = 96;
+constexpr int kSaturationOffset = 16;
 constexpr double kMinBrightnessMean = 8.0;
 constexpr double kMaxBrightnessMean = 247.0;
 constexpr double kMinBrightnessScale = 0.75;
@@ -32,6 +36,26 @@ struct RunnerFailure
     QJsonObject payloadPatch = QJsonObject();
 };
 
+struct SmoothingProfile
+{
+    QString sensitivity;
+    double hueSigma = 0.0;
+    double saturationSigma = 0.0;
+    bool valid = false;
+};
+
+SmoothingProfile smoothingProfile(const QString &sensitivity)
+{
+    const QString normalized = sensitivity.trimmed().toLower();
+    if (normalized == QStringLiteral("high"))
+        return {normalized, 1.5, 4.0, true};
+    if (normalized == QStringLiteral("medium"))
+        return {normalized, 3.0, 8.0, true};
+    if (normalized == QStringLiteral("low"))
+        return {normalized, 4.0, 10.0, true};
+    return {};
+}
+
 bool halconStatusOk(Herror status)
 {
     return status == H_MSG_OK || status == H_MSG_TRUE || status == H_MSG_FALSE;
@@ -45,8 +69,7 @@ bool halconObjectAllocated(Hobject object)
 bool isLicenseError(Herror status)
 {
     const Hlong code = static_cast<Hlong>(status);
-    return (code >= H_ERR_LIC_RANGE1_BEGIN && code <= H_ERR_LIC_RANGE1_END)
-            || (code >= H_ERR_LIC_RANGE2_BEGIN && code <= H_ERR_LIC_RANGE2_END);
+    return code >= H_ERR_LIC_NO_LICENSE && code <= H_ERR_LIC_NEWVER;
 }
 
 bool finiteValue(double value)
@@ -476,18 +499,6 @@ QString modelFailureStatus(const ColorComparisonModelValidation &validation)
     return validation.status;
 }
 
-int sensitivityRadius(const QString &sensitivity)
-{
-    const QString normalized = sensitivity.trimmed().toLower();
-    if (normalized == QStringLiteral("high"))
-        return 0;
-    if (normalized == QStringLiteral("medium"))
-        return 1;
-    if (normalized == QStringLiteral("low"))
-        return 2;
-    return -1;
-}
-
 struct HalconCApi
 {
     using SetUtf8Fn = void (*)(int);
@@ -495,6 +506,7 @@ struct HalconCApi
     using CreateTupleFn = void (*)(Htuple *, Hlong);
     using SetDoubleFn = void (*)(Htuple *, double, Hlong);
     using SetIntFn = void (*)(Htuple *, Hlong, Hlong);
+    using SetStringFn = void (*)(Htuple *, const char *, Hlong);
     using DestroyTupleFn = void (*)(Htuple *);
     using GetDoubleFn = double (*)(const Htuple *, Hlong);
     using GenImageInterleavedFn = Herror (*)(Hobject *, Hlong, const char *, Hlong,
@@ -518,6 +530,14 @@ struct HalconCApi
     using TupleSumFn = Herror (*)(const Htuple, Htuple *);
     using TupleMaxFn = Herror (*)(const Htuple, Htuple *);
     using TupleDivFn = Herror (*)(const Htuple, const Htuple, Htuple *);
+    using GenImage1Fn = Herror (*)(Hobject *, const Htuple, const Htuple,
+                                   const Htuple, const Htuple);
+    using GenGaussFilterFn = Herror (*)(Hobject *, const Htuple, const Htuple,
+                                        const Htuple, const Htuple, const Htuple,
+                                        const Htuple, const Htuple);
+    using RftGenericFn = Herror (*)(const Hobject, Hobject *, const Htuple,
+                                    const Htuple, const Htuple, const Htuple);
+    using ConvolFftFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using ClearObjFn = Herror (*)(const Hobject);
 
     SetUtf8Fn setUtf8 = nullptr;
@@ -525,6 +545,7 @@ struct HalconCApi
     CreateTupleFn createTuple = nullptr;
     SetDoubleFn setDouble = nullptr;
     SetIntFn setInt = nullptr;
+    SetStringFn setString = nullptr;
     DestroyTupleFn destroyTuple = nullptr;
     GetDoubleFn getDouble = nullptr;
     GenImageInterleavedFn genImageInterleaved = nullptr;
@@ -545,6 +566,10 @@ struct HalconCApi
     TupleSumFn tupleSum = nullptr;
     TupleMaxFn tupleMax = nullptr;
     TupleDivFn tupleDiv = nullptr;
+    GenImage1Fn genImage1 = nullptr;
+    GenGaussFilterFn genGaussFilter = nullptr;
+    RftGenericFn rftGeneric = nullptr;
+    ConvolFftFn convolFft = nullptr;
     ClearObjFn clearObj = nullptr;
 };
 
@@ -604,6 +629,7 @@ public:
                 || !resolveRequired(m_handle, api.createTuple, "F_create_tuple", message)
                 || !resolveRequired(m_handle, api.setDouble, "F_set_d", message)
                 || !resolveRequired(m_handle, api.setInt, "F_set_i", message)
+                || !resolveRequired(m_handle, api.setString, "F_set_s", message)
                 || !resolveRequired(m_handle, api.destroyTuple, "F_destroy_tuple", message)
                 || !resolveRequired(m_handle, api.getDouble, "F_get_d", message)
                 || !resolveRequired(m_handle, api.genImageInterleaved,
@@ -626,6 +652,13 @@ public:
                 || !resolveRequired(m_handle, api.tupleSum, "T_tuple_sum", message)
                 || !resolveRequired(m_handle, api.tupleMax, "T_tuple_max", message)
                 || !resolveRequired(m_handle, api.tupleDiv, "T_tuple_div", message)
+                || !resolveRequired(m_handle, api.genImage1, "T_gen_image1", message)
+                || !resolveRequired(m_handle, api.genGaussFilter,
+                                    "T_gen_gauss_filter", message)
+                || !resolveRequired(m_handle, api.rftGeneric,
+                                    "T_rft_generic", message)
+                || !resolveRequired(m_handle, api.convolFft,
+                                    "T_convol_fft", message)
                 || !resolveRequired(m_handle, api.clearObj, "clear_obj", message)) {
             *symbolMissing = true;
             dlclose(m_handle);
@@ -708,6 +741,11 @@ public:
         m_api->setInt(&m_tuple, value, index);
     }
 
+    void setString(int index, const char *value)
+    {
+        m_api->setString(&m_tuple, value, index);
+    }
+
     double doubleAt(int index) const
     {
         return m_api->getDouble(&m_tuple, index);
@@ -788,6 +826,14 @@ HalconTuple scalarTuple(HalconCApi *api, double value)
     HalconTuple tuple(api);
     tuple.create(1);
     tuple.setDouble(0, value);
+    return tuple;
+}
+
+HalconTuple stringTuple(HalconCApi *api, const char *value)
+{
+    HalconTuple tuple(api);
+    tuple.create(1);
+    tuple.setString(0, value);
     return tuple;
 }
 
@@ -1404,66 +1450,153 @@ ExtractedFeature extractFeature(HalconCApi *api,
     return extracted;
 }
 
-double shiftedHistogramIntersection(HalconCApi *api,
-                                    const QVector<double> &templateFeature,
-                                    const QVector<double> &detectFeature,
-                                    int radius)
+double histogramIntersection(HalconCApi *api,
+                             const QVector<double> &left,
+                             const QVector<double> &right)
 {
-    QVector<double> detectWithZero = detectFeature;
-    detectWithZero.append(0.0);
-    HalconTuple templateTuple = vectorTuple(api, templateFeature);
-    HalconTuple detectTuple = vectorTuple(api, detectWithZero);
-    const int diameter = radius * 2 + 1;
-    HalconTuple intersections(api);
-    intersections.create(diameter * diameter);
-    int intersectionIndex = 0;
+    if (left.size() != kHistogramLength || right.size() != kHistogramLength) {
+        throw RunnerFailure{QStringLiteral("invalid_smoothed_histogram"),
+                            QStringLiteral("H/S histograms must contain 1024 values.")};
+    }
+    HalconTuple leftTuple = vectorTuple(api, left);
+    HalconTuple rightTuple = vectorTuple(api, right);
+    HalconTuple minimum(api);
+    checkHalcon(api,
+                api->tupleMin2(leftTuple.value(), rightTuple.value(), minimum.ptr()),
+                QStringLiteral("score.tuple_min2"));
+    HalconTuple sum(api);
+    checkHalcon(api, api->tupleSum(minimum.value(), sum.ptr()),
+                QStringLiteral("score.tuple_sum"));
+    const double result = tupleScalar(sum);
+    if (!finiteValue(result)) {
+        throw RunnerFailure{QStringLiteral("invalid_smoothed_histogram"),
+                            QStringLiteral("Histogram intersection is not finite.")};
+    }
+    return qBound(0.0, result, 1.0);
+}
 
-    for (int deltaHue = -radius; deltaHue <= radius; ++deltaHue) {
-        for (int deltaSaturation = -radius;
-             deltaSaturation <= radius;
-             ++deltaSaturation) {
-            QVector<int> indices;
-            indices.reserve(kHistogramLength);
-            for (int hueBin = 0; hueBin < kHistogramBins; ++hueBin) {
-                const int shiftedHue = (hueBin + deltaHue + kHistogramBins)
-                        % kHistogramBins;
-                for (int saturationBin = 0;
-                     saturationBin < kHistogramBins;
-                     ++saturationBin) {
-                    const int shiftedSaturation = saturationBin + deltaSaturation;
-                    indices.append(shiftedSaturation < 0
-                                   || shiftedSaturation >= kHistogramBins
-                                   ? kHistogramLength
-                                   : shiftedHue * kHistogramBins
-                                     + shiftedSaturation);
-                }
+QVector<double> smoothHsHistogram(HalconCApi *api,
+                                  const QVector<double> &histogram,
+                                  const SmoothingProfile &profile)
+{
+    if (histogram.size() != kHistogramLength) {
+        throw RunnerFailure{QStringLiteral("invalid_smoothed_histogram"),
+                            QStringLiteral("H/S histogram must contain 1024 values.")};
+    }
+
+    QVector<float> tiled(kPaddedHistogramWidth * kTiledHistogramHeight, 0.0f);
+    for (int hueBin = 0; hueBin < kHistogramBins; ++hueBin) {
+        for (int saturationBin = 0; saturationBin < kHistogramBins;
+             ++saturationBin) {
+            const double value = histogram.at(hueBin * kHistogramBins
+                                              + saturationBin);
+            if (!finiteValue(value) || value < 0.0) {
+                throw RunnerFailure{QStringLiteral("invalid_smoothed_histogram"),
+                                    QStringLiteral("H/S histogram contains an invalid value.")};
             }
-
-            HalconTuple index = indexTuple(api, indices);
-            HalconTuple candidate(api);
-            checkHalcon(api,
-                        api->tupleSelect(detectTuple.value(),
-                                         index.value(),
-                                         candidate.ptr()),
-                        QStringLiteral("score.tuple_select"));
-            HalconTuple minimum(api);
-            checkHalcon(api,
-                        api->tupleMin2(templateTuple.value(),
-                                       candidate.value(),
-                                       minimum.ptr()),
-                        QStringLiteral("score.tuple_min2"));
-            HalconTuple intersection(api);
-            checkHalcon(api,
-                        api->tupleSum(minimum.value(), intersection.ptr()),
-                        QStringLiteral("score.tuple_sum"));
-            intersections.setDouble(intersectionIndex++, tupleScalar(intersection));
+            for (int repeat = 0; repeat < 3; ++repeat) {
+                tiled[(repeat * kHistogramBins + hueBin)
+                      * kPaddedHistogramWidth
+                      + kSaturationOffset + saturationBin]
+                        = static_cast<float>(value);
+            }
         }
     }
-    HalconTuple maximum(api);
+
+    HalconTuple realType = stringTuple(api, "real");
+    HalconTuple width = scalarTuple(api, kPaddedHistogramWidth);
+    HalconTuple height = scalarTuple(api, kTiledHistogramHeight);
+    HalconTuple pointer(api);
+    pointer.create(1);
+    pointer.setInt(0, reinterpret_cast<Hlong>(tiled.data()));
+
+    HalconObject image(api);
     checkHalcon(api,
-                api->tupleMax(intersections.value(), maximum.ptr()),
-                QStringLiteral("score.tuple_max"));
-    return qBound(0.0, tupleScalar(maximum), 1.0);
+                api->genImage1(image.ptr(), realType.value(), width.value(),
+                               height.value(), pointer.value()),
+                QStringLiteral("score.gen_image1"));
+
+    HalconTuple saturationSigma = scalarTuple(api, profile.saturationSigma);
+    HalconTuple hueSigma = scalarTuple(api, profile.hueSigma);
+    HalconTuple phi = scalarTuple(api, 0.0);
+    HalconTuple filterNorm = stringTuple(api, "n");
+    HalconTuple filterMode = stringTuple(api, "rft");
+    HalconObject filter(api);
+    checkHalcon(api,
+                api->genGaussFilter(filter.ptr(), saturationSigma.value(),
+                                    hueSigma.value(), phi.value(),
+                                    filterNorm.value(), filterMode.value(),
+                                    width.value(), height.value()),
+                QStringLiteral("score.gen_gauss_filter"));
+
+    HalconTuple toFrequency = stringTuple(api, "to_freq");
+    HalconTuple none = stringTuple(api, "none");
+    HalconTuple complex = stringTuple(api, "complex");
+    HalconObject frequency(api);
+    checkHalcon(api,
+                api->rftGeneric(image.value(), frequency.ptr(),
+                                toFrequency.value(), none.value(),
+                                complex.value(), width.value()),
+                QStringLiteral("score.rft_to_freq"));
+    HalconObject convolved(api);
+    checkHalcon(api,
+                api->convolFft(frequency.value(), filter.value(), convolved.ptr()),
+                QStringLiteral("score.convol_fft"));
+
+    HalconTuple fromFrequency = stringTuple(api, "from_freq");
+    HalconObject smoothed(api);
+    checkHalcon(api,
+                api->rftGeneric(convolved.value(), smoothed.ptr(),
+                                fromFrequency.value(), none.value(),
+                                realType.value(), width.value()),
+                QStringLiteral("score.rft_from_freq"));
+
+    QVector<int> rows;
+    QVector<int> columns;
+    rows.reserve(kHistogramLength);
+    columns.reserve(kHistogramLength);
+    for (int hueBin = 0; hueBin < kHistogramBins; ++hueBin) {
+        for (int saturationBin = 0; saturationBin < kHistogramBins;
+             ++saturationBin) {
+            rows.append(kHistogramBins + hueBin);
+            columns.append(kSaturationOffset + saturationBin);
+        }
+    }
+    HalconTuple rowTuple = indexTuple(api, rows);
+    HalconTuple columnTuple = indexTuple(api, columns);
+    HalconTuple values(api);
+    checkHalcon(api,
+                api->getGrayval(smoothed.value(), rowTuple.value(),
+                                columnTuple.value(), values.ptr()),
+                QStringLiteral("score.get_grayval"));
+    QVector<double> cleanedValues = tupleToVector(values);
+    for (double &value : cleanedValues) {
+        if (!finiteValue(value)) {
+            throw RunnerFailure{QStringLiteral("invalid_smoothed_histogram"),
+                                QStringLiteral("Smoothed histogram contains an invalid value.")};
+        }
+        // The inverse FFT may leave very small negative round-off values.
+        // They are not histogram mass and must not invalidate a valid model.
+        if (value < 0.0)
+            value = 0.0;
+    }
+    HalconTuple cleanedTuple = vectorTuple(api, cleanedValues);
+    return normalizedTupleValues(api, cleanedTuple,
+                                 QStringLiteral("score.normalize_smoothed"));
+}
+
+double meanSaturation(const QVector<double> &histogram)
+{
+    double result = 0.0;
+    for (int hueBin = 0; hueBin < kHistogramBins; ++hueBin) {
+        for (int saturationBin = 0; saturationBin < kHistogramBins;
+             ++saturationBin) {
+            result += histogram.at(hueBin * kHistogramBins + saturationBin)
+                    * static_cast<double>(saturationBin)
+                    / static_cast<double>(kHistogramBins - 1);
+        }
+    }
+    return qBound(0.0, result, 1.0);
 }
 
 QJsonObject brightnessDiagnostics(const ColorComparisonHalconConfig &config,
@@ -1792,8 +1925,8 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           image.rows);
     }
 
-    const int radius = sensitivityRadius(config.sensitivity);
-    if (radius < 0) {
+    const SmoothingProfile profile = smoothingProfile(config.sensitivity);
+    if (!profile.valid) {
         return runFailure(QStringLiteral("invalid_sensitivity"),
                           QStringLiteral("Sensitivity must be high, medium, or low."),
                           config,
@@ -1837,12 +1970,46 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                     false,
                     config.brightnessCompensation,
                     config.model.brightnessReference.mean);
-        const double similarity = shiftedHistogramIntersection(
-                    &library.api,
-                    config.model.values,
-                    extracted.hsHistogram,
-                    radius);
-        const double score = qBound(0.0, similarity * 100.0, 100.0);
+        const double rawIntersection = histogramIntersection(
+                    &library.api, config.model.values, extracted.hsHistogram);
+        const QVector<double> smoothedTemplate = smoothHsHistogram(
+                    &library.api, config.model.values, profile);
+        const QVector<double> smoothedDetect = smoothHsHistogram(
+                    &library.api, extracted.hsHistogram, profile);
+        const double smoothedIntersection = histogramIntersection(
+                    &library.api, smoothedTemplate, smoothedDetect);
+        const double hsScore = smoothedIntersection * 100.0;
+        const double templateMeanSaturation = meanSaturation(config.model.values);
+        const double detectMeanSaturation = meanSaturation(extracted.hsHistogram);
+        const double brightnessDifference = qBound(
+                    0.0,
+                    std::abs(config.model.brightnessReference.mean
+                             - extracted.meanAfter) / 255.0,
+                    1.0);
+        double brightnessFactor = 1.0;
+        if (brightnessDifference > 0.10 && brightnessDifference < 0.40)
+            brightnessFactor = 1.10 - brightnessDifference;
+        else if (brightnessDifference >= 0.40)
+            brightnessFactor = 0.70;
+
+        const double colorScore = hsScore * brightnessFactor;
+        const double grayScore = 100.0 * qMax(
+                    0.0, 1.0 - brightnessDifference / 0.50);
+        const double minimumSaturation = qMin(templateMeanSaturation,
+                                              detectMeanSaturation);
+        const double maximumSaturation = qMax(templateMeanSaturation,
+                                              detectMeanSaturation);
+        const double grayWeight = qBound(
+                    0.0, (0.20 - maximumSaturation) / 0.10, 1.0);
+        double score = grayWeight * grayScore
+                + (1.0 - grayWeight) * colorScore;
+        if (minimumSaturation <= 0.10) {
+            const double mismatchProgress = qBound(
+                        0.0, (maximumSaturation - 0.10) / 0.10, 1.0);
+            score = qMin(score, 100.0 - 60.0 * mismatchProgress);
+        }
+        score = qBound(0.0, score, 100.0);
+        const double similarity = score / 100.0;
         const bool passed = score >= static_cast<double>(config.minScore);
 
         ColorComparisonHalconResult result;
@@ -1862,6 +2029,29 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.payload.insert(QStringLiteral("passed"), passed);
         result.payload.insert(QStringLiteral("score"), score);
         result.payload.insert(QStringLiteral("similarity"), similarity);
+        result.payload.insert(QStringLiteral("rawIntersection"), rawIntersection);
+        result.payload.insert(QStringLiteral("smoothedIntersection"),
+                              smoothedIntersection);
+        result.payload.insert(QStringLiteral("hsScore"), hsScore);
+        result.payload.insert(QStringLiteral("templateMeanSaturation"),
+                              templateMeanSaturation);
+        result.payload.insert(QStringLiteral("detectMeanSaturation"),
+                              detectMeanSaturation);
+        result.payload.insert(QStringLiteral("brightnessDifference"),
+                              brightnessDifference);
+        result.payload.insert(QStringLiteral("brightnessFactor"),
+                              brightnessFactor);
+        result.payload.insert(QStringLiteral("smoothingProfile"), QJsonObject{
+            {QStringLiteral("sensitivity"), profile.sensitivity},
+            {QStringLiteral("hueSigma"), profile.hueSigma},
+            {QStringLiteral("saturationSigma"), profile.saturationSigma},
+            {QStringLiteral("hueCircular"), true},
+            {QStringLiteral("saturationBoundary"), QStringLiteral("zero_pad")}
+        });
+        result.payload.insert(QStringLiteral("halconRuntimePath"),
+                              QFileInfo(config.halconSoPath).absoluteFilePath());
+        result.payload.insert(QStringLiteral("halconRuntimeVersion"),
+                              HalconRuntimePaths::expectedHalconVersion());
         result.payload.insert(QStringLiteral("effectiveDetectionPixels"),
                               static_cast<double>(extracted.effectivePixelCount));
         result.payload.insert(QStringLiteral("brightnessCompensation"),

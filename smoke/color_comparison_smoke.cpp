@@ -203,21 +203,15 @@ void checkRunnerSourceContract()
           "runner must not duplicate the shared minimum-effective-pixels contract");
     check(code.contains("kColorComparisonMinimumEffectivePixels"),
           "runner must use the shared minimum-effective-pixels contract");
-    check(code.contains("\"T_tuple_max\""),
-          "runner must resolve T_tuple_max as a required HALCON symbol");
-    const int scoringStart = code.indexOf("double shiftedHistogramIntersection");
-    const int scoringEnd = code.indexOf("QJsonObject brightnessDiagnostics",
-                                        scoringStart);
-    check(scoringStart >= 0 && scoringEnd > scoringStart,
-          "runner scoring implementation must be locatable for static contract checks");
-    if (scoringStart < 0 || scoringEnd <= scoringStart)
-        return;
-
-    const QByteArray scoring = code.mid(scoringStart, scoringEnd - scoringStart);
-    check(scoring.contains("api->tupleMax("),
-          "runner scoring must call the resolved HALCON tuple_max operator");
-    check(!scoring.contains("qMax("),
-          "runner must not use C++ qMax for scoring candidate aggregation");
+    check(code.contains("\"T_gen_image1\"")
+          && code.contains("\"T_gen_gauss_filter\"")
+          && code.contains("\"T_rft_generic\"")
+          && code.contains("\"T_convol_fft\""),
+          "runner must resolve HALCON continuous-scoring symbols");
+    check(code.contains("api->tupleMin2(") && code.contains("api->tupleSum("),
+          "runner must calculate histogram intersection with HALCON tuple operators");
+    check(!code.contains("shiftedHistogramIntersection"),
+          "runner must remove the old global histogram shift search");
 }
 
 void checkDefaultContract(ColorComparisonHalconRunner *runner)
@@ -465,7 +459,7 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
     if (buildOrReport(runner, redLowHue, redConfig, &redBuilt, "red wrap")) {
         redConfig.model = redBuilt.model;
         const ColorComparisonHalconResult redWrap = runner->run(redHighHue, redConfig);
-        if (!(redWrap.success && redWrap.score > 99.0)) {
+        if (!(redWrap.success && redWrap.score >= 80.0)) {
             std::cerr << "red-wrap diagnostic: status="
                       << redWrap.status.toStdString()
                       << " score=" << redWrap.score
@@ -473,8 +467,8 @@ void checkLicensedContract(ColorComparisonHalconRunner *runner)
                       << " detectPeak=" << maximumFeatureIndex(redWrap.detectFeature)
                       << std::endl;
         }
-        check(redWrap.success && redWrap.score > 99.0,
-              "medium tolerance must wrap hue across red bin 31/0");
+        check(redWrap.success && redWrap.score >= 80.0,
+              "medium continuous scoring must wrap hue across red bin 31/0");
     }
 
     ColorComparisonHalconConfig pairedConfig = baseConfig();
