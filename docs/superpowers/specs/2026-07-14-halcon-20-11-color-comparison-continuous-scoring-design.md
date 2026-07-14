@@ -64,7 +64,7 @@ OCR 默认模型目录改为 `/opt/halcon/ocr`。已有配置中的 24.11 绝对
 
 ### 4.3 模型兼容
 
-HALCON 20.11 已确认提供并导出本设计需要的 `histo_2dim`、`get_grayval`、`gen_image1`、`gauss_filter`、`crop_rectangle1`、`tile_images_offset` 和 tuple 算子。
+HALCON 20.11 已确认提供并导出本设计需要的 `histo_2dim`、`get_grayval`、`gen_image1`、`gen_gauss_filter`、`rft_generic`、`convol_fft` 和 tuple 算子。
 
 20.11 canary 与当前外部模型坐标合同一致：`histo_2dim(Region,H,S)` 按 `row=S,column=H` 读取后组织为 `hueBin*32+saturationBin`。因此继续使用 V2 原始模型，不升级 V3，不强制重新取样。若正式 canary 得到不同结果，实施必须停止，不允许自动转换模型。
 
@@ -87,25 +87,33 @@ HALCON 20.11 已确认提供并导出本设计需要的 `histo_2dim`、`get_gray
 
 对模板与检测使用完全相同的链路：
 
-1. `gen_image1(...,"real",32,32,...)` 将直方图转换为 HALCON real image。
-2. Hue 方向复制三份形成循环扩展图；Saturation 方向不循环。
-3. 使用 `gauss_filter` 进行离散高斯平滑。
-4. `crop_rectangle1` 取回中间 Hue 周期的 32×32 区域。
-5. `get_grayval` 按稳定的 row/column 合同取回 1024 个值。
-6. 使用 HALCON tuple 求和并重新归一化。
-7. 使用 `tuple_min2 + tuple_sum` 计算平滑直方图交集。
+1. 在 Saturation 两侧各增加 16 列零填充，并将 Hue 方向复制三份，形成 `64×96` 的 hue-major HALCON `real` 图像。`real` 像素缓冲必须使用 32 位 `float`。
+2. 使用 `gen_gauss_filter(SaturationSigma,HueSigma,0,'n','rft',64,96)` 生成 HALCON 20.11 官方各向异性高斯频域滤波器。
+3. 使用 `rft_generic('to_freq','none','complex',64)`、`convol_fft`、`rft_generic('from_freq','none','real',64)` 完成平滑。
+4. `get_grayval` 从中间 Hue 周期和中间 Saturation 区域取回 32×32、共 1024 个值。
+5. 使用 HALCON tuple 求和并重新归一化。
+6. 使用 `tuple_min2 + tuple_sum` 计算平滑直方图交集。
 
-Hue 循环扩展保证红色在 0/360° 两侧相邻；Saturation 不循环，越界质量不得从低饱和度回绕到高饱和度。
+Hue 循环扩展保证红色在 0/360° 两侧相邻；Saturation 零填充且不循环，越界质量不得从低饱和度回绕到高饱和度。使用频域滤波不是自行实现高斯算法，而是为了调用 HALCON 20.11 支持不同 Hue/Saturation 标准差的官方算子链路。
 
 ### 5.3 灵敏度
 
-高、中、低继续作为内部固定 profile，不新增 UI 参数。实施只允许从 HALCON 20.11 `gauss_filter` 支持的奇数尺寸 `3,5,7,9,11` 中选择，并遵守：
+高、中、低继续作为内部固定 profile，不新增 UI 参数。固定参数为：
+
+| 灵敏度 | Hue Sigma | Saturation Sigma |
+| --- | ---: | ---: |
+| high | 1.5 | 4.0 |
+| medium | 3.0 | 8.0 |
+| low | 4.0 | 10.0 |
+
+参数来自 HALCON 20.11 实测，而不是分数整体抬升。对当前复现样本，medium 的结果为：
 
 ```text
-high kernel < medium kernel < low kernel
+H10/S31 -> H11/S27（相似色）  81.5066
+H10/S31 -> H15/S27（明确色偏）39.5854
 ```
 
-参数选择使用固定回归矩阵：每档选择满足本档正负样本边界的最小 kernel，并将最终常量写入 Runner、smoke 断言和功能文档。默认 medium 必须使批准的相近数字色块判定 OK，同时所有明确色偏样本保持 NG。若 `3..11` 不存在同时满足正负边界的组合，实施必须停止并返回设计阶段，不得增加经验旁路或整体抬分。
+原等方 `gauss_filter` 方案已被实测否决：其最大允许档位 11 对相似样本也只有 49.1903，无法达到最低分 80；继续扩大等方核还会同步抬高 Hue 异色分数。各向异性参数必须写入 Runner、smoke 断言和功能文档。默认 medium 必须使批准的相近数字色块判定 OK，同时所有明确色偏样本保持 NG；若完整回归矩阵不能满足边界，实施必须停止并返回设计阶段，不得增加经验旁路或整体抬分。
 
 旧的全局位移搜索从最终评分中移除，避免同时叠加两套容差；`rawIntersection` 保留无位移硬交集用于诊断。
 
@@ -158,7 +166,13 @@ templateMeanSaturation
 detectMeanSaturation
 brightnessDifference
 brightnessFactor
-smoothingProfile { sensitivity, kernelSize, hueCircular=true }
+smoothingProfile {
+  sensitivity,
+  hueSigma,
+  saturationSigma,
+  hueCircular=true,
+  saturationBoundary="zero_pad"
+}
 halconRuntimePath
 halconRuntimeVersion = "20.11.1"
 ```
