@@ -14,11 +14,7 @@ system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 
 INCLUDEPATH += ../src
 INCLUDEPATH += /usr/include/opencv4
-HALCON_ROOT = $$(HALCONROOT)
-!exists($$HALCON_ROOT/include/HalconC.h) {
-    HALCON_ROOT = /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady
-}
-INCLUDEPATH += $$HALCON_ROOT/include
+include(../qmake/halcon_20_11.pri)
 
 SOURCES += \
     halcon_runtime_smoke.cpp \

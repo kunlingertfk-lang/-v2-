@@ -15,11 +15,7 @@ system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 INCLUDEPATH += ../src
 OPENCV_ROOT = /home/tt/.local/opencv-4.8.0
 INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
-HALCON_ROOT = $$(HALCONROOT)
-!exists($$HALCON_ROOT/include/HalconC.h) {
-    HALCON_ROOT = /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady
-}
-INCLUDEPATH += $$HALCON_ROOT/include
+include(../qmake/halcon_20_11.pri)
 
 SOURCES += \
     color_comparison_dialog_smoke.cpp \
