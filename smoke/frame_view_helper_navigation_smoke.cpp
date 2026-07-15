@@ -110,6 +110,27 @@ int main(int argc, char **argv)
           && near(helper.viewScale(), 1.0),
           "enabling navigation must start at fit scale");
 
+    QGraphicsView legacyView;
+    legacyView.resize(500, 380);
+    FrameViewHelper legacyHelper(&legacyView);
+    legacyHelper.setImage(QImage(320, 240, QImage::Format_RGB32));
+    legacyView.show();
+    QApplication::processEvents();
+
+    const QPoint legacyCenter = legacyView.viewport()->rect().center();
+    const QTransform legacyTransform = legacyView.transform();
+    const QPointF legacySceneCenter = legacyView.mapToScene(legacyCenter);
+    sendWheel(legacyView.viewport(), QPoint(100, 80), 120, Qt::NoModifier);
+    sendMousePress(legacyView.viewport(), QPoint(220, 170), Qt::NoModifier);
+    sendMouseMove(legacyView.viewport(), QPoint(260, 200), Qt::NoModifier);
+    sendMouseRelease(legacyView.viewport(), QPoint(260, 200), Qt::NoModifier);
+    check(!legacyHelper.navigationEnabled()
+          && near(legacyHelper.viewScale(), 1.0)
+          && legacyView.transform() == legacyTransform
+          && QLineF(legacyView.mapToScene(legacyCenter),
+                    legacySceneCenter).length() < 0.001,
+          "legacy helpers must not acquire navigation unless explicitly enabled");
+
     const QPoint cursor(330, 210);
     const QPointF beforeAnchor = view.mapToScene(cursor);
     sendWheel(view.viewport(), cursor, 120, Qt::NoModifier);
