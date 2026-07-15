@@ -1517,3 +1517,16 @@ QToolButton#headerCloseButton {
 QToolButton#headerCloseButton:hover {
     background: #ff4b4b;
 }
+QDialog#ColorComparisonDialog QFrame[legendRole="overlap"] {
+    background: #a3e635;
+    border: 1px solid #365314;
+}
+
+QDialog#ColorComparisonDialog QScrollArea#colorComparisonFeatureZoomScrollArea {
+    background: #ffffff;
+    border: none;
+}
+
+QDialog#ColorComparisonDialog QScrollArea#colorComparisonFeatureZoomScrollArea QWidget#qt_scrollarea_viewport {
+    background: #ffffff;
+}
