@@ -22,10 +22,12 @@
 #include <QPixmap>
 #include <QPolygonF>
 #include <QScrollBar>
+#include <QResizeEvent>
 #include <QSizePolicy>
 #include <QtGlobal>
 #include <QWidget>
 #include <QFont>
+#include <QWheelEvent>
 
 #include <cmath>
 
@@ -258,6 +260,7 @@ void FrameViewHelper::setImage(const QImage &image)
 
 void FrameViewHelper::clear()
 {
+    endPan();
     m_lastImage = QImage();
     clearToolOverlays();
     clearDraftRoiItem();
@@ -284,6 +287,8 @@ void FrameViewHelper::clear()
         m_circleItem->hide();
     m_scene->setSceneRect(QRectF());
     m_view->resetTransform();
+    m_viewScale = 1.0;
+    m_isFitToView = true;
     m_view->viewport()->update();
 }
 
@@ -295,11 +300,38 @@ void FrameViewHelper::fitToView()
 
     m_view->resetTransform();
     m_view->fitInView(m_imageRect, Qt::KeepAspectRatio);
+    m_viewScale = 1.0;
+    m_isFitToView = true;
 }
 
 bool FrameViewHelper::hasImage() const
 {
     return !m_lastImage.isNull();
+}
+
+void FrameViewHelper::setNavigationEnabled(bool enabled)
+{
+    if (m_navigationEnabled == enabled)
+        return;
+
+    endPan();
+    m_navigationEnabled = enabled;
+    fitToView();
+}
+
+bool FrameViewHelper::navigationEnabled() const
+{
+    return m_navigationEnabled;
+}
+
+qreal FrameViewHelper::viewScale() const
+{
+    return m_viewScale;
+}
+
+bool FrameViewHelper::isFitToView() const
+{
+    return m_isFitToView;
 }
 
 QPointF FrameViewHelper::viewToImage(const QPoint &viewPos) const
@@ -754,10 +786,149 @@ void FrameViewHelper::clearToolOverlays()
     restoreImageSceneRect();
 }
 
+bool FrameViewHelper::drawingInteractionActive() const
+{
+    return m_roiDrawingEnabled || m_polygonDrawingEnabled ||
+            m_circleDrawingEnabled || m_lineBandDrawingEnabled;
+}
+
+bool FrameViewHelper::navigationGestureAllowed(Qt::KeyboardModifiers modifiers) const
+{
+    return !drawingInteractionActive() || (modifiers & Qt::ControlModifier);
+}
+
+bool FrameViewHelper::viewPositionInsideImage(const QPoint &viewPosition) const
+{
+    return m_view && !m_imageRect.isEmpty() &&
+            m_imageRect.contains(m_view->mapToScene(viewPosition));
+}
+
+qreal FrameViewHelper::sceneUnitsForViewportPixels(qreal pixels) const
+{
+    if (!m_view || pixels <= 0.0)
+        return pixels;
+
+    const QPointF origin = m_view->mapToScene(QPoint(0, 0));
+    const QPointF offset = m_view->mapToScene(QPoint(qRound(pixels), 0));
+    const qreal sceneUnits = QLineF(origin, offset).length();
+    return sceneUnits > 0.0 ? sceneUnits : pixels;
+}
+
+void FrameViewHelper::applyWheelZoom(const QPoint &viewPosition, int angleDeltaY)
+{
+    if (!m_view || m_imageRect.isEmpty() || angleDeltaY == 0)
+        return;
+
+    const qreal next = qBound<qreal>(1.0,
+            m_viewScale * (angleDeltaY > 0 ? 1.25 : 0.8), 8.0);
+    if (qFuzzyCompare(next, m_viewScale))
+        return;
+
+    const qreal factor = next / m_viewScale;
+    const QGraphicsView::ViewportAnchor anchor = m_view->transformationAnchor();
+    m_view->setTransformationAnchor(QGraphicsView::NoAnchor);
+    const QPointF before = m_view->mapToScene(viewPosition);
+    m_view->scale(factor, factor);
+    const QPointF after = m_view->mapToScene(viewPosition);
+    m_view->translate(after.x() - before.x(), after.y() - before.y());
+    m_view->setTransformationAnchor(anchor);
+    m_viewScale = next;
+    m_isFitToView = qFuzzyCompare(next, 1.0);
+}
+
+void FrameViewHelper::beginPan(const QPoint &viewPosition)
+{
+    if (!m_view || m_imageRect.isEmpty())
+        return;
+
+    m_panning = true;
+    m_lastPanPosition = viewPosition;
+    m_view->viewport()->setCursor(Qt::ClosedHandCursor);
+}
+
+void FrameViewHelper::updatePan(const QPoint &viewPosition)
+{
+    if (!m_panning || !m_view)
+        return;
+
+    const QPoint delta = viewPosition - m_lastPanPosition;
+    m_view->horizontalScrollBar()->setValue(
+                m_view->horizontalScrollBar()->value() - delta.x());
+    m_view->verticalScrollBar()->setValue(
+                m_view->verticalScrollBar()->value() - delta.y());
+    m_lastPanPosition = viewPosition;
+}
+
+void FrameViewHelper::endPan()
+{
+    if (!m_panning)
+        return;
+
+    m_panning = false;
+    if (!m_view || !m_view->viewport())
+        return;
+
+    if (drawingInteractionActive())
+        m_view->viewport()->setCursor(Qt::CrossCursor);
+    else
+        m_view->viewport()->unsetCursor();
+}
+
 bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
 {
     if (m_view && obj == m_view->viewport() && event->type() == QEvent::Resize) {
-        fitToView();
+        if (m_isFitToView) {
+            fitToView();
+        } else {
+            QResizeEvent *resizeEvent = static_cast<QResizeEvent *>(event);
+            const QSize delta = resizeEvent->size() - resizeEvent->oldSize();
+            m_view->horizontalScrollBar()->setValue(
+                        m_view->horizontalScrollBar()->value() - delta.width() / 2);
+            m_view->verticalScrollBar()->setValue(
+                        m_view->verticalScrollBar()->value() - delta.height() / 2);
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_navigationEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::Wheel) {
+            QWheelEvent *wheelEvent = static_cast<QWheelEvent *>(event);
+            if (navigationGestureAllowed(wheelEvent->modifiers())) {
+                applyWheelZoom(wheelEvent->position().toPoint(), wheelEvent->angleDelta().y());
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton &&
+                navigationGestureAllowed(mouseEvent->modifiers())) {
+                beginPan(mouseEvent->pos());
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove && m_panning) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            updatePan(mouseEvent->pos());
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_panning) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                endPan();
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonDblClick) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton &&
+                navigationGestureAllowed(mouseEvent->modifiers())) {
+                fitToView();
+                return true;
+            }
+        }
     }
 
     if (m_view && obj == m_view->viewport() && m_lineBandDrawingEnabled && !m_lastImage.isNull()) {
@@ -778,6 +949,9 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
                     emit lineBandChanged(m_lineBandRoi);
                     return true;
                 }
+
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
 
                 m_lineBandDrawingLine = true;
                 m_lineBandDraftP1 = viewToImage(mouseEvent->pos());
@@ -835,6 +1009,9 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
         if (event->type() == QEvent::MouseButtonPress) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
                 QPointF imagePoint;
                 if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
                     return true;
@@ -893,6 +1070,9 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
         if (event->type() == QEvent::MouseButtonPress) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
                 QPointF imagePoint;
                 if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
                     return false;
@@ -967,6 +1147,9 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
         if (event->type() == QEvent::MouseButtonPress) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
                 QPointF imagePoint;
                 if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
                     return true;
@@ -1067,6 +1250,9 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
         if (event->type() == QEvent::MouseButtonPress) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
                 m_roiDrawing = true;
                 m_roiDrawStart = viewToImage(mouseEvent->pos());
                 updateDraftRoiItem(QRectF(m_roiDrawStart, QSizeF()));
@@ -1202,7 +1388,7 @@ bool FrameViewHelper::completeDraftPolygon()
 
 double FrameViewHelper::polygonCloseThresholdPixels() const
 {
-    return 12.0;
+    return sceneUnitsForViewportPixels(12.0);
 }
 
 int FrameViewHelper::polygonVertexIndexAt(const QPointF &imagePoint) const
@@ -1210,7 +1396,7 @@ int FrameViewHelper::polygonVertexIndexAt(const QPointF &imagePoint) const
     if (m_lastImage.isNull() || m_polygonNormalized.isEmpty())
         return -1;
 
-    const double hitRadius = 9.0;
+    const double hitRadius = sceneUnitsForViewportPixels(9.0);
     for (int index = 0; index < m_polygonNormalized.size(); ++index) {
         if (QLineF(imagePoint, normalizedToImagePoint(m_polygonNormalized.at(index))).length() <= hitRadius)
             return index;

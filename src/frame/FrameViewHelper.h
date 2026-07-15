@@ -64,6 +64,10 @@ public:
     void clear();
     void fitToView();
     bool hasImage() const;
+    void setNavigationEnabled(bool enabled);
+    bool navigationEnabled() const;
+    qreal viewScale() const;
+    bool isFitToView() const;
 
     QPointF viewToImage(const QPoint &viewPos) const;
     QRectF imageRectToNormalized(const QRectF &imageRect) const;
@@ -120,6 +124,14 @@ private:
         CompletedPolygon
     };
 
+    bool drawingInteractionActive() const;
+    bool navigationGestureAllowed(Qt::KeyboardModifiers modifiers) const;
+    bool viewPositionInsideImage(const QPoint &viewPosition) const;
+    qreal sceneUnitsForViewportPixels(qreal pixels) const;
+    void applyWheelZoom(const QPoint &viewPosition, int angleDeltaY);
+    void beginPan(const QPoint &viewPosition);
+    void updatePan(const QPoint &viewPosition);
+    void endPan();
     bool viewPosToImagePoint(const QPoint &viewPos, QPointF *imagePoint) const;
     QRectF clampedImageRect(const QRectF &rect) const;
     QPointF clampedImagePoint(const QPointF &point) const;
@@ -202,6 +214,11 @@ private:
     bool m_circleDrawing = false;
     bool m_lineBandDrawingLine = false;
     bool m_lineBandAdjustingWidth = false;
+    bool m_navigationEnabled = false;
+    bool m_isFitToView = true;
+    qreal m_viewScale = 1.0;
+    bool m_panning = false;
+    QPoint m_lastPanPosition;
     PolygonDrawingState m_polygonDrawingState = PolygonDrawingState::Idle;
     QPointF m_roiDrawStart;
     QVector<QGraphicsItem *> m_overlayItems;
