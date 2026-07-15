@@ -1367,6 +1367,27 @@ minScore
 
 - 需要在具备有效 HALCON license 的目标机上用 GUI 复测截图场景，确认同色高分有梯度、相近偏色不再过快塌到 0。
 
+### 2026-07-15 - 直方图显示增强与图片导航
+
+#### 已实现功能
+
+- 一维和二维直方图的重合区域改为高对比亮绿色显示；未修改直方图数据、`rawIntersection`、`score` 或判定阈值。
+- 放大图初始约占宿主区域 85%，支持 100%、125%、150%、175%、200% 五档等比例缩放，标题、关闭按钮和诊断区保持固定。
+- 公共 `FrameViewHelper` 新增默认关闭的图片导航；颜色比较对话框显式启用，其他工具保持原有行为。
+- ROI 仍按 scene/原图/normalized 坐标处理；自动导航 smoke 已验证矩形 normalized ROI 在缩放和平移后不变。矩形、圆形、多边形及屏蔽区的 GUI 全 ROI 人工操作未执行，原因是当前 shell 无可交互图形桌面（`DISPLAY`/`WAYLAND_DISPLAY` 均未设置），不记为通过。
+
+#### 验证
+
+- `QT_QPA_PLATFORM=offscreen build/smoke/frame_view_helper_navigation/bin/frame_view_helper_navigation_smoke`：通过，exit 0，无 `FAIL:`。
+- `QT_QPA_PLATFORM=offscreen build/smoke/color_comparison_feature_view/bin/color_comparison_feature_view_smoke`：通过，exit 0，无 `FAIL:`。
+- `qmake smoke/color_comparison_feature_diagnostics_smoke.pro -o build/smoke/color_comparison_feature_diagnostics/Makefile && make -C build/smoke/color_comparison_feature_diagnostics -j8 && build/smoke/color_comparison_feature_diagnostics/bin/color_comparison_feature_diagnostics_smoke`：首次 qmake 因当前 shell 遗留的 HALCON 24.11 路径被工程主版本 20 门禁拒绝；加载 `scripts/dependencies.env` 切换到 `/opt/halcon` 20.11 后重新执行通过，输出 `preflight passed; licensed extraction skipped`。
+- `source scripts/dependencies.env && qmake qt_ui_test.pro -o build/Makefile && make -C build -j8`：主工程编译、链接通过。
+- `QT_QPA_PLATFORM=offscreen timeout 4s build/qt_ui_test/bin/qt_ui_test`：按预期返回 124；对启动日志执行 `rg -n "stylesheet|parse error|Unknown property"` 无匹配。
+
+#### 剩余事项
+
+- 在可交互 GUI 桌面上补做矩形、圆形、多边形及屏蔽区全 ROI 操作，确认缩放、平移、双击还原后的 overlay 与保存坐标。
+
 ## 后续记录模板
 
 后续每次实现后，在本节上方追加：
