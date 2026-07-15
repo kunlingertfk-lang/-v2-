@@ -1207,6 +1207,7 @@ void ColorComparisonDialog::buildUi()
         "QPushButton#exitTestButton:pressed,QPushButton#exitTestButton[flash=\"true\"]{background:#dc2626;color:#ffffff;border-color:#dc2626;}"
         "QPushButton#exitTestButton:disabled{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}"
         "QToolButton:pressed{background:#ffe1bf;color:#ff7a00;border-color:#ff7a00;}"));
+    m_previewHelper->setNavigationEnabled(true);
 
     setAllParamsMode(false);
     if (m_detectRectButton)
@@ -1325,8 +1326,6 @@ void ColorComparisonDialog::connectControls()
 void ColorComparisonDialog::resizeEvent(QResizeEvent *event)
 {
     QDialog::resizeEvent(event);
-    if (m_previewHelper)
-        m_previewHelper->fitToView();
     updateTemplatePreview();
 }
 
