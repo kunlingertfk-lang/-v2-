@@ -378,6 +378,12 @@ QJsonObject baseRunPayload(const ColorComparisonHalconConfig &config,
         {QStringLiteral("positionCorrection"), positionCorrectionJson(config)},
         {QStringLiteral("detectionRoi"),
          detectionRoiJson(config, imageWidth, imageHeight)},
+        {QStringLiteral("histogramDiagnostics"), QJsonObject{
+             {QStringLiteral("available"), false},
+             {QStringLiteral("hueBins"), kHistogramBins},
+             {QStringLiteral("saturationBins"), kHistogramBins},
+             {QStringLiteral("layout"), QStringLiteral("hue_major")}
+         }},
         {QStringLiteral("warnings"), stringsToJson(warnings)}
     };
 }
@@ -2021,6 +2027,7 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.similarity = similarity;
         result.elapsedMs = timer.elapsed();
         result.detectFeature = extracted.hsHistogram;
+        result.detectValueHistogram = extracted.valueHistogram;
         result.overlays = detectionOverlays(config, image, score, passed);
         result.payload = baseRunPayload(config, warnings, image.cols, image.rows);
         result.payload.insert(QStringLiteral("status"), result.status);
@@ -2030,6 +2037,17 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.payload.insert(QStringLiteral("score"), score);
         result.payload.insert(QStringLiteral("similarity"), similarity);
         result.payload.insert(QStringLiteral("rawIntersection"), rawIntersection);
+        result.payload.insert(QStringLiteral("histogramDiagnostics"), QJsonObject{
+            {QStringLiteral("available"), true},
+            {QStringLiteral("hueBins"), kHistogramBins},
+            {QStringLiteral("saturationBins"), kHistogramBins},
+            {QStringLiteral("layout"), QStringLiteral("hue_major")},
+            {QStringLiteral("detectHsHistogram"),
+             featureToJson(extracted.hsHistogram)},
+            {QStringLiteral("detectValueHistogram"),
+             featureToJson(extracted.valueHistogram)},
+            {QStringLiteral("rawIntersection"), rawIntersection}
+        });
         result.payload.insert(QStringLiteral("smoothedIntersection"),
                               smoothedIntersection);
         result.payload.insert(QStringLiteral("hsScore"), hsScore);

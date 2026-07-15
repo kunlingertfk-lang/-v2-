@@ -55,6 +55,7 @@ SOURCES += \
     src/CharacterRecognitionDialog.cpp \
     src/ColorRecognitionDialog.cpp \
     src/ColorComparisonDialog.cpp \
+    src/ColorComparisonFeatureView.cpp \
     src/RegisteredClassificationDialog.cpp \
     src/RegisteredClassificationDetectionDialog.cpp \
     src/RegisteredClassificationDetectionTrainingDialog.cpp \
@@ -123,6 +124,7 @@ HEADERS += \
     src/CharacterRecognitionDialog.h \
     src/ColorRecognitionDialog.h \
     src/ColorComparisonDialog.h \
+    src/ColorComparisonFeatureView.h \
     src/RegisteredClassificationDialog.h \
     src/RegisteredClassificationDetectionDialog.h \
     src/RegisteredClassificationDetectionTrainingDialog.h \

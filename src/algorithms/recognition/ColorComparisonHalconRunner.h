@@ -54,6 +54,7 @@ struct ColorComparisonHalconResult
     double similarity = 0.0;
     qint64 elapsedMs = 0;
     QVector<double> detectFeature;
+    QVector<double> detectValueHistogram;
     QVector<ToolOverlay> overlays;
     QJsonObject payload;
 };

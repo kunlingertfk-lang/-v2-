@@ -1387,6 +1387,7 @@ minScore
 #### 剩余事项
 
 - 在可交互 GUI 桌面上补做矩形、圆形、多边形及屏蔽区全 ROI 操作，确认缩放、平移、双击还原后的 overlay 与保存坐标。
+- 当前自动验证仅完成无 license preflight；仍需在具备有效 HALCON license 的目标机运行 licensed extraction，确认真实检测直方图提取与字段输出。
 
 ## 后续记录模板
 

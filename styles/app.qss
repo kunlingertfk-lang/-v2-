@@ -1517,6 +1517,232 @@ QToolButton#headerCloseButton {
 QToolButton#headerCloseButton:hover {
     background: #ff4b4b;
 }
+
+/* ColorComparisonDialog: keep the dialog independent from the global dark palette. */
+QDialog#ColorComparisonDialog {
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 18px;
+}
+
+QFrame#colorComparisonHeader {
+    min-height: 58px;
+    background: #3f444e;
+    border: none;
+}
+
+QDialog#ColorComparisonDialog QLabel#colorComparisonHeaderTitle {
+    background: transparent;
+    color: #ffffff;
+    font-size: 26px;
+    font-weight: 800;
+}
+
+QDialog#ColorComparisonDialog QToolButton#colorComparisonHeaderClose {
+    min-width: 40px;
+    min-height: 40px;
+    background: transparent;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 26px;
+    font-weight: 700;
+}
+
+QDialog#ColorComparisonDialog QToolButton#colorComparisonHeaderClose:hover {
+    background: #ef4444;
+}
+
+QFrame#colorComparisonLeftPanel,
+QScrollArea#colorComparisonParamsScrollArea,
+QStackedWidget#colorComparisonParamsStack {
+    background: #eef1f5;
+    color: #0f172a;
+    border: none;
+}
+
+QDialog#ColorComparisonDialog QScrollArea#colorComparisonParamsScrollArea QWidget {
+    background: transparent;
+    color: #0f172a;
+}
+
+QDialog#ColorComparisonDialog QFrame[panelRole="configCard"] {
+    background: #ffffff;
+    border: 2px solid #93c5fd;
+    border-radius: 8px;
+}
+
+QDialog#ColorComparisonDialog QLabel {
+    background: transparent;
+    color: #0f172a;
+    font-size: 18px;
+}
+
+QDialog#ColorComparisonDialog QLabel[role="cardTitle"] {
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+QDialog#ColorComparisonDialog QLabel[role="rowField"] {
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QDialog#ColorComparisonDialog QCheckBox#colorComparisonBrightnessCompensation {
+    spacing: 8px;
+    background: transparent;
+    color: #0f172a;
+    font-size: 18px;
+}
+
+QDialog#ColorComparisonDialog QCheckBox#colorComparisonBrightnessCompensation::indicator {
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border: 2px solid #60a5fa;
+    border-radius: 3px;
+}
+
+QDialog#ColorComparisonDialog QCheckBox#colorComparisonBrightnessCompensation::indicator:checked {
+    background: #f97316;
+    border-color: #f97316;
+}
+
+QDialog#ColorComparisonDialog QPushButton,
+QDialog#ColorComparisonDialog QToolButton,
+QDialog#ColorComparisonDialog QComboBox,
+QDialog#ColorComparisonDialog QSpinBox {
+    min-height: 38px;
+    background: #ffffff;
+    color: #0f172a;
+    border: 2px solid #93c5fd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QDialog#ColorComparisonDialog QPushButton:checked,
+QDialog#ColorComparisonDialog QToolButton:checked {
+    background: #fff7ed;
+    color: #ea580c;
+    border-color: #f97316;
+}
+
+QDialog#ColorComparisonDialog QToolButton:pressed {
+    background: #ffedd5;
+    color: #ea580c;
+    border-color: #f97316;
+}
+
+QFrame#colorComparisonBottomActionBar {
+    background: #eef1f5;
+    border: none;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testPrimary"],
+QDialog#ColorComparisonDialog QPushButton[actionRole="testAction"] {
+    min-width: 0;
+    min-height: 48px;
+    max-height: 48px;
+    padding: 0 4px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testPrimary"] {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testPrimary"]:hover {
+    background: #020617;
+    border-color: #020617;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testPrimary"]:pressed,
+QDialog#ColorComparisonDialog QPushButton[actionRole="testPrimary"][flash="true"] {
+    background: #ffffff;
+    color: #0f172a;
+    border-color: #0f172a;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testAction"] {
+    background: #ffffff;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testAction"]:hover {
+    background: #f8fafc;
+    border-color: #0f172a;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testAction"]:pressed,
+QDialog#ColorComparisonDialog QPushButton[actionRole="testAction"][flash="true"] {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testAction"][running="true"] {
+    background: #f97316;
+    color: #ffffff;
+    border-color: #f97316;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="testPrimary"]:disabled,
+QDialog#ColorComparisonDialog QPushButton[actionRole="testAction"]:disabled,
+QDialog#ColorComparisonDialog QPushButton#exitTestButton:disabled {
+    background: #e5e7eb;
+    color: #94a3b8;
+    border-color: #cbd5e1;
+}
+
+QDialog#ColorComparisonDialog QPushButton#exitTestButton {
+    background: transparent;
+    color: #64748b;
+    border-color: #cbd5e1;
+}
+
+QDialog#ColorComparisonDialog QPushButton#exitTestButton:hover {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #dc2626;
+}
+
+QFrame#colorComparisonRightPanel,
+QFrame#colorComparisonRightPanel QGraphicsView {
+    background: #111418;
+    color: #f8fafc;
+    border: none;
+}
+
+QDialog#ColorComparisonDialog QLabel#colorComparisonViewerTitleLabel,
+QDialog#ColorComparisonDialog QLabel#colorComparisonStatusLabel {
+    background: #111418;
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QWidget#colorComparisonFeatureView {
+    background: transparent;
+}
+
+QDialog#ColorComparisonDialog QFrame[legendRole="template"] {
+    background: #f97316;
+    border: 1px solid #f97316;
+}
+
+QDialog#ColorComparisonDialog QFrame[legendRole="detection"] {
+    background: #ffffff;
+    border: 2px solid #64748b;
+}
+
 QDialog#ColorComparisonDialog QFrame[legendRole="overlap"] {
     background: #a3e635;
     border: 1px solid #365314;
@@ -1529,4 +1755,59 @@ QDialog#ColorComparisonDialog QScrollArea#colorComparisonFeatureZoomScrollArea {
 
 QDialog#ColorComparisonDialog QScrollArea#colorComparisonFeatureZoomScrollArea QWidget#qt_scrollarea_viewport {
     background: #ffffff;
+}
+
+QDialog#ColorComparisonDialog QLabel[role="featureLegend"],
+QDialog#ColorComparisonDialog QLabel[role="featureState"] {
+    color: #334155;
+    font-size: 18px;
+}
+
+QDialog#ColorComparisonDialog QLabel[role="featureMetrics"] {
+    background: #f8fafc;
+    color: #334155;
+    border: 1px solid #93c5fd;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 18px;
+}
+
+QDialog#ColorComparisonDialog QWidget[panelRole="featureZoomOverlay"] {
+    background: rgba(15, 23, 42, 205);
+}
+
+QDialog#ColorComparisonDialog QFrame[panelRole="featureZoomCard"] {
+    background: #ffffff;
+    border: 3px solid #60a5fa;
+    border-radius: 8px;
+}
+
+QDialog#ColorComparisonDialog QLabel[role="featureZoomTitle"] {
+    background: transparent;
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+QDialog#ColorComparisonDialog QLabel[role="featureZoomDetails"] {
+    background: #ffffff;
+    color: #334155;
+    border-top: 1px solid #bfdbfe;
+    padding: 10px 14px;
+    font-size: 18px;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="featureZoomClose"] {
+    min-height: 44px;
+    background: #ef4444;
+    color: #ffffff;
+    border: 2px solid #dc2626;
+    border-radius: 5px;
+    padding: 4px 14px;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+QDialog#ColorComparisonDialog QPushButton[actionRole="featureZoomClose"]:hover {
+    background: #dc2626;
 }

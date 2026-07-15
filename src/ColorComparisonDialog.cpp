@@ -1,5 +1,6 @@
 #include "ColorComparisonDialog.h"
 
+#include "ColorComparisonFeatureView.h"
 #include "PlanDialogUtils.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/MatImageConverter.h"
@@ -24,6 +25,7 @@
 #include <QPolygonF>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QSpinBox>
@@ -88,6 +90,32 @@ bool strictJsonNumber(const QJsonValue &value, double *parsed)
         return false;
     if (parsed)
         *parsed = number;
+    return true;
+}
+
+bool normalizedHistogramFromJson(const QJsonValue &value,
+                                 int expectedSize,
+                                 QVector<double> *histogram)
+{
+    if (!value.isArray() || !histogram)
+        return false;
+    const QJsonArray array = value.toArray();
+    if (array.size() != expectedSize)
+        return false;
+    QVector<double> parsed;
+    parsed.reserve(expectedSize);
+    for (const QJsonValue &entry : array) {
+        if (!entry.isDouble() || !std::isfinite(entry.toDouble())
+                || entry.toDouble() < 0.0) {
+            return false;
+        }
+        parsed.append(entry.toDouble());
+    }
+    if (!ColorComparisonFeatureView::validNormalizedHistogram(parsed,
+                                                               expectedSize)) {
+        return false;
+    }
+    *histogram = parsed;
     return true;
 }
 
@@ -701,9 +729,9 @@ void applyBottomActionButtonMetrics(QPushButton *button)
     if (!button)
         return;
 
-    button->setMinimumSize(120, 48);
-    button->setMaximumSize(120, 48);
-    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    button->setMinimumSize(0, 48);
+    button->setMaximumSize(QWIDGETSIZE_MAX, 48);
+    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     button->setAutoDefault(false);
     button->setDefault(false);
 }
@@ -793,6 +821,7 @@ void ColorComparisonDialog::connectAsyncWorkers()
 
 void ColorComparisonDialog::buildUi()
 {
+    setObjectName(QStringLiteral("ColorComparisonDialog"));
     setWindowTitle(tr("方案编辑 - 颜色比较"));
     setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
@@ -806,13 +835,14 @@ void ColorComparisonDialog::buildUi()
     root->setSpacing(0);
 
     QFrame *header = new QFrame(this);
-    header->setStyleSheet(QStringLiteral("background:#3f444e; color:#ffffff;"));
+    header->setObjectName(QStringLiteral("colorComparisonHeader"));
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
     headerLayout->setContentsMargins(28, 0, 22, 0);
     QLabel *headerTitle = new QLabel(tr("方案编辑"), header);
+    headerTitle->setObjectName(QStringLiteral("colorComparisonHeaderTitle"));
     QToolButton *closeButton = new QToolButton(header);
+    closeButton->setObjectName(QStringLiteral("colorComparisonHeaderClose"));
     closeButton->setText(QStringLiteral("×"));
-    closeButton->setStyleSheet(QStringLiteral("color:#ffffff; font-size:24px; border:0;"));
     headerLayout->addWidget(headerTitle);
     headerLayout->addStretch(1);
     headerLayout->addWidget(closeButton);
@@ -824,9 +854,9 @@ void ColorComparisonDialog::buildUi()
     root->addLayout(content, 1);
 
     QFrame *leftPanel = new QFrame(this);
+    leftPanel->setObjectName(QStringLiteral("colorComparisonLeftPanel"));
     leftPanel->setMinimumWidth(420);
     leftPanel->setMaximumWidth(480);
-    leftPanel->setStyleSheet(QStringLiteral("background:#eef1f5; color:#1f2937;"));
     QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->setContentsMargins(24, 18, 24, 18);
     leftLayout->setSpacing(14);
@@ -849,12 +879,21 @@ void ColorComparisonDialog::buildUi()
     titleLayout->addWidget(m_allButton);
     leftLayout->addLayout(titleLayout);
 
-    m_paramsStack = new QStackedWidget(leftPanel);
-    leftLayout->addWidget(m_paramsStack, 1);
+    QScrollArea *paramsScroll = new QScrollArea(leftPanel);
+    paramsScroll->setObjectName(QStringLiteral("colorComparisonParamsScrollArea"));
+    paramsScroll->setWidgetResizable(true);
+    paramsScroll->setFrameShape(QFrame::NoFrame);
+    paramsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    paramsScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_paramsStack = new QStackedWidget(paramsScroll);
+    m_paramsStack->setObjectName(QStringLiteral("colorComparisonParamsStack"));
+    paramsScroll->setWidget(m_paramsStack);
+    leftLayout->addWidget(paramsScroll, 1);
 
     auto buildPage = [this](bool allMode) {
         QWidget *page = new QWidget;
         QVBoxLayout *layout = new QVBoxLayout(page);
+        layout->setSizeConstraint(QLayout::SetMinimumSize);
         layout->setContentsMargins(0, 8, 0, 0);
         layout->setSpacing(14);
 
@@ -978,27 +1017,9 @@ void ColorComparisonDialog::buildUi()
             featureLayout->addLayout(row(tr("特征类型"), m_featureTypeComboBox));
             featureLayout->addWidget(m_brightnessCheckBox);
 
-            QHBoxLayout *histogramLayout = new QHBoxLayout;
-            auto makeHistogram = [featureCard](const QString &name,
-                                               const QString &text) {
-                QLabel *label = new QLabel(text, featureCard);
-                label->setObjectName(name);
-                label->setAlignment(Qt::AlignCenter);
-                label->setMinimumSize(96, 72);
-                label->setStyleSheet(QStringLiteral(
-                    "background:#252a31;color:#d1d5db;border:1px solid #111827;"));
-                return label;
-            };
-            m_hueHistogramLabel = makeHistogram(
-                        QStringLiteral("colorComparisonHueHistogram"), tr("H"));
-            m_saturationHistogramLabel = makeHistogram(
-                        QStringLiteral("colorComparisonSaturationHistogram"), tr("S"));
-            m_valueHistogramLabel = makeHistogram(
-                        QStringLiteral("colorComparisonValueHistogram"), tr("V"));
-            histogramLayout->addWidget(m_hueHistogramLabel);
-            histogramLayout->addWidget(m_saturationHistogramLabel);
-            histogramLayout->addWidget(m_valueHistogramLabel);
-            featureLayout->addLayout(histogramLayout);
+            if (!m_featureView)
+                m_featureView = new ColorComparisonFeatureView(featureCard);
+            featureLayout->addWidget(m_featureView);
             layout->addWidget(featureCard);
         }
 
@@ -1135,7 +1156,12 @@ void ColorComparisonDialog::buildUi()
 
     m_paramsStack->addWidget(buildPage(true));
 
-    QHBoxLayout *bottomButtons = new QHBoxLayout;
+    QFrame *bottomBar = new QFrame(leftPanel);
+    bottomBar->setObjectName(QStringLiteral("colorComparisonBottomActionBar"));
+    bottomBar->setProperty("panelRole", QStringLiteral("bottomActionBar"));
+    QHBoxLayout *bottomButtons = new QHBoxLayout(bottomBar);
+    bottomButtons->setContentsMargins(0, 0, 0, 0);
+    bottomButtons->setSpacing(8);
     m_referenceTestButton = new QPushButton(tr("基准图测试"), leftPanel);
     m_testRunButton = new QPushButton(tr("测试运行"), leftPanel);
     m_finishButton = new QPushButton(tr("完成"), leftPanel);
@@ -1160,15 +1186,14 @@ void ColorComparisonDialog::buildUi()
     installActionButtonFlash(m_testRunButton);
     installActionButtonFlash(m_finishButton);
     installActionButtonFlash(m_exitTestButton);
-    bottomButtons->addStretch(1);
-    bottomButtons->addWidget(m_referenceTestButton);
-    bottomButtons->addWidget(m_testRunButton);
-    bottomButtons->addWidget(m_finishButton);
-    bottomButtons->addWidget(m_exitTestButton);
-    leftLayout->addLayout(bottomButtons);
+    bottomButtons->addWidget(m_referenceTestButton, 1);
+    bottomButtons->addWidget(m_testRunButton, 1);
+    bottomButtons->addWidget(m_finishButton, 1);
+    bottomButtons->addWidget(m_exitTestButton, 1);
+    leftLayout->addWidget(bottomBar, 0);
 
     QFrame *rightPanel = new QFrame(this);
-    rightPanel->setStyleSheet(QStringLiteral("background:#111418; color:#f9fafb;"));
+    rightPanel->setObjectName(QStringLiteral("colorComparisonRightPanel"));
     QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
     rightLayout->setContentsMargins(0, 0, 0, 0);
     m_viewerTitleLabel = new QLabel(tr("基准图"), rightPanel);
@@ -1189,25 +1214,6 @@ void ColorComparisonDialog::buildUi()
 
     m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
     m_previewHelper->setNavigationEnabled(true);
-
-    setStyleSheet(styleSheet() + QStringLiteral(
-        "QPushButton,QToolButton,QComboBox,QSpinBox{background:#ffffff;color:#111827;border:1px solid #cfd6df;padding:6px;}"
-        "QPushButton:checked,QToolButton:checked{background:#fff3e6;color:#ff7a00;border-color:#ff7a00;}"
-        "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;border-radius:4px;padding:0;font-size:15px;font-weight:600;min-width:120px;min-height:48px;}"
-        "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000;border-color:#000;}"
-        "QPushButton[actionRole=\"testPrimary\"]:pressed,QPushButton[actionRole=\"testPrimary\"][flash=\"true\"]{background:#ffffff;color:#111827;border-color:#111827;}"
-        "QPushButton[actionRole=\"testPrimary\"]:disabled{background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;}"
-        "QPushButton[actionRole=\"testAction\"]{background:#ffffff;color:#111827;border:1px solid #9ca3af;border-radius:4px;padding:0;font-size:15px;font-weight:600;min-width:120px;min-height:48px;}"
-        "QPushButton[actionRole=\"testAction\"]:hover{background:#f9fafb;border-color:#111827;}"
-        "QPushButton[actionRole=\"testAction\"]:pressed,QPushButton[actionRole=\"testAction\"][flash=\"true\"]{background:#111827;color:#ffffff;border-color:#111827;}"
-        "QPushButton[actionRole=\"testAction\"][running=\"true\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;}"
-        "QPushButton[actionRole=\"testAction\"][running=\"true\"]:hover{background:#e66e00;border-color:#e66e00;}"
-        "QPushButton[actionRole=\"testAction\"]:disabled{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}"
-        "QPushButton#exitTestButton{background:transparent;color:#6b7280;border:1px solid #d1d5db;}"
-        "QPushButton#exitTestButton:hover{background:#fef2f2;color:#dc2626;border-color:#dc2626;}"
-        "QPushButton#exitTestButton:pressed,QPushButton#exitTestButton[flash=\"true\"]{background:#dc2626;color:#ffffff;border-color:#dc2626;}"
-        "QPushButton#exitTestButton:disabled{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}"
-        "QToolButton:pressed{background:#ffe1bf;color:#ff7a00;border-color:#ff7a00;}"));
 
     setAllParamsMode(false);
     if (m_detectRectButton)
@@ -1297,7 +1303,9 @@ void ColorComparisonDialog::connectControls()
     connect(m_minScoreSpinBox,
             QOverload<int>::of(&QSpinBox::valueChanged),
             this,
-            [this]() {
+            [this](int value) {
+                if (m_featureView)
+                    m_featureView->setThreshold(value);
                 if (m_loadingConfig)
                     return;
                 invalidateAsyncWork();
@@ -1326,6 +1334,8 @@ void ColorComparisonDialog::connectControls()
 void ColorComparisonDialog::resizeEvent(QResizeEvent *event)
 {
     QDialog::resizeEvent(event);
+    if (m_featureView)
+        m_featureView->syncZoomGeometry();
     updateTemplatePreview();
 }
 
@@ -1336,6 +1346,8 @@ void ColorComparisonDialog::setAllParamsMode(bool allMode)
     m_allButton->setChecked(allMode);
     if (m_featureCard)
         m_featureCard->setVisible(allMode);
+    if (!allMode && m_featureView)
+        m_featureView->closeZoom();
     if (m_detectMaskRow)
         m_detectMaskRow->setVisible(allMode);
     if (m_positionCorrectionPanel)
@@ -1784,82 +1796,64 @@ void ColorComparisonDialog::updateModelStateUi()
 
 void ColorComparisonDialog::updateFeaturePreview()
 {
-    const QList<QLabel *> labels = {m_hueHistogramLabel,
-                                    m_saturationHistogramLabel,
-                                    m_valueHistogramLabel};
-    const QStringList names = {tr("H"), tr("S"), tr("V")};
-    for (int index = 0; index < labels.size(); ++index) {
-        if (!labels.at(index))
-            continue;
-        labels.at(index)->clear();
-        labels.at(index)->setText(names.at(index));
-    }
-
+    if (!m_featureView)
+        return;
+    m_featureView->setThreshold(m_minScoreSpinBox
+                                ? m_minScoreSpinBox->value() : 80);
     if (m_model.state != ColorComparisonModelState::Ready
             || m_model.hueBins != 32 || m_model.saturationBins != 32
-            || m_model.values.size() != 1024
-            || m_model.valueHistogram.size() != 32) {
+            || !ColorComparisonFeatureView::validNormalizedHistogram(
+                m_model.values, 1024)
+            || !ColorComparisonFeatureView::validNormalizedHistogram(
+                m_model.valueHistogram, 32)) {
+        m_featureView->clearTemplate();
         return;
     }
-
-    QVector<double> hue(32, 0.0);
-    QVector<double> saturation(32, 0.0);
-    for (int h = 0; h < 32; ++h) {
-        for (int s = 0; s < 32; ++s) {
-            const double value = m_model.values.at(h * 32 + s);
-            hue[h] += value;
-            saturation[s] += value;
-        }
-    }
-
-    auto applyHistogram = [this](QLabel *label,
-                                 const QVector<double> &values,
-                                 const QColor &color) {
-        if (!label)
-            return;
-        QSize size = label->size();
-        if (size.width() < 2 || size.height() < 2)
-            size = QSize(112, 72);
-        label->setText(QString());
-        label->setPixmap(renderHistogram(values, color, size));
-    };
-    applyHistogram(m_hueHistogramLabel, hue, QColor(255, 122, 0));
-    applyHistogram(m_saturationHistogramLabel, saturation, QColor(31, 189, 255));
-    applyHistogram(m_valueHistogramLabel, m_model.valueHistogram,
-                   QColor(164, 224, 75));
+    m_featureView->setTemplateHistograms(m_model.values,
+                                         m_model.valueHistogram);
 }
 
-QPixmap ColorComparisonDialog::renderHistogram(const QVector<double> &values,
-                                                const QColor &color,
-                                                const QSize &size) const
+bool ColorComparisonDialog::updateDetectionFeaturePreview(
+        const ToolResult &result)
 {
-    QPixmap pixmap(size.expandedTo(QSize(2, 2)));
-    pixmap.fill(QColor(37, 42, 49));
-    if (values.isEmpty())
-        return pixmap;
-
-    double maximum = 0.0;
-    for (double value : values) {
-        if (std::isfinite(value))
-            maximum = qMax(maximum, qMax(0.0, value));
+    if (!m_featureView)
+        return false;
+    const QJsonObject diagnostics = result.payload.value(
+                QStringLiteral("histogramDiagnostics")).toObject();
+    if (!diagnostics.value(QStringLiteral("available")).toBool()) {
+        m_featureView->clearDetection(tr("检测特征不可用：%1")
+                                      .arg(result.status));
+        return false;
     }
-    if (maximum <= 0.0)
-        return pixmap;
-
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, false);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(color);
-    const double barWidth = static_cast<double>(pixmap.width()) / values.size();
-    for (int index = 0; index < values.size(); ++index) {
-        const double normalized = qBound(0.0, values.at(index) / maximum, 1.0);
-        const double height = normalized * qMax(1, pixmap.height() - 4);
-        painter.drawRect(QRectF(index * barWidth,
-                                pixmap.height() - height,
-                                qMax(1.0, barWidth - 1.0),
-                                height));
+    if (diagnostics.value(QStringLiteral("hueBins")).toInt(-1) != 32
+            || diagnostics.value(QStringLiteral("saturationBins")).toInt(-1) != 32
+            || diagnostics.value(QStringLiteral("layout")).toString()
+               != QStringLiteral("hue_major")) {
+        m_featureView->clearDetection(tr("检测特征不可用：维度或布局不匹配"));
+        return false;
     }
-    return pixmap;
+    QVector<double> hsHistogram;
+    QVector<double> valueHistogram;
+    if (!normalizedHistogramFromJson(
+                diagnostics.value(QStringLiteral("detectHsHistogram")),
+                1024,
+                &hsHistogram)
+            || !normalizedHistogramFromJson(
+                diagnostics.value(QStringLiteral("detectValueHistogram")),
+                32,
+                &valueHistogram)) {
+        m_featureView->clearDetection(tr("检测特征不可用：直方图字段无效"));
+        return false;
+    }
+    const double rawIntersection = diagnostics.value(
+                QStringLiteral("rawIntersection")).toDouble(
+                std::numeric_limits<double>::quiet_NaN());
+    return m_featureView->setDetectionHistograms(
+                hsHistogram,
+                valueHistogram,
+                rawIntersection,
+                result.score,
+                m_minScoreSpinBox ? m_minScoreSpinBox->value() : 80);
 }
 
 QJsonObject ColorComparisonDialog::colorComparisonParams() const
@@ -2381,6 +2375,10 @@ void ColorComparisonDialog::exitTestMode()
     updateBottomButtons();
     showPreviewImage();
     refreshRoiOverlay();
+    if (m_featureView) {
+        m_featureView->clearDetection();
+        m_featureView->closeZoom();
+    }
     updateStatus(tr("已退出测试"));
 }
 
@@ -2515,11 +2513,14 @@ void ColorComparisonDialog::displayResult(const ToolResult &result, bool referen
 {
     if (m_previewHelper)
         m_previewHelper->setToolOverlays(result.overlays);
-    updateStatus(tr("%1 | score:%2 | %3 | %4")
+    const bool featureAvailable = updateDetectionFeaturePreview(result);
+    updateStatus(tr("%1 | score:%2 | %3 | %4%5")
                  .arg(result.ok ? QStringLiteral("OK") : QStringLiteral("NG"),
                       QString::number(result.score, 'f', 2),
                       result.status,
-                      result.message));
+                      result.message,
+                      featureAvailable ? QString()
+                                       : tr(" | 检测特征不可用")));
     if (referenceSource) {
         m_referencePreviewSnapshot =
                 makeReferenceToolPreviewSnapshot(toToolConfig(), result, m_detectRoi);
@@ -2714,6 +2715,8 @@ void ColorComparisonDialog::accept()
 
     if (m_continuousTimer)
         m_continuousTimer->stop();
+    if (m_featureView)
+        m_featureView->closeZoom();
     invalidateAsyncWork();
     invalidateModelBuild();
     QDialog::accept();
@@ -2723,6 +2726,8 @@ void ColorComparisonDialog::reject()
 {
     if (m_continuousTimer)
         m_continuousTimer->stop();
+    if (m_featureView)
+        m_featureView->closeZoom();
     invalidateAsyncWork();
     invalidateModelBuild();
     QDialog::reject();
@@ -2732,6 +2737,8 @@ void ColorComparisonDialog::closeEvent(QCloseEvent *event)
 {
     if (m_continuousTimer)
         m_continuousTimer->stop();
+    if (m_featureView)
+        m_featureView->closeZoom();
     invalidateAsyncWork();
     invalidateModelBuild();
     QDialog::closeEvent(event);

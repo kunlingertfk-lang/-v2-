@@ -18,20 +18,18 @@
 class QButtonGroup;
 class QCheckBox;
 class QCloseEvent;
-class QColor;
 class QComboBox;
 class QFrame;
 class QGraphicsView;
 class QLabel;
-class QPixmap;
 class QPushButton;
 class QResizeEvent;
-class QSize;
 class QSpinBox;
 class QStackedWidget;
 class QToolButton;
 class QTimer;
 class QWidget;
+class ColorComparisonFeatureView;
 template <typename T> class QFutureWatcher;
 
 class ColorComparisonDialog : public QDialog
@@ -142,9 +140,7 @@ private:
     void handleModelBuildFinished();
     void updateModelStateUi();
     void updateFeaturePreview();
-    QPixmap renderHistogram(const QVector<double> &values,
-                            const QColor &color,
-                            const QSize &size) const;
+    bool updateDetectionFeaturePreview(const ToolResult &result);
     QJsonObject colorComparisonParams() const;
 
     QString m_toolId;
@@ -202,9 +198,7 @@ private:
     QWidget *m_positionCorrectionPanel = nullptr;
     QLabel *m_templatePreviewLabel = nullptr;
     QLabel *m_modelStateLabel = nullptr;
-    QLabel *m_hueHistogramLabel = nullptr;
-    QLabel *m_saturationHistogramLabel = nullptr;
-    QLabel *m_valueHistogramLabel = nullptr;
+    ColorComparisonFeatureView *m_featureView = nullptr;
     QLabel *m_viewerTitleLabel = nullptr;
     QLabel *m_viewerStatusLabel = nullptr;
     QGraphicsView *m_previewGraphicsView = nullptr;
