@@ -1389,6 +1389,29 @@ minScore
 - 在可交互 GUI 桌面上补做矩形、圆形、多边形及屏蔽区全 ROI 操作，确认缩放、平移、双击还原后的 overlay 与保存坐标。
 - 当前自动验证仅完成无 license preflight；仍需在具备有效 HALCON license 的目标机运行 licensed extraction，确认真实检测直方图提取与字段输出。
 
+### 2026-07-15 - 连续评分、亮度补偿回退与原始 ROI 缩略图
+
+#### 已实现功能
+
+- 灰色/有色饱和度不匹配由固定上限改为连续乘法惩罚，不同基础分不再全部显示为 `40.0`。
+- scale 超限或预计截断比例过高时跳过亮度补偿并使用原始特征继续测量；亮度均值本身无效、过暗或过曝仍明确失败。
+- 特征区分别显示 HS 原始重合、平滑 HS 分数、亮度处理状态与系数、饱和度系数、最终得分和阈值。
+- 模板缩略图改为先从原始参考图裁剪，不再把 ROI 边框或 Mask 画入缩略图像素；HALCON Runner 继续仅接收原始帧与 Region/Mask。
+- 公共功能文档增加原始图像、ROI 裁剪与显示 overlay 分离规范。
+
+#### 验证
+
+- `color_comparison_feature_diagnostics_smoke`：无 license preflight 通过；纯评分断言验证现场数据不再固定 40 分、基础分差异保留、阈值附近连续。licensed 亮度回退分支仍待有效 license 环境运行。
+- `color_comparison_dialog_integration_smoke`：offscreen 通过；验证评分分解显示，并使用固定 BGR 源图逐像素确认 ROI 缩略图不含橙色框和 Mask 色。
+- `color_comparison_feature_view_smoke`：offscreen 通过。
+- 主工程 shadow qmake/make：通过。
+
+#### 剩余事项
+
+- 在具备有效 HALCON license 的环境执行 scale 超限与 clipped ratio 超限真实提取回退。
+- 在可交互桌面复测自定义矩形、同步矩形、同步圆和 Mask 的缩略图与 HALCON Region 一致性。
+- 使用现有产线样本记录旧分数、新分数和建议阈值，评估评分公式变化后的阈值迁移。
+
 ## 后续记录模板
 
 后续每次实现后，在本节上方追加：

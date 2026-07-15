@@ -124,7 +124,7 @@ private:
     void leaveInvalidConfigReadOnly();
     void updateInvalidConfigReadOnlyUi();
     QRectF normalizedRoiOrDefault(const QRectF &roi) const;
-    QImage templateRoiImage() const;
+    QImage templateRawRoiImage() const;
     void refreshEditControls();
     void refreshDetectRegionButtons();
     void refreshPositionCorrectionControls();

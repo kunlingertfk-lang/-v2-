@@ -347,7 +347,10 @@ QJsonObject emptyBrightnessDiagnostics(const ColorComparisonHalconConfig &config
 {
     return {
         {QStringLiteral("enabled"), config.brightnessCompensation},
+        {QStringLiteral("requested"), config.brightnessCompensation},
         {QStringLiteral("applied"), false},
+        {QStringLiteral("fallback"), false},
+        {QStringLiteral("fallbackReason"), QString()},
         {QStringLiteral("templateMean"), config.model.brightnessReference.mean},
         {QStringLiteral("detectMeanBefore"), 0.0},
         {QStringLiteral("detectMeanAfter"), 0.0},
@@ -1085,6 +1088,8 @@ struct ExtractedFeature
     double scale = 1.0;
     double clippedRatio = 0.0;
     bool compensationApplied = false;
+    bool compensationFallback = false;
+    QString compensationFallbackReason;
 };
 
 RunnerFailure illuminationFailure(const QString &message,
@@ -1102,7 +1107,11 @@ RunnerFailure illuminationFailure(const QString &message,
                 QStringLiteral("brightnessCompensation"),
                 QJsonObject{
                     {QStringLiteral("enabled"), config.brightnessCompensation},
+                    {QStringLiteral("requested"), config.brightnessCompensation},
                     {QStringLiteral("applied"), extracted.compensationApplied},
+                    {QStringLiteral("fallback"), extracted.compensationFallback},
+                    {QStringLiteral("fallbackReason"),
+                     extracted.compensationFallbackReason},
                     {QStringLiteral("templateMean"),
                      templateRegion ? extracted.meanBefore : templateMean},
                     {QStringLiteral("detectMeanBefore"),
@@ -1369,73 +1378,69 @@ ExtractedFeature extractFeature(HalconCApi *api,
         if (!finiteValue(extracted.scale)
                 || extracted.scale < kMinBrightnessScale
                 || extracted.scale > kMaxBrightnessScale) {
-            throw illuminationFailure(
-                        QStringLiteral("Brightness compensation scale is outside the safe range."),
-                        config,
-                        extracted,
-                        templateRegion,
-                        templateMean);
+            extracted.compensationFallback = true;
+            extracted.compensationFallbackReason =
+                    QStringLiteral("scale_out_of_range");
+        } else {
+            extracted.clippedRatio = compensationClippedRatio(
+                        api,
+                        effectiveRegion,
+                        value.value(),
+                        extracted.scale,
+                        static_cast<double>(extracted.effectivePixelCount));
+            if (extracted.clippedRatio > kMaxClippedRatio) {
+                extracted.compensationFallback = true;
+                extracted.compensationFallbackReason =
+                        QStringLiteral("clip_ratio_exceeded");
+            }
         }
 
-        extracted.clippedRatio = compensationClippedRatio(
-                    api,
-                    effectiveRegion,
-                    value.value(),
-                    extracted.scale,
-                    static_cast<double>(extracted.effectivePixelCount));
-        if (extracted.clippedRatio > kMaxClippedRatio) {
-            throw illuminationFailure(
-                        QStringLiteral("Brightness compensation would clip too many effective pixels."),
-                        config,
-                        extracted,
-                        templateRegion,
-                        templateMean);
-        }
-
-        HalconTuple multiplier = scalarTuple(api, extracted.scale);
-        HalconTuple add = scalarTuple(api, 0.0);
-        checkHalcon(api,
-                    api->scaleImage(red.value(),
-                                    scaledRed.ptr(),
-                                    multiplier.value(),
-                                    add.value()),
-                    QStringLiteral("brightness.scale_red.scale_image"));
-        checkHalcon(api,
-                    api->scaleImage(green.value(),
-                                    scaledGreen.ptr(),
-                                    multiplier.value(),
-                                    add.value()),
-                    QStringLiteral("brightness.scale_green.scale_image"));
-        checkHalcon(api,
-                    api->scaleImage(blue.value(),
-                                    scaledBlue.ptr(),
-                                    multiplier.value(),
-                                    add.value()),
-                    QStringLiteral("brightness.scale_blue.scale_image"));
-        checkHalcon(api,
-                    api->compose3(scaledRed.value(),
-                                  scaledGreen.value(),
-                                  scaledBlue.value(),
-                                  composed.ptr()),
-                    QStringLiteral("brightness.compose3"));
-        checkHalcon(api,
-                    api->transFromRgb(scaledRed.value(),
+        if (!extracted.compensationFallback) {
+            HalconTuple multiplier = scalarTuple(api, extracted.scale);
+            HalconTuple add = scalarTuple(api, 0.0);
+            checkHalcon(api,
+                        api->scaleImage(red.value(),
+                                        scaledRed.ptr(),
+                                        multiplier.value(),
+                                        add.value()),
+                        QStringLiteral("brightness.scale_red.scale_image"));
+            checkHalcon(api,
+                        api->scaleImage(green.value(),
+                                        scaledGreen.ptr(),
+                                        multiplier.value(),
+                                        add.value()),
+                        QStringLiteral("brightness.scale_green.scale_image"));
+            checkHalcon(api,
+                        api->scaleImage(blue.value(),
+                                        scaledBlue.ptr(),
+                                        multiplier.value(),
+                                        add.value()),
+                        QStringLiteral("brightness.scale_blue.scale_image"));
+            checkHalcon(api,
+                        api->compose3(scaledRed.value(),
                                       scaledGreen.value(),
                                       scaledBlue.value(),
-                                      compensatedHue.ptr(),
-                                      compensatedSaturation.ptr(),
-                                      compensatedValue.ptr(),
-                                      "hsv"),
-                    QStringLiteral("brightness.trans_from_rgb"));
-        featureHue = compensatedHue.value();
-        featureSaturation = compensatedSaturation.value();
-        featureValue = compensatedValue.value();
-        extracted.compensationApplied = true;
-        extracted.meanAfter = intensityStatistics(
-                    api,
-                    effectiveRegion,
-                    featureValue,
-                    QStringLiteral("brightness.after")).first;
+                                      composed.ptr()),
+                        QStringLiteral("brightness.compose3"));
+            checkHalcon(api,
+                        api->transFromRgb(scaledRed.value(),
+                                          scaledGreen.value(),
+                                          scaledBlue.value(),
+                                          compensatedHue.ptr(),
+                                          compensatedSaturation.ptr(),
+                                          compensatedValue.ptr(),
+                                          "hsv"),
+                        QStringLiteral("brightness.trans_from_rgb"));
+            featureHue = compensatedHue.value();
+            featureSaturation = compensatedSaturation.value();
+            featureValue = compensatedValue.value();
+            extracted.compensationApplied = true;
+            extracted.meanAfter = intensityStatistics(
+                        api,
+                        effectiveRegion,
+                        featureValue,
+                        QStringLiteral("brightness.after")).first;
+        }
     }
 
     extracted.hsHistogram = hsHistogram(api,
@@ -1610,7 +1615,11 @@ QJsonObject brightnessDiagnostics(const ColorComparisonHalconConfig &config,
 {
     return {
         {QStringLiteral("enabled"), config.brightnessCompensation},
+        {QStringLiteral("requested"), config.brightnessCompensation},
         {QStringLiteral("applied"), extracted.compensationApplied},
+        {QStringLiteral("fallback"), extracted.compensationFallback},
+        {QStringLiteral("fallbackReason"),
+         extracted.compensationFallbackReason},
         {QStringLiteral("templateMean"), config.model.brightnessReference.mean},
         {QStringLiteral("detectMeanBefore"), extracted.meanBefore},
         {QStringLiteral("detectMeanAfter"), extracted.meanAfter},
@@ -1618,6 +1627,59 @@ QJsonObject brightnessDiagnostics(const ColorComparisonHalconConfig &config,
         {QStringLiteral("clippedRatio"), extracted.clippedRatio}
     };
 }
+
+} // namespace
+
+ColorComparisonScoreBreakdown ColorComparisonHalconRunner::scoreBreakdown(
+        double hsScore,
+        double templateBrightnessMean,
+        double detectBrightnessMean,
+        double templateMeanSaturation,
+        double detectMeanSaturation)
+{
+    ColorComparisonScoreBreakdown breakdown;
+    breakdown.hsScore = qBound(0.0, hsScore, 100.0);
+    breakdown.brightnessDifference = qBound(
+                0.0,
+                std::abs(templateBrightnessMean - detectBrightnessMean) / 255.0,
+                1.0);
+    if (breakdown.brightnessDifference > 0.10
+            && breakdown.brightnessDifference < 0.40) {
+        breakdown.brightnessFactor = 1.10 - breakdown.brightnessDifference;
+    } else if (breakdown.brightnessDifference >= 0.40) {
+        breakdown.brightnessFactor = 0.70;
+    }
+
+    const double colorScore = breakdown.hsScore * breakdown.brightnessFactor;
+    breakdown.grayScore = 100.0 * qMax(
+                0.0, 1.0 - breakdown.brightnessDifference / 0.50);
+    const double minimumSaturation = qMin(templateMeanSaturation,
+                                          detectMeanSaturation);
+    const double maximumSaturation = qMax(templateMeanSaturation,
+                                          detectMeanSaturation);
+    breakdown.grayWeight = qBound(
+                0.0, (0.20 - maximumSaturation) / 0.10, 1.0);
+    breakdown.baseScoreBeforeSaturationPenalty =
+            breakdown.grayWeight * breakdown.grayScore
+            + (1.0 - breakdown.grayWeight) * colorScore;
+
+    if (minimumSaturation <= 0.10) {
+        const double linearProgress = qBound(
+                    0.0, (maximumSaturation - 0.10) / 0.10, 1.0);
+        breakdown.saturationMismatchProgress = linearProgress * linearProgress
+                * (3.0 - 2.0 * linearProgress);
+        breakdown.saturationFactor =
+                1.0 - 0.60 * breakdown.saturationMismatchProgress;
+    }
+    breakdown.finalScore = qBound(
+                0.0,
+                breakdown.baseScoreBeforeSaturationPenalty
+                * breakdown.saturationFactor,
+                100.0);
+    return breakdown;
+}
+
+namespace {
 
 QRectF normalizedRectToPixels(const QRectF &rect, const cv::Mat &image)
 {
@@ -1976,6 +2038,8 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                     false,
                     config.brightnessCompensation,
                     config.model.brightnessReference.mean);
+        if (extracted.compensationFallback)
+            warnings.append(QStringLiteral("brightness_compensation_skipped"));
         const double rawIntersection = histogramIntersection(
                     &library.api, config.model.values, extracted.hsHistogram);
         const QVector<double> smoothedTemplate = smoothHsHistogram(
@@ -1987,34 +2051,13 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         const double hsScore = smoothedIntersection * 100.0;
         const double templateMeanSaturation = meanSaturation(config.model.values);
         const double detectMeanSaturation = meanSaturation(extracted.hsHistogram);
-        const double brightnessDifference = qBound(
-                    0.0,
-                    std::abs(config.model.brightnessReference.mean
-                             - extracted.meanAfter) / 255.0,
-                    1.0);
-        double brightnessFactor = 1.0;
-        if (brightnessDifference > 0.10 && brightnessDifference < 0.40)
-            brightnessFactor = 1.10 - brightnessDifference;
-        else if (brightnessDifference >= 0.40)
-            brightnessFactor = 0.70;
-
-        const double colorScore = hsScore * brightnessFactor;
-        const double grayScore = 100.0 * qMax(
-                    0.0, 1.0 - brightnessDifference / 0.50);
-        const double minimumSaturation = qMin(templateMeanSaturation,
-                                              detectMeanSaturation);
-        const double maximumSaturation = qMax(templateMeanSaturation,
-                                              detectMeanSaturation);
-        const double grayWeight = qBound(
-                    0.0, (0.20 - maximumSaturation) / 0.10, 1.0);
-        double score = grayWeight * grayScore
-                + (1.0 - grayWeight) * colorScore;
-        if (minimumSaturation <= 0.10) {
-            const double mismatchProgress = qBound(
-                        0.0, (maximumSaturation - 0.10) / 0.10, 1.0);
-            score = qMin(score, 100.0 - 60.0 * mismatchProgress);
-        }
-        score = qBound(0.0, score, 100.0);
+        const ColorComparisonScoreBreakdown scoreParts = scoreBreakdown(
+                    hsScore,
+                    config.model.brightnessReference.mean,
+                    extracted.meanAfter,
+                    templateMeanSaturation,
+                    detectMeanSaturation);
+        const double score = scoreParts.finalScore;
         const double similarity = score / 100.0;
         const bool passed = score >= static_cast<double>(config.minScore);
 
@@ -2056,9 +2099,20 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.payload.insert(QStringLiteral("detectMeanSaturation"),
                               detectMeanSaturation);
         result.payload.insert(QStringLiteral("brightnessDifference"),
-                              brightnessDifference);
+                              scoreParts.brightnessDifference);
         result.payload.insert(QStringLiteral("brightnessFactor"),
-                              brightnessFactor);
+                              scoreParts.brightnessFactor);
+        result.payload.insert(QStringLiteral("grayScore"),
+                              scoreParts.grayScore);
+        result.payload.insert(QStringLiteral("grayWeight"),
+                              scoreParts.grayWeight);
+        result.payload.insert(QStringLiteral("baseScoreBeforeSaturationPenalty"),
+                              scoreParts.baseScoreBeforeSaturationPenalty);
+        result.payload.insert(QStringLiteral("saturationMismatchProgress"),
+                              scoreParts.saturationMismatchProgress);
+        result.payload.insert(QStringLiteral("saturationFactor"),
+                              scoreParts.saturationFactor);
+        result.payload.insert(QStringLiteral("finalScore"), scoreParts.finalScore);
         result.payload.insert(QStringLiteral("smoothingProfile"), QJsonObject{
             {QStringLiteral("sensitivity"), profile.sensitivity},
             {QStringLiteral("hueSigma"), profile.hueSigma},

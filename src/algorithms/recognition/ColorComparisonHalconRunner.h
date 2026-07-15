@@ -59,9 +59,28 @@ struct ColorComparisonHalconResult
     QJsonObject payload;
 };
 
+struct ColorComparisonScoreBreakdown
+{
+    double hsScore = 0.0;
+    double brightnessDifference = 0.0;
+    double brightnessFactor = 1.0;
+    double grayScore = 0.0;
+    double grayWeight = 0.0;
+    double baseScoreBeforeSaturationPenalty = 0.0;
+    double saturationMismatchProgress = 0.0;
+    double saturationFactor = 1.0;
+    double finalScore = 0.0;
+};
+
 class ColorComparisonHalconRunner
 {
 public:
+    static ColorComparisonScoreBreakdown scoreBreakdown(
+            double hsScore,
+            double templateBrightnessMean,
+            double detectBrightnessMean,
+            double templateMeanSaturation,
+            double detectMeanSaturation);
     ColorComparisonTemplateBuildResult buildTemplateModel(
             const cv::Mat &referenceImage,
             const ColorComparisonHalconConfig &config) const;

@@ -85,6 +85,15 @@ ToolResult / overlays / payload
 - 视口尺寸变化时，处于适应窗口状态则重新适应；用户已手动放大时保持倍率和观察中心，不得因普通 resize 强制复位。
 - 临时平移不得发出 `roiChanged`、`polygonChanged`、`circleChanged`、`lineBandChanged` 等 ROI 变更信号。
 
+### 原始图像、ROI 裁剪与显示层分离规范
+
+- 算法输入必须来自相机帧、参考帧或其未经标注的原始图像副本；禁止把 QWidget 截图、`QGraphicsScene::render` 结果、带 overlay 的 `QImage/QPixmap` 或预览窗口缓存传入 Runner。
+- ROI 缩略图必须先从原始图像按原图像素或 `0..1` 归一化坐标完成裁剪，再进行仅影响显示尺寸的缩放；橙色 ROI 框、Mask 填充、顶点、文字、OK/NG 和得分等显示层不得写入裁剪图像像素。
+- ROI、Mask 和结果标注应使用独立的 scene item、overlay widget 或控件外框绘制。需要在缩略图中表达排除区域时，也必须作为可移除的独立显示层，并明确其不属于算法像素。
+- 模板建模、检测运行和缩略图展示必须共用同一套 ROI 坐标合同，但不得共用已经合成显示标注的位图。缩放、平移、抗锯齿和高 DPI 适配只能改变显示，不得改变 Runner 使用的裁剪范围。
+- 公共辅助函数应在命名上区分 `raw/source image` 与 `annotated/preview image`，禁止用语义含糊的 preview 图像作为算法输入。
+- 自动化验证至少覆盖：原始裁剪像素与源图对应区域一致；开启 ROI/Mask/结果 overlay 前后 Runner 输入哈希或特征不变；缩略图像素中不存在框线、填充或文字的显示颜色。
+
 自动化验证至少覆盖：缩放上下限、光标锚点、平移模式锁定、绘制态 `Ctrl` 切换、适应窗口恢复，以及缩放/平移前后 ROI 归一化坐标不变。单个功能启用该能力后，还应手工检查该功能实际提供的所有 ROI 和屏蔽区形状。
 
 ## FID UI 可读性和占位窗口样式规范

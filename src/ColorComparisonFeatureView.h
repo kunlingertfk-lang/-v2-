@@ -18,7 +18,11 @@ public:
                                 const QVector<double> &valueHistogram,
                                 double rawIntersection,
                                 double score,
-                                int threshold);
+                                int threshold,
+                                double smoothedHsScore = -1.0,
+                                double brightnessFactor = -1.0,
+                                double saturationFactor = -1.0,
+                                const QString &brightnessState = QString());
     void clearDetection(const QString &reason = QString());
     void setThreshold(int threshold);
     void closeZoom();

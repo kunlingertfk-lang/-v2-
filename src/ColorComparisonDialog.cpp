@@ -1489,7 +1489,7 @@ void ColorComparisonDialog::updateTemplatePreview()
     if (!m_templatePreviewLabel)
         return;
 
-    const QImage roiImage = templateRoiImage();
+    const QImage roiImage = templateRawRoiImage();
     if (roiImage.isNull()) {
         m_templatePreviewLabel->clear();
         m_templatePreviewLabel->setText(tr("无模板图像"));
@@ -1572,7 +1572,7 @@ QRectF ColorComparisonDialog::normalizedRoiOrDefault(const QRectF &roi) const
     return roi.intersected(QRectF(0.0, 0.0, 1.0, 1.0));
 }
 
-QImage ColorComparisonDialog::templateRoiImage() const
+QImage ColorComparisonDialog::templateRawRoiImage() const
 {
     const ReferenceFrameSnapshot snapshot =
             ReferenceImageProvider::instance().referenceFrameSnapshot();
@@ -1602,44 +1602,6 @@ QImage ColorComparisonDialog::templateRoiImage() const
     if (roi.width() <= 0.0 || roi.height() <= 0.0)
         return QImage();
 
-    QImage annotated = referenceImage.convertToFormat(QImage::Format_ARGB32);
-    QPainter overlayPainter(&annotated);
-    overlayPainter.setRenderHint(QPainter::Antialiasing, true);
-    const auto imageRect = [&annotated](const QRectF &normalized) {
-        return QRectF(normalized.x() * annotated.width(),
-                      normalized.y() * annotated.height(),
-                      normalized.width() * annotated.width(),
-                      normalized.height() * annotated.height());
-    };
-    overlayPainter.setBrush(Qt::NoBrush);
-    overlayPainter.setPen(QPen(QColor(255, 122, 0), 2.0));
-    if (m_templateRegionMode == QStringLiteral("sync")
-            && m_detectRegionType == QStringLiteral("circle")
-            && m_detectCircle.valid) {
-        overlayPainter.drawEllipse(imageRect(syncCircleRoi));
-    } else {
-        overlayPainter.drawRect(imageRect(roi));
-    }
-
-    const auto drawMask = [&annotated, &overlayPainter](
-            const QVector<QPointF> &points) {
-        if (points.size() < 3)
-            return;
-        QPolygonF polygon;
-        polygon.reserve(points.size());
-        for (const QPointF &point : points) {
-            polygon.append(QPointF(point.x() * annotated.width(),
-                                   point.y() * annotated.height()));
-        }
-        overlayPainter.setPen(QPen(QColor(220, 38, 38), 2.0));
-        overlayPainter.setBrush(QColor(220, 38, 38, 120));
-        overlayPainter.drawPolygon(polygon);
-    };
-    if (m_templateRegionMode == QStringLiteral("sync"))
-        drawMask(m_detectMask);
-    drawMask(m_templateMask);
-    overlayPainter.end();
-
     const QRect sourceRect(
                 qBound(0, static_cast<int>(std::floor(roi.x()
                                                      * referenceImage.width())),
@@ -1651,7 +1613,7 @@ QImage ColorComparisonDialog::templateRoiImage() const
                                                   * referenceImage.width()))),
                 qMax(1, static_cast<int>(std::ceil(roi.height()
                                                   * referenceImage.height()))));
-    return annotated.copy(sourceRect.intersected(annotated.rect()));
+    return referenceImage.copy(sourceRect.intersected(referenceImage.rect()));
 }
 
 void ColorComparisonDialog::refreshEditControls()
@@ -1848,12 +1810,30 @@ bool ColorComparisonDialog::updateDetectionFeaturePreview(
     const double rawIntersection = diagnostics.value(
                 QStringLiteral("rawIntersection")).toDouble(
                 std::numeric_limits<double>::quiet_NaN());
+    const QJsonObject brightness = result.payload.value(
+                QStringLiteral("brightnessCompensation")).toObject();
+    QString brightnessState = tr("关闭");
+    const bool brightnessRequested = brightness.value(
+                QStringLiteral("requested")).toBool(
+                brightness.value(QStringLiteral("enabled")).toBool());
+    if (brightness.value(QStringLiteral("fallback")).toBool()) {
+        brightnessState = tr("已跳过：%1").arg(
+                    brightness.value(QStringLiteral("fallbackReason")).toString());
+    } else if (brightness.value(QStringLiteral("applied")).toBool()) {
+        brightnessState = tr("已应用");
+    } else if (brightnessRequested) {
+        brightnessState = tr("未应用");
+    }
     return m_featureView->setDetectionHistograms(
                 hsHistogram,
                 valueHistogram,
                 rawIntersection,
                 result.score,
-                m_minScoreSpinBox ? m_minScoreSpinBox->value() : 80);
+                m_minScoreSpinBox ? m_minScoreSpinBox->value() : 80,
+                result.payload.value(QStringLiteral("hsScore")).toDouble(-1.0),
+                result.payload.value(QStringLiteral("brightnessFactor")).toDouble(-1.0),
+                result.payload.value(QStringLiteral("saturationFactor")).toDouble(-1.0),
+                brightnessState);
 }
 
 QJsonObject ColorComparisonDialog::colorComparisonParams() const
@@ -2514,13 +2494,21 @@ void ColorComparisonDialog::displayResult(const ToolResult &result, bool referen
     if (m_previewHelper)
         m_previewHelper->setToolOverlays(result.overlays);
     const bool featureAvailable = updateDetectionFeaturePreview(result);
-    updateStatus(tr("%1 | score:%2 | %3 | %4%5")
+    const QJsonObject brightness = result.payload.value(
+                QStringLiteral("brightnessCompensation")).toObject();
+    const QString brightnessNotice = brightness.value(
+                QStringLiteral("fallback")).toBool()
+            ? tr(" | 光照补偿已跳过：%1").arg(
+                  brightness.value(QStringLiteral("fallbackReason")).toString())
+            : QString();
+    updateStatus(tr("%1 | score:%2 | %3 | %4%5%6")
                  .arg(result.ok ? QStringLiteral("OK") : QStringLiteral("NG"),
                       QString::number(result.score, 'f', 2),
                       result.status,
                       result.message,
                       featureAvailable ? QString()
-                                       : tr(" | 检测特征不可用")));
+                                       : tr(" | 检测特征不可用"),
+                      brightnessNotice));
     if (referenceSource) {
         m_referencePreviewSnapshot =
                 makeReferenceToolPreviewSnapshot(toToolConfig(), result, m_detectRoi);

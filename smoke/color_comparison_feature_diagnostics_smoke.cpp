@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+#include <cmath>
 #include <iostream>
 #include <opencv2/core.hpp>
 
@@ -25,6 +26,29 @@ void check(bool condition, const char *message)
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
+
+    const ColorComparisonScoreBreakdown scenePlatform =
+            ColorComparisonHalconRunner::scoreBreakdown(
+                89.15929556406984, 27.49512987012987, 27.49512987012987,
+                0.21695643066610806, 0.09929032258064516);
+    check(std::abs(scenePlatform.finalScore - 40.0) > 0.5,
+          "continuous saturation penalty must remove the fixed 40-point plateau");
+    check(scenePlatform.saturationFactor > 0.39
+          && scenePlatform.saturationFactor <= 0.40,
+          "full gray/color mismatch must expose the saturation factor");
+    const ColorComparisonScoreBreakdown lowerBase =
+            ColorComparisonHalconRunner::scoreBreakdown(
+                60.0, 27.5, 27.5, 0.217, 0.099);
+    check(std::abs(scenePlatform.finalScore - lowerBase.finalScore) > 5.0,
+          "different base scores must remain distinguishable after saturation penalty");
+    const ColorComparisonScoreBreakdown belowBoundary =
+            ColorComparisonHalconRunner::scoreBreakdown(
+                90.0, 50.0, 50.0, 0.10, 0.1499);
+    const ColorComparisonScoreBreakdown aboveBoundary =
+            ColorComparisonHalconRunner::scoreBreakdown(
+                90.0, 50.0, 50.0, 0.10, 0.1501);
+    check(std::abs(belowBoundary.finalScore - aboveBoundary.finalScore) < 0.5,
+          "saturation penalty must stay continuous around intermediate thresholds");
 
     ColorComparisonHalconConfig config;
     config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
@@ -85,6 +109,37 @@ int main(int argc, char **argv)
         check(diagnostics.value(QStringLiteral("detectValueHistogram"))
               .toArray().size() == 32,
               "payload must contain 32 detection V values");
+
+        ColorComparisonHalconConfig fallbackConfig = config;
+        fallbackConfig.brightnessCompensation = true;
+        cv::Mat darkImage(48, 64, CV_8UC3, cv::Scalar(20, 40, 100));
+        cv::Mat brightImage(48, 64, CV_8UC3, cv::Scalar(40, 80, 200));
+        const ColorComparisonTemplateBuildResult fallbackTemplate =
+                runner.buildTemplateModel(darkImage, fallbackConfig);
+        check(fallbackTemplate.success,
+              "brightness fallback template build must succeed");
+        if (fallbackTemplate.success) {
+            fallbackConfig.model = fallbackTemplate.model;
+            const ColorComparisonHalconResult fallbackResult =
+                    runner.run(brightImage, fallbackConfig);
+            const QJsonObject brightness = fallbackResult.payload.value(
+                        QStringLiteral("brightnessCompensation")).toObject();
+            check(fallbackResult.success && fallbackResult.measurementValid,
+                  "unsafe brightness scale must fall back to raw features");
+            check(brightness.value(QStringLiteral("requested")).toBool()
+                  && brightness.value(QStringLiteral("fallback")).toBool()
+                  && !brightness.value(QStringLiteral("applied")).toBool(),
+                  "brightness diagnostics must expose requested/fallback/applied states");
+            check(brightness.value(QStringLiteral("fallbackReason")).toString()
+                  == QStringLiteral("scale_out_of_range"),
+                  "unsafe brightness scale must expose a stable fallback reason");
+            check(fallbackResult.payload.value(QStringLiteral("warnings"))
+                  .toArray().contains(QStringLiteral("brightness_compensation_skipped")),
+                  "brightness fallback must be visible as a warning");
+            check(fallbackResult.payload.value(QStringLiteral("histogramDiagnostics"))
+                  .toObject().value(QStringLiteral("available")).toBool(),
+                  "brightness fallback must retain detection histograms");
+        }
     } else {
         std::cerr << "template build: " << built.status.toStdString()
                   << ": " << built.message.toStdString() << std::endl;

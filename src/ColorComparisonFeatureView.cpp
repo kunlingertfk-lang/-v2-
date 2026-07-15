@@ -604,11 +604,26 @@ public:
         saturation->setHistograms(templateSaturation, detectionSaturation);
         value->setHistograms(templateV, detectionV);
         joint->setHistograms(templateHs, detectionHs);
-        metrics->setText(QObject::tr("HS 联合重合：%1\n当前得分：%2\n判定阈值：%3")
+        const QString smoothedText = detectionAvailable && smoothedHsScore >= 0.0
+                ? QString::number(smoothedHsScore, 'f', 1)
+                : QStringLiteral("--");
+        const QString brightnessText = detectionAvailable && brightnessFactor >= 0.0
+                ? QStringLiteral("%1（系数 %2）")
+                  .arg(brightnessState.isEmpty()
+                       ? QObject::tr("未知") : brightnessState,
+                       QString::number(brightnessFactor, 'f', 3))
+                : QStringLiteral("--");
+        const QString saturationText = detectionAvailable && saturationFactor >= 0.0
+                ? QString::number(saturationFactor, 'f', 3)
+                : QStringLiteral("--");
+        metrics->setText(QObject::tr("HS 原始重合：%1\n平滑 HS 分数：%2\n亮度处理：%3\n饱和度系数：%4\n最终得分：%5\n判定阈值：%6")
                          .arg(detectionAvailable
                               ? QString::number(rawIntersection * 100.0, 'f', 1)
                                 + QStringLiteral("%")
                               : QStringLiteral("--"),
+                              smoothedText,
+                              brightnessText,
+                              saturationText,
                               detectionAvailable
                               ? QString::number(score, 'f', 1)
                               : QStringLiteral("--"),
@@ -685,6 +700,10 @@ public:
     QVector<double> detectionV;
     double rawIntersection = 0.0;
     double score = 0.0;
+    double smoothedHsScore = -1.0;
+    double brightnessFactor = -1.0;
+    double saturationFactor = -1.0;
+    QString brightnessState;
     int threshold = 80;
     bool detectionAvailable = false;
 };
@@ -768,7 +787,11 @@ bool ColorComparisonFeatureView::setDetectionHistograms(
         const QVector<double> &valueHistogram,
         double rawIntersection,
         double score,
-        int threshold)
+        int threshold,
+        double smoothedHsScore,
+        double brightnessFactor,
+        double saturationFactor,
+        const QString &brightnessState)
 {
     if (!validNormalizedHistogram(hsHistogram, kHsValues)
             || !validNormalizedHistogram(valueHistogram, kBins)
@@ -781,6 +804,10 @@ bool ColorComparisonFeatureView::setDetectionHistograms(
     d->detectionV = valueHistogram;
     d->rawIntersection = qBound(0.0, rawIntersection, 1.0);
     d->score = score;
+    d->smoothedHsScore = smoothedHsScore;
+    d->brightnessFactor = brightnessFactor;
+    d->saturationFactor = saturationFactor;
+    d->brightnessState = brightnessState;
     d->threshold = threshold;
     d->detectionAvailable = true;
     d->state->setText(tr("显示最新检测特征"));
@@ -794,6 +821,10 @@ void ColorComparisonFeatureView::clearDetection(const QString &reason)
     d->detectionV.clear();
     d->rawIntersection = 0.0;
     d->score = 0.0;
+    d->smoothedHsScore = -1.0;
+    d->brightnessFactor = -1.0;
+    d->saturationFactor = -1.0;
+    d->brightnessState.clear();
     d->detectionAvailable = false;
     d->state->setText(reason.isEmpty() ? tr("等待测试运行") : reason);
     d->refresh();

@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QColor>
 #include <QDialog>
 #include <QFrame>
 #include <QJsonArray>
@@ -14,6 +15,7 @@
 #include "algorithms/recognition/ColorComparisonModel.h"
 #include "frame/FrameInputMetadata.h"
 #include "frame/FrameViewHelper.h"
+#include "frame/ReferenceImageProvider.h"
 #include "tooladapters/ColorComparisonAdapter.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolPreviewSnapshot.h"
@@ -66,6 +68,17 @@ ToolResult validDiagnosticResult()
     result.status = QStringLiteral("ok");
     result.score = 73.5;
     result.payload.insert(QStringLiteral("histogramDiagnostics"), diagnostics);
+    result.payload.insert(QStringLiteral("hsScore"), 81.25);
+    result.payload.insert(QStringLiteral("brightnessFactor"), 0.92);
+    result.payload.insert(QStringLiteral("saturationFactor"), 0.75);
+    result.payload.insert(QStringLiteral("brightnessCompensation"), QJsonObject{
+                              {QStringLiteral("enabled"), true},
+                              {QStringLiteral("requested"), true},
+                              {QStringLiteral("applied"), false},
+                              {QStringLiteral("fallback"), true},
+                              {QStringLiteral("fallbackReason"),
+                               QStringLiteral("scale_out_of_range")}
+                          });
     return result;
 }
 
@@ -120,8 +133,35 @@ int main(int argc, char **argv)
     check(state && state->text().contains(QStringLiteral("最新检测特征")),
           "valid diagnostics must expose the latest-detection state");
     check(metrics && metrics->text().contains(QStringLiteral("42.0%"))
-          && metrics->text().contains(QStringLiteral("73.5")),
-          "valid diagnostics must expose intersection and score metrics");
+          && metrics->text().contains(QStringLiteral("81.3"))
+          && metrics->text().contains(QStringLiteral("0.750"))
+          && metrics->text().contains(QStringLiteral("73.5"))
+          && metrics->text().contains(QStringLiteral("scale_out_of_range")),
+          "valid diagnostics must expose raw, smoothed, penalty and final metrics");
+
+    cv::Mat source(20, 30, CV_8UC3, cv::Scalar(3, 17, 91));
+    ReferenceImageProvider::instance().setReferenceFrame(source);
+    dialog.m_templateRegionMode = QStringLiteral("custom");
+    dialog.m_templateRoi = QRectF(0.2, 0.25, 0.5, 0.5);
+    dialog.m_templateMask = {
+        QPointF(0.2, 0.25), QPointF(0.7, 0.25), QPointF(0.7, 0.75)
+    };
+    const QImage rawRoi = dialog.templateRawRoiImage();
+    check(rawRoi.size() == QSize(15, 10),
+          "raw ROI thumbnail must use source-image normalized coordinates");
+    bool rawPixelsPreserved = !rawRoi.isNull();
+    for (int y = 0; rawPixelsPreserved && y < rawRoi.height(); ++y) {
+        for (int x = 0; x < rawRoi.width(); ++x) {
+            const QColor pixel = rawRoi.pixelColor(x, y);
+            if (pixel.red() != 91 || pixel.green() != 17 || pixel.blue() != 3) {
+                rawPixelsPreserved = false;
+                break;
+            }
+        }
+    }
+    check(rawPixelsPreserved,
+          "ROI border and mask overlays must never modify thumbnail source pixels");
+    ReferenceImageProvider::instance().clearReferenceFrame();
 
     ToolResult unavailable;
     unavailable.status = QStringLiteral("no_measurement");
