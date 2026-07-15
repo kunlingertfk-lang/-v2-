@@ -924,7 +924,7 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
         if (event->type() == QEvent::MouseButtonDblClick) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             if (mouseEvent->button() == Qt::LeftButton &&
-                navigationGestureAllowed(mouseEvent->modifiers())) {
+                !drawingInteractionActive()) {
                 fitToView();
                 return true;
             }

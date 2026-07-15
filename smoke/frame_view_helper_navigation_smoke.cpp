@@ -96,6 +96,15 @@ int main(int argc, char **argv)
                      [&roiSignalCount](const QRectF &) { ++roiSignalCount; });
 
     check(!helper.navigationEnabled(), "navigation must remain opt-in");
+    const QPoint disabledCursor(330, 210);
+    const QTransform disabledTransform = view.transform();
+    sendWheel(view.viewport(), disabledCursor, 120, Qt::NoModifier);
+    sendMousePress(view.viewport(), QPoint(260, 190), Qt::NoModifier);
+    sendMouseMove(view.viewport(), QPoint(300, 220), Qt::NoModifier);
+    sendMouseRelease(view.viewport(), QPoint(300, 220), Qt::NoModifier);
+    check(view.transform() == disabledTransform && near(helper.viewScale(), 1.0),
+          "wheel and drag must not navigate while navigation is disabled");
+
     helper.setNavigationEnabled(true);
     check(helper.navigationEnabled() && helper.isFitToView()
           && near(helper.viewScale(), 1.0),
@@ -135,6 +144,12 @@ int main(int argc, char **argv)
     sendWheel(view.viewport(), cursor, 120, Qt::ControlModifier);
     check(near(helper.viewScale(), 1.25),
           "Ctrl+wheel must zoom while ROI drawing is active");
+
+    const QTransform drawingTransform = view.transform();
+    sendMouseDoubleClick(view.viewport(), cursor, Qt::ControlModifier);
+    check(near(helper.viewScale(), 1.25) && !helper.isFitToView()
+          && view.transform() == drawingTransform,
+          "double click must not reset navigation while ROI drawing is active");
 
     const QPointF roiBeforePan = helper.roiRectNormalized().topLeft();
     sendMousePress(view.viewport(), QPoint(260, 190), Qt::ControlModifier);
