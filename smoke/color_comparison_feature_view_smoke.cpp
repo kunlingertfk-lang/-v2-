@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QWheelEvent>
 
 #include <cmath>
@@ -53,7 +54,11 @@ QColor jointCellColor(QWidget *chart, int hue, int saturation)
     QImage rendered(chart->size(), QImage::Format_ARGB32_Premultiplied);
     rendered.fill(Qt::transparent);
     chart->render(&rendered);
-    const QRectF plot = QRectF(chart->rect()).adjusted(18, 24, -8, -18);
+    const QRectF available = QRectF(chart->rect()).adjusted(18, 24, -8, -18);
+    const double side = qMin(available.width(), available.height());
+    const QRectF plot(available.center().x() - side / 2.0,
+                      available.center().y() - side / 2.0,
+                      side, side);
     const double cellWidth = plot.width() / 32.0;
     const double cellHeight = plot.height() / 32.0;
     const QPoint sample(qRound(plot.left() + (hue + 0.5) * cellWidth),
@@ -210,16 +215,39 @@ int main(int argc, char **argv)
         check(expanded && expanded->width() == expanded->height(),
               "expanded HS chart canvas must be square");
         if (expanded && scroll) {
-            sendWheel(scroll->viewport(), scroll->viewport()->rect().center(), 120);
-            check(overlay->property("zoomPercent").toInt() == 125,
-                  "HS chart must support the same zoom steps");
+            QImage expandedRender(expanded->size(),
+                                  QImage::Format_ARGB32_Premultiplied);
+            expandedRender.fill(Qt::transparent);
+            expanded->render(&expandedRender);
+            const double plotWidth = expanded->property("jointPlotWidth").toDouble();
+            const double plotHeight = expanded->property("jointPlotHeight").toDouble();
+            check(plotWidth > 0.0 && qAbs(plotWidth - plotHeight) < 0.01,
+                  "expanded HS actual plot area must be square");
+
+            for (int i = 0; i < 4; ++i)
+                sendWheel(scroll->viewport(), scroll->viewport()->rect().center(), 120);
+            check(overlay->property("zoomPercent").toInt() == 200,
+                  "HS chart must support zooming to 200 percent");
+            QScrollBar *horizontal = scroll->horizontalScrollBar();
+            QScrollBar *vertical = scroll->verticalScrollBar();
+            check(horizontal->maximum() > 0 && vertical->maximum() > 0,
+                  "200 percent HS chart must be scrollable on both axes");
+            horizontal->setValue(qMax(1, horizontal->maximum() / 2));
+            vertical->setValue(qMax(1, vertical->maximum() / 2));
+            const int horizontalBefore = horizontal->value();
+            const int verticalBefore = vertical->value();
+            check(horizontalBefore > 0 && verticalBefore > 0,
+                  "scroll preservation check must start at non-zero positions");
             check(view.setDetectionHistograms(detectionHs, value,
                                               0.5, 50.0, 80),
                   "updated diagnostics must remain valid");
             expanded = view.findChild<QWidget *>(
                         QStringLiteral("colorComparisonExpandedFeatureChart"));
-            check(overlay->property("zoomPercent").toInt() == 125,
+            check(overlay->property("zoomPercent").toInt() == 200,
                   "same-kind histogram refresh must preserve zoom percent");
+            check(horizontal->value() == horizontalBefore
+                  && vertical->value() == verticalBefore,
+                  "same-kind histogram refresh must preserve both scroll positions");
         }
         if (closeButton)
             closeButton->click();

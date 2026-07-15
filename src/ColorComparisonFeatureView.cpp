@@ -258,10 +258,16 @@ private:
 
     void paintJoint(QPainter *painter)
     {
-        const QRectF plot = QRectF(rect()).adjusted(m_expanded ? 38 : 18,
-                                                   m_expanded ? 34 : 24,
-                                                   m_expanded ? -22 : -8,
-                                                   m_expanded ? -32 : -18);
+        const QRectF available = QRectF(rect()).adjusted(m_expanded ? 38 : 18,
+                                                        m_expanded ? 34 : 24,
+                                                        m_expanded ? -22 : -8,
+                                                        m_expanded ? -32 : -18);
+        const double side = qMin(available.width(), available.height());
+        const QRectF plot(available.center().x() - side / 2.0,
+                          available.center().y() - side / 2.0,
+                          side, side);
+        setProperty("jointPlotWidth", plot.width());
+        setProperty("jointPlotHeight", plot.height());
         if (plot.width() <= 0 || plot.height() <= 0)
             return;
 
