@@ -90,7 +90,9 @@ backendConfigs.cielabGmm = {
 }
 ```
 
-普通 UI 只开放 `colorChannels`。`maxSamplesPerClass` 在 B2 固定为 10000，仅持久化和进入签名，不开放编辑。
+普通 UI 不直接展示 `colorChannels`，而是使用统一的“亮度参与”复选框映射：未勾选为 `ab`，勾选为 `lab`。`maxSamplesPerClass` 在 B2 固定为 10000，仅持久化和进入签名，不开放编辑。
+
+“亮度参与”只是统一的业务交互文案，不是跨后端共用的配置字段。HSV 一维模式仍保存 `backendConfigs.hsvHistogram.brightnessEnabled`，GMM 保存 `backendConfigs.cielabGmm.colorChannels`；CIELAB `L` 与 HSV `V` 不得解释为相同数值特征。
 
 ### 3.4 GMM 模型
 
@@ -119,13 +121,19 @@ backendModels.cielabGmm = {
 
 在 `ColorTemplateDialog` 的算法参数区域增加：
 
-- “识别算法”下拉框：`二维 H/S 直方图（推荐纯色/少样本）`、`CIELAB GMM（推荐复杂颜色）`。
-- GMM 通道下拉框：`a/b（推荐，弱化亮度）`、`L/a/b（区分明暗）`。
+- “识别算法”下拉框：`HSV 直方图（推荐纯色/少样本）`、`CIELAB GMM（推荐复杂颜色）`。HSV 后端内部继续由现有特征类型控件选择“一维兼容”或“二维 H/S 推荐”模式。
+- 统一的“亮度参与”复选框，并根据所选后端映射到各自配置。
 - 模型状态标签：未建立、建模中、可用、可用但样本偏少、已失效、校验失败、建模失败。
 - “建立 GMM 模型”或“重新建立”按钮。
 - 类别 ROI 数、实际训练像素数、中心范围和 warning 的只读诊断摘要。
 
-选择 HSV 时显示现有特征类型、灵敏度和亮度控件；选择 GMM 时隐藏或禁用 HSV 专属参数，显示 GMM 通道、状态和建模按钮。切换后端不删除另一后端模型。
+“亮度参与”的交互规则固定为：
+
+- HSV 一维直方图：可操作，关闭表示 H/S，开启表示 H/S/V。
+- HSV 二维 H/S：固定关闭并禁用，因为该模式不使用亮度。
+- CIELAB GMM：可操作，关闭映射 `colorChannels=ab`，开启映射 `colorChannels=lab`。
+
+选择 HSV 时显示现有特征类型和灵敏度控件；选择 GMM 时隐藏或禁用 HSV 专属参数，显示 GMM 模型状态和建模按钮。切换后端时复选框回显当前后端自己的值，不将 HSV 的选择复制给 GMM，也不删除另一后端模型。
 
 建模按钮执行以下校验后调用 `buildGmmTemplateModel()`：至少两个有效类别、每类至少一个具有无损 GMM 图像的 ROI、样本 ID 唯一、位深元数据完整。建模期间禁用保存、重复建模和样本修改；完成后恢复控件并显示结果。
 
@@ -144,7 +152,7 @@ backendModels.cielabGmm = {
 
 以下变化只使 GMM stale：
 
-- `colorChannels` 在 `ab` 与 `lab` 间切换。
+- GMM 模式下切换“亮度参与”，使 `colorChannels` 在 `ab` 与 `lab` 间变化。
 - 固定采样上限或后续 GMM 建模参数变化。
 - GMM 算法、特征 schema 或 HALCON 主次版本不匹配。
 
@@ -202,12 +210,13 @@ B1 的 HALCON runtime、图像元数据、训练和产物校验错误原样向 U
 4. 工程保存、重新加载、模板导出和导入后，GMM Base64/size/hash 不变且反序列化成功。
 5. 旧 HSV 模板迁移后仍能运行，GMM 状态为 empty。
 6. 缺少无损 GMM 图的旧样本建模时返回 `gmm_raw_sample_missing`。
-7. 修改公共样本或标签后 GMM stale；修改 HSV 参数不误伤 GMM；修改 GMM 通道不误伤 HSV。
-8. 切换后端不删除模型、不改变 ready/stale 状态。
-9. GMM 模式执行测试运行返回 `unsupported_gmm_detection_phase_b2`，不调用 HSV。
-10. 篡改模型 Base64/hash 后加载为 invalid，且界面不崩溃。
-11. 空图、Mono、无效 ROI、缺类别和缺 HALCON runtime 返回明确错误。
-12. Qt 主工程、现有 HSV smoke 和 GMM B1 smoke 均通过。
+7. 修改公共样本或标签后 GMM stale；修改 HSV 参数不误伤 GMM；在 GMM 模式切换“亮度参与”只使 GMM stale。
+8. 在不同后端间切换时，“亮度参与”分别回显 HSV 和 GMM 的独立值，不发生跨后端覆盖。
+9. 切换后端不删除模型、不改变 ready/stale 状态。
+10. GMM 模式执行测试运行返回 `unsupported_gmm_detection_phase_b2`，不调用 HSV。
+11. 篡改模型 Base64/hash 后加载为 invalid，且界面不崩溃。
+12. 空图、Mono、无效 ROI、缺类别和缺 HALCON runtime 返回明确错误。
+13. Qt 主工程、现有 HSV smoke 和 GMM B1 smoke 均通过。
 
 ## 10. 完成标准
 
