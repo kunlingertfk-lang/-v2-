@@ -49,6 +49,19 @@ QJsonArray oneHotHistogram(int size, int activeIndex)
     return values;
 }
 
+bool imageHasOnlyColor(const QImage &image, const QColor &expected)
+{
+    if (image.isNull())
+        return false;
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (image.pixelColor(x, y) != expected)
+                return false;
+        }
+    }
+    return true;
+}
+
 ToolResult validDiagnosticResult()
 {
     QJsonObject diagnostics;
@@ -149,18 +162,30 @@ int main(int argc, char **argv)
     const QImage rawRoi = dialog.templateRawRoiImage();
     check(rawRoi.size() == QSize(15, 10),
           "raw ROI thumbnail must use source-image normalized coordinates");
-    bool rawPixelsPreserved = !rawRoi.isNull();
-    for (int y = 0; rawPixelsPreserved && y < rawRoi.height(); ++y) {
-        for (int x = 0; x < rawRoi.width(); ++x) {
-            const QColor pixel = rawRoi.pixelColor(x, y);
-            if (pixel.red() != 91 || pixel.green() != 17 || pixel.blue() != 3) {
-                rawPixelsPreserved = false;
-                break;
-            }
-        }
-    }
-    check(rawPixelsPreserved,
+    const QColor sourceColor(91, 17, 3);
+    check(imageHasOnlyColor(rawRoi, sourceColor),
           "ROI border and mask overlays must never modify thumbnail source pixels");
+
+    dialog.m_templateRegionMode = QStringLiteral("sync");
+    dialog.m_globalDetection = false;
+    dialog.m_detectRegionType = QStringLiteral("rectangle");
+    dialog.m_detectRoi = QRectF(0.1, 0.2, 0.4, 0.5);
+    dialog.m_detectMask = {
+        QPointF(0.1, 0.2), QPointF(0.5, 0.2), QPointF(0.5, 0.7)
+    };
+    const QImage syncRectRoi = dialog.templateRawRoiImage();
+    check(syncRectRoi.size() == QSize(12, 10)
+          && imageHasOnlyColor(syncRectRoi, sourceColor),
+          "synchronized rectangle thumbnail must preserve raw source pixels");
+
+    dialog.m_detectRegionType = QStringLiteral("circle");
+    dialog.m_detectCircle.centerNormalized = QPointF(0.5, 0.5);
+    dialog.m_detectCircle.radiusNormalized = 0.1;
+    dialog.m_detectCircle.valid = true;
+    const QImage syncCircleRoi = dialog.templateRawRoiImage();
+    check(syncCircleRoi.size() == QSize(6, 6)
+          && imageHasOnlyColor(syncCircleRoi, sourceColor),
+          "synchronized circle thumbnail must use its raw bounding rectangle");
     ReferenceImageProvider::instance().clearReferenceFrame();
 
     ToolResult unavailable;

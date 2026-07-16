@@ -1602,17 +1602,24 @@ QImage ColorComparisonDialog::templateRawRoiImage() const
     if (roi.width() <= 0.0 || roi.height() <= 0.0)
         return QImage();
 
-    const QRect sourceRect(
-                qBound(0, static_cast<int>(std::floor(roi.x()
-                                                     * referenceImage.width())),
-                       referenceImage.width() - 1),
-                qBound(0, static_cast<int>(std::floor(roi.y()
-                                                     * referenceImage.height())),
-                       referenceImage.height() - 1),
-                qMax(1, static_cast<int>(std::ceil(roi.width()
-                                                  * referenceImage.width()))),
-                qMax(1, static_cast<int>(std::ceil(roi.height()
-                                                  * referenceImage.height()))));
+    const int left = qBound(0,
+                            qRound(roi.left() * referenceImage.width()),
+                            referenceImage.width() - 1);
+    const int top = qBound(0,
+                           qRound(roi.top() * referenceImage.height()),
+                           referenceImage.height() - 1);
+    const int rightExclusive = qBound(
+                left + 1,
+                qRound(roi.right() * referenceImage.width()),
+                referenceImage.width());
+    const int bottomExclusive = qBound(
+                top + 1,
+                qRound(roi.bottom() * referenceImage.height()),
+                referenceImage.height());
+    const QRect sourceRect(left,
+                           top,
+                           rightExclusive - left,
+                           bottomExclusive - top);
     return referenceImage.copy(sourceRect.intersected(referenceImage.rect()));
 }
 
