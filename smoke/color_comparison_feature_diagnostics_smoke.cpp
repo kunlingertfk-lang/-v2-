@@ -140,6 +140,46 @@ int main(int argc, char **argv)
                   .toObject().value(QStringLiteral("available")).toBool(),
                   "brightness fallback must retain detection histograms");
         }
+
+        ColorComparisonHalconConfig clipFallbackConfig = config;
+        clipFallbackConfig.brightnessCompensation = true;
+        cv::Mat clipTemplateImage(48, 64, CV_8UC3,
+                                  cv::Scalar(120, 120, 120));
+        cv::Mat clipDetectionImage(48, 64, CV_8UC3,
+                                   cv::Scalar(92, 92, 92));
+        const int brightPixels = 200;
+        for (int index = 0; index < brightPixels; ++index) {
+            const int row = index / clipDetectionImage.cols;
+            const int column = index % clipDetectionImage.cols;
+            clipDetectionImage.at<cv::Vec3b>(row, column) =
+                    cv::Vec3b(250, 250, 250);
+        }
+        const ColorComparisonTemplateBuildResult clipTemplate =
+                runner.buildTemplateModel(clipTemplateImage,
+                                          clipFallbackConfig);
+        check(clipTemplate.success,
+              "clip-ratio fallback template build must succeed");
+        if (clipTemplate.success) {
+            clipFallbackConfig.model = clipTemplate.model;
+            const ColorComparisonHalconResult clipFallbackResult =
+                    runner.run(clipDetectionImage, clipFallbackConfig);
+            const QJsonObject brightness = clipFallbackResult.payload.value(
+                        QStringLiteral("brightnessCompensation")).toObject();
+            check(clipFallbackResult.success
+                  && clipFallbackResult.measurementValid,
+                  "excessive clipping must fall back to raw features");
+            check(brightness.value(QStringLiteral("fallback")).toBool()
+                  && brightness.value(QStringLiteral("fallbackReason")).toString()
+                     == QStringLiteral("clip_ratio_exceeded"),
+                  "clip fallback must expose a stable reason");
+            check(brightness.value(QStringLiteral("clippedRatio")).toDouble()
+                  > 0.02,
+                  "clip fallback diagnostics must preserve the measured ratio");
+            check(clipFallbackResult.payload.value(
+                      QStringLiteral("histogramDiagnostics")).toObject()
+                  .value(QStringLiteral("available")).toBool(),
+                  "clip fallback must retain detection histograms");
+        }
     } else {
         std::cerr << "template build: " << built.status.toStdString()
                   << ": " << built.message.toStdString() << std::endl;

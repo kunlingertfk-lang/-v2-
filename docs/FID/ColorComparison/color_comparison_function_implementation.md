@@ -1401,14 +1401,13 @@ minScore
 
 #### 验证
 
-- `color_comparison_feature_diagnostics_smoke`：无 license preflight 通过；纯评分断言验证现场数据不再固定 40 分、基础分差异保留、阈值附近连续。licensed 亮度回退分支仍待有效 license 环境运行。
+- `color_comparison_feature_diagnostics_smoke`：无 license preflight 与 `RUN_HALCON_LICENSED_SMOKE=1` 均通过；纯评分断言验证现场数据不再固定 40 分、基础分差异保留、阈值附近连续，真实 HALCON 提取覆盖正常补偿、scale 超限回退和 clipped ratio 超限回退，并确认回退后直方图仍可用。
 - `color_comparison_dialog_integration_smoke`：offscreen 通过；验证评分分解显示，并使用固定 BGR 源图逐像素确认 ROI 缩略图不含橙色框和 Mask 色。
 - `color_comparison_feature_view_smoke`：offscreen 通过。
 - 主工程 shadow qmake/make：通过。
 
 #### 剩余事项
 
-- 在具备有效 HALCON license 的环境执行 scale 超限与 clipped ratio 超限真实提取回退。
 - 在可交互桌面复测自定义矩形、同步矩形、同步圆和 Mask 的缩略图与 HALCON Region 一致性。
 - 使用现有产线样本记录旧分数、新分数和建议阈值，评估评分公式变化后的阈值迁移。
 
