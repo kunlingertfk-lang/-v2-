@@ -24,6 +24,7 @@
 #include "tooladapters/LinePresenceAdapter.h"
 #include "tooladapters/AiDetectionAdapter.h"
 #include "tooladapters/RegisteredClassificationAdapter.h"
+#include "tooladapters/TemplateLocationAdapter.h"
 
 class FrameViewHelper;
 class QEvent;
@@ -148,6 +149,7 @@ private:
     LinePresenceAdapter m_linePresenceAdapter;
     AiDetectionAdapter m_aiDetectionAdapter;
     RegisteredClassificationAdapter m_registeredClassificationAdapter;
+    TemplateLocationAdapter m_templateLocationAdapter;
     ToolEngine m_toolEngine;
     FrameViewHelper *m_previewHelper = nullptr;
     Ui::MainWindow *ui;

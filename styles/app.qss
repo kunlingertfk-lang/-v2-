@@ -849,6 +849,23 @@ QToolButton[actionRole="toolbarIcon"] {
     border: 1px solid #cfd5de;
     border-radius: 4px;
     background: #ffffff;
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 900;
+}
+
+QToolButton#toolbarIconButton:checked,
+QToolButton[actionRole="toolbarIcon"]:checked {
+    background: #ffedd5;
+    color: #9a3412;
+    border: 2px solid #f97316;
+}
+
+QToolButton#toolbarIconButton:disabled,
+QToolButton[actionRole="toolbarIcon"]:disabled {
+    background: #e2e8f0;
+    color: #475569;
+    border-color: #94a3b8;
 }
 
 QToolButton#toolbarPrimaryButton,
@@ -1624,6 +1641,77 @@ QDialog#ColorComparisonDialog QSpinBox {
     font-weight: 600;
 }
 
+/* Public semantic roles: combo popup views may be reparented to a top-level
+   Qt popup, so these selectors must not depend on a dialog ancestor. */
+QComboBox[uiRole="lightField"] {
+    min-height: 38px;
+    background: #ffffff;
+    color: #0f172a;
+    border: 2px solid #93c5fd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QComboBox[uiRole="lightField"]:focus,
+QComboBox[uiRole="lightField"]:on {
+    border-color: #f97316;
+}
+
+QWidget#sharedLightComboPopupContainer,
+QWidget#sharedLightComboPopupViewport,
+QAbstractItemView#sharedLightComboPopup,
+QWidget[uiRole="lightComboPopupContainer"],
+QWidget[uiRole="lightComboPopupViewport"],
+QAbstractItemView[uiRole="lightComboPopup"],
+QComboBox[uiRole="lightField"] QAbstractItemView {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+QAbstractItemView#sharedLightComboPopup,
+QAbstractItemView[uiRole="lightComboPopup"],
+QComboBox[uiRole="lightField"] QAbstractItemView {
+    border: 2px solid #60a5fa;
+    border-radius: 3px;
+    outline: 0;
+    font-size: 18px;
+    font-weight: 600;
+    selection-background-color: #ffedd5;
+    selection-color: #9a3412;
+}
+
+QAbstractItemView#sharedLightComboPopup::item,
+QAbstractItemView[uiRole="lightComboPopup"]::item,
+QComboBox[uiRole="lightField"] QAbstractItemView::item {
+    min-height: 38px;
+    padding: 4px 10px;
+    background: #ffffff;
+    color: #0f172a;
+}
+
+QAbstractItemView#sharedLightComboPopup::item:hover,
+QAbstractItemView[uiRole="lightComboPopup"]::item:hover,
+QComboBox[uiRole="lightField"] QAbstractItemView::item:hover {
+    background: #eff6ff;
+    color: #0f172a;
+}
+
+QAbstractItemView#sharedLightComboPopup::item:selected,
+QAbstractItemView[uiRole="lightComboPopup"]::item:selected,
+QComboBox[uiRole="lightField"] QAbstractItemView::item:selected {
+    background: #ffedd5;
+    color: #9a3412;
+}
+
+QAbstractItemView#sharedLightComboPopup::item:disabled,
+QAbstractItemView[uiRole="lightComboPopup"]::item:disabled,
+QComboBox[uiRole="lightField"] QAbstractItemView::item:disabled {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
 QDialog#ColorComparisonDialog QPushButton:checked,
 QDialog#ColorComparisonDialog QToolButton:checked {
     background: #fff7ed;
@@ -1810,4 +1898,177 @@ QDialog#ColorComparisonDialog QPushButton[actionRole="featureZoomClose"] {
 
 QDialog#ColorComparisonDialog QPushButton[actionRole="featureZoomClose"]:hover {
     background: #dc2626;
+}
+
+QLabel[statusTone="neutral"] {
+    color: #64748b;
+}
+
+QLabel[statusTone="building"],
+QLabel[statusTone="warning"],
+QLabel[statusTone="stale"] {
+    color: #d97706;
+    font-weight: 600;
+}
+
+QLabel[statusTone="success"] {
+    color: #15803d;
+    font-weight: 600;
+}
+
+QLabel[statusTone="error"] {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+/* TemplateLocation: utility-first industrial editor, light controls + dark canvas. */
+QDialog#TemplateLocationDialog {
+    background: #171a20;
+}
+
+QDialog#TemplateLocationDialog QFrame#titleBar,
+QDialog#TemplateLocationDialog QFrame#viewerHeader,
+QDialog#TemplateLocationDialog QFrame#resultBar {
+    background: #20242c;
+    color: #f8fafc;
+}
+
+QDialog#TemplateLocationDialog QFrame#parameterPanel,
+QDialog#TemplateLocationDialog QScrollArea#parameterScrollArea,
+QDialog#TemplateLocationDialog QWidget#parameterScrollContents,
+QDialog#TemplateLocationDialog QScrollArea#parameterScrollArea QWidget#qt_scrollarea_viewport {
+    background: #eef2f6;
+    color: #334155;
+}
+
+QDialog#TemplateLocationDialog QFrame#parameterPanel QLabel {
+    background: transparent;
+    color: #475569;
+}
+
+QDialog#TemplateLocationDialog QSpinBox,
+QDialog#TemplateLocationDialog QDoubleSpinBox {
+    min-height: 36px;
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+
+QDialog#TemplateLocationDialog QSpinBox:focus,
+QDialog#TemplateLocationDialog QDoubleSpinBox:focus {
+    border: 2px solid #f97316;
+}
+
+QDialog#TemplateLocationDialog QLabel[autoParameter="true"]:disabled {
+    color: #374151;
+    font-weight: 600;
+}
+
+QDialog#TemplateLocationDialog QSpinBox[autoParameter="true"]:disabled {
+    background: #c1c7d0;
+    color: #374151;
+    border-color: #6b7280;
+}
+
+QDialog#TemplateLocationDialog QPushButton {
+    min-height: 38px;
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 0 14px;
+    font-weight: 600;
+}
+
+QDialog#TemplateLocationDialog QPushButton:checked {
+    background: #fff7ed;
+    color: #ea580c;
+    border-color: #f97316;
+}
+
+/* ROI mode must remain unmistakable after clicking, including during redraw. */
+QDialog#TemplateLocationDialog QToolButton#templateRectButton:checked,
+QDialog#TemplateLocationDialog QToolButton#templatePolygonButton:checked,
+QDialog#TemplateLocationDialog QToolButton#searchGlobalButton:checked,
+QDialog#TemplateLocationDialog QToolButton#searchRectButton:checked,
+QDialog#TemplateLocationDialog QToolButton#searchCircleButton:checked,
+QDialog#TemplateLocationDialog QToolButton#searchPolygonButton:checked {
+    background: #fed7aa;
+    border: 3px solid #ea580c;
+    color: #7c2d12;
+}
+
+QDialog#TemplateLocationDialog QToolButton#templateRectButton:checked:hover,
+QDialog#TemplateLocationDialog QToolButton#templatePolygonButton:checked:hover,
+QDialog#TemplateLocationDialog QToolButton#searchGlobalButton:checked:hover,
+QDialog#TemplateLocationDialog QToolButton#searchRectButton:checked:hover,
+QDialog#TemplateLocationDialog QToolButton#searchCircleButton:checked:hover,
+QDialog#TemplateLocationDialog QToolButton#searchPolygonButton:checked:hover {
+    background: #fdba74;
+    border-color: #c2410c;
+}
+
+QDialog#TemplateLocationDialog QPushButton#createTemplateButton,
+QDialog#TemplateLocationDialog QPushButton#finishButton {
+    background: #f97316;
+    color: #ffffff;
+    border-color: #ea580c;
+}
+
+QDialog#TemplateLocationDialog QFrame#previewPanel,
+QDialog#TemplateLocationDialog QGraphicsView#previewGraphicsView {
+    background: #000000;
+}
+
+QDialog#TemplateLocationDialog QTableWidget#matchResultTable {
+    background: #171a20;
+    alternate-background-color: #20242c;
+    color: #e5e7eb;
+    border: 1px solid #475569;
+    gridline-color: #475569;
+    selection-background-color: #9a3412;
+    selection-color: #ffffff;
+}
+
+QDialog#TemplateLocationDialog QFrame#matchResultDrawer {
+    background: #20242c;
+    border-top: 1px solid #475569;
+}
+
+QDialog#TemplateLocationDialog QPushButton#matchResultToggle {
+    min-height: 36px;
+    max-height: 36px;
+    background: #2b313b;
+    color: #f8fafc;
+    border: 0;
+    border-radius: 0;
+    padding: 0 14px;
+    text-align: left;
+    font-weight: 600;
+}
+
+QDialog#TemplateLocationDialog QPushButton#matchResultToggle:hover,
+QDialog#TemplateLocationDialog QPushButton#matchResultToggle:checked {
+    background: #374151;
+    color: #ffffff;
+    border: 0;
+}
+
+QDialog#TemplateLocationDialog QTableWidget#matchResultTable QHeaderView::section {
+    min-height: 30px;
+    background: #2b313b;
+    color: #f8fafc;
+    border: 0;
+    border-right: 1px solid #475569;
+    border-bottom: 1px solid #64748b;
+    font-weight: 600;
+}
+
+QDialog#TemplateLocationDialog QFrame#viewerHeader QLabel,
+QDialog#TemplateLocationDialog QFrame#resultBar QLabel,
+QDialog#TemplateLocationDialog QFrame#titleBar QLabel {
+    background: transparent;
+    color: #f8fafc;
 }

@@ -17,7 +17,7 @@ CXX           = g++
 DEFINES       = -DQT_NO_DEBUG -DQT_MULTIMEDIAWIDGETS_LIB -DQT_WIDGETS_LIB -DQT_MULTIMEDIA_LIB -DQT_GUI_LIB -DQT_CONCURRENT_LIB -DQT_NETWORK_LIB -DQT_CORE_LIB
 CFLAGS        = -pipe -O2 -Wall -Wextra -D_REENTRANT -fPIC $(DEFINES)
 CXXFLAGS      = -pipe -O2 -std=gnu++1z -Wall -Wextra -D_REENTRANT -fPIC $(DEFINES)
-INCPATH       = -I../../../qt_znxj_v2_work_1920_515 -I. -I../../src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -Imoc -I/usr/include/libdrm -Iui -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++
+INCPATH       = -I../../../qt_znxj_v2_work_1920_515 -I. -I../../src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -Imoc -I/usr/include/libdrm -Iui -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++
 QMAKE         = /home/tt/Qt/5.15.2/gcc_64/bin/qmake
 DEL_FILE      = rm -f
 CHK_DIR_EXISTS= test -d
@@ -40,7 +40,7 @@ DISTNAME      = qt_ui_test1.0.0
 DISTDIR = /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/obj/qt_ui_test1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-O1 -Wl,-rpath,/home/tt/Qt/5.15.2/gcc_64/lib -Wl,-rpath-link,/home/tt/Qt/5.15.2/gcc_64/lib
-LIBS          = $(SUBLIBS) -L/home/tt/.local/opencv-4.8.0/lib -Wl,-rpath,/home/tt/.local/opencv-4.8.0/lib -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs -ldl /home/tt/Qt/5.15.2/gcc_64/lib/libQt5MultimediaWidgets.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Widgets.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Multimedia.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Gui.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Concurrent.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Network.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Core.so -lGL -lpthread   
+LIBS          = $(SUBLIBS) -L/opt/halcon/lib/x64-linux -Wl,-rpath,/opt/halcon/lib/x64-linux -lhalconcpp -lhalcon -ldl -lopencv_stitching -lopencv_alphamat -lopencv_aruco -lopencv_barcode -lopencv_bgsegm -lopencv_bioinspired -lopencv_ccalib -lopencv_dnn_objdetect -lopencv_dnn_superres -lopencv_dpm -lopencv_face -lopencv_freetype -lopencv_fuzzy -lopencv_hdf -lopencv_hfs -lopencv_img_hash -lopencv_intensity_transform -lopencv_line_descriptor -lopencv_mcc -lopencv_quality -lopencv_rapid -lopencv_reg -lopencv_rgbd -lopencv_saliency -lopencv_shape -lopencv_stereo -lopencv_structured_light -lopencv_phase_unwrapping -lopencv_superres -lopencv_optflow -lopencv_surface_matching -lopencv_tracking -lopencv_highgui -lopencv_datasets -lopencv_text -lopencv_plot -lopencv_ml -lopencv_videostab -lopencv_videoio -lopencv_viz -lopencv_wechat_qrcode -lopencv_ximgproc -lopencv_video -lopencv_xobjdetect -lopencv_objdetect -lopencv_calib3d -lopencv_imgcodecs -lopencv_features2d -lopencv_dnn -lopencv_flann -lopencv_xphoto -lopencv_photo -lopencv_imgproc -lopencv_core /home/tt/Qt/5.15.2/gcc_64/lib/libQt5MultimediaWidgets.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Widgets.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Multimedia.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Gui.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Concurrent.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Network.so /home/tt/Qt/5.15.2/gcc_64/lib/libQt5Core.so -lGL -lpthread   
 AR            = ar cqs
 RANLIB        = 
 SED           = sed
@@ -59,11 +59,18 @@ SOURCES       = ../../src/main.cpp \
 		../../src/PlanDialogUtils.cpp \
 		../../src/CameraParamsDialog.cpp \
 		../../src/ReferenceImageDialog.cpp \
+		../../src/PositionCorrectionDialog.cpp \
+		../../src/TemplateLocationDialog.cpp \
 		../../src/ToolLibraryDialog.cpp \
 		../../src/CharacterRecognitionDialog.cpp \
 		../../src/ColorRecognitionDialog.cpp \
 		../../src/ColorComparisonDialog.cpp \
+		../../src/ColorComparisonFeatureView.cpp \
 		../../src/RegisteredClassificationDialog.cpp \
+		../../src/RegisteredClassificationDetectionDialog.cpp \
+		../../src/RegisteredClassificationDetectionTrainingDialog.cpp \
+		../../src/RegisteredClassificationTrainingDialog.cpp \
+		../../src/RegisteredClassificationModelManagementDialog.cpp \
 		../../src/ColorTemplateDialog.cpp \
 		../../src/ClassificationDialog.cpp \
 		../../src/ObjectDetectionDialog.cpp \
@@ -76,15 +83,18 @@ SOURCES       = ../../src/main.cpp \
 		../../src/ToolsDialog.cpp \
 		../../src/OutputDialog.cpp \
 		../../src/frame/CameraFrameProvider.cpp \
+		../../src/frame/FrameInputMetadata.cpp \
 		../../src/frame/FrameViewHelper.cpp \
 		../../src/frame/MatImageConverter.cpp \
 		../../src/frame/ReferenceImageProvider.cpp \
+		../../src/toolcore/PositionCorrection.cpp \
 		../../src/toolcore/ToolEngine.cpp \
 		../../src/tooladapters/OcrAdapter.cpp \
 		../../src/tooladapters/ColorRecognitionAdapter.cpp \
 		../../src/tooladapters/ColorComparisonAdapter.cpp \
 		../../src/tooladapters/RegisteredClassificationAdapter.cpp \
 		../../src/tooladapters/PatternPresenceAdapter.cpp \
+		../../src/tooladapters/TemplateLocationAdapter.cpp \
 		../../src/tooladapters/BlobPresenceAdapter.cpp \
 		../../src/tooladapters/CirclePresenceAdapter.cpp \
 		../../src/tooladapters/EdgePresenceAdapter.cpp \
@@ -93,13 +103,22 @@ SOURCES       = ../../src/main.cpp \
 		../../src/tooladapters/AiDetectionAdapter.cpp \
 		../../src/algorithms/halcon/HalconRuntimePaths.cpp \
 		../../src/algorithms/ocr/OcrHalconRunner.cpp \
+		../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
+		../../src/algorithms/recognition/ColorComparisonModel.cpp \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
 		../../src/algorithms/ai/AiDetectionRunner.cpp \
 		../../src/algorithms/presence/PatternPresenceHalconApi.cpp \
 		../../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
 		../../src/algorithms/presence/PatternPresenceHalconRunner.cpp \
+		../../src/algorithms/location/TemplateLocationHalconRunner.cpp \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.cpp \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.cpp \
 		../../src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -109,11 +128,17 @@ SOURCES       = ../../src/main.cpp \
 		moc/moc_MainWindow.cpp \
 		moc/moc_CameraParamsDialog.cpp \
 		moc/moc_ReferenceImageDialog.cpp \
+		moc/moc_PositionCorrectionDialog.cpp \
+		moc/moc_TemplateLocationDialog.cpp \
 		moc/moc_ToolLibraryDialog.cpp \
 		moc/moc_CharacterRecognitionDialog.cpp \
 		moc/moc_ColorRecognitionDialog.cpp \
 		moc/moc_ColorComparisonDialog.cpp \
 		moc/moc_RegisteredClassificationDialog.cpp \
+		moc/moc_RegisteredClassificationDetectionDialog.cpp \
+		moc/moc_RegisteredClassificationDetectionTrainingDialog.cpp \
+		moc/moc_RegisteredClassificationTrainingDialog.cpp \
+		moc/moc_RegisteredClassificationModelManagementDialog.cpp \
 		moc/moc_ColorTemplateDialog.cpp \
 		moc/moc_ClassificationDialog.cpp \
 		moc/moc_ObjectDetectionDialog.cpp \
@@ -135,11 +160,18 @@ OBJECTS       = obj/main.o \
 		obj/PlanDialogUtils.o \
 		obj/CameraParamsDialog.o \
 		obj/ReferenceImageDialog.o \
+		obj/PositionCorrectionDialog.o \
+		obj/TemplateLocationDialog.o \
 		obj/ToolLibraryDialog.o \
 		obj/CharacterRecognitionDialog.o \
 		obj/ColorRecognitionDialog.o \
 		obj/ColorComparisonDialog.o \
+		obj/ColorComparisonFeatureView.o \
 		obj/RegisteredClassificationDialog.o \
+		obj/RegisteredClassificationDetectionDialog.o \
+		obj/RegisteredClassificationDetectionTrainingDialog.o \
+		obj/RegisteredClassificationTrainingDialog.o \
+		obj/RegisteredClassificationModelManagementDialog.o \
 		obj/ColorTemplateDialog.o \
 		obj/ClassificationDialog.o \
 		obj/ObjectDetectionDialog.o \
@@ -152,15 +184,18 @@ OBJECTS       = obj/main.o \
 		obj/ToolsDialog.o \
 		obj/OutputDialog.o \
 		obj/CameraFrameProvider.o \
+		obj/FrameInputMetadata.o \
 		obj/FrameViewHelper.o \
 		obj/MatImageConverter.o \
 		obj/ReferenceImageProvider.o \
+		obj/PositionCorrection.o \
 		obj/ToolEngine.o \
 		obj/OcrAdapter.o \
 		obj/ColorRecognitionAdapter.o \
 		obj/ColorComparisonAdapter.o \
 		obj/RegisteredClassificationAdapter.o \
 		obj/PatternPresenceAdapter.o \
+		obj/TemplateLocationAdapter.o \
 		obj/BlobPresenceAdapter.o \
 		obj/CirclePresenceAdapter.o \
 		obj/EdgePresenceAdapter.o \
@@ -169,13 +204,22 @@ OBJECTS       = obj/main.o \
 		obj/AiDetectionAdapter.o \
 		obj/HalconRuntimePaths.o \
 		obj/OcrHalconRunner.o \
+		obj/ColorRecognitionGmmHalconBackend.o \
 		obj/ColorRecognitionHalconRunner.o \
+		obj/ColorComparisonModel.o \
 		obj/ColorComparisonHalconRunner.o \
+		obj/RegisteredClassificationFeatureSpace.o \
+		obj/RegisteredClassificationModelPackage.o \
+		obj/RegisteredClassificationTrainingSession.o \
+		obj/RegisteredClassificationFeatureExtractor.o \
+		obj/RegisteredClassificationKnnRuntime.o \
+		obj/RegisteredClassificationTrainingRunner.o \
 		obj/RegisteredClassificationHalconRunner.o \
 		obj/AiDetectionRunner.o \
 		obj/PatternPresenceHalconApi.o \
 		obj/PatternPresenceAutoModelDomain.o \
 		obj/PatternPresenceHalconRunner.o \
+		obj/TemplateLocationHalconRunner.o \
 		obj/BlobPresenceHalconRunner.o \
 		obj/CirclePresenceHalconRunner.o \
 		obj/EdgePresenceHalconRunner.o \
@@ -186,11 +230,17 @@ OBJECTS       = obj/main.o \
 		obj/moc_MainWindow.o \
 		obj/moc_CameraParamsDialog.o \
 		obj/moc_ReferenceImageDialog.o \
+		obj/moc_PositionCorrectionDialog.o \
+		obj/moc_TemplateLocationDialog.o \
 		obj/moc_ToolLibraryDialog.o \
 		obj/moc_CharacterRecognitionDialog.o \
 		obj/moc_ColorRecognitionDialog.o \
 		obj/moc_ColorComparisonDialog.o \
 		obj/moc_RegisteredClassificationDialog.o \
+		obj/moc_RegisteredClassificationDetectionDialog.o \
+		obj/moc_RegisteredClassificationDetectionTrainingDialog.o \
+		obj/moc_RegisteredClassificationTrainingDialog.o \
+		obj/moc_RegisteredClassificationModelManagementDialog.o \
 		obj/moc_ColorTemplateDialog.o \
 		obj/moc_ClassificationDialog.o \
 		obj/moc_ObjectDetectionDialog.o \
@@ -403,8 +453,11 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/exclusive_builds.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/toolchain.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_pre.prf \
+		../../../../qmake/opencv.pri \
+		../../../../qmake/halcon_20_11.pri \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resolve_config.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_post.prf \
+		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/link_pkgconfig.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/warn_on.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/qt.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resources_functions.prf \
@@ -423,13 +476,21 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/MainWindow.h \
 		../../src/SchemeStore.h \
 		../../src/PlanDialogUtils.h \
+		../../src/UiStyleRoles.h \
 		../../src/CameraParamsDialog.h \
 		../../src/ReferenceImageDialog.h \
+		../../src/PositionCorrectionDialog.h \
+		../../src/TemplateLocationDialog.h \
 		../../src/ToolLibraryDialog.h \
 		../../src/CharacterRecognitionDialog.h \
 		../../src/ColorRecognitionDialog.h \
 		../../src/ColorComparisonDialog.h \
+		../../src/ColorComparisonFeatureView.h \
 		../../src/RegisteredClassificationDialog.h \
+		../../src/RegisteredClassificationDetectionDialog.h \
+		../../src/RegisteredClassificationDetectionTrainingDialog.h \
+		../../src/RegisteredClassificationTrainingDialog.h \
+		../../src/RegisteredClassificationModelManagementDialog.h \
 		../../src/ColorTemplateDialog.h \
 		../../src/ClassificationDialog.h \
 		../../src/ObjectDetectionDialog.h \
@@ -442,6 +503,7 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/ToolsDialog.h \
 		../../src/OutputDialog.h \
 		../../src/frame/CameraFrameProvider.h \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h \
@@ -450,6 +512,7 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
+		../../src/toolcore/PositionCorrection.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolEngine.h \
@@ -458,6 +521,7 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/tooladapters/PatternPresenceAdapter.h \
+		../../src/tooladapters/TemplateLocationAdapter.h \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/tooladapters/CirclePresenceAdapter.h \
 		../../src/tooladapters/EdgePresenceAdapter.h \
@@ -466,13 +530,22 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/tooladapters/AiDetectionAdapter.h \
 		../../src/algorithms/halcon/HalconRuntimePaths.h \
 		../../src/algorithms/ocr/OcrHalconRunner.h \
+		../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.h \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
 		../../src/algorithms/ai/AiDetectionRunner.h \
 		../../src/algorithms/presence/PatternPresenceHalconApi.h \
 		../../src/algorithms/presence/PatternPresenceAutoModelDomain.h \
 		../../src/algorithms/presence/PatternPresenceHalconRunner.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/algorithms/presence/EdgePresenceHalconRunner.h \
@@ -484,11 +557,18 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/PlanDialogUtils.cpp \
 		../../src/CameraParamsDialog.cpp \
 		../../src/ReferenceImageDialog.cpp \
+		../../src/PositionCorrectionDialog.cpp \
+		../../src/TemplateLocationDialog.cpp \
 		../../src/ToolLibraryDialog.cpp \
 		../../src/CharacterRecognitionDialog.cpp \
 		../../src/ColorRecognitionDialog.cpp \
 		../../src/ColorComparisonDialog.cpp \
+		../../src/ColorComparisonFeatureView.cpp \
 		../../src/RegisteredClassificationDialog.cpp \
+		../../src/RegisteredClassificationDetectionDialog.cpp \
+		../../src/RegisteredClassificationDetectionTrainingDialog.cpp \
+		../../src/RegisteredClassificationTrainingDialog.cpp \
+		../../src/RegisteredClassificationModelManagementDialog.cpp \
 		../../src/ColorTemplateDialog.cpp \
 		../../src/ClassificationDialog.cpp \
 		../../src/ObjectDetectionDialog.cpp \
@@ -501,15 +581,18 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/ToolsDialog.cpp \
 		../../src/OutputDialog.cpp \
 		../../src/frame/CameraFrameProvider.cpp \
+		../../src/frame/FrameInputMetadata.cpp \
 		../../src/frame/FrameViewHelper.cpp \
 		../../src/frame/MatImageConverter.cpp \
 		../../src/frame/ReferenceImageProvider.cpp \
+		../../src/toolcore/PositionCorrection.cpp \
 		../../src/toolcore/ToolEngine.cpp \
 		../../src/tooladapters/OcrAdapter.cpp \
 		../../src/tooladapters/ColorRecognitionAdapter.cpp \
 		../../src/tooladapters/ColorComparisonAdapter.cpp \
 		../../src/tooladapters/RegisteredClassificationAdapter.cpp \
 		../../src/tooladapters/PatternPresenceAdapter.cpp \
+		../../src/tooladapters/TemplateLocationAdapter.cpp \
 		../../src/tooladapters/BlobPresenceAdapter.cpp \
 		../../src/tooladapters/CirclePresenceAdapter.cpp \
 		../../src/tooladapters/EdgePresenceAdapter.cpp \
@@ -518,13 +601,22 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/tooladapters/AiDetectionAdapter.cpp \
 		../../src/algorithms/halcon/HalconRuntimePaths.cpp \
 		../../src/algorithms/ocr/OcrHalconRunner.cpp \
+		../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
+		../../src/algorithms/recognition/ColorComparisonModel.cpp \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp \
 		../../src/algorithms/ai/AiDetectionRunner.cpp \
 		../../src/algorithms/presence/PatternPresenceHalconApi.cpp \
 		../../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
 		../../src/algorithms/presence/PatternPresenceHalconRunner.cpp \
+		../../src/algorithms/location/TemplateLocationHalconRunner.cpp \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.cpp \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.cpp \
 		../../src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -538,7 +630,7 @@ TARGET        = bin/qt_ui_test
 first: all
 ####### Build rules
 
-bin/qt_ui_test: ui/ui_LoginWindow.h ui/ui_MainWindow.h ui/ui_CameraParamsDialog.h ui/ui_ReferenceImageDialog.h ui/ui_ToolLibraryDialog.h ui/ui_CharacterRecognitionDialog.h ui/ui_ColorRecognitionDialog.h ui/ui_ColorComparisonDialog.h ui/ui_ClassificationDialog.h ui/ui_ObjectDetectionDialog.h ui/ui_PatternPresenceDialog.h ui/ui_BlobPresenceDialog.h ui/ui_CirclePresenceDialog.h ui/ui_EdgePresenceDialog.h ui/ui_LinePresenceDialog.h ui/ui_ContourPresenceDialog.h ui/ui_ToolsDialog.h ui/ui_OutputDialog.h $(OBJECTS)  
+bin/qt_ui_test: ui/ui_LoginWindow.h ui/ui_MainWindow.h ui/ui_CameraParamsDialog.h ui/ui_ReferenceImageDialog.h ui/ui_PositionCorrectionDialog.h ui/ui_TemplateLocationDialog.h ui/ui_ToolLibraryDialog.h ui/ui_CharacterRecognitionDialog.h ui/ui_ColorRecognitionDialog.h ui/ui_ColorComparisonDialog.h ui/ui_ClassificationDialog.h ui/ui_ObjectDetectionDialog.h ui/ui_PatternPresenceDialog.h ui/ui_BlobPresenceDialog.h ui/ui_CirclePresenceDialog.h ui/ui_EdgePresenceDialog.h ui/ui_LinePresenceDialog.h ui/ui_ContourPresenceDialog.h ui/ui_ToolsDialog.h ui/ui_OutputDialog.h $(OBJECTS)  
 	@test -d bin/ || mkdir -p bin/
 	$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(OBJCOMP) $(LIBS)
 
@@ -740,8 +832,11 @@ Makefile: ../../qt_ui_test.pro /home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++/qmake
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/exclusive_builds.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/toolchain.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_pre.prf \
+		../../qmake/opencv.pri \
+		../../qmake/halcon_20_11.pri \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resolve_config.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_post.prf \
+		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/link_pkgconfig.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/warn_on.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/qt.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resources_functions.prf \
@@ -957,8 +1052,11 @@ Makefile: ../../qt_ui_test.pro /home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++/qmake
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/exclusive_builds.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/toolchain.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_pre.prf:
+../../qmake/opencv.pri:
+../../qmake/halcon_20_11.pri:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resolve_config.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_post.prf:
+/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/link_pkgconfig.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/warn_on.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/qt.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resources_functions.prf:
@@ -991,9 +1089,9 @@ distdir: FORCE
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents ../../resources/resources.qrc $(DISTDIR)/
 	$(COPY_FILE) --parents /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../../src/LoginWindow.h ../../src/MainWindow.h ../../src/SchemeStore.h ../../src/PlanDialogUtils.h ../../src/CameraParamsDialog.h ../../src/ReferenceImageDialog.h ../../src/ToolLibraryDialog.h ../../src/CharacterRecognitionDialog.h ../../src/ColorRecognitionDialog.h ../../src/ColorComparisonDialog.h ../../src/RegisteredClassificationDialog.h ../../src/ColorTemplateDialog.h ../../src/ClassificationDialog.h ../../src/ObjectDetectionDialog.h ../../src/PatternPresenceDialog.h ../../src/BlobPresenceDialog.h ../../src/CirclePresenceDialog.h ../../src/EdgePresenceDialog.h ../../src/LinePresenceDialog.h ../../src/ContourPresenceDialog.h ../../src/ToolsDialog.h ../../src/OutputDialog.h ../../src/frame/CameraFrameProvider.h ../../src/frame/FrameViewHelper.h ../../src/frame/MatImageConverter.h ../../src/frame/ReferenceImageProvider.h ../../src/toolcore/ToolTypes.h ../../src/toolcore/ToolConfig.h ../../src/toolcore/ToolRequest.h ../../src/toolcore/ToolResult.h ../../src/toolcore/ToolOverlay.h ../../src/toolcore/ToolPreviewSnapshot.h ../../src/toolcore/ToolAdapter.h ../../src/toolcore/ToolEngine.h ../../src/tooladapters/OcrAdapter.h ../../src/tooladapters/ColorRecognitionAdapter.h ../../src/tooladapters/ColorComparisonAdapter.h ../../src/tooladapters/RegisteredClassificationAdapter.h ../../src/tooladapters/PatternPresenceAdapter.h ../../src/tooladapters/BlobPresenceAdapter.h ../../src/tooladapters/CirclePresenceAdapter.h ../../src/tooladapters/EdgePresenceAdapter.h ../../src/tooladapters/LinePresenceAdapter.h ../../src/tooladapters/ContourPresenceAdapter.h ../../src/tooladapters/AiDetectionAdapter.h ../../src/algorithms/halcon/HalconRuntimePaths.h ../../src/algorithms/ocr/OcrHalconRunner.h ../../src/algorithms/recognition/ColorRecognitionHalconRunner.h ../../src/algorithms/recognition/ColorComparisonHalconRunner.h ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h ../../src/algorithms/ai/AiDetectionRunner.h ../../src/algorithms/presence/PatternPresenceHalconApi.h ../../src/algorithms/presence/PatternPresenceAutoModelDomain.h ../../src/algorithms/presence/PatternPresenceHalconRunner.h ../../src/algorithms/presence/BlobPresenceHalconRunner.h ../../src/algorithms/presence/CirclePresenceHalconRunner.h ../../src/algorithms/presence/EdgePresenceHalconRunner.h ../../src/algorithms/presence/LinePresenceHalconRunner.h ../../src/algorithms/presence/ContourPresenceHalconRunner.h $(DISTDIR)/
-	$(COPY_FILE) --parents ../../src/main.cpp ../../src/LoginWindow.cpp ../../src/MainWindow.cpp ../../src/SchemeStore.cpp ../../src/PlanDialogUtils.cpp ../../src/CameraParamsDialog.cpp ../../src/ReferenceImageDialog.cpp ../../src/ToolLibraryDialog.cpp ../../src/CharacterRecognitionDialog.cpp ../../src/ColorRecognitionDialog.cpp ../../src/ColorComparisonDialog.cpp ../../src/RegisteredClassificationDialog.cpp ../../src/ColorTemplateDialog.cpp ../../src/ClassificationDialog.cpp ../../src/ObjectDetectionDialog.cpp ../../src/PatternPresenceDialog.cpp ../../src/BlobPresenceDialog.cpp ../../src/CirclePresenceDialog.cpp ../../src/EdgePresenceDialog.cpp ../../src/LinePresenceDialog.cpp ../../src/ContourPresenceDialog.cpp ../../src/ToolsDialog.cpp ../../src/OutputDialog.cpp ../../src/frame/CameraFrameProvider.cpp ../../src/frame/FrameViewHelper.cpp ../../src/frame/MatImageConverter.cpp ../../src/frame/ReferenceImageProvider.cpp ../../src/toolcore/ToolEngine.cpp ../../src/tooladapters/OcrAdapter.cpp ../../src/tooladapters/ColorRecognitionAdapter.cpp ../../src/tooladapters/ColorComparisonAdapter.cpp ../../src/tooladapters/RegisteredClassificationAdapter.cpp ../../src/tooladapters/PatternPresenceAdapter.cpp ../../src/tooladapters/BlobPresenceAdapter.cpp ../../src/tooladapters/CirclePresenceAdapter.cpp ../../src/tooladapters/EdgePresenceAdapter.cpp ../../src/tooladapters/LinePresenceAdapter.cpp ../../src/tooladapters/ContourPresenceAdapter.cpp ../../src/tooladapters/AiDetectionAdapter.cpp ../../src/algorithms/halcon/HalconRuntimePaths.cpp ../../src/algorithms/ocr/OcrHalconRunner.cpp ../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp ../../src/algorithms/ai/AiDetectionRunner.cpp ../../src/algorithms/presence/PatternPresenceHalconApi.cpp ../../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp ../../src/algorithms/presence/PatternPresenceHalconRunner.cpp ../../src/algorithms/presence/BlobPresenceHalconRunner.cpp ../../src/algorithms/presence/CirclePresenceHalconRunner.cpp ../../src/algorithms/presence/EdgePresenceHalconRunner.cpp ../../src/algorithms/presence/LinePresenceHalconRunner.cpp ../../src/algorithms/presence/ContourPresenceHalconRunner.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../../ui/LoginWindow.ui ../../ui/MainWindow.ui ../../ui/CameraParamsDialog.ui ../../ui/ReferenceImageDialog.ui ../../ui/ToolLibraryDialog.ui ../../ui/CharacterRecognitionDialog.ui ../../ui/ColorRecognitionDialog.ui ../../ui/ColorComparisonDialog.ui ../../ui/ClassificationDialog.ui ../../ui/ObjectDetectionDialog.ui ../../ui/PatternPresenceDialog.ui ../../ui/BlobPresenceDialog.ui ../../ui/CirclePresenceDialog.ui ../../ui/EdgePresenceDialog.ui ../../ui/LinePresenceDialog.ui ../../ui/ContourPresenceDialog.ui ../../ui/ToolsDialog.ui ../../ui/OutputDialog.ui $(DISTDIR)/
+	$(COPY_FILE) --parents ../../src/LoginWindow.h ../../src/MainWindow.h ../../src/SchemeStore.h ../../src/PlanDialogUtils.h ../../src/UiStyleRoles.h ../../src/CameraParamsDialog.h ../../src/ReferenceImageDialog.h ../../src/PositionCorrectionDialog.h ../../src/TemplateLocationDialog.h ../../src/ToolLibraryDialog.h ../../src/CharacterRecognitionDialog.h ../../src/ColorRecognitionDialog.h ../../src/ColorComparisonDialog.h ../../src/ColorComparisonFeatureView.h ../../src/RegisteredClassificationDialog.h ../../src/RegisteredClassificationDetectionDialog.h ../../src/RegisteredClassificationDetectionTrainingDialog.h ../../src/RegisteredClassificationTrainingDialog.h ../../src/RegisteredClassificationModelManagementDialog.h ../../src/ColorTemplateDialog.h ../../src/ClassificationDialog.h ../../src/ObjectDetectionDialog.h ../../src/PatternPresenceDialog.h ../../src/BlobPresenceDialog.h ../../src/CirclePresenceDialog.h ../../src/EdgePresenceDialog.h ../../src/LinePresenceDialog.h ../../src/ContourPresenceDialog.h ../../src/ToolsDialog.h ../../src/OutputDialog.h ../../src/frame/CameraFrameProvider.h ../../src/frame/FrameInputMetadata.h ../../src/frame/FrameViewHelper.h ../../src/frame/MatImageConverter.h ../../src/frame/ReferenceImageProvider.h ../../src/toolcore/ToolTypes.h ../../src/toolcore/ToolConfig.h ../../src/toolcore/ToolRequest.h ../../src/toolcore/ToolResult.h ../../src/toolcore/ToolOverlay.h ../../src/toolcore/PositionCorrection.h ../../src/toolcore/ToolPreviewSnapshot.h ../../src/toolcore/ToolAdapter.h ../../src/toolcore/ToolEngine.h ../../src/tooladapters/OcrAdapter.h ../../src/tooladapters/ColorRecognitionAdapter.h ../../src/tooladapters/ColorComparisonAdapter.h ../../src/tooladapters/RegisteredClassificationAdapter.h ../../src/tooladapters/PatternPresenceAdapter.h ../../src/tooladapters/TemplateLocationAdapter.h ../../src/tooladapters/BlobPresenceAdapter.h ../../src/tooladapters/CirclePresenceAdapter.h ../../src/tooladapters/EdgePresenceAdapter.h ../../src/tooladapters/LinePresenceAdapter.h ../../src/tooladapters/ContourPresenceAdapter.h ../../src/tooladapters/AiDetectionAdapter.h ../../src/algorithms/halcon/HalconRuntimePaths.h ../../src/algorithms/ocr/OcrHalconRunner.h ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.h ../../src/algorithms/recognition/ColorRecognitionHalconRunner.h ../../src/algorithms/recognition/ColorComparisonModel.h ../../src/algorithms/recognition/ColorComparisonHalconRunner.h ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h ../../src/algorithms/recognition/RegisteredClassificationModelPackage.h ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h ../../src/algorithms/ai/AiDetectionRunner.h ../../src/algorithms/presence/PatternPresenceHalconApi.h ../../src/algorithms/presence/PatternPresenceAutoModelDomain.h ../../src/algorithms/presence/PatternPresenceHalconRunner.h ../../src/algorithms/location/TemplateLocationHalconRunner.h ../../src/algorithms/presence/BlobPresenceHalconRunner.h ../../src/algorithms/presence/CirclePresenceHalconRunner.h ../../src/algorithms/presence/EdgePresenceHalconRunner.h ../../src/algorithms/presence/LinePresenceHalconRunner.h ../../src/algorithms/presence/ContourPresenceHalconRunner.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../../src/main.cpp ../../src/LoginWindow.cpp ../../src/MainWindow.cpp ../../src/SchemeStore.cpp ../../src/PlanDialogUtils.cpp ../../src/CameraParamsDialog.cpp ../../src/ReferenceImageDialog.cpp ../../src/PositionCorrectionDialog.cpp ../../src/TemplateLocationDialog.cpp ../../src/ToolLibraryDialog.cpp ../../src/CharacterRecognitionDialog.cpp ../../src/ColorRecognitionDialog.cpp ../../src/ColorComparisonDialog.cpp ../../src/ColorComparisonFeatureView.cpp ../../src/RegisteredClassificationDialog.cpp ../../src/RegisteredClassificationDetectionDialog.cpp ../../src/RegisteredClassificationDetectionTrainingDialog.cpp ../../src/RegisteredClassificationTrainingDialog.cpp ../../src/RegisteredClassificationModelManagementDialog.cpp ../../src/ColorTemplateDialog.cpp ../../src/ClassificationDialog.cpp ../../src/ObjectDetectionDialog.cpp ../../src/PatternPresenceDialog.cpp ../../src/BlobPresenceDialog.cpp ../../src/CirclePresenceDialog.cpp ../../src/EdgePresenceDialog.cpp ../../src/LinePresenceDialog.cpp ../../src/ContourPresenceDialog.cpp ../../src/ToolsDialog.cpp ../../src/OutputDialog.cpp ../../src/frame/CameraFrameProvider.cpp ../../src/frame/FrameInputMetadata.cpp ../../src/frame/FrameViewHelper.cpp ../../src/frame/MatImageConverter.cpp ../../src/frame/ReferenceImageProvider.cpp ../../src/toolcore/PositionCorrection.cpp ../../src/toolcore/ToolEngine.cpp ../../src/tooladapters/OcrAdapter.cpp ../../src/tooladapters/ColorRecognitionAdapter.cpp ../../src/tooladapters/ColorComparisonAdapter.cpp ../../src/tooladapters/RegisteredClassificationAdapter.cpp ../../src/tooladapters/PatternPresenceAdapter.cpp ../../src/tooladapters/TemplateLocationAdapter.cpp ../../src/tooladapters/BlobPresenceAdapter.cpp ../../src/tooladapters/CirclePresenceAdapter.cpp ../../src/tooladapters/EdgePresenceAdapter.cpp ../../src/tooladapters/LinePresenceAdapter.cpp ../../src/tooladapters/ContourPresenceAdapter.cpp ../../src/tooladapters/AiDetectionAdapter.cpp ../../src/algorithms/halcon/HalconRuntimePaths.cpp ../../src/algorithms/ocr/OcrHalconRunner.cpp ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp ../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp ../../src/algorithms/recognition/ColorComparisonModel.cpp ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp ../../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp ../../src/algorithms/ai/AiDetectionRunner.cpp ../../src/algorithms/presence/PatternPresenceHalconApi.cpp ../../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp ../../src/algorithms/presence/PatternPresenceHalconRunner.cpp ../../src/algorithms/location/TemplateLocationHalconRunner.cpp ../../src/algorithms/presence/BlobPresenceHalconRunner.cpp ../../src/algorithms/presence/CirclePresenceHalconRunner.cpp ../../src/algorithms/presence/EdgePresenceHalconRunner.cpp ../../src/algorithms/presence/LinePresenceHalconRunner.cpp ../../src/algorithms/presence/ContourPresenceHalconRunner.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents ../../ui/LoginWindow.ui ../../ui/MainWindow.ui ../../ui/CameraParamsDialog.ui ../../ui/ReferenceImageDialog.ui ../../ui/PositionCorrectionDialog.ui ../../ui/TemplateLocationDialog.ui ../../ui/ToolLibraryDialog.ui ../../ui/CharacterRecognitionDialog.ui ../../ui/ColorRecognitionDialog.ui ../../ui/ColorComparisonDialog.ui ../../ui/ClassificationDialog.ui ../../ui/ObjectDetectionDialog.ui ../../ui/PatternPresenceDialog.ui ../../ui/BlobPresenceDialog.ui ../../ui/CirclePresenceDialog.ui ../../ui/EdgePresenceDialog.ui ../../ui/LinePresenceDialog.ui ../../ui/ContourPresenceDialog.ui ../../ui/ToolsDialog.ui ../../ui/OutputDialog.ui $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -1065,43 +1163,47 @@ rcc/qrc_resources.cpp: ../../resources/resources.qrc \
 		../../resources/images/home_03.png \
 		../../styles/app.qss \
 		../../resources/fonts/ALIMAMASHUHEITI-BOLD.OTF \
-		../../resources/icons/camera.svg \
-		../../resources/icons/reference-active.svg \
-		../../resources/icons/comm.svg \
-		../../resources/icons/add.svg \
-		../../resources/icons/lock.svg \
-		../../resources/icons/trash.svg \
-		../../resources/icons/fullscreen.svg \
-		../../resources/icons/sliders-active.svg \
-		../../resources/icons/settings.svg \
-		../../resources/icons/user.svg \
-		../../resources/icons/compare.svg \
-		../../resources/icons/fit.svg \
-		../../resources/icons/arrow-down.svg \
-		../../resources/icons/eye.svg \
-		../../resources/icons/save.svg \
-		../../resources/icons/zoom.svg \
-		../../resources/icons/plan.svg \
-		../../resources/icons/output.svg \
-		../../resources/icons/output-active.svg \
-		../../resources/icons/export-output.svg \
-		../../resources/icons/stop.svg \
-		../../resources/icons/external-link.svg \
-		../../resources/icons/delete-outline.svg \
-		../../resources/icons/reference.svg \
-		../../resources/icons/measure.svg \
-		../../resources/icons/refresh.svg \
-		../../resources/icons/close.svg \
-		../../resources/icons/play.svg \
-		../../resources/icons/sliders.svg \
 		../../resources/icons/device.svg \
-		../../resources/icons/tool.svg \
 		../../resources/icons/tool-step.svg \
-		../../resources/icons/copy.svg \
+		../../resources/icons/sliders-active.svg \
 		../../resources/icons/grid.svg \
+		../../resources/icons/roi-rectangle.svg \
+		../../resources/icons/settings.svg \
+		../../resources/icons/arrow-down.svg \
+		../../resources/icons/output-active.svg \
+		../../resources/icons/play.svg \
+		../../resources/icons/tool.svg \
+		../../resources/icons/lock.svg \
+		../../resources/icons/fullscreen.svg \
+		../../resources/icons/compare.svg \
+		../../resources/icons/external-link.svg \
+		../../resources/icons/measure.svg \
+		../../resources/icons/plan.svg \
 		../../resources/icons/save-as.svg \
+		../../resources/icons/roi-circle.svg \
+		../../resources/icons/reference.svg \
+		../../resources/icons/global-search.svg \
+		../../resources/icons/user.svg \
 		../../resources/icons/io.svg \
-		../../resources/icons/monitor.svg
+		../../resources/icons/refresh.svg \
+		../../resources/icons/camera.svg \
+		../../resources/icons/fit.svg \
+		../../resources/icons/delete-outline.svg \
+		../../resources/icons/comm.svg \
+		../../resources/icons/eye.svg \
+		../../resources/icons/close.svg \
+		../../resources/icons/copy.svg \
+		../../resources/icons/sliders.svg \
+		../../resources/icons/stop.svg \
+		../../resources/icons/export-output.svg \
+		../../resources/icons/reference-active.svg \
+		../../resources/icons/save.svg \
+		../../resources/icons/roi-polygon.svg \
+		../../resources/icons/add.svg \
+		../../resources/icons/output.svg \
+		../../resources/icons/monitor.svg \
+		../../resources/icons/trash.svg \
+		../../resources/icons/zoom.svg
 	/home/tt/Qt/5.15.2/gcc_64/bin/rcc -name resources ../../resources/resources.qrc -o rcc/qrc_resources.cpp
 
 compiler_moc_predefs_make_all: moc/moc_predefs.h
@@ -1110,9 +1212,9 @@ compiler_moc_predefs_clean:
 moc/moc_predefs.h: /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/data/dummy.cpp
 	g++ -pipe -O2 -std=gnu++1z -Wall -Wextra -dM -E -o moc/moc_predefs.h /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/data/dummy.cpp
 
-compiler_moc_header_make_all: moc/moc_LoginWindow.cpp moc/moc_MainWindow.cpp moc/moc_CameraParamsDialog.cpp moc/moc_ReferenceImageDialog.cpp moc/moc_ToolLibraryDialog.cpp moc/moc_CharacterRecognitionDialog.cpp moc/moc_ColorRecognitionDialog.cpp moc/moc_ColorComparisonDialog.cpp moc/moc_RegisteredClassificationDialog.cpp moc/moc_ColorTemplateDialog.cpp moc/moc_ClassificationDialog.cpp moc/moc_ObjectDetectionDialog.cpp moc/moc_PatternPresenceDialog.cpp moc/moc_BlobPresenceDialog.cpp moc/moc_CirclePresenceDialog.cpp moc/moc_EdgePresenceDialog.cpp moc/moc_LinePresenceDialog.cpp moc/moc_ContourPresenceDialog.cpp moc/moc_ToolsDialog.cpp moc/moc_OutputDialog.cpp moc/moc_CameraFrameProvider.cpp moc/moc_FrameViewHelper.cpp moc/moc_ReferenceImageProvider.cpp
+compiler_moc_header_make_all: moc/moc_LoginWindow.cpp moc/moc_MainWindow.cpp moc/moc_CameraParamsDialog.cpp moc/moc_ReferenceImageDialog.cpp moc/moc_PositionCorrectionDialog.cpp moc/moc_TemplateLocationDialog.cpp moc/moc_ToolLibraryDialog.cpp moc/moc_CharacterRecognitionDialog.cpp moc/moc_ColorRecognitionDialog.cpp moc/moc_ColorComparisonDialog.cpp moc/moc_RegisteredClassificationDialog.cpp moc/moc_RegisteredClassificationDetectionDialog.cpp moc/moc_RegisteredClassificationDetectionTrainingDialog.cpp moc/moc_RegisteredClassificationTrainingDialog.cpp moc/moc_RegisteredClassificationModelManagementDialog.cpp moc/moc_ColorTemplateDialog.cpp moc/moc_ClassificationDialog.cpp moc/moc_ObjectDetectionDialog.cpp moc/moc_PatternPresenceDialog.cpp moc/moc_BlobPresenceDialog.cpp moc/moc_CirclePresenceDialog.cpp moc/moc_EdgePresenceDialog.cpp moc/moc_LinePresenceDialog.cpp moc/moc_ContourPresenceDialog.cpp moc/moc_ToolsDialog.cpp moc/moc_OutputDialog.cpp moc/moc_CameraFrameProvider.cpp moc/moc_FrameViewHelper.cpp moc/moc_ReferenceImageProvider.cpp
 compiler_moc_header_clean:
-	-$(DEL_FILE) moc/moc_LoginWindow.cpp moc/moc_MainWindow.cpp moc/moc_CameraParamsDialog.cpp moc/moc_ReferenceImageDialog.cpp moc/moc_ToolLibraryDialog.cpp moc/moc_CharacterRecognitionDialog.cpp moc/moc_ColorRecognitionDialog.cpp moc/moc_ColorComparisonDialog.cpp moc/moc_RegisteredClassificationDialog.cpp moc/moc_ColorTemplateDialog.cpp moc/moc_ClassificationDialog.cpp moc/moc_ObjectDetectionDialog.cpp moc/moc_PatternPresenceDialog.cpp moc/moc_BlobPresenceDialog.cpp moc/moc_CirclePresenceDialog.cpp moc/moc_EdgePresenceDialog.cpp moc/moc_LinePresenceDialog.cpp moc/moc_ContourPresenceDialog.cpp moc/moc_ToolsDialog.cpp moc/moc_OutputDialog.cpp moc/moc_CameraFrameProvider.cpp moc/moc_FrameViewHelper.cpp moc/moc_ReferenceImageProvider.cpp
+	-$(DEL_FILE) moc/moc_LoginWindow.cpp moc/moc_MainWindow.cpp moc/moc_CameraParamsDialog.cpp moc/moc_ReferenceImageDialog.cpp moc/moc_PositionCorrectionDialog.cpp moc/moc_TemplateLocationDialog.cpp moc/moc_ToolLibraryDialog.cpp moc/moc_CharacterRecognitionDialog.cpp moc/moc_ColorRecognitionDialog.cpp moc/moc_ColorComparisonDialog.cpp moc/moc_RegisteredClassificationDialog.cpp moc/moc_RegisteredClassificationDetectionDialog.cpp moc/moc_RegisteredClassificationDetectionTrainingDialog.cpp moc/moc_RegisteredClassificationTrainingDialog.cpp moc/moc_RegisteredClassificationModelManagementDialog.cpp moc/moc_ColorTemplateDialog.cpp moc/moc_ClassificationDialog.cpp moc/moc_ObjectDetectionDialog.cpp moc/moc_PatternPresenceDialog.cpp moc/moc_BlobPresenceDialog.cpp moc/moc_CirclePresenceDialog.cpp moc/moc_EdgePresenceDialog.cpp moc/moc_LinePresenceDialog.cpp moc/moc_ContourPresenceDialog.cpp moc/moc_ToolsDialog.cpp moc/moc_OutputDialog.cpp moc/moc_CameraFrameProvider.cpp moc/moc_FrameViewHelper.cpp moc/moc_ReferenceImageProvider.cpp
 moc/moc_LoginWindow.cpp: ../../src/LoginWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
@@ -1221,7 +1323,7 @@ moc/moc_LoginWindow.cpp: ../../src/LoginWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/LoginWindow.h -o moc/moc_LoginWindow.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/LoginWindow.h -o moc/moc_LoginWindow.cpp
 
 moc/moc_MainWindow.cpp: ../../src/MainWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMainWindow \
@@ -1358,36 +1460,6 @@ moc/moc_MainWindow.cpp: ../../src/MainWindow.h \
 		../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
@@ -1409,8 +1481,10 @@ moc/moc_MainWindow.cpp: ../../src/MainWindow.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
 		../../src/tooladapters/ColorRecognitionAdapter.h \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		../../src/tooladapters/ContourPresenceAdapter.h \
 		../../src/algorithms/presence/ContourPresenceHalconRunner.h \
 		../../src/tooladapters/EdgePresenceAdapter.h \
@@ -1422,9 +1496,12 @@ moc/moc_MainWindow.cpp: ../../src/MainWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
+		../../src/toolcore/PositionCorrection.h \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/MainWindow.h -o moc/moc_MainWindow.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/MainWindow.h -o moc/moc_MainWindow.cpp
 
 moc/moc_CameraParamsDialog.cpp: ../../src/CameraParamsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -1534,7 +1611,7 @@ moc/moc_CameraParamsDialog.cpp: ../../src/CameraParamsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/CameraParamsDialog.h -o moc/moc_CameraParamsDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/CameraParamsDialog.h -o moc/moc_CameraParamsDialog.cpp
 
 moc/moc_ReferenceImageDialog.cpp: ../../src/ReferenceImageDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -1641,9 +1718,301 @@ moc/moc_ReferenceImageDialog.cpp: ../../src/ReferenceImageDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ReferenceImageDialog.h -o moc/moc_ReferenceImageDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ReferenceImageDialog.h -o moc/moc_ReferenceImageDialog.cpp
+
+moc/moc_PositionCorrectionDialog.cpp: ../../src/PositionCorrectionDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		../../src/toolcore/ToolPreviewSnapshot.h \
+		../../src/toolcore/ToolResult.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
+		moc/moc_predefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/bin/moc
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/PositionCorrectionDialog.h -o moc/moc_PositionCorrectionDialog.cpp
+
+moc/moc_TemplateLocationDialog.cpp: ../../src/TemplateLocationDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMetaObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/ToolRequest.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/ToolResult.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		../../src/toolcore/ToolEngine.h \
+		../../src/toolcore/ToolPreviewSnapshot.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
+		moc/moc_predefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/bin/moc
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/TemplateLocationDialog.h -o moc/moc_TemplateLocationDialog.cpp
 
 moc/moc_ToolLibraryDialog.cpp: ../../src/ToolLibraryDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -1754,7 +2123,7 @@ moc/moc_ToolLibraryDialog.cpp: ../../src/ToolLibraryDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ToolLibraryDialog.h -o moc/moc_ToolLibraryDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ToolLibraryDialog.h -o moc/moc_ToolLibraryDialog.cpp
 
 moc/moc_CharacterRecognitionDialog.cpp: ../../src/CharacterRecognitionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -1879,36 +2248,6 @@ moc/moc_CharacterRecognitionDialog.cpp: ../../src/CharacterRecognitionDialog.h \
 		../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
@@ -1924,7 +2263,7 @@ moc/moc_CharacterRecognitionDialog.cpp: ../../src/CharacterRecognitionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/CharacterRecognitionDialog.h -o moc/moc_CharacterRecognitionDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/CharacterRecognitionDialog.h -o moc/moc_CharacterRecognitionDialog.cpp
 
 moc/moc_ColorRecognitionDialog.cpp: ../../src/ColorRecognitionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -2041,36 +2380,6 @@ moc/moc_ColorRecognitionDialog.cpp: ../../src/ColorRecognitionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/ColorTemplateDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
@@ -2087,7 +2396,9 @@ moc/moc_ColorRecognitionDialog.cpp: ../../src/ColorRecognitionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
@@ -2104,7 +2415,7 @@ moc/moc_ColorRecognitionDialog.cpp: ../../src/ColorRecognitionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ColorRecognitionDialog.h -o moc/moc_ColorRecognitionDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ColorRecognitionDialog.h -o moc/moc_ColorRecognitionDialog.cpp
 
 moc/moc_ColorComparisonDialog.cpp: ../../src/ColorComparisonDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -2213,54 +2524,28 @@ moc/moc_ColorComparisonDialog.cpp: ../../src/ColorComparisonDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../src/frame/FrameViewHelper.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
@@ -2269,21 +2554,19 @@ moc/moc_ColorComparisonDialog.cpp: ../../src/ColorComparisonDialog.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
 		../../src/toolcore/ToolResult.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ColorComparisonDialog.h -o moc/moc_ColorComparisonDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ColorComparisonDialog.h -o moc/moc_ColorComparisonDialog.cpp
 
 moc/moc_RegisteredClassificationDialog.cpp: ../../src/RegisteredClassificationDialog.h \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -2356,50 +2639,21 @@ moc/moc_RegisteredClassificationDialog.cpp: ../../src/RegisteredClassificationDi
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../src/toolcore/ToolAdapter.h \
-		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolResult.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
@@ -2443,7 +2697,489 @@ moc/moc_RegisteredClassificationDialog.cpp: ../../src/RegisteredClassificationDi
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/RegisteredClassificationDialog.h -o moc/moc_RegisteredClassificationDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/RegisteredClassificationDialog.h -o moc/moc_RegisteredClassificationDialog.cpp
+
+moc/moc_RegisteredClassificationDetectionDialog.cpp: ../../src/RegisteredClassificationDetectionDialog.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		../../src/toolcore/ToolPreviewSnapshot.h \
+		../../src/toolcore/ToolResult.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		moc/moc_predefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/bin/moc
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/RegisteredClassificationDetectionDialog.h -o moc/moc_RegisteredClassificationDetectionDialog.cpp
+
+moc/moc_RegisteredClassificationDetectionTrainingDialog.cpp: ../../src/RegisteredClassificationDetectionTrainingDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		moc/moc_predefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/bin/moc
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/RegisteredClassificationDetectionTrainingDialog.h -o moc/moc_RegisteredClassificationDetectionTrainingDialog.cpp
+
+moc/moc_RegisteredClassificationTrainingDialog.cpp: ../../src/RegisteredClassificationTrainingDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
+		moc/moc_predefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/bin/moc
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/RegisteredClassificationTrainingDialog.h -o moc/moc_RegisteredClassificationTrainingDialog.cpp
+
+moc/moc_RegisteredClassificationModelManagementDialog.cpp: ../../src/RegisteredClassificationModelManagementDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		moc/moc_predefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/bin/moc
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/RegisteredClassificationModelManagementDialog.h -o moc/moc_RegisteredClassificationModelManagementDialog.cpp
 
 moc/moc_ColorTemplateDialog.cpp: ../../src/ColorTemplateDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -2568,40 +3304,12 @@ moc/moc_ColorTemplateDialog.cpp: ../../src/ColorTemplateDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ColorTemplateDialog.h -o moc/moc_ColorTemplateDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ColorTemplateDialog.h -o moc/moc_ColorTemplateDialog.cpp
 
 moc/moc_ClassificationDialog.cpp: ../../src/ClassificationDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -2733,7 +3441,7 @@ moc/moc_ClassificationDialog.cpp: ../../src/ClassificationDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ClassificationDialog.h -o moc/moc_ClassificationDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ClassificationDialog.h -o moc/moc_ClassificationDialog.cpp
 
 moc/moc_ObjectDetectionDialog.cpp: ../../src/ObjectDetectionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -2865,7 +3573,7 @@ moc/moc_ObjectDetectionDialog.cpp: ../../src/ObjectDetectionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ObjectDetectionDialog.h -o moc/moc_ObjectDetectionDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ObjectDetectionDialog.h -o moc/moc_ObjectDetectionDialog.cpp
 
 moc/moc_PatternPresenceDialog.cpp: ../../src/PatternPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -2993,36 +3701,6 @@ moc/moc_PatternPresenceDialog.cpp: ../../src/PatternPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -3035,7 +3713,7 @@ moc/moc_PatternPresenceDialog.cpp: ../../src/PatternPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/PatternPresenceDialog.h -o moc/moc_PatternPresenceDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/PatternPresenceDialog.h -o moc/moc_PatternPresenceDialog.cpp
 
 moc/moc_BlobPresenceDialog.cpp: ../../src/BlobPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -3166,36 +3844,6 @@ moc/moc_BlobPresenceDialog.cpp: ../../src/BlobPresenceDialog.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -3208,7 +3856,7 @@ moc/moc_BlobPresenceDialog.cpp: ../../src/BlobPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/BlobPresenceDialog.h -o moc/moc_BlobPresenceDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/BlobPresenceDialog.h -o moc/moc_BlobPresenceDialog.cpp
 
 moc/moc_CirclePresenceDialog.cpp: ../../src/CirclePresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -3339,36 +3987,6 @@ moc/moc_CirclePresenceDialog.cpp: ../../src/CirclePresenceDialog.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -3381,7 +3999,7 @@ moc/moc_CirclePresenceDialog.cpp: ../../src/CirclePresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/CirclePresenceDialog.h -o moc/moc_CirclePresenceDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/CirclePresenceDialog.h -o moc/moc_CirclePresenceDialog.cpp
 
 moc/moc_EdgePresenceDialog.cpp: ../../src/EdgePresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -3512,36 +4130,6 @@ moc/moc_EdgePresenceDialog.cpp: ../../src/EdgePresenceDialog.h \
 		../../src/algorithms/presence/EdgePresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -3554,7 +4142,7 @@ moc/moc_EdgePresenceDialog.cpp: ../../src/EdgePresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/EdgePresenceDialog.h -o moc/moc_EdgePresenceDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/EdgePresenceDialog.h -o moc/moc_EdgePresenceDialog.cpp
 
 moc/moc_LinePresenceDialog.cpp: ../../src/LinePresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -3685,36 +4273,6 @@ moc/moc_LinePresenceDialog.cpp: ../../src/LinePresenceDialog.h \
 		../../src/algorithms/presence/LinePresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -3727,7 +4285,7 @@ moc/moc_LinePresenceDialog.cpp: ../../src/LinePresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/LinePresenceDialog.h -o moc/moc_LinePresenceDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/LinePresenceDialog.h -o moc/moc_LinePresenceDialog.cpp
 
 moc/moc_ContourPresenceDialog.cpp: ../../src/ContourPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -3853,36 +4411,6 @@ moc/moc_ContourPresenceDialog.cpp: ../../src/ContourPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -3895,7 +4423,7 @@ moc/moc_ContourPresenceDialog.cpp: ../../src/ContourPresenceDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ContourPresenceDialog.h -o moc/moc_ContourPresenceDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ContourPresenceDialog.h -o moc/moc_ContourPresenceDialog.cpp
 
 moc/moc_ToolsDialog.cpp: ../../src/ToolsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -4016,11 +4544,12 @@ moc/moc_ToolsDialog.cpp: ../../src/ToolsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
@@ -4028,7 +4557,7 @@ moc/moc_ToolsDialog.cpp: ../../src/ToolsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ToolsDialog.h -o moc/moc_ToolsDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/ToolsDialog.h -o moc/moc_ToolsDialog.cpp
 
 moc/moc_OutputDialog.cpp: ../../src/OutputDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -4163,7 +4692,7 @@ moc/moc_OutputDialog.cpp: ../../src/OutputDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/OutputDialog.h -o moc/moc_OutputDialog.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/OutputDialog.h -o moc/moc_OutputDialog.cpp
 
 moc/moc_CameraFrameProvider.cpp: ../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
@@ -4247,45 +4776,31 @@ moc/moc_CameraFrameProvider.cpp: ../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/frame/CameraFrameProvider.h -o moc/moc_CameraFrameProvider.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/frame/CameraFrameProvider.h -o moc/moc_CameraFrameProvider.cpp
 
 moc/moc_FrameViewHelper.cpp: ../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
@@ -4394,7 +4909,7 @@ moc/moc_FrameViewHelper.cpp: ../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/frame/FrameViewHelper.h -o moc/moc_FrameViewHelper.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/frame/FrameViewHelper.h -o moc/moc_FrameViewHelper.cpp
 
 moc/moc_ReferenceImageProvider.cpp: ../../src/frame/ReferenceImageProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
@@ -4472,47 +4987,40 @@ moc/moc_ReferenceImageProvider.cpp: ../../src/frame/ReferenceImageProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		moc/moc_predefs.h \
 		/home/tt/Qt/5.15.2/gcc_64/bin/moc
-	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/frame/ReferenceImageProvider.h -o moc/moc_ReferenceImageProvider.cpp
+	/home/tt/Qt/5.15.2/gcc_64/bin/moc $(DEFINES) --include /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/build/qt_ui_test/moc/moc_predefs.h -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++ -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515 -I/home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/src -I/opt/halcon/include -I/opt/halcon/include/halconcpp -I/usr/include/opencv4 -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimediaWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets -I/home/tt/Qt/5.15.2/gcc_64/include/QtMultimedia -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent -I/home/tt/Qt/5.15.2/gcc_64/include/QtNetwork -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -I. -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include ../../src/frame/ReferenceImageProvider.h -o moc/moc_ReferenceImageProvider.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
 compiler_moc_source_make_all:
 compiler_moc_source_clean:
-compiler_uic_make_all: ui/ui_LoginWindow.h ui/ui_MainWindow.h ui/ui_CameraParamsDialog.h ui/ui_ReferenceImageDialog.h ui/ui_ToolLibraryDialog.h ui/ui_CharacterRecognitionDialog.h ui/ui_ColorRecognitionDialog.h ui/ui_ColorComparisonDialog.h ui/ui_ClassificationDialog.h ui/ui_ObjectDetectionDialog.h ui/ui_PatternPresenceDialog.h ui/ui_BlobPresenceDialog.h ui/ui_CirclePresenceDialog.h ui/ui_EdgePresenceDialog.h ui/ui_LinePresenceDialog.h ui/ui_ContourPresenceDialog.h ui/ui_ToolsDialog.h ui/ui_OutputDialog.h
+compiler_uic_make_all: ui/ui_LoginWindow.h ui/ui_MainWindow.h ui/ui_CameraParamsDialog.h ui/ui_ReferenceImageDialog.h ui/ui_PositionCorrectionDialog.h ui/ui_TemplateLocationDialog.h ui/ui_ToolLibraryDialog.h ui/ui_CharacterRecognitionDialog.h ui/ui_ColorRecognitionDialog.h ui/ui_ColorComparisonDialog.h ui/ui_ClassificationDialog.h ui/ui_ObjectDetectionDialog.h ui/ui_PatternPresenceDialog.h ui/ui_BlobPresenceDialog.h ui/ui_CirclePresenceDialog.h ui/ui_EdgePresenceDialog.h ui/ui_LinePresenceDialog.h ui/ui_ContourPresenceDialog.h ui/ui_ToolsDialog.h ui/ui_OutputDialog.h
 compiler_uic_clean:
-	-$(DEL_FILE) ui/ui_LoginWindow.h ui/ui_MainWindow.h ui/ui_CameraParamsDialog.h ui/ui_ReferenceImageDialog.h ui/ui_ToolLibraryDialog.h ui/ui_CharacterRecognitionDialog.h ui/ui_ColorRecognitionDialog.h ui/ui_ColorComparisonDialog.h ui/ui_ClassificationDialog.h ui/ui_ObjectDetectionDialog.h ui/ui_PatternPresenceDialog.h ui/ui_BlobPresenceDialog.h ui/ui_CirclePresenceDialog.h ui/ui_EdgePresenceDialog.h ui/ui_LinePresenceDialog.h ui/ui_ContourPresenceDialog.h ui/ui_ToolsDialog.h ui/ui_OutputDialog.h
+	-$(DEL_FILE) ui/ui_LoginWindow.h ui/ui_MainWindow.h ui/ui_CameraParamsDialog.h ui/ui_ReferenceImageDialog.h ui/ui_PositionCorrectionDialog.h ui/ui_TemplateLocationDialog.h ui/ui_ToolLibraryDialog.h ui/ui_CharacterRecognitionDialog.h ui/ui_ColorRecognitionDialog.h ui/ui_ColorComparisonDialog.h ui/ui_ClassificationDialog.h ui/ui_ObjectDetectionDialog.h ui/ui_PatternPresenceDialog.h ui/ui_BlobPresenceDialog.h ui/ui_CirclePresenceDialog.h ui/ui_EdgePresenceDialog.h ui/ui_LinePresenceDialog.h ui/ui_ContourPresenceDialog.h ui/ui_ToolsDialog.h ui/ui_OutputDialog.h
 ui/ui_LoginWindow.h: ../../ui/LoginWindow.ui \
 		/home/tt/Qt/5.15.2/gcc_64/bin/uic
 	/home/tt/Qt/5.15.2/gcc_64/bin/uic ../../ui/LoginWindow.ui -o ui/ui_LoginWindow.h
@@ -4528,6 +5036,14 @@ ui/ui_CameraParamsDialog.h: ../../ui/CameraParamsDialog.ui \
 ui/ui_ReferenceImageDialog.h: ../../ui/ReferenceImageDialog.ui \
 		/home/tt/Qt/5.15.2/gcc_64/bin/uic
 	/home/tt/Qt/5.15.2/gcc_64/bin/uic ../../ui/ReferenceImageDialog.ui -o ui/ui_ReferenceImageDialog.h
+
+ui/ui_PositionCorrectionDialog.h: ../../ui/PositionCorrectionDialog.ui \
+		/home/tt/Qt/5.15.2/gcc_64/bin/uic
+	/home/tt/Qt/5.15.2/gcc_64/bin/uic ../../ui/PositionCorrectionDialog.ui -o ui/ui_PositionCorrectionDialog.h
+
+ui/ui_TemplateLocationDialog.h: ../../ui/TemplateLocationDialog.ui \
+		/home/tt/Qt/5.15.2/gcc_64/bin/uic
+	/home/tt/Qt/5.15.2/gcc_64/bin/uic ../../ui/TemplateLocationDialog.ui -o ui/ui_TemplateLocationDialog.h
 
 ui/ui_ToolLibraryDialog.h: ../../ui/ToolLibraryDialog.ui \
 		/home/tt/Qt/5.15.2/gcc_64/bin/uic
@@ -4726,42 +5242,14 @@ obj/main.o: ../../src/main.cpp /home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QAppl
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/main.o ../../src/main.cpp
 
 obj/LoginWindow.o: ../../src/LoginWindow.cpp ../../src/LoginWindow.h \
@@ -4939,36 +5427,6 @@ obj/LoginWindow.o: ../../src/LoginWindow.cpp ../../src/LoginWindow.h \
 		../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
@@ -4990,8 +5448,10 @@ obj/LoginWindow.o: ../../src/LoginWindow.cpp ../../src/LoginWindow.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
 		../../src/tooladapters/ColorRecognitionAdapter.h \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		../../src/tooladapters/ContourPresenceAdapter.h \
 		../../src/algorithms/presence/ContourPresenceHalconRunner.h \
 		../../src/tooladapters/EdgePresenceAdapter.h \
@@ -5003,6 +5463,9 @@ obj/LoginWindow.o: ../../src/LoginWindow.cpp ../../src/LoginWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
+		../../src/toolcore/PositionCorrection.h \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
 		../../src/PlanDialogUtils.h \
 		ui/ui_LoginWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariant \
@@ -5165,36 +5628,6 @@ obj/MainWindow.o: ../../src/MainWindow.cpp ../../src/MainWindow.h \
 		../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
@@ -5216,8 +5649,10 @@ obj/MainWindow.o: ../../src/MainWindow.cpp ../../src/MainWindow.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
 		../../src/tooladapters/ColorRecognitionAdapter.h \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		../../src/tooladapters/ContourPresenceAdapter.h \
 		../../src/algorithms/presence/ContourPresenceHalconRunner.h \
 		../../src/tooladapters/EdgePresenceAdapter.h \
@@ -5229,6 +5664,9 @@ obj/MainWindow.o: ../../src/MainWindow.cpp ../../src/MainWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
+		../../src/toolcore/PositionCorrection.h \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QAbstractItemView \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemview.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
@@ -5327,6 +5765,7 @@ obj/MainWindow.o: ../../src/MainWindow.cpp ../../src/MainWindow.h \
 		../../src/ClassificationDialog.h \
 		../../src/CirclePresenceDialog.h \
 		../../src/ColorComparisonDialog.h \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/ColorRecognitionDialog.h \
 		../../src/ColorTemplateDialog.h \
 		../../src/ContourPresenceDialog.h \
@@ -5336,18 +5775,14 @@ obj/MainWindow.o: ../../src/MainWindow.cpp ../../src/MainWindow.h \
 		../../src/PatternPresenceDialog.h \
 		../../src/PlanDialogUtils.h \
 		../../src/RegisteredClassificationDialog.h \
+		../../src/RegisteredClassificationDetectionDialog.h \
+		../../src/TemplateLocationDialog.h \
 		../../src/SchemeStore.h \
 		../../src/ToolsDialog.h \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QThread \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h \
 		ui/ui_MainWindow.h \
@@ -5440,70 +5875,23 @@ obj/SchemeStore.o: ../../src/SchemeStore.cpp ../../src/SchemeStore.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCoreApplication \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFile \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSaveFile \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsavefile.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		../../src/frame/ReferenceImageProvider.h \
+		../../src/frame/FrameInputMetadata.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
@@ -5521,6 +5909,24 @@ obj/SchemeStore.o: ../../src/SchemeStore.cpp ../../src/SchemeStore.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCoreApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFile \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSaveFile \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsavefile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
+		../../src/frame/ReferenceImageProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/SchemeStore.o ../../src/SchemeStore.cpp
@@ -5698,36 +6104,6 @@ obj/PlanDialogUtils.o: ../../src/PlanDialogUtils.cpp ../../src/PlanDialogUtils.h
 		../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
@@ -5748,6 +6124,7 @@ obj/PlanDialogUtils.o: ../../src/PlanDialogUtils.cpp ../../src/PlanDialogUtils.h
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
 		../../src/tooladapters/ColorRecognitionAdapter.h \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
 		../../src/tooladapters/ContourPresenceAdapter.h \
@@ -5759,7 +6136,10 @@ obj/PlanDialogUtils.o: ../../src/PlanDialogUtils.cpp ../../src/PlanDialogUtils.h
 		../../src/tooladapters/AiDetectionAdapter.h \
 		../../src/algorithms/ai/AiDetectionRunner.h \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
-		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h
+		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
+		../../src/toolcore/PositionCorrection.h \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/PlanDialogUtils.o ../../src/PlanDialogUtils.cpp
 
 obj/CameraParamsDialog.o: ../../src/CameraParamsDialog.cpp ../../src/CameraParamsDialog.h \
@@ -5966,38 +6346,10 @@ obj/CameraParamsDialog.o: ../../src/CameraParamsDialog.cpp ../../src/CameraParam
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		../../src/PlanDialogUtils.h \
 		../../src/ReferenceImageDialog.h \
+		../../src/toolcore/PositionCorrection.h \
 		../../src/SchemeStore.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/ToolsDialog.h \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
@@ -6007,12 +6359,6 @@ obj/CameraParamsDialog.o: ../../src/CameraParamsDialog.cpp ../../src/CameraParam
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize
@@ -6123,72 +6469,7 @@ obj/ReferenceImageDialog.o: ../../src/ReferenceImageDialog.cpp ../../src/Referen
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFileDialog \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qfiledialog.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QIcon \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QInputDialog \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qinputdialog.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlineedit.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextcursor.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextformat.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMessageBox \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmessagebox.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
-		../../src/CameraParamsDialog.h \
-		../../src/OutputDialog.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointer \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpointer.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		../../src/toolcore/ToolConfig.h \
-		../../src/toolcore/ToolTypes.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		../../src/toolcore/PositionCorrection.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
@@ -6197,12 +6478,57 @@ obj/ReferenceImageDialog.o: ../../src/ReferenceImageDialog.cpp ../../src/Referen
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qbuttongroup.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFileDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qfiledialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QIcon \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QInputDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qinputdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlineedit.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMessageBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmessagebox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
+		../../src/CameraParamsDialog.h \
+		../../src/OutputDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpointer.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
@@ -6211,6 +6537,7 @@ obj/ReferenceImageDialog.o: ../../src/ReferenceImageDialog.cpp ../../src/Referen
 		../../src/PlanDialogUtils.h \
 		../../src/SchemeStore.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QList \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/ToolsDialog.h \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
@@ -6220,10 +6547,6 @@ obj/ReferenceImageDialog.o: ../../src/ReferenceImageDialog.cpp ../../src/Referen
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		../../src/frame/ReferenceImageProvider.h \
@@ -6238,6 +6561,181 @@ obj/ReferenceImageDialog.o: ../../src/ReferenceImageDialog.cpp ../../src/Referen
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qinputmethod.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QCheckBox \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcheckbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsscene.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGridLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpacerItem \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ReferenceImageDialog.o ../../src/ReferenceImageDialog.cpp
+
+obj/PositionCorrectionDialog.o: ../../src/PositionCorrectionDialog.cpp ../../src/PositionCorrectionDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		../../src/toolcore/ToolPreviewSnapshot.h \
+		../../src/toolcore/ToolResult.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlineedit.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMenu \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmenu.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qaction.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qactiongroup.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		../../src/frame/ReferenceImageProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		../../src/frame/FrameInputMetadata.h \
+		../../src/toolcore/PositionCorrection.h \
+		ui/ui_PositionCorrectionDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariant \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdesktopwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qguiapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qinputmethod.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
@@ -6253,11 +6751,228 @@ obj/ReferenceImageDialog.o: ../../src/ReferenceImageDialog.cpp ../../src/Referen
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpacerItem \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/PositionCorrectionDialog.o ../../src/PositionCorrectionDialog.cpp
+
+obj/TemplateLocationDialog.o: ../../src/TemplateLocationDialog.cpp ../../src/TemplateLocationDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMetaObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/ToolRequest.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/ToolResult.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		../../src/toolcore/ToolEngine.h \
+		../../src/toolcore/ToolPreviewSnapshot.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
+		../../src/PlanDialogUtils.h \
+		../../src/UiStyleRoles.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QAbstractItemView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qitemselectionmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStyle \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget \
+		../../src/frame/CameraFrameProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QThread \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		../../src/frame/FrameInputMetadata.h \
+		../../src/frame/ReferenceImageProvider.h \
+		ui/ui_TemplateLocationDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariant \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QIcon \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdesktopwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qguiapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qinputmethod.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDoubleSpinBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsscene.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGridLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpacerItem \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpinBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget
-	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ReferenceImageDialog.o ../../src/ReferenceImageDialog.cpp
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qbuttongroup.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMessageBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmessagebox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSignalBlocker \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/TemplateLocationDialog.o ../../src/TemplateLocationDialog.cpp
 
 obj/ToolLibraryDialog.o: ../../src/ToolLibraryDialog.cpp ../../src/ToolLibraryDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -6534,36 +7249,6 @@ obj/CharacterRecognitionDialog.o: ../../src/CharacterRecognitionDialog.cpp ../..
 		../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
@@ -6660,8 +7345,6 @@ obj/CharacterRecognitionDialog.o: ../../src/CharacterRecognitionDialog.cpp ../..
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasictimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -6670,10 +7353,7 @@ obj/CharacterRecognitionDialog.o: ../../src/CharacterRecognitionDialog.cpp ../..
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
@@ -6796,36 +7476,6 @@ obj/ColorRecognitionDialog.o: ../../src/ColorRecognitionDialog.cpp ../../src/Col
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/ColorTemplateDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
@@ -6842,7 +7492,9 @@ obj/ColorRecognitionDialog.o: ../../src/ColorRecognitionDialog.cpp ../../src/Col
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
@@ -6884,6 +7536,8 @@ obj/ColorRecognitionDialog.o: ../../src/ColorRecognitionDialog.cpp ../../src/Col
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDoubleSpinBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qspinbox.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
@@ -6909,7 +7563,6 @@ obj/ColorRecognitionDialog.o: ../../src/ColorRecognitionDialog.cpp ../../src/Col
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpacerItem \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpinBox \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qspinbox.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStackedWidget \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstackedwidget.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
@@ -6917,10 +7570,11 @@ obj/ColorRecognitionDialog.o: ../../src/ColorRecognitionDialog.cpp ../../src/Col
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget \
 		../../src/PlanDialogUtils.h \
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		../../src/toolcore/PositionCorrection.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qbuttongroup.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QBrush \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QColor \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFile \
@@ -7072,12 +7726,6 @@ obj/ColorRecognitionDialog.o: ../../src/ColorRecognitionDialog.cpp ../../src/Col
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QThread \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorRecognitionDialog.o ../../src/ColorRecognitionDialog.cpp
@@ -7189,54 +7837,28 @@ obj/ColorComparisonDialog.o: ../../src/ColorComparisonDialog.cpp ../../src/Color
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../src/frame/FrameViewHelper.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
@@ -7245,14 +7867,34 @@ obj/ColorComparisonDialog.o: ../../src/ColorComparisonDialog.cpp ../../src/Color
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
 		../../src/toolcore/ToolResult.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
+		../../src/ColorComparisonFeatureView.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QScopedPointer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget \
 		../../src/PlanDialogUtils.h \
-		../../src/algorithms/halcon/HalconRuntimePaths.h \
-		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		../../src/UiStyleRoles.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QAbstractItemView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qitemselectionmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStyle \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -7260,12 +7902,6 @@ obj/ColorComparisonDialog.o: ../../src/ColorComparisonDialog.cpp ../../src/Color
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
@@ -7273,29 +7909,21 @@ obj/ColorComparisonDialog.o: ../../src/ColorComparisonDialog.cpp ../../src/Color
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QCheckBox \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcheckbox.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QCloseEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFutureWatcher \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfuturewatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfuture.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfutureinterface.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrunnable.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qexception.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qresultstore.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsscene.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
@@ -7305,31 +7933,177 @@ obj/ColorComparisonDialog.o: ../../src/ColorComparisonDialog.cpp ../../src/Color
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPainter \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPen \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPixmap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPolygonF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QResizeEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSignalBlocker \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpinBox \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qspinbox.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStackedWidget \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstackedwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QStandardItemModel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qstandarditemmodel.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasictimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent/QtConcurrentRun \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent/qtconcurrentrun.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent/qtconcurrentcompilertest.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent/qtconcurrent_global.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent/qtconcurrentrunbase.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthreadpool.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtConcurrent/qtconcurrentstoredfunctioncall.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorComparisonDialog.o ../../src/ColorComparisonDialog.cpp
+
+obj/ColorComparisonFeatureView.o: ../../src/ColorComparisonFeatureView.cpp ../../src/ColorComparisonFeatureView.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QScopedPointer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QHideEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QKeyEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QMouseEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPainter \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QWheelEvent
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorComparisonFeatureView.o ../../src/ColorComparisonFeatureView.cpp
 
 obj/RegisteredClassificationDialog.o: ../../src/RegisteredClassificationDialog.cpp ../../src/RegisteredClassificationDialog.h \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -7402,50 +8176,21 @@ obj/RegisteredClassificationDialog.o: ../../src/RegisteredClassificationDialog.c
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../src/toolcore/ToolAdapter.h \
-		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolResult.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
@@ -7488,6 +8233,226 @@ obj/RegisteredClassificationDialog.o: ../../src/RegisteredClassificationDialog.c
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
 		../../src/PlanDialogUtils.h \
+		../../src/RegisteredClassificationModelManagementDialog.h \
+		../../src/RegisteredClassificationTrainingDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
+		../../src/frame/CameraFrameProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QThread \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		../../src/frame/FrameInputMetadata.h \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		../../src/frame/MatImageConverter.h \
+		../../src/frame/ReferenceImageProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qbuttongroup.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QCheckBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcheckbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFile \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFileDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qfiledialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsscene.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlineedit.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMessageBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmessagebox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QResizeEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSignalBlocker \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSpinBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationDialog.o ../../src/RegisteredClassificationDialog.cpp
+
+obj/RegisteredClassificationDetectionDialog.o: ../../src/RegisteredClassificationDetectionDialog.cpp ../../src/RegisteredClassificationDetectionDialog.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		../../src/toolcore/ToolPreviewSnapshot.h \
+		../../src/toolcore/ToolResult.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		../../src/PlanDialogUtils.h \
+		../../src/RegisteredClassificationDetectionTrainingDialog.h \
+		../../src/RegisteredClassificationModelManagementDialog.h \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
@@ -7497,17 +8462,13 @@ obj/RegisteredClassificationDialog.o: ../../src/RegisteredClassificationDialog.c
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h \
+		../../src/toolcore/PositionCorrection.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qbuttongroup.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QCheckBox \
@@ -7570,7 +8531,653 @@ obj/RegisteredClassificationDialog.o: ../../src/RegisteredClassificationDialog.c
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout
-	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationDialog.o ../../src/RegisteredClassificationDialog.cpp
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationDetectionDialog.o ../../src/RegisteredClassificationDetectionDialog.cpp
+
+obj/RegisteredClassificationDetectionTrainingDialog.o: ../../src/RegisteredClassificationDetectionTrainingDialog.cpp ../../src/RegisteredClassificationDetectionTrainingDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		../../src/frame/CameraFrameProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QThread \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/frame/MatImageConverter.h \
+		../../src/frame/ReferenceImageProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QAbstractItemView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qitemselectionmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdesktopwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qguiapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qinputmethod.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QCheckBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcheckbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QColor \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QContextMenuEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFileDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qfiledialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsscene.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGridLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QIcon \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QInputDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qinputdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlineedit.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QListWidget \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlistwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlistview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QListWidgetItem \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMessageBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmessagebox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMenu \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmenu.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qaction.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qactiongroup.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QMouseEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPainter \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPixmap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSignalBlocker \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStackedWidget \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstackedwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStyle \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationDetectionTrainingDialog.o ../../src/RegisteredClassificationDetectionTrainingDialog.cpp
+
+obj/RegisteredClassificationTrainingDialog.o: ../../src/RegisteredClassificationTrainingDialog.cpp ../../src/RegisteredClassificationTrainingDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
+		../../src/frame/CameraFrameProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QThread \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		../../src/frame/FrameInputMetadata.h \
+		../../src/frame/FrameViewHelper.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/frame/MatImageConverter.h \
+		../../src/frame/ReferenceImageProvider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QAbstractItemView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qitemselectionmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qbuttongroup.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdesktopwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qguiapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qinputmethod.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QColor \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QContextMenuEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCoreApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFileDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qfiledialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGridLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsScene \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsscene.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGraphicsView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QInputDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qinputdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlineedit.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QListWidget \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlistwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlistview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QListWidgetItem \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMessageBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmessagebox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMenu \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmenu.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qaction.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qactiongroup.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QMouseEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPainter \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPen \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPixmap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRegularExpression \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSignalBlocker \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStackedWidget \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstackedwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStyle \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationTrainingDialog.o ../../src/RegisteredClassificationTrainingDialog.cpp
+
+obj/RegisteredClassificationModelManagementDialog.o: ../../src/RegisteredClassificationModelManagementDialog.cpp ../../src/RegisteredClassificationModelManagementDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgetsglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtwidgets-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpalette.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qbrush.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfont.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontmetrics.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qfontinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qsizepolicy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qkeysequence.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvector2d.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtouchdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		../../src/RegisteredClassificationTrainingDialog.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QColor \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCoreApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialogButtonBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qdialogbuttonbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfoList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QGridLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QIcon \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlineedit.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextcursor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPainter \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpainter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPolygonF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPixmap \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QPushButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qpushbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStyle \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationModelManagementDialog.o ../../src/RegisteredClassificationModelManagementDialog.cpp
 
 obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemplateDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QDialog \
@@ -7695,37 +9302,9 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/algorithms/halcon/HalconRuntimePaths.h \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
@@ -7735,16 +9314,32 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h \
+		../../src/UiStyleRoles.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QAbstractItemView \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qitemselectionmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStyle \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QButtonGroup \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qbuttongroup.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QBuffer \
@@ -7753,23 +9348,15 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QCheckBox \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcheckbox.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractbutton.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCryptographicHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcryptographichash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCoreApplication \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QEvent \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QEventLoop \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFileDialog \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qfiledialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
@@ -7782,7 +9369,6 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtextoption.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpen.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollarea.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractscrollarea.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgraphicsscene.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
@@ -7799,11 +9385,11 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLabel \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlabel.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QLineEdit \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QListWidget \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlistwidget.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlistview.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemview.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qitemselectionmodel.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QListWidgetItem \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QListView \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMessageBox \
@@ -7813,6 +9399,7 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QColor \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QResizeEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollArea \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSet \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSignalBlocker \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QStandardItem \
@@ -7820,8 +9407,8 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QStandardItemModel \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QToolButton \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QMouseEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPainter \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPen \
@@ -7834,8 +9421,6 @@ obj/ColorTemplateDialog.o: ../../src/ColorTemplateDialog.cpp ../../src/ColorTemp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QTransform \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QGuiApplication \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qguiapplication.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qeventloop.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qinputmethod.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorTemplateDialog.o ../../src/ColorTemplateDialog.cpp
 
@@ -8046,42 +9631,7 @@ obj/ClassificationDialog.o: ../../src/ClassificationDialog.cpp ../../src/Classif
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
@@ -8295,42 +9845,7 @@ obj/ObjectDetectionDialog.o: ../../src/ObjectDetectionDialog.cpp ../../src/Objec
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
@@ -8463,36 +9978,6 @@ obj/PatternPresenceDialog.o: ../../src/PatternPresenceDialog.cpp ../../src/Patte
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -8571,8 +10056,6 @@ obj/PatternPresenceDialog.o: ../../src/PatternPresenceDialog.cpp ../../src/Patte
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasictimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -8581,10 +10064,7 @@ obj/PatternPresenceDialog.o: ../../src/PatternPresenceDialog.cpp ../../src/Patte
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		../../src/frame/MatImageConverter.h \
@@ -8720,36 +10200,6 @@ obj/BlobPresenceDialog.o: ../../src/BlobPresenceDialog.cpp ../../src/BlobPresenc
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -8825,8 +10275,6 @@ obj/BlobPresenceDialog.o: ../../src/BlobPresenceDialog.cpp ../../src/BlobPresenc
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSignalBlocker \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -8834,10 +10282,7 @@ obj/BlobPresenceDialog.o: ../../src/BlobPresenceDialog.cpp ../../src/BlobPresenc
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/BlobPresenceDialog.o ../../src/BlobPresenceDialog.cpp
@@ -8971,36 +10416,6 @@ obj/CirclePresenceDialog.o: ../../src/CirclePresenceDialog.cpp ../../src/CircleP
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -9074,8 +10489,6 @@ obj/CirclePresenceDialog.o: ../../src/CirclePresenceDialog.cpp ../../src/CircleP
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QResizeEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -9083,10 +10496,7 @@ obj/CirclePresenceDialog.o: ../../src/CirclePresenceDialog.cpp ../../src/CircleP
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/CirclePresenceDialog.o ../../src/CirclePresenceDialog.cpp
@@ -9220,36 +10630,6 @@ obj/EdgePresenceDialog.o: ../../src/EdgePresenceDialog.cpp ../../src/EdgePresenc
 		../../src/algorithms/presence/EdgePresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -9325,8 +10705,6 @@ obj/EdgePresenceDialog.o: ../../src/EdgePresenceDialog.cpp ../../src/EdgePresenc
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QResizeEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -9334,10 +10712,7 @@ obj/EdgePresenceDialog.o: ../../src/EdgePresenceDialog.cpp ../../src/EdgePresenc
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/EdgePresenceDialog.o ../../src/EdgePresenceDialog.cpp
@@ -9471,36 +10846,6 @@ obj/LinePresenceDialog.o: ../../src/LinePresenceDialog.cpp ../../src/LinePresenc
 		../../src/algorithms/presence/LinePresenceHalconRunner.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -9575,8 +10920,6 @@ obj/LinePresenceDialog.o: ../../src/LinePresenceDialog.cpp ../../src/LinePresenc
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QResizeEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -9584,10 +10927,7 @@ obj/LinePresenceDialog.o: ../../src/LinePresenceDialog.cpp ../../src/LinePresenc
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/MatImageConverter.h \
 		../../src/frame/ReferenceImageProvider.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/LinePresenceDialog.o ../../src/LinePresenceDialog.cpp
@@ -9716,36 +11056,6 @@ obj/ContourPresenceDialog.o: ../../src/ContourPresenceDialog.cpp ../../src/Conto
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -9823,8 +11133,6 @@ obj/ContourPresenceDialog.o: ../../src/ContourPresenceDialog.cpp ../../src/Conto
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QUuid \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/frame/CameraFrameProvider.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QAtomicInt \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
@@ -9833,10 +11141,7 @@ obj/ContourPresenceDialog.o: ../../src/ContourPresenceDialog.cpp ../../src/Conto
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
 		../../src/frame/MatImageConverter.h \
@@ -9962,27 +11267,42 @@ obj/ToolsDialog.o: ../../src/ToolsDialog.cpp ../../src/ToolsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariantMap \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QColor \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QComboBox \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qcombobox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractitemdelegate.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyleoption.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractspinbox.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qvalidator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabbar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qrubberband.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qabstractitemmodel.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QFrame \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qframe.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QHBoxLayout \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qboxlayout.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayout.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qlayoutitem.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qgridlayout.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QIcon \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qicon.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QInputDialog \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qinputdialog.h \
@@ -10005,7 +11325,6 @@ obj/ToolsDialog.o: ../../src/ToolsDialog.cpp ../../src/ToolsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QStyle \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qstyle.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasictimer.h \
@@ -10013,38 +11332,6 @@ obj/ToolsDialog.o: ../../src/ToolsDialog.cpp ../../src/ToolsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtoolbutton.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariant \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QVBoxLayout \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
 		../../src/CharacterRecognitionDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMetaObject \
 		../../src/toolcore/ToolEngine.h \
@@ -10060,6 +11347,8 @@ obj/ToolsDialog.o: ../../src/ToolsDialog.cpp ../../src/ToolsDialog.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
 		../../src/CameraParamsDialog.h \
 		../../src/ColorComparisonDialog.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
 		../../src/ColorRecognitionDialog.h \
@@ -10072,6 +11361,7 @@ obj/ToolsDialog.o: ../../src/ToolsDialog.cpp ../../src/ToolsDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qresultstore.h \
 		../../src/ColorTemplateDialog.h \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		../../src/tooladapters/ColorRecognitionAdapter.h \
 		../../src/ClassificationDialog.h \
 		../../src/CirclePresenceDialog.h \
@@ -10089,7 +11379,6 @@ obj/ToolsDialog.o: ../../src/ToolsDialog.cpp ../../src/ToolsDialog.h \
 		../../src/MainWindow.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QMainWindow \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qmainwindow.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qtabwidget.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		../../src/tooladapters/PatternPresenceAdapter.h \
@@ -10098,14 +11387,19 @@ obj/ToolsDialog.o: ../../src/ToolsDialog.cpp ../../src/ToolsDialog.h \
 		../../src/algorithms/ai/AiDetectionRunner.h \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
 		../../src/ObjectDetectionDialog.h \
 		../../src/OutputDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpointer.h \
 		../../src/PatternPresenceDialog.h \
+		../../src/PositionCorrectionDialog.h \
+		../../src/TemplateLocationDialog.h \
 		../../src/PlanDialogUtils.h \
 		../../src/ReferenceImageDialog.h \
 		../../src/RegisteredClassificationDialog.h \
+		../../src/RegisteredClassificationDetectionDialog.h \
 		../../src/SchemeStore.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QList \
 		../../src/ToolLibraryDialog.h \
@@ -10295,38 +11589,10 @@ obj/OutputDialog.o: ../../src/OutputDialog.cpp ../../src/OutputDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
 		../../src/PlanDialogUtils.h \
 		../../src/ReferenceImageDialog.h \
+		../../src/toolcore/PositionCorrection.h \
 		../../src/SchemeStore.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
+		../../src/frame/FrameInputMetadata.h \
 		../../src/ToolsDialog.h \
 		ui/ui_OutputDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVariant \
@@ -10380,8 +11646,10 @@ obj/OutputDialog.o: ../../src/OutputDialog.cpp ../../src/OutputDialog.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
 		../../src/tooladapters/ColorRecognitionAdapter.h \
 		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		../../src/tooladapters/ContourPresenceAdapter.h \
 		../../src/algorithms/presence/ContourPresenceHalconRunner.h \
 		../../src/tooladapters/EdgePresenceAdapter.h \
@@ -10393,6 +11661,8 @@ obj/OutputDialog.o: ../../src/OutputDialog.cpp ../../src/OutputDialog.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
+		../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
 		../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPoint \
@@ -10482,59 +11752,133 @@ obj/CameraFrameProvider.o: ../../src/frame/CameraFrameProvider.cpp ../../src/fra
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qthread.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdeadlinetimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/highgui.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/videoio.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp \
-		../../src/frame/MatImageConverter.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		../../src/frame/MatImageConverter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/CameraFrameProvider.o ../../src/frame/CameraFrameProvider.cpp
+
+obj/FrameInputMetadata.o: ../../src/frame/FrameInputMetadata.cpp ../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/FrameInputMetadata.o ../../src/frame/FrameInputMetadata.cpp
 
 obj/FrameViewHelper.o: ../../src/frame/FrameViewHelper.cpp ../../src/frame/FrameViewHelper.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
@@ -10692,10 +12036,12 @@ obj/FrameViewHelper.o: ../../src/frame/FrameViewHelper.cpp ../../src/frame/Frame
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QScrollBar \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qscrollbar.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/qabstractslider.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QResizeEvent \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QSizePolicy \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtWidgets/QWidget \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QFont
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QFont \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QWheelEvent
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/FrameViewHelper.o ../../src/frame/FrameViewHelper.cpp
 
 obj/MatImageConverter.o: ../../src/frame/MatImageConverter.cpp ../../src/frame/MatImageConverter.h \
@@ -10773,36 +12119,6 @@ obj/MatImageConverter.o: ../../src/frame/MatImageConverter.cpp ../../src/frame/M
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
@@ -10818,9 +12134,7 @@ obj/MatImageConverter.o: ../../src/frame/MatImageConverter.cpp ../../src/frame/M
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QHash \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/MatImageConverter.o ../../src/frame/MatImageConverter.cpp
 
 obj/ReferenceImageProvider.o: ../../src/frame/ReferenceImageProvider.cpp ../../src/frame/ReferenceImageProvider.h \
@@ -10899,42 +12213,120 @@ obj/ReferenceImageProvider.o: ../../src/frame/ReferenceImageProvider.cpp ../../s
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../src/frame/MatImageConverter.h \
+		../../src/frame/FrameInputMetadata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp
+		../../src/frame/MatImageConverter.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ReferenceImageProvider.o ../../src/frame/ReferenceImageProvider.cpp
+
+obj/PositionCorrection.o: ../../src/toolcore/PositionCorrection.cpp ../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/PositionCorrection.o ../../src/toolcore/PositionCorrection.cpp
 
 obj/ToolEngine.o: ../../src/toolcore/ToolEngine.cpp ../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
@@ -11020,36 +12412,6 @@ obj/ToolEngine.o: ../../src/toolcore/ToolEngine.cpp ../../src/toolcore/ToolEngin
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
@@ -11149,36 +12511,6 @@ obj/OcrAdapter.o: ../../src/tooladapters/OcrAdapter.cpp ../../src/tooladapters/O
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -11276,37 +12608,8 @@ obj/ColorRecognitionAdapter.o: ../../src/tooladapters/ColorRecognitionAdapter.cp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -11314,14 +12617,15 @@ obj/ColorRecognitionAdapter.o: ../../src/tooladapters/ColorRecognitionAdapter.cp
 		../../src/toolcore/ToolResult.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		../../src/algorithms/halcon/HalconRuntimePaths.h
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		../../src/toolcore/PositionCorrection.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorRecognitionAdapter.o ../../src/tooladapters/ColorRecognitionAdapter.cpp
 
 obj/ColorComparisonAdapter.o: ../../src/tooladapters/ColorComparisonAdapter.cpp ../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -11394,61 +12698,32 @@ obj/ColorComparisonAdapter.o: ../../src/tooladapters/ColorComparisonAdapter.cpp 
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
 		../../src/toolcore/ToolResult.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
 		../../src/algorithms/halcon/HalconRuntimePaths.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorComparisonAdapter.o ../../src/tooladapters/ColorComparisonAdapter.cpp
 
 obj/RegisteredClassificationAdapter.o: ../../src/tooladapters/RegisteredClassificationAdapter.cpp ../../src/tooladapters/RegisteredClassificationAdapter.h \
 		../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -11521,54 +12796,27 @@ obj/RegisteredClassificationAdapter.o: ../../src/tooladapters/RegisteredClassifi
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../src/toolcore/ToolAdapter.h \
-		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolResult.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		../../src/algorithms/halcon/HalconRuntimePaths.h
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationAdapter.o ../../src/tooladapters/RegisteredClassificationAdapter.cpp
 
 obj/PatternPresenceAdapter.o: ../../src/tooladapters/PatternPresenceAdapter.cpp ../../src/tooladapters/PatternPresenceAdapter.h \
@@ -11659,36 +12907,6 @@ obj/PatternPresenceAdapter.o: ../../src/tooladapters/PatternPresenceAdapter.cpp 
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -11697,6 +12915,103 @@ obj/PatternPresenceAdapter.o: ../../src/tooladapters/PatternPresenceAdapter.cpp 
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		../../src/algorithms/halcon/HalconRuntimePaths.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/PatternPresenceAdapter.o ../../src/tooladapters/PatternPresenceAdapter.cpp
+
+obj/TemplateLocationAdapter.o: ../../src/tooladapters/TemplateLocationAdapter.cpp ../../src/tooladapters/TemplateLocationAdapter.h \
+		../../src/algorithms/location/TemplateLocationHalconRunner.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/ToolRequest.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/ToolResult.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		../../src/algorithms/halcon/HalconRuntimePaths.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/TemplateLocationAdapter.o ../../src/tooladapters/TemplateLocationAdapter.cpp
 
 obj/BlobPresenceAdapter.o: ../../src/tooladapters/BlobPresenceAdapter.cpp ../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
@@ -11786,36 +13101,6 @@ obj/BlobPresenceAdapter.o: ../../src/tooladapters/BlobPresenceAdapter.cpp ../../
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -11913,36 +13198,6 @@ obj/CirclePresenceAdapter.o: ../../src/tooladapters/CirclePresenceAdapter.cpp ..
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -12040,36 +13295,6 @@ obj/EdgePresenceAdapter.o: ../../src/tooladapters/EdgePresenceAdapter.cpp ../../
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -12167,36 +13392,6 @@ obj/LinePresenceAdapter.o: ../../src/tooladapters/LinePresenceAdapter.cpp ../../
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -12294,36 +13489,6 @@ obj/ContourPresenceAdapter.o: ../../src/tooladapters/ContourPresenceAdapter.cpp 
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -12422,36 +13587,6 @@ obj/AiDetectionAdapter.o: ../../src/tooladapters/AiDetectionAdapter.cpp ../../sr
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
@@ -12616,51 +13751,21 @@ obj/OcrHalconRunner.o: ../../src/algorithms/ocr/OcrHalconRunner.cpp ../../src/al
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
@@ -12668,6 +13773,125 @@ obj/OcrHalconRunner.o: ../../src/algorithms/ocr/OcrHalconRunner.cpp ../../src/al
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/OcrHalconRunner.o ../../src/algorithms/ocr/OcrHalconRunner.cpp
+
+obj/ColorRecognitionGmmHalconBackend.o: ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.h \
+		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCryptographicHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcryptographichash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSet
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorRecognitionGmmHalconBackend.o ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp
 
 obj/ColorRecognitionHalconRunner.o: ../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp ../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
 		../../src/toolcore/ToolOverlay.h \
@@ -12754,69 +13978,43 @@ obj/ColorRecognitionHalconRunner.o: ../../src/algorithms/recognition/ColorRecogn
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCryptographicHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcryptographichash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorRecognitionHalconRunner.o ../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp
 
-obj/ColorComparisonHalconRunner.o: ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp ../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+obj/ColorComparisonModel.o: ../../src/algorithms/recognition/ColorComparisonModel.cpp ../../src/algorithms/recognition/ColorComparisonModel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -12889,57 +14087,23 @@ obj/ColorComparisonHalconRunner.o: ../../src/algorithms/recognition/ColorCompari
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPair \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
-	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorComparisonHalconRunner.o ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCryptographicHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcryptographichash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorComparisonModel.o ../../src/algorithms/recognition/ColorComparisonModel.cpp
 
-obj/RegisteredClassificationHalconRunner.o: ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
-		../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+obj/ColorComparisonHalconRunner.o: ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp ../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
+		../../src/algorithms/recognition/ColorComparisonModel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -13012,72 +14176,717 @@ obj/RegisteredClassificationHalconRunner.o: ../../src/algorithms/recognition/Reg
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorComparisonHalconRunner.o ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp
+
+obj/RegisteredClassificationFeatureSpace.o: ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationFeatureSpace.o ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp
+
+obj/RegisteredClassificationModelPackage.o: ../../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp ../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFile \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonParseError \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSet
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationModelPackage.o ../../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp
+
+obj/RegisteredClassificationTrainingSession.o: ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFile \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QImage \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qimage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qcolor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgb.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qrgba64.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpaintdevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qwindowdefs_win.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpixelformat.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtransform.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qmatrix.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qregion.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatastream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qline.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSaveFile \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsavefile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSet
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationTrainingSession.o ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp
+
+obj/RegisteredClassificationFeatureExtractor.o: ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRegularExpression \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationFeatureExtractor.o ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp
+
+obj/RegisteredClassificationKnnRuntime.o: ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSet
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationKnnRuntime.o ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp
+
+obj/RegisteredClassificationTrainingRunner.o: ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFile \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationTrainingRunner.o ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp
+
+obj/RegisteredClassificationHalconRunner.o: ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h \
+		../../src/toolcore/PositionCorrection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
+		../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+		../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h \
+		../../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMap
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/RegisteredClassificationHalconRunner.o ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp
 
 obj/AiDetectionRunner.o: ../../src/algorithms/ai/AiDetectionRunner.cpp ../../src/algorithms/ai/AiDetectionRunner.h \
@@ -13168,36 +14977,6 @@ obj/AiDetectionRunner.o: ../../src/algorithms/ai/AiDetectionRunner.cpp ../../src
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSize \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDir \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdir.h \
@@ -13214,26 +14993,25 @@ obj/AiDetectionRunner.o: ../../src/algorithms/ai/AiDetectionRunner.cpp ../../src
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRegularExpression \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStandardPaths \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstandardpaths.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstandardpaths.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/AiDetectionRunner.o ../../src/algorithms/ai/AiDetectionRunner.cpp
 
 obj/PatternPresenceHalconApi.o: ../../src/algorithms/presence/PatternPresenceHalconApi.cpp ../../src/algorithms/presence/PatternPresenceHalconApi.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
@@ -13299,21 +15077,21 @@ obj/PatternPresenceHalconApi.o: ../../src/algorithms/presence/PatternPresenceHal
 
 obj/PatternPresenceAutoModelDomain.o: ../../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp ../../src/algorithms/presence/PatternPresenceAutoModelDomain.h \
 		../../src/algorithms/presence/PatternPresenceHalconApi.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
@@ -13463,53 +15241,23 @@ obj/PatternPresenceHalconRunner.o: ../../src/algorithms/presence/PatternPresence
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/algorithms/presence/PatternPresenceAutoModelDomain.h \
 		../../src/algorithms/presence/PatternPresenceHalconApi.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
@@ -13526,11 +15274,238 @@ obj/PatternPresenceHalconRunner.o: ../../src/algorithms/presence/PatternPresence
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgcodecs.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/PatternPresenceHalconRunner.o ../../src/algorithms/presence/PatternPresenceHalconRunner.cpp
+
+obj/TemplateLocationHalconRunner.o: ../../src/algorithms/location/TemplateLocationHalconRunner.cpp ../../src/algorithms/location/TemplateLocationHalconRunner.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/opt/halcon/include/halconcpp/HalconCpp.h \
+		/opt/halcon/include/Halcon.h \
+		/opt/halcon/include/HVersNum.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/hlib/HAlloc.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/hlib/HBaseGP.h \
+		/opt/halcon/include/hlib/IOSpy.h \
+		/opt/halcon/include/hlib/HInstance.h \
+		/opt/halcon/include/hlib/HInstanceDefines.h \
+		/opt/halcon/include/hlib/DBNew.h \
+		/opt/halcon/include/hlib/CORE1.h \
+		/opt/halcon/include/hlib/HXLD.h \
+		/opt/halcon/include/hlib/HError.h \
+		/opt/halcon/include/halconcpp/HalconCppForwards.h \
+		/opt/halcon/include/halconcpp/HTuple.h \
+		/opt/halcon/include/halconcpp/HTupleElement.h \
+		/opt/halcon/include/halconcpp/HString.h \
+		/opt/halcon/include/halconcpp/HSmartPtr.h \
+		/opt/halcon/include/halconcpp/HHandleBase.h \
+		/opt/halcon/include/halconcpp/HHandle.h \
+		/opt/halcon/include/halconcpp/HTupleLegacy.h \
+		/opt/halcon/include/halconcpp/HVector.h \
+		/opt/halcon/include/halconcpp/HObjectBase.h \
+		/opt/halcon/include/halconcpp/HObject.h \
+		/opt/halcon/include/halconcpp/HException.h \
+		/opt/halcon/include/halconcpp/HDevWindowStack.h \
+		/opt/halcon/include/halconcpp/HDataBase.h \
+		/opt/halcon/include/halconcpp/HOperatorOverloads.h \
+		/opt/halcon/include/halconcpp/HalconCppIncludes.h \
+		/opt/halcon/include/halconcpp/HOperatorSet.h \
+		/opt/halcon/include/halconcpp/HFeatureSet.h \
+		/opt/halcon/include/halconcpp/HTemplate.h \
+		/opt/halcon/include/halconcpp/HNCCModel.h \
+		/opt/halcon/include/halconcpp/HShapeModel.h \
+		/opt/halcon/include/halconcpp/HObjectModel3D.h \
+		/opt/halcon/include/halconcpp/HSurfaceModel.h \
+		/opt/halcon/include/halconcpp/HSurfaceMatchingResult.h \
+		/opt/halcon/include/halconcpp/HDeformableSurfaceModel.h \
+		/opt/halcon/include/halconcpp/HDeformableSurfaceMatchingResult.h \
+		/opt/halcon/include/halconcpp/HShapeModel3D.h \
+		/opt/halcon/include/halconcpp/HDeformableModel.h \
+		/opt/halcon/include/halconcpp/HDescriptorModel.h \
+		/opt/halcon/include/halconcpp/HVariationModel.h \
+		/opt/halcon/include/halconcpp/HCalibData.h \
+		/opt/halcon/include/halconcpp/HCameraSetupModel.h \
+		/opt/halcon/include/halconcpp/HStereoModel.h \
+		/opt/halcon/include/halconcpp/HComponentTraining.h \
+		/opt/halcon/include/halconcpp/HComponentModel.h \
+		/opt/halcon/include/halconcpp/HGnuplot.h \
+		/opt/halcon/include/halconcpp/HSocket.h \
+		/opt/halcon/include/halconcpp/HSerial.h \
+		/opt/halcon/include/halconcpp/HMeasure.h \
+		/opt/halcon/include/halconcpp/HMatrix.h \
+		/opt/halcon/include/halconcpp/HFunction1D.h \
+		/opt/halcon/include/halconcpp/HBarCode.h \
+		/opt/halcon/include/halconcpp/HDataCode2D.h \
+		/opt/halcon/include/halconcpp/HMisc.h \
+		/opt/halcon/include/halconcpp/HImage.h \
+		/opt/halcon/include/halconcpp/HRegion.h \
+		/opt/halcon/include/halconcpp/HXLD.h \
+		/opt/halcon/include/halconcpp/HXLDCont.h \
+		/opt/halcon/include/halconcpp/HXLDPoly.h \
+		/opt/halcon/include/halconcpp/HXLDPara.h \
+		/opt/halcon/include/halconcpp/HXLDModPara.h \
+		/opt/halcon/include/halconcpp/HXLDExtPara.h \
+		/opt/halcon/include/halconcpp/HWindow.h \
+		/opt/halcon/include/halconcpp/HFile.h \
+		/opt/halcon/include/halconcpp/HFramegrabber.h \
+		/opt/halcon/include/halconcpp/HIODevice.h \
+		/opt/halcon/include/halconcpp/HIOChannel.h \
+		/opt/halcon/include/halconcpp/HOCRBox.h \
+		/opt/halcon/include/halconcpp/HOCRMlp.h \
+		/opt/halcon/include/halconcpp/HOCRSvm.h \
+		/opt/halcon/include/halconcpp/HLexicon.h \
+		/opt/halcon/include/halconcpp/HOCV.h \
+		/opt/halcon/include/halconcpp/HClassBox.h \
+		/opt/halcon/include/halconcpp/HClassMlp.h \
+		/opt/halcon/include/halconcpp/HClassSvm.h \
+		/opt/halcon/include/halconcpp/HClassGmm.h \
+		/opt/halcon/include/halconcpp/HDlClassifier.h \
+		/opt/halcon/include/halconcpp/HDlClassifierResult.h \
+		/opt/halcon/include/halconcpp/HDlClassifierTrainResult.h \
+		/opt/halcon/include/halconcpp/HDlDevice.h \
+		/opt/halcon/include/halconcpp/HDlModel.h \
+		/opt/halcon/include/halconcpp/HDlPrune.h \
+		/opt/halcon/include/halconcpp/HDlModelOcr.h \
+		/opt/halcon/include/halconcpp/HColorTransLUT.h \
+		/opt/halcon/include/halconcpp/HBgEsti.h \
+		/opt/halcon/include/halconcpp/HSystem.h \
+		/opt/halcon/include/halconcpp/HInfo.h \
+		/opt/halcon/include/halconcpp/HCamPar.h \
+		/opt/halcon/include/halconcpp/HPose.h \
+		/opt/halcon/include/halconcpp/HHomMat2D.h \
+		/opt/halcon/include/halconcpp/HHomMat3D.h \
+		/opt/halcon/include/halconcpp/HQuaternion.h \
+		/opt/halcon/include/halconcpp/HDualQuaternion.h \
+		/opt/halcon/include/halconcpp/HSheetOfLightModel.h \
+		/opt/halcon/include/halconcpp/HClassLUT.h \
+		/opt/halcon/include/halconcpp/HComputeDevice.h \
+		/opt/halcon/include/halconcpp/HMutex.h \
+		/opt/halcon/include/halconcpp/HEvent.h \
+		/opt/halcon/include/halconcpp/HCondition.h \
+		/opt/halcon/include/halconcpp/HBarrier.h \
+		/opt/halcon/include/halconcpp/HMessage.h \
+		/opt/halcon/include/halconcpp/HMessageQueue.h \
+		/opt/halcon/include/halconcpp/HDict.h \
+		/opt/halcon/include/halconcpp/HTextModel.h \
+		/opt/halcon/include/halconcpp/HTextResult.h \
+		/opt/halcon/include/halconcpp/HMetrologyModel.h \
+		/opt/halcon/include/halconcpp/HSerializedItem.h \
+		/opt/halcon/include/halconcpp/HClassKnn.h \
+		/opt/halcon/include/halconcpp/HOCRKnn.h \
+		/opt/halcon/include/halconcpp/HOCRCnn.h \
+		/opt/halcon/include/halconcpp/HClassTrainData.h \
+		/opt/halcon/include/halconcpp/HScatteredDataInterpolator.h \
+		/opt/halcon/include/halconcpp/HSampleIdentifier.h \
+		/opt/halcon/include/halconcpp/HXLDDistTrans.h \
+		/opt/halcon/include/halconcpp/HDrawingObject.h \
+		/opt/halcon/include/halconcpp/HScene3D.h \
+		/opt/halcon/include/halconcpp/HBeadInspectionModel.h \
+		/opt/halcon/include/halconcpp/HTextureInspectionModel.h \
+		/opt/halcon/include/halconcpp/HTextureInspectionResult.h \
+		/opt/halcon/include/halconcpp/HStructuredLightModel.h \
+		/opt/halcon/include/halconcpp/HIOStream.h \
+		/opt/halcon/include/halconcpp/HOperatorSetLegacy.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/TemplateLocationHalconRunner.o ../../src/algorithms/location/TemplateLocationHalconRunner.cpp
 
 obj/BlobPresenceHalconRunner.o: ../../src/algorithms/presence/BlobPresenceHalconRunner.cpp ../../src/algorithms/presence/BlobPresenceHalconRunner.h \
 		../../src/toolcore/ToolOverlay.h \
@@ -13619,51 +15594,21 @@ obj/BlobPresenceHalconRunner.o: ../../src/algorithms/presence/BlobPresenceHalcon
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
@@ -13760,51 +15705,21 @@ obj/CirclePresenceHalconRunner.o: ../../src/algorithms/presence/CirclePresenceHa
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
@@ -13902,51 +15817,21 @@ obj/EdgePresenceHalconRunner.o: ../../src/algorithms/presence/EdgePresenceHalcon
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
@@ -14044,51 +15929,21 @@ obj/LinePresenceHalconRunner.o: ../../src/algorithms/presence/LinePresenceHalcon
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
@@ -14187,52 +16042,22 @@ obj/ContourPresenceHalconRunner.o: ../../src/algorithms/presence/ContourPresence
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cv_cpu_helper.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/msa_macros.h \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/fast_math.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/base.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/opencv_modules.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd_wrapper.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/neon_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utility.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/instrumentation.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../src/algorithms/presence/PatternPresenceHalconApi.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QSharedPointer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
@@ -14258,6 +16083,12 @@ obj/moc_CameraParamsDialog.o: moc/moc_CameraParamsDialog.cpp
 obj/moc_ReferenceImageDialog.o: moc/moc_ReferenceImageDialog.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_ReferenceImageDialog.o moc/moc_ReferenceImageDialog.cpp
 
+obj/moc_PositionCorrectionDialog.o: moc/moc_PositionCorrectionDialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_PositionCorrectionDialog.o moc/moc_PositionCorrectionDialog.cpp
+
+obj/moc_TemplateLocationDialog.o: moc/moc_TemplateLocationDialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_TemplateLocationDialog.o moc/moc_TemplateLocationDialog.cpp
+
 obj/moc_ToolLibraryDialog.o: moc/moc_ToolLibraryDialog.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_ToolLibraryDialog.o moc/moc_ToolLibraryDialog.cpp
 
@@ -14272,6 +16103,18 @@ obj/moc_ColorComparisonDialog.o: moc/moc_ColorComparisonDialog.cpp
 
 obj/moc_RegisteredClassificationDialog.o: moc/moc_RegisteredClassificationDialog.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_RegisteredClassificationDialog.o moc/moc_RegisteredClassificationDialog.cpp
+
+obj/moc_RegisteredClassificationDetectionDialog.o: moc/moc_RegisteredClassificationDetectionDialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_RegisteredClassificationDetectionDialog.o moc/moc_RegisteredClassificationDetectionDialog.cpp
+
+obj/moc_RegisteredClassificationDetectionTrainingDialog.o: moc/moc_RegisteredClassificationDetectionTrainingDialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_RegisteredClassificationDetectionTrainingDialog.o moc/moc_RegisteredClassificationDetectionTrainingDialog.cpp
+
+obj/moc_RegisteredClassificationTrainingDialog.o: moc/moc_RegisteredClassificationTrainingDialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_RegisteredClassificationTrainingDialog.o moc/moc_RegisteredClassificationTrainingDialog.cpp
+
+obj/moc_RegisteredClassificationModelManagementDialog.o: moc/moc_RegisteredClassificationModelManagementDialog.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_RegisteredClassificationModelManagementDialog.o moc/moc_RegisteredClassificationModelManagementDialog.cpp
 
 obj/moc_ColorTemplateDialog.o: moc/moc_ColorTemplateDialog.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/moc_ColorTemplateDialog.o moc/moc_ColorTemplateDialog.cpp

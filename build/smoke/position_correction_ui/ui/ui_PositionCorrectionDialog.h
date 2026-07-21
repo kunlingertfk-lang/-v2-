@@ -59,9 +59,9 @@ public:
     QLabel *templateTitle;
     QHBoxLayout *templateToolsLayout;
     QLabel *templateField;
-    QSpacerItem *templateSpacer;
     QPushButton *rectTemplateButton;
     QPushButton *polygonTemplateButton;
+    QSpacerItem *templateSpacer;
     QSpacerItem *parameterSpacer;
     QLabel *statusLabel;
     QHBoxLayout *actionLayout;
@@ -69,8 +69,15 @@ public:
     QPushButton *finishButton;
     QFrame *previewPanel;
     QVBoxLayout *previewLayout;
-    QLabel *previewTitleLabel;
+    QFrame *viewerHeader;
+    QHBoxLayout *viewerHeaderLayout;
+    QLabel *viewerTitleLabel;
+    QSpacerItem *viewerHeaderSpacer;
     QGraphicsView *previewGraphicsView;
+    QFrame *viewerStatusBar;
+    QHBoxLayout *viewerStatusLayout;
+    QLabel *viewerStatusLabel;
+    QSpacerItem *viewerStatusSpacer;
 
     void setupUi(QDialog *PositionCorrectionDialog)
     {
@@ -134,6 +141,8 @@ public:
         subscriptionCard->setObjectName(QString::fromUtf8("subscriptionCard"));
         subscriptionLayout = new QGridLayout(subscriptionCard);
         subscriptionLayout->setObjectName(QString::fromUtf8("subscriptionLayout"));
+        subscriptionLayout->setHorizontalSpacing(6);
+        subscriptionLayout->setVerticalSpacing(22);
         subscriptionTitle = new QLabel(subscriptionCard);
         subscriptionTitle->setObjectName(QString::fromUtf8("subscriptionTitle"));
 
@@ -216,10 +225,6 @@ public:
 
         templateToolsLayout->addWidget(templateField);
 
-        templateSpacer = new QSpacerItem(20, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
-
-        templateToolsLayout->addItem(templateSpacer);
-
         rectTemplateButton = new QPushButton(templateCard);
         rectTemplateButton->setObjectName(QString::fromUtf8("rectTemplateButton"));
         rectTemplateButton->setCheckable(true);
@@ -238,7 +243,11 @@ public:
 
         parameterLayout->addWidget(templateCard);
 
-        parameterSpacer = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
+        templateSpacer = new QSpacerItem(20, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        parameterLayout->addItem(templateSpacer);
+
+        parameterSpacer = new QSpacerItem(20, 20, QSizePolicy::Minimum, QSizePolicy::Expanding);
 
         parameterLayout->addItem(parameterSpacer);
 
@@ -270,16 +279,51 @@ public:
         previewPanel = new QFrame(PositionCorrectionDialog);
         previewPanel->setObjectName(QString::fromUtf8("previewPanel"));
         previewLayout = new QVBoxLayout(previewPanel);
+        previewLayout->setSpacing(0);
         previewLayout->setObjectName(QString::fromUtf8("previewLayout"));
-        previewTitleLabel = new QLabel(previewPanel);
-        previewTitleLabel->setObjectName(QString::fromUtf8("previewTitleLabel"));
+        previewLayout->setContentsMargins(0, 0, 0, 0);
+        viewerHeader = new QFrame(previewPanel);
+        viewerHeader->setObjectName(QString::fromUtf8("viewerHeader"));
+        viewerHeader->setMinimumSize(QSize(0, 44));
+        viewerHeader->setMaximumSize(QSize(16777215, 44));
+        viewerHeaderLayout = new QHBoxLayout(viewerHeader);
+        viewerHeaderLayout->setObjectName(QString::fromUtf8("viewerHeaderLayout"));
+        viewerHeaderLayout->setContentsMargins(16, -1, 16, -1);
+        viewerTitleLabel = new QLabel(viewerHeader);
+        viewerTitleLabel->setObjectName(QString::fromUtf8("viewerTitleLabel"));
 
-        previewLayout->addWidget(previewTitleLabel);
+        viewerHeaderLayout->addWidget(viewerTitleLabel);
+
+        viewerHeaderSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        viewerHeaderLayout->addItem(viewerHeaderSpacer);
+
+
+        previewLayout->addWidget(viewerHeader);
 
         previewGraphicsView = new QGraphicsView(previewPanel);
         previewGraphicsView->setObjectName(QString::fromUtf8("previewGraphicsView"));
 
         previewLayout->addWidget(previewGraphicsView);
+
+        viewerStatusBar = new QFrame(previewPanel);
+        viewerStatusBar->setObjectName(QString::fromUtf8("viewerStatusBar"));
+        viewerStatusBar->setMinimumSize(QSize(0, 32));
+        viewerStatusBar->setMaximumSize(QSize(16777215, 32));
+        viewerStatusLayout = new QHBoxLayout(viewerStatusBar);
+        viewerStatusLayout->setObjectName(QString::fromUtf8("viewerStatusLayout"));
+        viewerStatusLayout->setContentsMargins(16, -1, 16, -1);
+        viewerStatusLabel = new QLabel(viewerStatusBar);
+        viewerStatusLabel->setObjectName(QString::fromUtf8("viewerStatusLabel"));
+
+        viewerStatusLayout->addWidget(viewerStatusLabel);
+
+        viewerStatusSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        viewerStatusLayout->addItem(viewerStatusSpacer);
+
+
+        previewLayout->addWidget(viewerStatusBar);
 
 
         bodyLayout->addWidget(previewPanel);
@@ -298,10 +342,10 @@ public:
         PositionCorrectionDialog->setWindowTitle(QCoreApplication::translate("PositionCorrectionDialog", "\344\275\215\347\275\256\344\277\256\346\255\243", nullptr));
         windowTitleLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\344\275\215\347\275\256\344\277\256\346\255\243", nullptr));
         windowTitleLabel->setProperty("role", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "windowTitle", nullptr)));
-        closeButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\303\227", nullptr));
 #if QT_CONFIG(tooltip)
         closeButton->setToolTip(QCoreApplication::translate("PositionCorrectionDialog", "\345\205\263\351\227\255\344\275\215\347\275\256\344\277\256\346\255\243", nullptr));
 #endif // QT_CONFIG(tooltip)
+        closeButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\303\227", nullptr));
         parameterPanel->setProperty("panelRole", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "parameterPanel", nullptr)));
         basicModeButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\345\237\272\347\241\200", nullptr));
         allModeButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\345\205\250\351\203\250", nullptr));
@@ -310,22 +354,22 @@ public:
         subscriptionTitle->setProperty("role", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "cardTitle", nullptr)));
         runXLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\350\277\220\350\241\214\347\202\271\345\235\220\346\240\207X", nullptr));
         runXLabel->setProperty("role", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "rowField", nullptr)));
-        runPointXLinkButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\351\223\276\346\216\245", nullptr));
 #if QT_CONFIG(tooltip)
         runPointXLinkButton->setToolTip(QCoreApplication::translate("PositionCorrectionDialog", "\351\200\211\346\213\251\350\277\220\350\241\214\347\202\271\345\235\220\346\240\207X\346\235\245\346\272\220", nullptr));
 #endif // QT_CONFIG(tooltip)
+        runPointXLinkButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\351\223\276\346\216\245", nullptr));
         runYLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\350\277\220\350\241\214\347\202\271\345\235\220\346\240\207Y", nullptr));
         runYLabel->setProperty("role", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "rowField", nullptr)));
-        runPointYLinkButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\351\223\276\346\216\245", nullptr));
 #if QT_CONFIG(tooltip)
         runPointYLinkButton->setToolTip(QCoreApplication::translate("PositionCorrectionDialog", "\351\200\211\346\213\251\350\277\220\350\241\214\347\202\271\345\235\220\346\240\207Y\346\235\245\346\272\220", nullptr));
 #endif // QT_CONFIG(tooltip)
+        runPointYLinkButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\351\223\276\346\216\245", nullptr));
         runAngleLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\350\277\220\350\241\214\350\247\222\345\272\246", nullptr));
         runAngleLabel->setProperty("role", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "rowField", nullptr)));
-        runAngleLinkButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\351\223\276\346\216\245", nullptr));
 #if QT_CONFIG(tooltip)
         runAngleLinkButton->setToolTip(QCoreApplication::translate("PositionCorrectionDialog", "\351\200\211\346\213\251\350\277\220\350\241\214\350\247\222\345\272\246\346\235\245\346\272\220", nullptr));
 #endif // QT_CONFIG(tooltip)
+        runAngleLinkButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\351\223\276\346\216\245", nullptr));
         createReferenceLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\345\210\233\345\273\272\345\237\272\345\207\206", nullptr));
         createReferenceLabel->setProperty("role", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "rowField", nullptr)));
         createReferenceButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\345\210\233\345\273\272\345\237\272\345\207\206", nullptr));
@@ -340,8 +384,8 @@ public:
         finishButton->setText(QCoreApplication::translate("PositionCorrectionDialog", "\345\256\214\346\210\220", nullptr));
         finishButton->setProperty("actionRole", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "primary", nullptr)));
         previewPanel->setProperty("panelRole", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "previewPanel", nullptr)));
-        previewTitleLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\345\237\272\345\207\206\345\233\276", nullptr));
-        previewTitleLabel->setProperty("role", QVariant(QCoreApplication::translate("PositionCorrectionDialog", "cardTitle", nullptr)));
+        viewerTitleLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\345\237\272\345\207\206\345\233\276", nullptr));
+        viewerStatusLabel->setText(QCoreApplication::translate("PositionCorrectionDialog", "\347\256\227\346\263\225\350\200\227\346\227\266: 0ms  \345\267\245\345\205\267\350\200\227\346\227\266: 0ms", nullptr));
     } // retranslateUi
 
 };

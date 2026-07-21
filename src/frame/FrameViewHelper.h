@@ -68,6 +68,8 @@ public:
     bool navigationEnabled() const;
     qreal viewScale() const;
     bool isFitToView() const;
+    void zoomIn();
+    void zoomOut();
 
     QPointF viewToImage(const QPoint &viewPos) const;
     QRectF imageRectToNormalized(const QRectF &imageRect) const;
@@ -94,6 +96,9 @@ public:
     QRectF circleBoundingRectNormalized(const CircleRoi &roi) const;
     void clearCircleRoi();
 
+    void setPointSelectionEnabled(bool enabled);
+    bool isPointSelectionEnabled() const;
+
     void setLineBandDrawingEnabled(bool enabled);
     bool isLineBandDrawingEnabled() const;
     void setLineBandRoiNormalized(const LineBandRoi &roi);
@@ -105,12 +110,14 @@ public:
     void clearToolOverlays();
 
 signals:
+    void viewTransformChanged(qreal scale, bool fitToView);
     void roiChanged(const QRectF &roiNormalized);
     void roiSelectionRejected(const QRectF &imageRect);
     void polygonChanged(const QVector<QPointF> &pointsNormalized);
     void polygonSelectionRejected(int pointCount);
     void circleChanged(const CircleRoi &roi);
     void circleSelectionRejected();
+    void pointSelected(const QPointF &pointNormalized);
     void lineBandChanged(const LineBandRoi &roi);
     void lineBandSelectionRejected();
 
@@ -208,6 +215,7 @@ private:
     bool m_roiDrawingEnabled = false;
     bool m_polygonDrawingEnabled = false;
     bool m_circleDrawingEnabled = false;
+    bool m_pointSelectionEnabled = false;
     bool m_lineBandDrawingEnabled = false;
     bool m_roiDrawing = false;
     bool m_polygonDragging = false;

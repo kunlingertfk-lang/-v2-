@@ -432,22 +432,22 @@ bool SchemeStore::loadCurrentReferenceIntoProvider(QString *errorMessage)
         return true;
     }
 
-    const cv::Mat frame = cv::imread(path.toStdString(), cv::IMREAD_COLOR);
+    const cv::Mat frame = cv::imread(path.toStdString(), cv::IMREAD_UNCHANGED);
     if (frame.empty()) {
         ReferenceImageProvider::instance().clearReferenceFrame();
         setError(errorMessage, QStringLiteral("无法加载方案基准图: %1").arg(path));
         return false;
     }
 
-    FrameInputMetadata metadata = m_currentScheme.referenceInputMetadata;
-    if (metadata.colorMode == QStringLiteral("unknown")
-            && metadata.pixelFormat.isEmpty()
-            && metadata.originalChannels == 0
-            && metadata.originalDepth < 0
-            && metadata.source.isEmpty()) {
-        metadata.source = QStringLiteral("reference");
-    }
+    // The persisted PNG may be 8-bit or 16-bit. Do not reuse acquisition metadata
+    // (for example RGBX8/BGRA16) as the runtime contract after decoding/normalization.
+    const QString source = m_currentScheme.referenceInputMetadata.source.trimmed().isEmpty()
+            ? QStringLiteral("reference")
+            : m_currentScheme.referenceInputMetadata.source;
+    const FrameInputMetadata metadata = FrameInputMetadata::fromMat(frame, source);
     ReferenceImageProvider::instance().setReferenceFrame(frame, metadata);
+    m_currentScheme.referenceInputMetadata =
+            ReferenceImageProvider::instance().referenceFrameMetadata();
     return true;
 }
 

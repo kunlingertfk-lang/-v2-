@@ -1,6 +1,9 @@
 #include "frame/FrameViewHelper.h"
 
 #include <QApplication>
+#include <QAbstractGraphicsShapeItem>
+#include <QGraphicsPathItem>
+#include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QLineF>
 #include <QMouseEvent>
@@ -109,6 +112,12 @@ int main(int argc, char **argv)
     check(helper.navigationEnabled() && helper.isFitToView()
           && near(helper.viewScale(), 1.0),
           "enabling navigation must start at fit scale");
+    helper.zoomIn();
+    check(near(helper.viewScale(), 1.25) && !helper.isFitToView(),
+          "zoomIn must use the public navigation scale contract");
+    helper.zoomOut();
+    check(near(helper.viewScale(), 1.0) && helper.isFitToView(),
+          "zoomOut must stop at fit scale");
 
     QGraphicsView legacyView;
     legacyView.resize(500, 380);
@@ -205,6 +214,66 @@ int main(int argc, char **argv)
     sendMouseDoubleClick(view.viewport(), view.viewport()->rect().center(), Qt::NoModifier);
     check(near(helper.viewScale(), 1.0) && helper.isFitToView(),
           "double click must restore fit scale");
+
+    ToolOverlay templateRoi;
+    templateRoi.type = ToolOverlayType::Rect;
+    templateRoi.rect = QRectF(40.0, 40.0, 180.0, 140.0);
+    templateRoi.label = QStringLiteral("styled-template-roi");
+    templateRoi.extra.insert(QStringLiteral("displayRole"),
+                             QStringLiteral("color_template_roi"));
+    templateRoi.extra.insert(QStringLiteral("emphasis"),
+                             QStringLiteral("muted"));
+    ToolOverlay detectMask;
+    detectMask.type = ToolOverlayType::Polygon;
+    detectMask.points = {
+        QPointF(200.0, 120.0), QPointF(500.0, 120.0),
+        QPointF(500.0, 360.0), QPointF(200.0, 360.0)
+    };
+    detectMask.label = QStringLiteral("styled-detect-mask");
+    detectMask.extra.insert(QStringLiteral("displayRole"),
+                            QStringLiteral("color_detect_mask"));
+    detectMask.extra.insert(QStringLiteral("emphasis"),
+                            QStringLiteral("active"));
+    detectMask.extra.insert(QStringLiteral("clipGeometry"), QJsonObject{
+        {QStringLiteral("type"), QStringLiteral("rect")},
+        {QStringLiteral("rect"), QJsonObject{
+             {QStringLiteral("x"), 240.0},
+             {QStringLiteral("y"), 160.0},
+             {QStringLiteral("width"), 160.0},
+             {QStringLiteral("height"), 120.0}
+         }}
+    });
+    helper.setToolOverlays({templateRoi, detectMask});
+    bool foundMutedTemplate = false;
+    bool foundEffectiveMask = false;
+    bool foundOutsideWarning = false;
+    for (QGraphicsItem *item : view.scene()->items()) {
+        if (item->toolTip() == templateRoi.label) {
+            QAbstractGraphicsShapeItem *shape =
+                    dynamic_cast<QAbstractGraphicsShapeItem *>(item);
+            foundMutedTemplate = shape
+                    && item->opacity() < 0.31
+                    && shape->pen().color() == QColor(255, 122, 0);
+        } else if (item->toolTip() == detectMask.label) {
+            QGraphicsPathItem *path = dynamic_cast<QGraphicsPathItem *>(item);
+            foundEffectiveMask = path
+                    && !path->path().isEmpty()
+                    && path->pen().widthF() > 3.0
+                    && path->brush().style() == Qt::BDiagPattern;
+        } else if (item->toolTip().contains(
+                       QStringLiteral("outside owner ROI"))) {
+            QGraphicsPathItem *outside = dynamic_cast<QGraphicsPathItem *>(item);
+            foundOutsideWarning = outside
+                    && outside->pen().style() == Qt::DashLine
+                    && outside->brush().style() == Qt::NoBrush;
+        }
+    }
+    check(foundMutedTemplate,
+          "template overlay role must render orange and muted");
+    check(foundEffectiveMask,
+          "mask overlay must render active clipped hatch path");
+    check(foundOutsideWarning,
+          "mask area outside owner ROI must render as red dashed warning");
 
     std::cout << "frame_view_helper_navigation_smoke: all checks passed" << std::endl;
     return 0;

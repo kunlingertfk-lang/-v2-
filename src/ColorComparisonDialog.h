@@ -81,9 +81,14 @@ private:
     void connectAsyncWorkers();
     void setAllParamsMode(bool allMode);
     void setEditState(EditState state);
+    void toggleEditState(EditState requestedState);
     void showPreviewImage();
     void showFrameImage(const cv::Mat &frame, const QString &title);
     void refreshRoiOverlay();
+    QVector<ToolOverlay> configurationGeometryOverlays() const;
+    QVector<ToolOverlay> detectionGeometryOverlays() const;
+    QVector<ToolOverlay> combinedDisplayOverlays() const;
+    void refreshGeometryOverlays();
     void updateStatus(const QString &text);
     void updateTemplatePreview();
     void runTest();
@@ -94,7 +99,6 @@ private:
     void runSingleShotTest();
     void exitTestMode();
     void rerunLiveComparison();
-    void applyDetectRoiEditState();
     void updateBottomButtons();
     void runComparisonOnFrame(const cv::Mat &frame,
                               const FrameInputMetadata &metadata,
@@ -126,9 +130,14 @@ private:
     QRectF normalizedRoiOrDefault(const QRectF &roi) const;
     QImage templateRawRoiImage() const;
     void refreshEditControls();
+    void refreshTemplateRegionControls();
     void refreshDetectRegionButtons();
     void refreshPositionCorrectionControls();
-    void handleDetectionConfigChanged(const QString &reason);
+    void beginMaskRedraw(EditState state);
+    void clearTemplateMask();
+    void clearDetectionMask();
+    void handleDetectionGeometryChanged(const QString &reason);
+    void handleDetectionMaskChanged(const QString &reason);
     void invalidateAsyncWork();
     bool invalidateModelBuild();
     void markModelStale(const QString &reason);
@@ -188,6 +197,9 @@ private:
     quint64 m_pendingTestGeneration = 0;
     QString m_activeImageTitle;
     bool m_activeReferenceSource = false;
+    QVector<ToolOverlay> m_runtimeResultOverlays;
+    QVector<QPointF> m_maskBeforeRedraw;
+    bool m_maskRedrawInProgress = false;
 
     QButtonGroup *m_segmentGroup = nullptr;
     QButtonGroup *m_detectRegionGroup = nullptr;
@@ -205,11 +217,14 @@ private:
     QPushButton *m_basicButton = nullptr;
     QPushButton *m_allButton = nullptr;
     QComboBox *m_templateRegionModeComboBox = nullptr;
+    QLabel *m_templateSyncHintLabel = nullptr;
     QPushButton *m_templateEditButton = nullptr;
     QToolButton *m_templateRectButton = nullptr;
     QPushButton *m_templateFinishButton = nullptr;
     QPushButton *m_templateMaskEditButton = nullptr;
     QToolButton *m_templateMaskPolygonButton = nullptr;
+    QPushButton *m_templateMaskRedrawButton = nullptr;
+    QPushButton *m_templateMaskClearButton = nullptr;
     QPushButton *m_templateMaskFinishButton = nullptr;
     QPushButton *m_rebuildModelButton = nullptr;
     QToolButton *m_detectGlobalButton = nullptr;
@@ -220,6 +235,8 @@ private:
     QComboBox *m_positionCorrectionComboBox = nullptr;
     QPushButton *m_detectMaskEditButton = nullptr;
     QToolButton *m_detectMaskPolygonButton = nullptr;
+    QPushButton *m_detectMaskRedrawButton = nullptr;
+    QPushButton *m_detectMaskClearButton = nullptr;
     QPushButton *m_detectMaskFinishButton = nullptr;
     QComboBox *m_sensitivityComboBox = nullptr;
     QComboBox *m_featureTypeComboBox = nullptr;

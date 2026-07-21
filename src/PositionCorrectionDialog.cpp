@@ -12,6 +12,7 @@
 
 namespace {
 
+// 构造指向方案级基准图节点的默认输出绑定，供新建工具首次回显使用。
 QJsonObject defaultBinding(const QString &outputKey, const QString &displayPath)
 {
     return QJsonObject{
@@ -23,11 +24,15 @@ QJsonObject defaultBinding(const QString &outputKey, const QString &displayPath)
 
 } // namespace
 
+// 初始化位置修正 Dialog 的布局、默认配置、基准图预览和交互信号。
 PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::PositionCorrectionDialog)
 {
     ui->setupUi(this);
+    ui->previewLayout->setStretch(0, 0);
+    ui->previewLayout->setStretch(1, 1);
+    ui->previewLayout->setStretch(2, 0);
     setWindowTitle(tr("方案编辑 - 位置修正"));
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     connect(ui->closeButton, &QToolButton::clicked, this, &QDialog::reject);
@@ -55,12 +60,13 @@ PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
 
     const QImage reference = ReferenceImageProvider::instance().referenceImage();
     if (reference.isNull()) {
-        ui->previewTitleLabel->setText(tr("请先设置基准图"));
+        ui->viewerTitleLabel->setText(tr("请先设置基准图"));
     } else {
-        ui->previewTitleLabel->setText(tr("基准图"));
+        ui->viewerTitleLabel->setText(tr("基准图"));
         m_previewHelper->setImage(reference);
     }
 
+    // 基础与全部页签保持互斥；第一阶段两者共用已定义的核心参数。
     connect(ui->basicModeButton, &QPushButton::clicked, this, [this]() {
         ui->basicModeButton->setChecked(true);
         ui->allModeButton->setChecked(false);
@@ -70,6 +76,7 @@ PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
         ui->basicModeButton->setChecked(false);
         ui->statusLabel->setText(tr("全部参数将在 HALCON 算法阶段扩展"));
     });
+    // 模板类型按钮只保存配置意图，真实 ROI 绘制由后续联调阶段接入。
     connect(ui->rectTemplateButton, &QPushButton::clicked, this, [this]() {
         m_correction.insert(QStringLiteral("templateRegionType"), QStringLiteral("rectangle"));
         updateTemplateButtons();
@@ -90,11 +97,13 @@ PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
     });
 }
 
+// 释放 Qt Designer 生成的界面对象。
 PositionCorrectionDialog::~PositionCorrectionDialog()
 {
     delete ui;
 }
 
+// 将三项默认/已有绑定回显到输入框，并建立可选来源菜单。
 void PositionCorrectionDialog::setupBindings()
 {
     setBinding(QStringLiteral("runPointX"), binding(QStringLiteral("runPointX")));
@@ -104,6 +113,7 @@ void PositionCorrectionDialog::setupBindings()
     rebuildBindingMenus();
 }
 
+// 保存完整工具链和当前消费位置，仅允许菜单引用当前工具之前的节点。
 void PositionCorrectionDialog::setAvailableProducers(const QVector<ToolConfig> &tools,
                                                       int consumerIndex)
 {
@@ -112,6 +122,7 @@ void PositionCorrectionDialog::setAvailableProducers(const QVector<ToolConfig> &
     rebuildBindingMenus();
 }
 
+// 为 X、Y、角度分别创建“上游节点 -> 输出字段”的二级绑定菜单。
 void PositionCorrectionDialog::rebuildBindingMenus()
 {
     const QList<QPair<QPushButton *, QString>> targets{
@@ -121,6 +132,7 @@ void PositionCorrectionDialog::rebuildBindingMenus()
     };
     for (const auto &target : targets) {
         QMenu *menu = new QMenu(target.first);
+        // 每个一级节点保留稳定 producerId，二级项保存实际 outputKey。
         const auto addNode = [this, menu, target](const QString &producerId,
                                                   const QString &nodeText) {
             QMenu *nodeMenu = menu->addMenu(nodeText);
@@ -143,7 +155,7 @@ void PositionCorrectionDialog::rebuildBindingMenus()
                 });
             }
         };
-        addNode(PositionCorrection::defaultSourceId(), tr("1 基准图"));
+        addNode(PositionCorrection::defaultSourceId(), tr("0 基准图"));
         for (int index = 0; index < m_consumerIndex; ++index) {
             const ToolConfig &tool = m_producers.at(index);
             if (!tool.enabled || tool.toolId.trimmed().isEmpty())
@@ -159,6 +171,7 @@ void PositionCorrectionDialog::rebuildBindingMenus()
     }
 }
 
+// 保存单项绑定，并用 displayPath 更新界面文本；稳定 ID 不依赖显示序号。
 void PositionCorrectionDialog::setBinding(const QString &key, const QJsonObject &value)
 {
     m_correction.insert(key, value);
@@ -173,11 +186,13 @@ void PositionCorrectionDialog::setBinding(const QString &key, const QJsonObject 
         edit->setText(value.value(QStringLiteral("displayPath")).toString());
 }
 
+// 返回指定配置键对应的绑定 JSON；键不存在时返回空对象。
 QJsonObject PositionCorrectionDialog::binding(const QString &key) const
 {
     return m_correction.value(key).toObject();
 }
 
+// 加载已有实例配置，同时强制保持位置修正的工具类型和定位分类。
 void PositionCorrectionDialog::loadFromConfig(const ToolConfig &config)
 {
     m_config = config;
@@ -192,6 +207,7 @@ void PositionCorrectionDialog::loadFromConfig(const ToolConfig &config)
     updateTemplateButtons();
 }
 
+// 将当前 UI 状态写回 ToolConfig，并明确标记位置修正后端尚未实现。
 ToolConfig PositionCorrectionDialog::toolConfig() const
 {
     ToolConfig config = m_config;
@@ -204,11 +220,13 @@ ToolConfig PositionCorrectionDialog::toolConfig() const
     return config;
 }
 
+// UI 第一阶段不生成工具专属预览快照，返回空快照避免伪造结果。
 ToolPreviewSnapshot PositionCorrectionDialog::referencePreviewSnapshot() const
 {
     return ToolPreviewSnapshot();
 }
 
+// 根据 templateRegionType 同步两个互斥模板按钮的选中状态。
 void PositionCorrectionDialog::updateTemplateButtons()
 {
     const QString type = m_correction.value(QStringLiteral("templateRegionType"))
@@ -217,6 +235,7 @@ void PositionCorrectionDialog::updateTemplateButtons()
     ui->polygonTemplateButton->setChecked(type == QStringLiteral("polygon"));
 }
 
+// 测试或创建基准时优先检查基准图，再显示统一的未实现提示。
 void PositionCorrectionDialog::showNotImplemented()
 {
     if (ReferenceImageProvider::instance().referenceImage().isNull()) {
@@ -226,8 +245,9 @@ void PositionCorrectionDialog::showNotImplemented()
     ui->statusLabel->setText(tr("位置修正后端尚未实现"));
 }
 
+// 确保运行点 X、Y 和角度均包含有效的来源 ID 与输出字段键。
 bool PositionCorrectionDialog::validateForFinish()
-{
+{   
     const QStringList keys{QStringLiteral("runPointX"),
                            QStringLiteral("runPointY"),
                            QStringLiteral("runAngle")};
@@ -241,3 +261,6 @@ bool PositionCorrectionDialog::validateForFinish()
     }
     return true;
 }
+
+
+

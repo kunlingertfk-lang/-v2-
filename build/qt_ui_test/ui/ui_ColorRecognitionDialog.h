@@ -14,6 +14,7 @@
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDialog>
+#include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QFrame>
 #include <QtWidgets/QGraphicsView>
 #include <QtWidgets/QHBoxLayout>
@@ -101,6 +102,15 @@ public:
     QHBoxLayout *minScoreLayout;
     QLabel *minScoreLabel;
     QSpinBox *minScoreSpinBox;
+    QHBoxLayout *gmmRejectionLayout;
+    QLabel *gmmRejectionLabel;
+    QDoubleSpinBox *gmmRejectionSpinBox;
+    QHBoxLayout *minCategoryConfidenceLayout;
+    QLabel *minCategoryConfidenceLabel;
+    QSpinBox *minCategoryConfidenceSpinBox;
+    QHBoxLayout *minClassifiedCoverageLayout;
+    QLabel *minClassifiedCoverageLabel;
+    QSpinBox *minClassifiedCoverageSpinBox;
     QHBoxLayout *expectedLabelLayout;
     QLabel *expectedLabelTitleLabel;
     QComboBox *expectedLabelComboBox;
@@ -506,6 +516,62 @@ public:
 
         judgeLayout->addLayout(minScoreLayout);
 
+        gmmRejectionLayout = new QHBoxLayout();
+        gmmRejectionLayout->setObjectName(QString::fromUtf8("gmmRejectionLayout"));
+        gmmRejectionLabel = new QLabel(judgeCard);
+        gmmRejectionLabel->setObjectName(QString::fromUtf8("gmmRejectionLabel"));
+        gmmRejectionLabel->setMinimumWidth(118);
+
+        gmmRejectionLayout->addWidget(gmmRejectionLabel);
+
+        gmmRejectionSpinBox = new QDoubleSpinBox(judgeCard);
+        gmmRejectionSpinBox->setObjectName(QString::fromUtf8("gmmRejectionSpinBox"));
+        gmmRejectionSpinBox->setMaximum(1.000000000000000);
+        gmmRejectionSpinBox->setSingleStep(0.000100000000000);
+        gmmRejectionSpinBox->setDecimals(6);
+        gmmRejectionSpinBox->setValue(0.000100000000000);
+
+        gmmRejectionLayout->addWidget(gmmRejectionSpinBox);
+
+
+        judgeLayout->addLayout(gmmRejectionLayout);
+
+        minCategoryConfidenceLayout = new QHBoxLayout();
+        minCategoryConfidenceLayout->setObjectName(QString::fromUtf8("minCategoryConfidenceLayout"));
+        minCategoryConfidenceLabel = new QLabel(judgeCard);
+        minCategoryConfidenceLabel->setObjectName(QString::fromUtf8("minCategoryConfidenceLabel"));
+        minCategoryConfidenceLabel->setMinimumWidth(118);
+
+        minCategoryConfidenceLayout->addWidget(minCategoryConfidenceLabel);
+
+        minCategoryConfidenceSpinBox = new QSpinBox(judgeCard);
+        minCategoryConfidenceSpinBox->setObjectName(QString::fromUtf8("minCategoryConfidenceSpinBox"));
+        minCategoryConfidenceSpinBox->setMaximum(100);
+        minCategoryConfidenceSpinBox->setValue(80);
+
+        minCategoryConfidenceLayout->addWidget(minCategoryConfidenceSpinBox);
+
+
+        judgeLayout->addLayout(minCategoryConfidenceLayout);
+
+        minClassifiedCoverageLayout = new QHBoxLayout();
+        minClassifiedCoverageLayout->setObjectName(QString::fromUtf8("minClassifiedCoverageLayout"));
+        minClassifiedCoverageLabel = new QLabel(judgeCard);
+        minClassifiedCoverageLabel->setObjectName(QString::fromUtf8("minClassifiedCoverageLabel"));
+        minClassifiedCoverageLabel->setMinimumWidth(118);
+
+        minClassifiedCoverageLayout->addWidget(minClassifiedCoverageLabel);
+
+        minClassifiedCoverageSpinBox = new QSpinBox(judgeCard);
+        minClassifiedCoverageSpinBox->setObjectName(QString::fromUtf8("minClassifiedCoverageSpinBox"));
+        minClassifiedCoverageSpinBox->setMaximum(100);
+        minClassifiedCoverageSpinBox->setValue(90);
+
+        minClassifiedCoverageLayout->addWidget(minClassifiedCoverageSpinBox);
+
+
+        judgeLayout->addLayout(minClassifiedCoverageLayout);
+
         expectedLabelLayout = new QHBoxLayout();
         expectedLabelLayout->setObjectName(QString::fromUtf8("expectedLabelLayout"));
         expectedLabelTitleLabel = new QLabel(judgeCard);
@@ -719,11 +785,17 @@ public:
 
         colorDecisionModeLabel->setText(QCoreApplication::translate("ColorRecognitionDialog", "\345\210\244\345\210\253\346\226\271\345\274\217", nullptr));
         colorDecisionModeLabel->setProperty("role", QVariant(QCoreApplication::translate("ColorRecognitionDialog", "rowField", nullptr)));
-        colorDecisionModeComboBox->setItemText(0, QCoreApplication::translate("ColorRecognitionDialog", "\344\270\273\351\242\234\350\211\262\345\215\240\346\257\224", nullptr));
+        colorDecisionModeComboBox->setItemText(0, QCoreApplication::translate("ColorRecognitionDialog", "\347\261\273\345\210\253\347\233\270\344\274\274\345\272\246", nullptr));
         colorDecisionModeComboBox->setItemText(1, QCoreApplication::translate("ColorRecognitionDialog", "\346\225\264\344\275\223\347\233\270\344\274\274\345\272\246", nullptr));
 
         minScoreLabel->setText(QCoreApplication::translate("ColorRecognitionDialog", "\346\234\200\344\275\216\345\276\227\345\210\206", nullptr));
         minScoreLabel->setProperty("role", QVariant(QCoreApplication::translate("ColorRecognitionDialog", "rowField", nullptr)));
+        gmmRejectionLabel->setText(QCoreApplication::translate("ColorRecognitionDialog", "\345\203\217\347\264\240\346\213\222\350\257\206\351\230\210\345\200\274", nullptr));
+        gmmRejectionLabel->setProperty("role", QVariant(QCoreApplication::translate("ColorRecognitionDialog", "rowField", nullptr)));
+        minCategoryConfidenceLabel->setText(QCoreApplication::translate("ColorRecognitionDialog", "\346\234\200\344\275\216\347\261\273\345\210\253\347\275\256\344\277\241\345\272\246", nullptr));
+        minCategoryConfidenceLabel->setProperty("role", QVariant(QCoreApplication::translate("ColorRecognitionDialog", "rowField", nullptr)));
+        minClassifiedCoverageLabel->setText(QCoreApplication::translate("ColorRecognitionDialog", "\346\234\200\344\275\216\345\210\206\347\261\273\350\246\206\347\233\226\347\216\207", nullptr));
+        minClassifiedCoverageLabel->setProperty("role", QVariant(QCoreApplication::translate("ColorRecognitionDialog", "rowField", nullptr)));
         expectedLabelTitleLabel->setText(QCoreApplication::translate("ColorRecognitionDialog", "\347\233\256\346\240\207\347\261\273\345\210\253", nullptr));
         expectedLabelTitleLabel->setProperty("role", QVariant(QCoreApplication::translate("ColorRecognitionDialog", "rowField", nullptr)));
         allTemplateCard->setProperty("panelRole", QVariant(QCoreApplication::translate("ColorRecognitionDialog", "configCard", nullptr)));

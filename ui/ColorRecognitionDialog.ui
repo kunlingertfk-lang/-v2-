@@ -244,13 +244,31 @@ QGraphicsView { border:1px solid #ff7a00; background:#ffffff; color:#111827; }</
                <item>
                 <layout class="QHBoxLayout" name="colorDecisionModeLayout">
                  <item><widget class="QLabel" name="colorDecisionModeLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>判别方式</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
-                 <item><widget class="QComboBox" name="colorDecisionModeComboBox"><item><property name="text"><string>主颜色占比</string></property></item><item><property name="text"><string>整体相似度</string></property></item></widget></item>
+                 <item><widget class="QComboBox" name="colorDecisionModeComboBox"><item><property name="text"><string>类别相似度</string></property></item><item><property name="text"><string>整体相似度</string></property></item></widget></item>
                 </layout>
                </item>
                <item>
                 <layout class="QHBoxLayout" name="minScoreLayout">
                  <item><widget class="QLabel" name="minScoreLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>最低得分</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
                  <item><widget class="QSpinBox" name="minScoreSpinBox"><property name="maximum"><number>100</number></property><property name="value"><number>80</number></property></widget></item>
+                </layout>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="gmmRejectionLayout">
+                 <item><widget class="QLabel" name="gmmRejectionLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>像素拒识阈值</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
+                 <item><widget class="QDoubleSpinBox" name="gmmRejectionSpinBox"><property name="maximum"><double>1.000000000000000</double></property><property name="singleStep"><double>0.000100000000000</double></property><property name="decimals"><number>6</number></property><property name="value"><double>0.000100000000000</double></property></widget></item>
+                </layout>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="minCategoryConfidenceLayout">
+                 <item><widget class="QLabel" name="minCategoryConfidenceLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>最低类别置信度</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
+                 <item><widget class="QSpinBox" name="minCategoryConfidenceSpinBox"><property name="maximum"><number>100</number></property><property name="value"><number>80</number></property></widget></item>
+                </layout>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="minClassifiedCoverageLayout">
+                 <item><widget class="QLabel" name="minClassifiedCoverageLabel"><property name="minimumWidth"><number>118</number></property><property name="text"><string>最低分类覆盖率</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item>
+                 <item><widget class="QSpinBox" name="minClassifiedCoverageSpinBox"><property name="maximum"><number>100</number></property><property name="value"><number>90</number></property></widget></item>
                 </layout>
                </item>
                <item>

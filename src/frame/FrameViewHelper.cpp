@@ -35,6 +35,10 @@ namespace {
 
 const int kMaxOverlayTextChars = 32;
 
+bool finiteValue(qreal value);
+bool finitePoint(const QPointF &point);
+bool finiteRect(const QRectF &rect);
+
 QPen cosmeticPen(const QColor &color, const qreal width = 2.0)
 {
     QPen pen(color, width);
@@ -44,6 +48,21 @@ QPen cosmeticPen(const QColor &color, const qreal width = 2.0)
 
 QColor overlayColor(const ToolOverlay &overlay)
 {
+    const QString displayRole = overlay.extra.value(
+                QStringLiteral("displayRole")).toString();
+    if (displayRole == QStringLiteral("color_template_roi"))
+        return QColor(255, 122, 0);
+    if (displayRole == QStringLiteral("color_template_mask"))
+        return QColor(255, 82, 45);
+    if (displayRole == QStringLiteral("color_detect_roi"))
+        return QColor(0, 210, 220);
+    if (displayRole == QStringLiteral("color_detect_mask"))
+        return QColor(40, 130, 255);
+    if (displayRole == QStringLiteral("template_location_model"))
+        return QColor(255, 122, 0);
+    if (displayRole == QStringLiteral("template_location_origin"))
+        return QColor(0, 210, 255);
+
     const QString label = overlay.label.trimmed().toLower();
     if (label == QStringLiteral("roi") || label == QStringLiteral("detect_roi"))
         return QColor(255, 122, 0);
@@ -96,11 +115,81 @@ QColor overlayColor(const ToolOverlay &overlay)
     if (label == QStringLiteral("match_result") ||
         label == QStringLiteral("match_rect") ||
         label == QStringLiteral("match_bbox") ||
-        label == QStringLiteral("match_center"))
+        label == QStringLiteral("match_center") ||
+        label == QStringLiteral("match_score"))
         return QColor(0, 200, 120);
     if (overlay.type == ToolOverlayType::Text)
         return QColor(255, 255, 255);
     return QColor(0, 200, 120);
+}
+
+QString overlayDisplayRole(const ToolOverlay &overlay)
+{
+    return overlay.extra.value(QStringLiteral("displayRole")).toString();
+}
+
+QPen styledOverlayPen(const ToolOverlay &overlay, const QColor &color)
+{
+    const QString emphasis = overlay.extra.value(
+                QStringLiteral("emphasis")).toString();
+    QPen pen = cosmeticPen(color, emphasis == QStringLiteral("active")
+                           ? 3.5 : 2.0);
+    if (overlayDisplayRole(overlay).endsWith(QStringLiteral("_mask")))
+        pen.setStyle(Qt::DashLine);
+    return pen;
+}
+
+QBrush styledOverlayBrush(const ToolOverlay &overlay, const QColor &color)
+{
+    if (!overlayDisplayRole(overlay).endsWith(QStringLiteral("_mask")))
+        return Qt::NoBrush;
+    QColor fill = color;
+    fill.setAlpha(72);
+    return QBrush(fill, Qt::BDiagPattern);
+}
+
+qreal styledOverlayOpacity(const ToolOverlay &overlay)
+{
+    return overlay.extra.value(QStringLiteral("emphasis")).toString()
+            == QStringLiteral("muted") ? 0.30 : 1.0;
+}
+
+QPainterPath polygonPath(const QPolygonF &polygon)
+{
+    QPainterPath path;
+    if (polygon.size() < 3)
+        return path;
+    path.addPolygon(polygon);
+    path.closeSubpath();
+    return path;
+}
+
+QPainterPath overlayClipPath(const ToolOverlay &overlay)
+{
+    const QJsonObject clip = overlay.extra.value(
+                QStringLiteral("clipGeometry")).toObject();
+    const QString type = clip.value(QStringLiteral("type")).toString();
+    QPainterPath path;
+    if (type == QStringLiteral("rect")) {
+        const QJsonObject rect = clip.value(QStringLiteral("rect")).toObject();
+        const QRectF geometry(rect.value(QStringLiteral("x")).toDouble(),
+                              rect.value(QStringLiteral("y")).toDouble(),
+                              rect.value(QStringLiteral("width")).toDouble(),
+                              rect.value(QStringLiteral("height")).toDouble());
+        if (finiteRect(geometry) && geometry.width() > 0.0
+                && geometry.height() > 0.0)
+            path.addRect(geometry.normalized());
+    } else if (type == QStringLiteral("circle")) {
+        const QJsonObject center = clip.value(
+                    QStringLiteral("center")).toObject();
+        const QPointF point(center.value(QStringLiteral("x")).toDouble(),
+                            center.value(QStringLiteral("y")).toDouble());
+        const qreal radius = clip.value(QStringLiteral("radius")).toDouble();
+        if (finitePoint(point) && finiteValue(radius) && radius > 0.0) {
+            path.addEllipse(point, radius, radius);
+        }
+    }
+    return path;
 }
 
 qreal overlayZValue(const ToolOverlay &overlay)
@@ -289,6 +378,7 @@ void FrameViewHelper::clear()
     m_view->resetTransform();
     m_viewScale = 1.0;
     m_isFitToView = true;
+    emit viewTransformChanged(m_viewScale, m_isFitToView);
     m_view->viewport()->update();
 }
 
@@ -302,6 +392,7 @@ void FrameViewHelper::fitToView()
     m_view->fitInView(m_imageRect, Qt::KeepAspectRatio);
     m_viewScale = 1.0;
     m_isFitToView = true;
+    emit viewTransformChanged(m_viewScale, m_isFitToView);
 }
 
 bool FrameViewHelper::hasImage() const
@@ -332,6 +423,20 @@ qreal FrameViewHelper::viewScale() const
 bool FrameViewHelper::isFitToView() const
 {
     return m_isFitToView;
+}
+
+void FrameViewHelper::zoomIn()
+{
+    if (!m_navigationEnabled || !m_view)
+        return;
+    applyWheelZoom(m_view->viewport()->rect().center(), 120);
+}
+
+void FrameViewHelper::zoomOut()
+{
+    if (!m_navigationEnabled || !m_view)
+        return;
+    applyWheelZoom(m_view->viewport()->rect().center(), -120);
 }
 
 QPointF FrameViewHelper::viewToImage(const QPoint &viewPos) const
@@ -374,6 +479,8 @@ QSize FrameViewHelper::imageSize() const
 
 void FrameViewHelper::setRoiDrawingEnabled(bool enabled)
 {
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
     if (enabled && m_polygonDrawingEnabled)
         setPolygonDrawingEnabled(false);
     if (enabled && m_circleDrawingEnabled)
@@ -428,6 +535,8 @@ void FrameViewHelper::clearRoi()
 
 void FrameViewHelper::setPolygonDrawingEnabled(bool enabled)
 {
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
     if (enabled && m_roiDrawingEnabled)
         setRoiDrawingEnabled(false);
     if (enabled && m_circleDrawingEnabled)
@@ -509,6 +618,8 @@ void FrameViewHelper::clearPolygonRoi()
 
 void FrameViewHelper::setCircleDrawingEnabled(bool enabled)
 {
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
     if (enabled && m_roiDrawingEnabled)
         setRoiDrawingEnabled(false);
     if (enabled && m_polygonDrawingEnabled)
@@ -535,6 +646,31 @@ void FrameViewHelper::setCircleDrawingEnabled(bool enabled)
 bool FrameViewHelper::isCircleDrawingEnabled() const
 {
     return m_circleDrawingEnabled;
+}
+
+void FrameViewHelper::setPointSelectionEnabled(bool enabled)
+{
+    if (enabled && m_roiDrawingEnabled)
+        setRoiDrawingEnabled(false);
+    if (enabled && m_polygonDrawingEnabled)
+        setPolygonDrawingEnabled(false);
+    if (enabled && m_circleDrawingEnabled)
+        setCircleDrawingEnabled(false);
+    if (enabled && m_lineBandDrawingEnabled)
+        setLineBandDrawingEnabled(false);
+
+    m_pointSelectionEnabled = enabled;
+    if (m_view && m_view->viewport()) {
+        if (enabled)
+            m_view->viewport()->setCursor(Qt::CrossCursor);
+        else
+            m_view->viewport()->unsetCursor();
+    }
+}
+
+bool FrameViewHelper::isPointSelectionEnabled() const
+{
+    return m_pointSelectionEnabled;
 }
 
 void FrameViewHelper::setCircleRoiNormalized(const CircleRoi &roi)
@@ -570,6 +706,8 @@ void FrameViewHelper::clearCircleRoi()
 
 void FrameViewHelper::setLineBandDrawingEnabled(bool enabled)
 {
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
     if (enabled && m_roiDrawingEnabled)
         setRoiDrawingEnabled(false);
     if (enabled && m_polygonDrawingEnabled)
@@ -660,6 +798,9 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
 
     for (const ToolOverlay &overlay : overlays) {
         const QColor color = overlayColor(overlay);
+        const QPen pen = styledOverlayPen(overlay, color);
+        const QBrush brush = styledOverlayBrush(overlay, color);
+        const qreal opacity = styledOverlayOpacity(overlay);
         switch (overlay.type) {
         case ToolOverlayType::Rect: {
             if (!finiteRect(overlay.rect))
@@ -669,8 +810,8 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
             if (rect.width() <= 0.0 || rect.height() <= 0.0)
                 break;
 
-            QGraphicsRectItem *item = m_scene->addRect(rect,
-                                                       cosmeticPen(color, 2.0));
+            QGraphicsRectItem *item = m_scene->addRect(rect, pen, brush);
+            item->setOpacity(opacity);
             item->setToolTip(overlay.label);
             addOverlayItem(item, overlayZValue(overlay));
             break;
@@ -681,7 +822,8 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
 
             QGraphicsLineItem *item = m_scene->addLine(QLineF(clampedImagePoint(overlay.p1),
                                                              clampedImagePoint(overlay.p2)),
-                                                       cosmeticPen(color, 2.0));
+                                                       pen);
+            item->setOpacity(opacity);
             item->setToolTip(overlay.label);
             addOverlayItem(item, overlayZValue(overlay));
             break;
@@ -699,7 +841,8 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
             if (clampedRect.width() <= 0.0 || clampedRect.height() <= 0.0)
                 break;
 
-            QGraphicsEllipseItem *item = m_scene->addEllipse(clampedRect, cosmeticPen(color, 2.0));
+            QGraphicsEllipseItem *item = m_scene->addEllipse(clampedRect, pen, brush);
+            item->setOpacity(opacity);
             item->setToolTip(overlay.label);
             addOverlayItem(item, overlayZValue(overlay));
             break;
@@ -716,9 +859,40 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
             if (polygon.size() < 3)
                 break;
 
-            QGraphicsPolygonItem *item = m_scene->addPolygon(polygon, cosmeticPen(color, 2.0));
-            item->setToolTip(overlay.label);
-            addOverlayItem(item, overlayZValue(overlay));
+            const QPainterPath originalPath = polygonPath(polygon);
+            const QPainterPath clipPath = overlayClipPath(overlay);
+            if (!clipPath.isEmpty()
+                    && overlayDisplayRole(overlay).endsWith(
+                        QStringLiteral("_mask"))) {
+                const QPainterPath effectivePath = originalPath.intersected(
+                            clipPath);
+                if (!effectivePath.isEmpty()) {
+                    QGraphicsPathItem *item = m_scene->addPath(
+                                effectivePath, pen, brush);
+                    item->setOpacity(opacity);
+                    item->setToolTip(overlay.label);
+                    addOverlayItem(item, overlayZValue(overlay));
+                }
+                const QPainterPath outsidePath = originalPath.subtracted(
+                            clipPath);
+                if (!outsidePath.isEmpty()) {
+                    QPen outsidePen = cosmeticPen(QColor(255, 70, 70), 2.0);
+                    outsidePen.setStyle(Qt::DashLine);
+                    QGraphicsPathItem *outside = m_scene->addPath(
+                                outsidePath, outsidePen, Qt::NoBrush);
+                    outside->setOpacity(opacity);
+                    outside->setToolTip(
+                                QStringLiteral("%1 (outside owner ROI)")
+                                .arg(overlay.label));
+                    addOverlayItem(outside, overlayZValue(overlay) + 0.1);
+                }
+            } else {
+                QGraphicsPolygonItem *item = m_scene->addPolygon(
+                            polygon, pen, brush);
+                item->setOpacity(opacity);
+                item->setToolTip(overlay.label);
+                addOverlayItem(item, overlayZValue(overlay));
+            }
             break;
         }
         case ToolOverlayType::Text: {
@@ -736,6 +910,7 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
             }
             item->setBrush(QBrush(color));
             item->setPen(cosmeticPen(QColor(0, 0, 0), 1.0));
+            item->setOpacity(opacity);
             QPointF textPosition = clampedImagePoint(overlay.p1);
             const QRectF anchorRect = rectFromOverlayExtra(overlay.extra).intersected(m_imageRect);
             if (overlay.label.trimmed().compare(QStringLiteral("color_result_text"), Qt::CaseInsensitive) == 0 &&
@@ -789,7 +964,8 @@ void FrameViewHelper::clearToolOverlays()
 bool FrameViewHelper::drawingInteractionActive() const
 {
     return m_roiDrawingEnabled || m_polygonDrawingEnabled ||
-            m_circleDrawingEnabled || m_lineBandDrawingEnabled;
+            m_circleDrawingEnabled || m_lineBandDrawingEnabled ||
+            m_pointSelectionEnabled;
 }
 
 bool FrameViewHelper::navigationGestureAllowed(Qt::KeyboardModifiers modifiers) const
@@ -834,6 +1010,7 @@ void FrameViewHelper::applyWheelZoom(const QPoint &viewPosition, int angleDeltaY
     m_view->setTransformationAnchor(anchor);
     m_viewScale = next;
     m_isFitToView = qFuzzyCompare(next, 1.0);
+    emit viewTransformChanged(m_viewScale, m_isFitToView);
 }
 
 void FrameViewHelper::beginPan(const QPoint &viewPosition)
@@ -926,6 +1103,25 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
             if (mouseEvent->button() == Qt::LeftButton &&
                 !drawingInteractionActive()) {
                 fitToView();
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_pointSelectionEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                setPointSelectionEnabled(false);
+                return true;
+            }
+        }
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                QPointF imagePoint;
+                if (viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    emit pointSelected(imagePointToNormalized(imagePoint));
                 return true;
             }
         }

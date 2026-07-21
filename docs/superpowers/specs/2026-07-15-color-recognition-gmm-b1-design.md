@@ -1,7 +1,7 @@
 # 颜色识别 CIELAB GMM 阶段 B1 设计
 
 日期：2026-07-15
-状态：待实施
+状态：B1 核心已实施（2026-07-16）
 上位设计：`docs/FID/ColorRecognition/颜色识别算法V2整理设计.md`
 
 ## 1. 目标与边界
@@ -66,7 +66,11 @@ HALCON runtime 按 `Gmm` profile 延迟加载。缺少 GMM 符号只影响 GMM �
 - `colorChannels = ab | lab`，默认 `ab`。
 - 固定 `maxSamplesPerClass = 10000`。
 - 固定训练合同：full covariance、none preprocessing、seed 42、MaxIter 100、Threshold 1e-4、uniform priors、Regularize 1e-4。
-- 固定 `samplingAlgorithmVersion`。
+- 固定 `samplingAlgorithmVersion`。当前为
+  `halcon_region_grid_points_v3`：类别间按最小可用像素数均衡，类别内先均衡分配到各 ROI；
+  C++ 只计算不超过配额且最接近 ROI 纵横比的离散二维网格密度，实际采样区域由 HALCON
+  `gen_grid_region('points')`、`move_region` 和 `intersection` 生成。因离散步长限制，实际数可略低于请求数，
+  两者均进入诊断与模型 hash。采样版本进入 `buildParamsHash`，V2 及更早模型加载后必须标记 `stale` 并重新训练。
 
 这些训练参数首版不开放普通 UI。检测期 rejection 阈值不进入本建模配置和模型 hash。
 

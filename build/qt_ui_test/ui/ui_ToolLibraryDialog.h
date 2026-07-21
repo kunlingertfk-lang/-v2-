@@ -64,7 +64,6 @@ public:
     QToolButton *pointMeasureButton;
     QToolButton *lineMeasureButton;
     QToolButton *contrastMeasureButton;
-    QToolButton *positionCorrectionToolButton;
     QToolButton *grayAreaToolButton;
     QToolButton *gapMeasureButton;
     QToolButton *widthMeasureButton;
@@ -112,6 +111,7 @@ public:
     QToolButton *templateLocationButton;
     QToolButton *edgeLocationButton;
     QToolButton *circleLocationButton;
+    QToolButton *positionCorrectionToolButton;
     QFrame *deepLearningCategoryFrame;
     QGridLayout *gridLayout_deepLearningCategoryFrame;
     QLabel *deepLearningCategoryFrameTitleLabel;
@@ -486,18 +486,6 @@ public:
 
         gridLayout_measurementCategoryFrame->addWidget(contrastMeasureButton, 1, 2, 1, 1);
 
-        positionCorrectionToolButton = new QToolButton(measurementCategoryFrame);
-        positionCorrectionToolButton->setObjectName(QString::fromUtf8("positionCorrectionToolButton"));
-        positionCorrectionToolButton->setMinimumSize(QSize(132, 118));
-        QIcon icon2;
-        icon2.addFile(QString::fromUtf8(":/icons/fit.svg"), QSize(), QIcon::Normal, QIcon::Off);
-        positionCorrectionToolButton->setIcon(icon2);
-        positionCorrectionToolButton->setIconSize(QSize(46, 46));
-        positionCorrectionToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-        positionCorrectionToolButton->setProperty("toolCard", QVariant(true));
-
-        gridLayout_measurementCategoryFrame->addWidget(positionCorrectionToolButton, 1, 3, 1, 1);
-
         grayAreaToolButton = new QToolButton(measurementCategoryFrame);
         grayAreaToolButton->setObjectName(QString::fromUtf8("grayAreaToolButton"));
         grayAreaToolButton->setMinimumSize(QSize(132, 118));
@@ -610,9 +598,9 @@ public:
         counterToolButton = new QToolButton(countCategoryFrame);
         counterToolButton->setObjectName(QString::fromUtf8("counterToolButton"));
         counterToolButton->setMinimumSize(QSize(132, 118));
-        QIcon icon3;
-        icon3.addFile(QString::fromUtf8(":/icons/tool.svg"), QSize(), QIcon::Normal, QIcon::Off);
-        counterToolButton->setIcon(icon3);
+        QIcon icon2;
+        icon2.addFile(QString::fromUtf8(":/icons/tool.svg"), QSize(), QIcon::Normal, QIcon::Off);
+        counterToolButton->setIcon(icon2);
         counterToolButton->setIconSize(QSize(46, 46));
         counterToolButton->setCheckable(true);
         counterToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -623,7 +611,7 @@ public:
         areaCounterButton = new QToolButton(countCategoryFrame);
         areaCounterButton->setObjectName(QString::fromUtf8("areaCounterButton"));
         areaCounterButton->setMinimumSize(QSize(132, 118));
-        areaCounterButton->setIcon(icon3);
+        areaCounterButton->setIcon(icon2);
         areaCounterButton->setIconSize(QSize(46, 46));
         areaCounterButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         areaCounterButton->setProperty("toolCard", QVariant(true));
@@ -633,7 +621,7 @@ public:
         edgeCounterButton = new QToolButton(countCategoryFrame);
         edgeCounterButton->setObjectName(QString::fromUtf8("edgeCounterButton"));
         edgeCounterButton->setMinimumSize(QSize(132, 118));
-        edgeCounterButton->setIcon(icon3);
+        edgeCounterButton->setIcon(icon2);
         edgeCounterButton->setIconSize(QSize(46, 46));
         edgeCounterButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         edgeCounterButton->setProperty("toolCard", QVariant(true));
@@ -661,9 +649,9 @@ public:
         ocrToolButton = new QToolButton(recognitionCategoryFrame);
         ocrToolButton->setObjectName(QString::fromUtf8("ocrToolButton"));
         ocrToolButton->setMinimumSize(QSize(132, 118));
-        QIcon icon4;
-        icon4.addFile(QString::fromUtf8(":/icons/tool-step.svg"), QSize(), QIcon::Normal, QIcon::Off);
-        ocrToolButton->setIcon(icon4);
+        QIcon icon3;
+        icon3.addFile(QString::fromUtf8(":/icons/tool-step.svg"), QSize(), QIcon::Normal, QIcon::Off);
+        ocrToolButton->setIcon(icon3);
         ocrToolButton->setIconSize(QSize(46, 46));
         ocrToolButton->setCheckable(true);
         ocrToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -674,9 +662,9 @@ public:
         codeToolButton = new QToolButton(recognitionCategoryFrame);
         codeToolButton->setObjectName(QString::fromUtf8("codeToolButton"));
         codeToolButton->setMinimumSize(QSize(132, 118));
-        QIcon icon5;
-        icon5.addFile(QString::fromUtf8(":/icons/zoom.svg"), QSize(), QIcon::Normal, QIcon::Off);
-        codeToolButton->setIcon(icon5);
+        QIcon icon4;
+        icon4.addFile(QString::fromUtf8(":/icons/zoom.svg"), QSize(), QIcon::Normal, QIcon::Off);
+        codeToolButton->setIcon(icon4);
         codeToolButton->setIconSize(QSize(46, 46));
         codeToolButton->setCheckable(true);
         codeToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -754,9 +742,9 @@ public:
         presenceToolButton = new QToolButton(presenceCategoryFrame);
         presenceToolButton->setObjectName(QString::fromUtf8("presenceToolButton"));
         presenceToolButton->setMinimumSize(QSize(132, 118));
-        QIcon icon6;
-        icon6.addFile(QString::fromUtf8(":/icons/eye.svg"), QSize(), QIcon::Normal, QIcon::Off);
-        presenceToolButton->setIcon(icon6);
+        QIcon icon5;
+        icon5.addFile(QString::fromUtf8(":/icons/eye.svg"), QSize(), QIcon::Normal, QIcon::Off);
+        presenceToolButton->setIcon(icon5);
         presenceToolButton->setIconSize(QSize(46, 46));
         presenceToolButton->setCheckable(true);
         presenceToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -767,7 +755,7 @@ public:
         circlePresenceButton = new QToolButton(presenceCategoryFrame);
         circlePresenceButton->setObjectName(QString::fromUtf8("circlePresenceButton"));
         circlePresenceButton->setMinimumSize(QSize(132, 118));
-        circlePresenceButton->setIcon(icon6);
+        circlePresenceButton->setIcon(icon5);
         circlePresenceButton->setIconSize(QSize(46, 46));
         circlePresenceButton->setCheckable(true);
         circlePresenceButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -778,7 +766,7 @@ public:
         blobPresenceButton = new QToolButton(presenceCategoryFrame);
         blobPresenceButton->setObjectName(QString::fromUtf8("blobPresenceButton"));
         blobPresenceButton->setMinimumSize(QSize(132, 118));
-        blobPresenceButton->setIcon(icon6);
+        blobPresenceButton->setIcon(icon5);
         blobPresenceButton->setIconSize(QSize(46, 46));
         blobPresenceButton->setCheckable(true);
         blobPresenceButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -789,7 +777,7 @@ public:
         edgePresenceButton = new QToolButton(presenceCategoryFrame);
         edgePresenceButton->setObjectName(QString::fromUtf8("edgePresenceButton"));
         edgePresenceButton->setMinimumSize(QSize(132, 118));
-        edgePresenceButton->setIcon(icon6);
+        edgePresenceButton->setIcon(icon5);
         edgePresenceButton->setIconSize(QSize(46, 46));
         edgePresenceButton->setCheckable(true);
         edgePresenceButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -800,7 +788,7 @@ public:
         linePresenceButton = new QToolButton(presenceCategoryFrame);
         linePresenceButton->setObjectName(QString::fromUtf8("linePresenceButton"));
         linePresenceButton->setMinimumSize(QSize(132, 118));
-        linePresenceButton->setIcon(icon6);
+        linePresenceButton->setIcon(icon5);
         linePresenceButton->setIconSize(QSize(46, 46));
         linePresenceButton->setCheckable(true);
         linePresenceButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -811,7 +799,7 @@ public:
         contourPresenceButton = new QToolButton(presenceCategoryFrame);
         contourPresenceButton->setObjectName(QString::fromUtf8("contourPresenceButton"));
         contourPresenceButton->setMinimumSize(QSize(132, 118));
-        contourPresenceButton->setIcon(icon6);
+        contourPresenceButton->setIcon(icon5);
         contourPresenceButton->setIconSize(QSize(46, 46));
         contourPresenceButton->setCheckable(true);
         contourPresenceButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -846,9 +834,9 @@ public:
         judgeToolButton = new QToolButton(logicCategoryFrame);
         judgeToolButton->setObjectName(QString::fromUtf8("judgeToolButton"));
         judgeToolButton->setMinimumSize(QSize(132, 118));
-        QIcon icon7;
-        icon7.addFile(QString::fromUtf8(":/icons/comm.svg"), QSize(), QIcon::Normal, QIcon::Off);
-        judgeToolButton->setIcon(icon7);
+        QIcon icon6;
+        icon6.addFile(QString::fromUtf8(":/icons/comm.svg"), QSize(), QIcon::Normal, QIcon::Off);
+        judgeToolButton->setIcon(icon6);
         judgeToolButton->setIconSize(QSize(46, 46));
         judgeToolButton->setCheckable(true);
         judgeToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -859,7 +847,7 @@ public:
         conditionToolButton = new QToolButton(logicCategoryFrame);
         conditionToolButton->setObjectName(QString::fromUtf8("conditionToolButton"));
         conditionToolButton->setMinimumSize(QSize(132, 118));
-        conditionToolButton->setIcon(icon7);
+        conditionToolButton->setIcon(icon6);
         conditionToolButton->setIconSize(QSize(46, 46));
         conditionToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         conditionToolButton->setProperty("toolCard", QVariant(true));
@@ -869,7 +857,7 @@ public:
         variableToolButton = new QToolButton(logicCategoryFrame);
         variableToolButton->setObjectName(QString::fromUtf8("variableToolButton"));
         variableToolButton->setMinimumSize(QSize(132, 118));
-        variableToolButton->setIcon(icon7);
+        variableToolButton->setIcon(icon6);
         variableToolButton->setIconSize(QSize(46, 46));
         variableToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         variableToolButton->setProperty("toolCard", QVariant(true));
@@ -879,9 +867,9 @@ public:
         outputLogicButton = new QToolButton(logicCategoryFrame);
         outputLogicButton->setObjectName(QString::fromUtf8("outputLogicButton"));
         outputLogicButton->setMinimumSize(QSize(132, 118));
-        QIcon icon8;
-        icon8.addFile(QString::fromUtf8(":/icons/output.svg"), QSize(), QIcon::Normal, QIcon::Off);
-        outputLogicButton->setIcon(icon8);
+        QIcon icon7;
+        icon7.addFile(QString::fromUtf8(":/icons/output.svg"), QSize(), QIcon::Normal, QIcon::Off);
+        outputLogicButton->setIcon(icon7);
         outputLogicButton->setIconSize(QSize(46, 46));
         outputLogicButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         outputLogicButton->setProperty("toolCard", QVariant(true));
@@ -909,7 +897,9 @@ public:
         templateLocationButton = new QToolButton(locationCategoryFrame);
         templateLocationButton->setObjectName(QString::fromUtf8("templateLocationButton"));
         templateLocationButton->setMinimumSize(QSize(132, 118));
-        templateLocationButton->setIcon(icon2);
+        QIcon icon8;
+        icon8.addFile(QString::fromUtf8(":/icons/fit.svg"), QSize(), QIcon::Normal, QIcon::Off);
+        templateLocationButton->setIcon(icon8);
         templateLocationButton->setIconSize(QSize(46, 46));
         templateLocationButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         templateLocationButton->setProperty("toolCard", QVariant(true));
@@ -919,7 +909,7 @@ public:
         edgeLocationButton = new QToolButton(locationCategoryFrame);
         edgeLocationButton->setObjectName(QString::fromUtf8("edgeLocationButton"));
         edgeLocationButton->setMinimumSize(QSize(132, 118));
-        edgeLocationButton->setIcon(icon2);
+        edgeLocationButton->setIcon(icon8);
         edgeLocationButton->setIconSize(QSize(46, 46));
         edgeLocationButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         edgeLocationButton->setProperty("toolCard", QVariant(true));
@@ -929,12 +919,23 @@ public:
         circleLocationButton = new QToolButton(locationCategoryFrame);
         circleLocationButton->setObjectName(QString::fromUtf8("circleLocationButton"));
         circleLocationButton->setMinimumSize(QSize(132, 118));
-        circleLocationButton->setIcon(icon2);
+        circleLocationButton->setIcon(icon8);
         circleLocationButton->setIconSize(QSize(46, 46));
         circleLocationButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         circleLocationButton->setProperty("toolCard", QVariant(true));
 
         gridLayout_locationCategoryFrame->addWidget(circleLocationButton, 1, 2, 1, 1);
+
+        positionCorrectionToolButton = new QToolButton(locationCategoryFrame);
+        positionCorrectionToolButton->setObjectName(QString::fromUtf8("positionCorrectionToolButton"));
+        positionCorrectionToolButton->setMinimumSize(QSize(132, 118));
+        positionCorrectionToolButton->setIcon(icon8);
+        positionCorrectionToolButton->setIconSize(QSize(46, 46));
+        positionCorrectionToolButton->setCheckable(true);
+        positionCorrectionToolButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        positionCorrectionToolButton->setProperty("toolCard", QVariant(true));
+
+        gridLayout_locationCategoryFrame->addWidget(positionCorrectionToolButton, 1, 3, 1, 1);
 
 
         verticalLayout_toolCategoryContent->addWidget(locationCategoryFrame);
@@ -1007,7 +1008,7 @@ public:
         scratchDefectButton = new QToolButton(defectCategoryFrame);
         scratchDefectButton->setObjectName(QString::fromUtf8("scratchDefectButton"));
         scratchDefectButton->setMinimumSize(QSize(132, 118));
-        scratchDefectButton->setIcon(icon6);
+        scratchDefectButton->setIcon(icon5);
         scratchDefectButton->setIconSize(QSize(46, 46));
         scratchDefectButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         scratchDefectButton->setProperty("toolCard", QVariant(true));
@@ -1017,7 +1018,7 @@ public:
         stainDefectButton = new QToolButton(defectCategoryFrame);
         stainDefectButton->setObjectName(QString::fromUtf8("stainDefectButton"));
         stainDefectButton->setMinimumSize(QSize(132, 118));
-        stainDefectButton->setIcon(icon6);
+        stainDefectButton->setIcon(icon5);
         stainDefectButton->setIconSize(QSize(46, 46));
         stainDefectButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         stainDefectButton->setProperty("toolCard", QVariant(true));
@@ -1027,7 +1028,7 @@ public:
         missingDefectButton = new QToolButton(defectCategoryFrame);
         missingDefectButton->setObjectName(QString::fromUtf8("missingDefectButton"));
         missingDefectButton->setMinimumSize(QSize(132, 118));
-        missingDefectButton->setIcon(icon6);
+        missingDefectButton->setIcon(icon5);
         missingDefectButton->setIconSize(QSize(46, 46));
         missingDefectButton->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         missingDefectButton->setProperty("toolCard", QVariant(true));
@@ -1157,10 +1158,6 @@ public:
         pointMeasureButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\347\202\271\347\202\271\346\265\213\351\207\217", nullptr));
         lineMeasureButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\347\202\271\347\272\277\346\265\213\351\207\217", nullptr));
         contrastMeasureButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\345\257\271\346\257\224\345\272\246\346\265\213\351\207\217", nullptr));
-        positionCorrectionToolButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\344\275\215\347\275\256\344\277\256\346\255\243", nullptr));
-#if QT_CONFIG(tooltip)
-        positionCorrectionToolButton->setToolTip(QCoreApplication::translate("ToolLibraryDialog", "\345\210\233\345\273\272\347\213\254\347\253\213\347\232\204\344\275\215\347\275\256\344\277\256\346\255\243\345\267\245\345\205\267", nullptr));
-#endif // QT_CONFIG(tooltip)
         grayAreaToolButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\347\201\260\345\272\246\351\235\242\347\247\257", nullptr));
         gapMeasureButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\350\212\202\350\267\235\346\265\213\351\207\217", nullptr));
         widthMeasureButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\345\256\275\345\272\246\346\265\213\351\207\217", nullptr));
@@ -1198,6 +1195,10 @@ public:
         templateLocationButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\346\250\241\346\235\277\345\256\232\344\275\215", nullptr));
         edgeLocationButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\350\276\271\347\274\230\345\256\232\344\275\215", nullptr));
         circleLocationButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\345\234\206\345\256\232\344\275\215", nullptr));
+        positionCorrectionToolButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\344\275\215\347\275\256\344\277\256\346\255\243", nullptr));
+#if QT_CONFIG(tooltip)
+        positionCorrectionToolButton->setToolTip(QCoreApplication::translate("ToolLibraryDialog", "\345\210\233\345\273\272\347\213\254\347\253\213\347\232\204\344\275\215\347\275\256\344\277\256\346\255\243\345\267\245\345\205\267", nullptr));
+#endif // QT_CONFIG(tooltip)
         deepLearningCategoryFrameTitleLabel->setText(QCoreApplication::translate("ToolLibraryDialog", "\346\267\261\345\272\246\345\255\246\344\271\240", nullptr));
         dlDetectButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\347\233\256\346\240\207\346\243\200\346\265\213", nullptr));
         FaultDetectButton->setText(QCoreApplication::translate("ToolLibraryDialog", "\345\274\202\345\270\270\346\243\200\346\265\213", nullptr));

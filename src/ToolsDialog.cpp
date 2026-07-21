@@ -41,6 +41,7 @@
 #include "OutputDialog.h"
 #include "PatternPresenceDialog.h"
 #include "PositionCorrectionDialog.h"
+#include "TemplateLocationDialog.h"
 #include "PlanDialogUtils.h"
 #include "ReferenceImageDialog.h"
 #include "RegisteredClassificationDialog.h"
@@ -175,8 +176,9 @@ QString toolIconForType(ToolType type)
     case ToolType::EdgePresence:
     case ToolType::LinePresence:
     case ToolType::ContourPresence:
-    case ToolType::PositionCorrection:
         return QStringLiteral(":/icons/eye.svg");
+    case ToolType::PositionCorrection:
+        return QStringLiteral(":/icons/fit.svg");
     default:
         return QStringLiteral(":/icons/tool.svg");
     }
@@ -602,7 +604,7 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
         break;
 /*============================tfk add=================================*/
     case ToolType::TemplateLocation:
-        qDebug() << "[ToolsDialog] TemplateLocation dialog is not implemented yet.";
+        accepted = runToolConfigDialog<TemplateLocationDialog>(this, nullptr, &config, &snapshot);
         break;
 
 /*============================tfk end=================================*/
@@ -674,6 +676,9 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
         break;
     case ToolType::PositionCorrection:
         accepted = runToolConfigDialog<PositionCorrectionDialog>(this, &originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::TemplateLocation:
+        accepted = runToolConfigDialog<TemplateLocationDialog>(this, &originalConfig, &editedConfig, &snapshot);
         break;
     default:
         qDebug() << "[ToolsDialog] Unsupported tool edit type:" << toolTypeToString(originalConfig.toolType);
@@ -920,6 +925,8 @@ QString ToolsDialog::toolDisplayName(const ToolConfig &config) const
         return tr("分类");
     case ToolType::PositionCorrection:
         return tr("位置修正");
+    case ToolType::TemplateLocation:
+        return tr("模板定位");
     default:
         return toolTypeToString(config.toolType);
     }

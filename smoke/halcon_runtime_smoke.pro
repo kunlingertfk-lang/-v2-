@@ -13,12 +13,12 @@ UI_DIR = $$BUILD_ROOT/ui
 system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 
 INCLUDEPATH += ../src
-INCLUDEPATH += /usr/include/opencv4
-HALCON_ROOT = $$(HALCONROOT)
-!exists($$HALCON_ROOT/include/HalconC.h) {
-    HALCON_ROOT = /home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady
+OPENCV_ROOT = $$(OPENCV_ROOT)
+isEmpty(OPENCV_ROOT) {
+    OPENCV_ROOT = $$(HOME)/.local/opencv-4.8.0
 }
-INCLUDEPATH += $$HALCON_ROOT/include
+INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
+include(../qmake/halcon_20_11.pri)
 
 SOURCES += \
     halcon_runtime_smoke.cpp \
@@ -32,4 +32,6 @@ SOURCES += \
     ../src/algorithms/presence/EdgePresenceHalconRunner.cpp \
     ../src/algorithms/presence/LinePresenceHalconRunner.cpp
 
+LIBS += -L$$OPENCV_ROOT/lib
+LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
 LIBS += -lopencv_core -lopencv_imgproc -lopencv_imgcodecs -ldl

@@ -1,3 +1,4 @@
+
 # 颜色识别 GMM B3 生产检测设计
 
 日期：2026-07-16
@@ -227,7 +228,7 @@ similarityMeaning = accepted_predicted_class_pixel_ratio
 首版默认值：
 
 ```text
-gmmRejectionThreshold = 0.50
+gmmRejectionThreshold = 0.0001
 minScore = 80
 minCategoryConfidence = 80
 minClassifiedCoverage = 90
@@ -275,7 +276,7 @@ GMM 检测配置保存在活动模板或工具稳定节点：
     "cielabGmm": {
       "colorChannels": "ab",
       "maxSamplesPerClass": 10000,
-      "gmmRejectionThreshold": 0.5
+      "gmmRejectionThreshold": 0.0001
     }
   },
   "judgeRule": {
@@ -295,7 +296,7 @@ GMM 检测配置保存在活动模板或工具稳定节点：
 
 颜色识别主 Dialog 在活动模板为 GMM 时显示：
 
-- rejection threshold：`0.00..1.00`，步长 `0.05`，默认 `0.50`。
+- 像素拒识阈值：HALCON K-sigma 概率阈值，`0..1`，显示 6 位小数、步长 `0.0001`、默认 `0.0001`；数值越高拒识越严格，`>=0.01` 显示风险提示。
 - 最低分数：`0..100`。
 - 最低类别置信度：`0..100`，默认 `80`。
 - 最低有效分类覆盖率：`0..100`，默认 `90`。

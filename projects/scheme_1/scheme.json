@@ -596,6 +596,44 @@
         }
     },
     "referenceImage": "reference.png",
+    "referenceInputMetadata": {
+        "bitShift": 0,
+        "colorMode": "color",
+        "originalChannels": 3,
+        "originalDepth": 8,
+        "pixelFormat": "BGR8",
+        "source": "reference",
+        "validBits": 8
+    },
+    "referencePositionCorrection": {
+        "enabled": true,
+        "templatePolygonNormalized": [
+            {
+                "x": 0.08174542682926829,
+                "y": 0.2225609756097561
+            },
+            {
+                "x": 0.46817835365853655,
+                "y": 0.33460365853658536
+            },
+            {
+                "x": 0.3938643292682927,
+                "y": 0.5442073170731707
+            },
+            {
+                "x": 0.10461128048780488,
+                "y": 0.5198170731707317
+            }
+        ],
+        "templateRegionType": "polygon",
+        "templateRoiNormalized": {
+            "height": 0.32164634146341464,
+            "width": 0.3864329268292683,
+            "x": 0.08174542682926829,
+            "y": 0.2225609756097561
+        },
+        "version": 1
+    },
     "schemaVersion": 1,
     "schemeId": "scheme_1",
     "schemeName": "5221",
@@ -801,27 +839,46 @@
             "displayName": "颜色识别",
             "enabled": true,
             "judgeRule": {
-                "minCoveragePercent": 10,
-                "mode": "coverage",
-                "okWhenMatched": true,
+                "expectedClassId": -1,
+                "expectedLabel": "",
+                "minCategoryConfidence": 80,
+                "minClassifiedCoverage": 90,
+                "minScore": 80,
+                "mode": "min_score",
                 "resultBasis": "最低分数"
             },
             "params": {
-                "detectRegionType": "rectangle",
-                "hueTolerance": 10,
-                "minBlobAreaPixels": 20,
-                "morphKernelSize": 3,
-                "paramMode": "basic",
-                "positionCorrectionEnabled": true,
-                "positionCorrectionSource": "1 基准图.位置修正信息",
-                "saturationTolerance": 80,
-                "targetColorHex": "#ffffff",
-                "targetColorRgb": {
-                    "b": 255,
-                    "g": 255,
-                    "r": 255
+                "colorDecisionMode": "dominant_ratio",
+                "colorModel": {
+                    "activeTemplateId": "",
+                    "templates": [
+                    ]
                 },
-                "valueTolerance": 80
+                "detectCircleNormalized": {
+                    "boundingRect": {
+                        "height": 0,
+                        "width": 0,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "center": {
+                        "x": 0,
+                        "y": 0
+                    },
+                    "radius": 0,
+                    "valid": false
+                },
+                "detectMaskApplied": false,
+                "detectMaskPolygon": [
+                ],
+                "detectMaskReason": "not configured",
+                "detectMaskType": "none",
+                "detectRegionType": "rectangle",
+                "enablePositionCorrection": false,
+                "globalDetection": false,
+                "paramMode": "basic",
+                "positionCorrectionSource": "1 基准图.位置修正信息",
+                "positionCorrectionSourceId": "reference.positionCorrection"
             },
             "roiNormalized": {
                 "height": 1,
@@ -830,11 +887,51 @@
                 "y": 0
             },
             "schemaVersion": 1,
-            "summary": "目标色 #ffffff；占比 >= 10%",
+            "summary": "未选择颜色模板；最低分 80",
             "toolId": "color_recognition_181e4694-051c-4731-ba20-14c26cbb70eb",
             "toolName": "颜色识别",
             "toolType": "ColorRecognition"
+        },
+        {
+            "category": "Location",
+            "displayName": "位置修正",
+            "enabled": true,
+            "judgeRule": {
+            },
+            "params": {
+                "positionCorrection": {
+                    "referenceCreated": false,
+                    "runAngle": {
+                        "displayPath": "1 基准图.基准角度",
+                        "outputKey": "angle",
+                        "producerId": "reference.positionCorrection"
+                    },
+                    "runPointX": {
+                        "displayPath": "1 基准图.匹配点X",
+                        "outputKey": "x",
+                        "producerId": "reference.positionCorrection"
+                    },
+                    "runPointY": {
+                        "displayPath": "1 基准图.基准点坐标Y",
+                        "outputKey": "y",
+                        "producerId": "reference.positionCorrection"
+                    },
+                    "templateRegionType": "rectangle",
+                    "version": 1
+                }
+            },
+            "roiNormalized": {
+                "height": 0,
+                "width": 0,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "位置修正后端尚未实现",
+            "toolId": "1b143a5c-3d0d-41c0-8e2c-5fcdf4eb2995",
+            "toolName": "位置修正",
+            "toolType": "PositionCorrection"
         }
     ],
-    "updatedAt": "2026-06-26T13:54:06"
+    "updatedAt": "2026-07-21T11:36:03"
 }

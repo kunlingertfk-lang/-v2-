@@ -1,234 +1,298 @@
-#include "algorithms/recognition/ColorRecognitionHalconRunner.h"
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "algorithms/recognition/ColorRecognitionHalconRunner.h"
 
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QPointF>
-#include <QString>
+#include <QtGlobal>
+
+#include <cmath>
 #include <iostream>
 #include <opencv2/core.hpp>
+
+namespace {
+
+bool near(double lhs, double rhs, double tolerance = 1e-6)
+{
+    return std::abs(lhs - rhs) <= tolerance;
+}
+
+double sum(const QVector<double> &values)
+{
+    double total = 0.0;
+    for (double value : values)
+        total += value;
+    return total;
+}
+
+double hueMass(const QVector<double> &feature, int bins, int hueBin)
+{
+    double total = 0.0;
+    for (int saturationBin = 0; saturationBin < bins; ++saturationBin)
+        total += feature.at(hueBin * bins + saturationBin);
+    return total;
+}
+
+double saturationMass(const QVector<double> &feature, int bins, int saturationBin)
+{
+    double total = 0.0;
+    for (int hueBin = 0; hueBin < bins; ++hueBin)
+        total += feature.at(hueBin * bins + saturationBin);
+    return total;
+}
+
+bool sameFeature(const QVector<double> &lhs,
+                 const QVector<double> &rhs,
+                 double tolerance)
+{
+    if (lhs.size() != rhs.size())
+        return false;
+    for (int i = 0; i < lhs.size(); ++i) {
+        if (!near(lhs.at(i), rhs.at(i), tolerance))
+            return false;
+    }
+    return true;
+}
+
+QVector<double> featureAtIntersection(const QVector<double> &reference,
+                                      double requestedSimilarity)
+{
+    int zeroBin = -1;
+    for (int index = 0; index < reference.size(); ++index) {
+        if (std::abs(reference.at(index)) <= 1e-12) {
+            zeroBin = index;
+            break;
+        }
+    }
+    if (zeroBin < 0)
+        return {};
+
+    const double similarity = qBound(0.0, requestedSimilarity, 1.0);
+    QVector<double> feature = reference;
+    for (double &value : feature)
+        value *= similarity;
+    feature[zeroBin] += 1.0 - similarity;
+    return feature;
+}
+
+ColorRecognitionHalconConfig baseConfig()
+{
+    ColorRecognitionHalconConfig config;
+    config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                QString(), &config.halconSoPathCandidates);
+    config.featureType = QStringLiteral("histogram_2dim_hs");
+    config.sensitivity = QStringLiteral("medium");
+    config.brightnessEnabled = false;
+    return config;
+}
+
+int fail(const char *message)
+{
+    std::cerr << message << std::endl;
+    return 1;
+}
+
+} // namespace
 
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
-
-    ColorRecognitionHalconConfig circleConfig;
-    circleConfig.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(QString(),
-                                                                         &circleConfig.halconSoPathCandidates);
-    circleConfig.detectRegionType = QStringLiteral("circle");
-    circleConfig.roiNormalized = QRectF(0.25, 0.25, 0.5, 0.5);
-    circleConfig.detectCircleCenterNormalized = QPointF(0.5, 0.5);
-    circleConfig.detectCircleRadiusNormalized = 0.25;
-    circleConfig.detectCircleBoundingRectNormalized = circleConfig.roiNormalized;
-
-    cv::Mat image(16, 16, CV_8UC3, cv::Scalar(20, 40, 60));
     ColorRecognitionHalconRunner runner;
-    const ColorRecognitionHalconFeatureResult circleFeature = runner.extractFeature(image, circleConfig);
-    if (!circleFeature.success) {
-        std::cerr << "circle feature extraction failed: "
-                  << circleFeature.status.toStdString() << ": "
-                  << circleFeature.message.toStdString() << std::endl;
-        return 1;
-    }
-    if (circleFeature.payload.value(QStringLiteral("detectRegionType")).toString() != QStringLiteral("circle") ||
-        circleFeature.payload.value(QStringLiteral("circleDetectRoiApplied")).toBool() != true ||
-        circleFeature.payload.value(QStringLiteral("effectiveRoiArea")).toDouble() <= 0.0) {
-        std::cerr << "circle ROI payload missing or invalid" << std::endl;
-        return 1;
+    const ColorRecognitionHalconConfig config = baseConfig();
+
+    const cv::Mat mono(24, 24, CV_8UC1, cv::Scalar(128));
+    const ColorRecognitionHalconFeatureResult monoResult = runner.extractFeature(mono, config);
+    if (monoResult.success ||
+        monoResult.status != QStringLiteral("unsupported_mono_for_color_recognition")) {
+        return fail("Mono input must be rejected explicitly");
     }
 
-    if (circleFeature.payload.value(QStringLiteral("lightingNormalizationMode")).toString()
-            != QStringLiteral("include_value_channel")) {
-        std::cerr << "brightness enabled must include value channel" << std::endl;
-        return 1;
+    const cv::Mat color16Missing(24, 24, CV_16UC3, cv::Scalar(1000, 2000, 3000));
+    const ColorRecognitionHalconFeatureResult missingMetadata =
+            runner.extractFeature(color16Missing, config);
+    if (missingMetadata.success ||
+        missingMetadata.status != QStringLiteral("missing_pixel_format_metadata")) {
+        return fail("16-bit input without validBits/bitShift must be rejected");
     }
 
-    ColorRecognitionHalconConfig hsConfig = circleConfig;
-    hsConfig.brightnessEnabled = false;
-    const ColorRecognitionHalconFeatureResult hsFeature = runner.extractFeature(image, hsConfig);
-    if (!hsFeature.success || hsFeature.feature.size() != 32 ||
-        hsFeature.payload.value(QStringLiteral("lightingNormalizationMode")).toString()
-            != QStringLiteral("hue_saturation_priority")) {
-        std::cerr << "brightness disabled must use H/S priority feature" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig dominantConfig = circleConfig;
-    dominantConfig.brightnessEnabled = false;
-    dominantConfig.colorDecisionMode = QStringLiteral("dominant_ratio");
-    dominantConfig.labels = {
-        {QStringLiteral("warm"), 1},
-        {QStringLiteral("cool"), 2}
-    };
-    dominantConfig.samples = {
-        {QStringLiteral("warm"), 1, hsFeature.feature, dominantConfig.roiNormalized},
-        {QStringLiteral("cool"), 2, QVector<double>(hsFeature.feature.size(), 0.0), dominantConfig.roiNormalized}
-    };
-    const ColorRecognitionHalconResult dominantResult = runner.run(image, dominantConfig);
-    if (!dominantResult.success ||
-        dominantResult.payload.value(QStringLiteral("colorDecisionMode")).toString()
-            != QStringLiteral("dominant_ratio") ||
-        dominantResult.payload.value(QStringLiteral("comparisonMethod")).toString()
-            != QStringLiteral("dominant_color_ratio") ||
-        dominantResult.payload.value(QStringLiteral("dominantColorRatio")).toDouble() <= 0.99 ||
-        dominantResult.predictedLabel != QStringLiteral("warm") ||
-        dominantResult.payload.value(QStringLiteral("labelAreaRatios")).toArray().isEmpty()) {
-        std::cerr << "dominant ratio mode did not select dominant color" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig dilutedDominantConfig = dominantConfig;
-    dilutedDominantConfig.labels = {
-        {QStringLiteral("warm"), 1},
-        {QStringLiteral("also_warm"), 2},
-        {QStringLiteral("again_warm"), 3}
-    };
-    dilutedDominantConfig.samples = {
-        {QStringLiteral("warm"), 1, hsFeature.feature, dilutedDominantConfig.roiNormalized},
-        {QStringLiteral("also_warm"), 2, hsFeature.feature, dilutedDominantConfig.roiNormalized},
-        {QStringLiteral("again_warm"), 3, hsFeature.feature, dilutedDominantConfig.roiNormalized}
-    };
-    const ColorRecognitionHalconResult dilutedDominantResult =
-            runner.run(image, dilutedDominantConfig);
-    if (!dilutedDominantResult.success ||
-        dilutedDominantResult.score < 99.0 ||
-        dilutedDominantResult.payload.value(QStringLiteral("dominantColorRatio")).toDouble() >= 50.0) {
-        std::cerr << "dominant ratio score must use best class similarity, not diluted ratio" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig legacyConfig = dominantConfig;
-    legacyConfig.colorDecisionMode = QStringLiteral("histogram_intersection");
-    const ColorRecognitionHalconResult legacyResult = runner.run(image, legacyConfig);
-    if (!legacyResult.success ||
-        legacyResult.payload.value(QStringLiteral("colorDecisionMode")).toString()
-            != QStringLiteral("histogram_intersection") ||
-        legacyResult.payload.value(QStringLiteral("comparisonMethod")).toString()
-            != QStringLiteral("histogram_intersection")) {
-        std::cerr << "legacy histogram intersection mode must remain available" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig alignedConfig = dominantConfig;
-    alignedConfig.samples = {
-        {QStringLiteral("warm"), 1, circleFeature.feature, dominantConfig.roiNormalized}
-    };
-    const ColorRecognitionHalconResult alignedResult = runner.run(image, alignedConfig);
-    if (!alignedResult.success ||
-        alignedResult.predictedLabel != QStringLiteral("warm") ||
-        alignedResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
-        std::cerr << "brightness-disabled detection must align older H/S/V samples to H/S" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig brightnessOnAlignedConfig = circleConfig;
-    brightnessOnAlignedConfig.colorDecisionMode = QStringLiteral("dominant_ratio");
-    brightnessOnAlignedConfig.labels = {
-        {QStringLiteral("warm"), 1}
-    };
-    brightnessOnAlignedConfig.samples = {
-        {QStringLiteral("warm"), 1, hsFeature.feature, brightnessOnAlignedConfig.roiNormalized}
-    };
-    const ColorRecognitionHalconResult brightnessOnAlignedResult =
-            runner.run(image, brightnessOnAlignedConfig);
-    if (!brightnessOnAlignedResult.success ||
-        brightnessOnAlignedResult.predictedLabel != QStringLiteral("warm") ||
-        brightnessOnAlignedResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
-        std::cerr << "brightness-enabled detection must align older H/S samples to H/S" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig lowSensitivityConfig = dominantConfig;
-    lowSensitivityConfig.sensitivity = QStringLiteral("low");
-    lowSensitivityConfig.samples = {
-        {QStringLiteral("warm"), 1, hsFeature.feature, lowSensitivityConfig.roiNormalized}
-    };
-    const ColorRecognitionHalconResult lowSensitivityResult =
-            runner.run(image, lowSensitivityConfig);
-    if (!lowSensitivityResult.success ||
-        lowSensitivityResult.predictedLabel != QStringLiteral("warm") ||
-        lowSensitivityResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
-        std::cerr << "low-sensitivity detection must compare medium-sensitivity samples" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig highFeatureConfig = hsConfig;
-    highFeatureConfig.sensitivity = QStringLiteral("high");
-    const ColorRecognitionHalconFeatureResult highFeature =
-            runner.extractFeature(image, highFeatureConfig);
-    if (!highFeature.success) {
-        std::cerr << "high sensitivity feature extraction failed" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig highSensitivityConfig = dominantConfig;
-    highSensitivityConfig.sensitivity = QStringLiteral("high");
-    highSensitivityConfig.samples = {
-        {QStringLiteral("warm"), 1, hsFeature.feature, highSensitivityConfig.roiNormalized}
-    };
-    const ColorRecognitionHalconResult highSensitivityResult =
-            runner.run(image, highSensitivityConfig);
-    if (!highSensitivityResult.success ||
-        highSensitivityResult.predictedLabel != QStringLiteral("warm") ||
-        highSensitivityResult.payload.value(QStringLiteral("featureAlignmentApplied")).toBool() != true) {
-        std::cerr << "high-sensitivity detection must compare medium-sensitivity samples" << std::endl;
-        return 1;
-    }
-
-    ColorRecognitionHalconConfig positionConfig = dominantConfig;
+    ColorRecognitionHalconConfig positionConfig = config;
     positionConfig.enablePositionCorrection = true;
+    positionConfig.positionCorrectionSourceId = QStringLiteral("reference.positionCorrection");
     positionConfig.positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
-    const ColorRecognitionHalconResult positionResult = runner.run(image, positionConfig);
-    if (!positionResult.success ||
-        positionResult.payload.value(QStringLiteral("enablePositionCorrection")).toBool() != true ||
-        positionResult.payload.value(QStringLiteral("positionCorrectionSource")).toString()
-            != QStringLiteral("1 基准图.位置修正信息") ||
-        positionResult.payload.value(QStringLiteral("positionCorrectionApplied")).toBool() != false ||
-        positionResult.payload.value(QStringLiteral("positionCorrectionReason")).toString()
-            != QStringLiteral("not implemented")) {
-        std::cerr << "position correction payload must expose requested-but-not-applied state" << std::endl;
-        return 1;
+    const cv::Mat red8(24, 24, CV_8UC3, cv::Scalar(0, 0, 255));
+    const ColorRecognitionHalconResult positionResult = runner.run(red8, positionConfig);
+    if (positionResult.success ||
+        positionResult.status != QStringLiteral("unsupported_position_correction") ||
+        positionResult.payload.value(QStringLiteral("positionCorrectionApplied")).toBool(true)) {
+        return fail("Unimplemented position correction must return unsupported");
     }
 
-    ColorRecognitionHalconConfig config = circleConfig;
-    config.detectMaskPolygonNormalized = {
-        QPointF(0.0, 0.0),
-        QPointF(1.0, 0.0),
-        QPointF(1.0, 1.0),
-        QPointF(0.0, 1.0)
+    const ColorRecognitionHalconFeatureResult redFeature = runner.extractFeature(red8, config);
+    if (!redFeature.success || redFeature.feature.size() != 16 * 16) {
+        std::cerr << redFeature.status.toStdString() << ": "
+                  << redFeature.message.toStdString() << ", size="
+                  << redFeature.feature.size() << std::endl;
+        return fail("2D H/S feature extraction failed");
+    }
+    if (!near(sum(redFeature.feature), 1.0) ||
+        !near(hueMass(redFeature.feature, 16, 0), 0.25) ||
+        !near(hueMass(redFeature.feature, 16, 14), 0.25) ||
+        !near(hueMass(redFeature.feature, 16, 15), 0.50)) {
+        std::cerr << "hue masses: first=" << hueMass(redFeature.feature, 16, 0)
+                  << ", penultimate=" << hueMass(redFeature.feature, 16, 14)
+                  << ", last=" << hueMass(redFeature.feature, 16, 15)
+                  << ", sum=" << sum(redFeature.feature) << std::endl;
+        return fail("Hue smoothing must wrap across first/last bins");
+    }
+    if (redFeature.payload.value(QStringLiteral("featureType")).toString()
+            != QStringLiteral("histogram_2dim_hs") ||
+        redFeature.payload.value(QStringLiteral("featureSchemaVersion")).toString()
+            != QStringLiteral("hs_joint_histogram_v2") ||
+        !redFeature.payload.value(QStringLiteral("featureSignature")).toString()
+            .startsWith(QStringLiteral("sha256:"))) {
+        return fail("Actual feature contract is missing from payload");
+    }
+
+    ColorRecognitionHalconConfig twoDimWithRequestedBrightness = config;
+    twoDimWithRequestedBrightness.brightnessEnabled = true;
+    const ColorRecognitionHalconFeatureResult normalizedTwoDim =
+            runner.extractFeature(red8, twoDimWithRequestedBrightness);
+    if (!normalizedTwoDim.success ||
+        !sameFeature(redFeature.feature, normalizedTwoDim.feature, 1e-12) ||
+        normalizedTwoDim.payload.value(QStringLiteral("featureSignature")).toString() !=
+            redFeature.payload.value(QStringLiteral("featureSignature")).toString() ||
+        normalizedTwoDim.payload.value(QStringLiteral("brightnessEnabled")).toBool(true) ||
+        !normalizedTwoDim.payload.value(QStringLiteral("requestedBrightnessEnabled")).toBool(false)) {
+        return fail("2D H/S must normalize the unused brightness request out of its feature contract");
+    }
+
+    const cv::Mat gray8(24, 24, CV_8UC3, cv::Scalar(128, 128, 128));
+    const ColorRecognitionHalconFeatureResult grayFeature = runner.extractFeature(gray8, config);
+    if (!grayFeature.success ||
+        saturationMass(grayFeature.feature, 16, 15) > 1e-9 ||
+        saturationMass(grayFeature.feature, 16, 0) < 0.80 ||
+        saturationMass(grayFeature.feature, 16, 1) < 0.15) {
+        return fail("Saturation smoothing must not wrap at the boundary");
+    }
+
+    ColorRecognitionHalconConfig runConfig = config;
+    runConfig.labels = {{QStringLiteral("red"), 1}};
+    ColorRecognitionHalconSample sample;
+    sample.label = QStringLiteral("red");
+    sample.classId = 1;
+    sample.feature = redFeature.feature;
+    sample.featureSignature = redFeature.payload
+            .value(QStringLiteral("featureSignature")).toString();
+    runConfig.samples = {sample};
+    const ColorRecognitionHalconResult matched = runner.run(red8, runConfig);
+    if (!matched.success || matched.predictedLabel != QStringLiteral("red") ||
+        matched.payload.value(QStringLiteral("featureAlignmentApplied")).toBool(true) ||
+        matched.payload.value(QStringLiteral("colorDecisionMode")).toString()
+            != QStringLiteral("category_similarity") ||
+        matched.payload.contains(QStringLiteral("dominantColorRatio")) ||
+        matched.payload.contains(QStringLiteral("labelAreaRatios"))) {
+        return fail("Strictly signed sample should classify without feature alignment");
+    }
+    if (matched.payload.value(QStringLiteral("classifierVersion")).toString() !=
+            colorRecognitionHsvCurrentClassifierVersion() ||
+        matched.payload.value(QStringLiteral("topNSampleCount")).toInt() != 1) {
+        return fail("Current HSV classifier contract is missing from payload");
+    }
+
+    const QVector<double> disjoint = featureAtIntersection(redFeature.feature, 0.0);
+    const QVector<double> similar80 = featureAtIntersection(redFeature.feature, 0.8);
+    if (disjoint.isEmpty() || similar80.isEmpty())
+        return fail("Synthetic HSV classifier features could not be constructed");
+
+    ColorRecognitionHalconConfig topNConfig = config;
+    topNConfig.labels = {{QStringLiteral("wrong"), 1},
+                         {QStringLiteral("correct"), 2}};
+    auto addClassifierSample = [&](const QString &label,
+                                   int classId,
+                                   const QVector<double> &feature) {
+        ColorRecognitionHalconSample item;
+        item.label = label;
+        item.classId = classId;
+        item.feature = feature;
+        item.featureSignature = sample.featureSignature;
+        topNConfig.samples.append(item);
     };
+    addClassifierSample(QStringLiteral("wrong"), 1, redFeature.feature);
+    addClassifierSample(QStringLiteral("wrong"), 1, disjoint);
+    addClassifierSample(QStringLiteral("wrong"), 1, disjoint);
+    addClassifierSample(QStringLiteral("correct"), 2, similar80);
+    addClassifierSample(QStringLiteral("correct"), 2, similar80);
+    addClassifierSample(QStringLiteral("correct"), 2, similar80);
 
-    const ColorRecognitionHalconResult result = runner.run(image, config);
-
-    if (result.status != QStringLiteral("masked_roi_empty")) {
-        std::cerr << "expected masked_roi_empty, got "
-                  << result.status.toStdString() << ": "
-                  << result.message.toStdString() << std::endl;
-        return 1;
-    }
-    if (result.success || result.ok) {
-        std::cerr << "fully masked ROI must not run detection as success/OK" << std::endl;
-        return 1;
-    }
-    if (result.payload.value(QStringLiteral("detectMaskApplied")).toBool() != true) {
-        std::cerr << "detectMaskApplied payload missing" << std::endl;
-        return 1;
-    }
-    if (result.overlays.isEmpty() ||
-        result.overlays.last().extra.value(QStringLiteral("status")).toString() != QStringLiteral("MASKED")) {
-        std::cerr << "masked brown text overlay missing" << std::endl;
-        return 1;
+    const ColorRecognitionHalconResult topNResult = runner.run(red8, topNConfig);
+    if (!topNResult.success || topNResult.predictedLabel != QStringLiteral("correct") ||
+        !near(topNResult.score, 80.0) ||
+        !near(topNResult.payload.value(QStringLiteral("secondClassScore")).toDouble(),
+              100.0 / 3.0) ||
+        !near(topNResult.payload.value(QStringLiteral("classMargin")).toDouble(),
+              80.0 - 100.0 / 3.0) ||
+        topNResult.payload.value(QStringLiteral("topNSampleCount")).toInt() != 3 ||
+        topNResult.payload.value(QStringLiteral("classDiagnostics")).toArray().size() != 2) {
+        return fail("Top-3 per-class aggregation did not suppress a single outlier sample");
     }
 
-    ColorRecognitionHalconConfig invalidCircleConfig = circleConfig;
-    invalidCircleConfig.detectCircleRadiusNormalized = 0.0;
-    const ColorRecognitionHalconFeatureResult invalidCircle =
-            runner.extractFeature(image, invalidCircleConfig);
-    if (invalidCircle.success || invalidCircle.status != QStringLiteral("invalid_roi")) {
-        std::cerr << "invalid circle ROI must fail with invalid_roi, got "
-                  << invalidCircle.status.toStdString() << std::endl;
-        return 1;
+    ColorRecognitionHalconConfig legacyConfig = topNConfig;
+    legacyConfig.classifierVersion = colorRecognitionHsvLegacyClassifierVersion();
+    legacyConfig.classifierParamsHash = colorRecognitionHsvClassifierParamsHash(
+                legacyConfig.classifierVersion);
+    const ColorRecognitionHalconResult legacyResult = runner.run(red8, legacyConfig);
+    if (!legacyResult.success || legacyResult.predictedLabel != QStringLiteral("wrong") ||
+        !near(legacyResult.score, 100.0)) {
+        return fail("Legacy HSV classifier compatibility path changed its best-sample behavior");
+    }
+
+    ColorRecognitionHalconConfig invalidClassifierConfig = topNConfig;
+    invalidClassifierConfig.classifierParamsHash = QStringLiteral("sha256:invalid");
+    const ColorRecognitionHalconResult invalidClassifier =
+            runner.run(red8, invalidClassifierConfig);
+    if (invalidClassifier.success ||
+        invalidClassifier.status != QStringLiteral("hsv_classifier_signature_mismatch")) {
+        return fail("Classifier signature mismatch must be rejected explicitly");
+    }
+
+    ColorRecognitionHalconConfig lowConfidenceConfig = runConfig;
+    lowConfidenceConfig.judgeMode = QStringLiteral("category");
+    lowConfidenceConfig.expectedLabel = QStringLiteral("red");
+    lowConfidenceConfig.minScore = 50;
+    lowConfidenceConfig.samples[0].feature.fill(0.0);
+    const ColorRecognitionHalconResult lowConfidence =
+            runner.run(red8, lowConfidenceConfig);
+    if (!lowConfidence.success || lowConfidence.ok || lowConfidence.score != 0.0) {
+        return fail("Category judgement must also enforce the minimum confidence");
+    }
+
+    ColorRecognitionHalconConfig staleConfig = runConfig;
+    staleConfig.sensitivity = QStringLiteral("high");
+    const ColorRecognitionHalconResult stale = runner.run(red8, staleConfig);
+    if (stale.success || stale.status != QStringLiteral("model_stale_needs_resample"))
+        return fail("Parameter changes must mark the model stale");
+
+    cv::Mat red16(24, 24, CV_16UC3, cv::Scalar(0, 0, 65535));
+    ColorRecognitionHalconConfig config16 = config;
+    config16.pixelFormat = QStringLiteral("BGR16");
+    config16.validBits = 16;
+    config16.bitShift = 0;
+    const ColorRecognitionHalconFeatureResult red16Feature = runner.extractFeature(red16, config16);
+    if (!red16Feature.success ||
+        !sameFeature(redFeature.feature, red16Feature.feature, 1e-6)) {
+        return fail("8-bit and normalized 16-bit features must be equivalent");
+    }
+
+    cv::Mat red12Left(24, 24, CV_16UC3, cv::Scalar(0, 0, 4095U << 4));
+    ColorRecognitionHalconConfig config12 = config16;
+    config12.pixelFormat = QStringLiteral("BGR12Left");
+    config12.validBits = 12;
+    config12.bitShift = 4;
+    const ColorRecognitionHalconFeatureResult red12Feature =
+            runner.extractFeature(red12Left, config12);
+    if (!red12Feature.success ||
+        !sameFeature(redFeature.feature, red12Feature.feature, 1e-6)) {
+        return fail("Left-aligned 12-bit and 8-bit features must be equivalent");
     }
 
     return 0;

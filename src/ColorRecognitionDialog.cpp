@@ -2,6 +2,8 @@
 #include "ui_ColorRecognitionDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
 
 #include <QButtonGroup>
 #include <QBrush>
@@ -10,6 +12,7 @@
 #include <QColor>
 #include <QComboBox>
 #include <QDebug>
+#include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileDialog>
 #include <QFrame>
@@ -246,15 +249,20 @@ QString colorDecisionModeToUi(const QString &value)
 {
     return value == QStringLiteral("histogram_intersection")
             ? QStringLiteral("整体相似度")
-            : QStringLiteral("主颜色占比");
+            : QStringLiteral("类别相似度");
 }
 
 // 将模板特征类型配置值转换为 UI 文案。
 QString featureTypeToUi(const QString &value)
 {
-    return value == QStringLiteral("spectrum")
-            ? QStringLiteral("色谱特征")
-            : QStringLiteral("直方图特征");
+    if (value == QStringLiteral("spectrum"))
+        return QStringLiteral("色谱特征（预留）");
+    if (value == QStringLiteral("histogram_2dim_hs") ||
+        value == QStringLiteral("histo_2dim") ||
+        value == QStringLiteral("histogram_2dim")) {
+        return QStringLiteral("二维 H/S 直方图（推荐）");
+    }
+    return QStringLiteral("一维 H/S(/V) 直方图（兼容）");
 }
 
 // 固定底部动作按钮尺寸，避免 default button 状态引发布局跳动。
@@ -345,13 +353,22 @@ ColorRecognitionLabelData labelFromJson(const QJsonObject &json)
 QJsonObject sampleToJson(const ColorRecognitionSampleData &sample)
 {
     QJsonObject json;
+    json.insert(QStringLiteral("sampleId"), sample.sampleId);
     json.insert(QStringLiteral("label"), sample.label);
     json.insert(QStringLiteral("classId"), sample.classId);
     json.insert(QStringLiteral("feature"), featureToJson(sample.feature));
+    json.insert(QStringLiteral("featureSignature"), sample.featureSignature);
     json.insert(QStringLiteral("roiNormalized"), rectToJson(sample.roiNormalized));
     json.insert(QStringLiteral("roiImagePngBase64"), sample.roiImagePngBase64);
     json.insert(QStringLiteral("roiImageWidth"), sample.roiImageWidth);
     json.insert(QStringLiteral("roiImageHeight"), sample.roiImageHeight);
+    json.insert(QStringLiteral("gmmRoiImagePngBase64"), sample.gmmRoiImagePngBase64);
+    json.insert(QStringLiteral("gmmImageSha256"), sample.gmmImageSha256);
+    json.insert(QStringLiteral("gmmImageWidth"), sample.gmmImageWidth);
+    json.insert(QStringLiteral("gmmImageHeight"), sample.gmmImageHeight);
+    json.insert(QStringLiteral("pixelFormat"), sample.pixelFormat);
+    json.insert(QStringLiteral("validBits"), sample.validBits);
+    json.insert(QStringLiteral("bitShift"), sample.bitShift);
     return json;
 }
 
@@ -359,16 +376,146 @@ QJsonObject sampleToJson(const ColorRecognitionSampleData &sample)
 ColorRecognitionSampleData sampleFromJson(const QJsonObject &json)
 {
     ColorRecognitionSampleData sample;
+    sample.sampleId = json.value(QStringLiteral("sampleId")).toString().trimmed();
     sample.label = json.value(QStringLiteral("label")).toString().trimmed();
     sample.classId = json.value(QStringLiteral("classId")).toInt();
     sample.feature = featureFromJson(json.value(QStringLiteral("feature")).toArray());
+    sample.featureSignature = json.value(QStringLiteral("featureSignature")).toString().trimmed();
     sample.roiNormalized = normalizedRoiOrDefault(
                 rectFromJson(json.value(QStringLiteral("roiNormalized")).toObject(),
                              sample.roiNormalized));
     sample.roiImagePngBase64 = json.value(QStringLiteral("roiImagePngBase64")).toString();
     sample.roiImageWidth = json.value(QStringLiteral("roiImageWidth")).toInt();
     sample.roiImageHeight = json.value(QStringLiteral("roiImageHeight")).toInt();
+    sample.gmmRoiImagePngBase64 = json.value(QStringLiteral("gmmRoiImagePngBase64")).toString();
+    sample.gmmImageSha256 = json.value(QStringLiteral("gmmImageSha256")).toString().trimmed();
+    sample.gmmImageWidth = json.value(QStringLiteral("gmmImageWidth")).toInt();
+    sample.gmmImageHeight = json.value(QStringLiteral("gmmImageHeight")).toInt();
+    sample.pixelFormat = json.value(QStringLiteral("pixelFormat")).toString().trimmed();
+    sample.validBits = json.value(QStringLiteral("validBits")).toInt(-1);
+    sample.bitShift = json.value(QStringLiteral("bitShift")).toInt(-1);
     return sample;
+}
+
+QJsonObject gmmClassToJson(const ColorRecognitionGmmClassDiagnostics &item)
+{
+    QJsonObject json;
+    json.insert(QStringLiteral("classId"), item.classId);
+    json.insert(QStringLiteral("label"), item.label);
+    json.insert(QStringLiteral("roiCount"), item.roiCount);
+    json.insert(QStringLiteral("availablePixels"), static_cast<double>(item.availablePixels));
+    json.insert(QStringLiteral("requestedTrainingPixels"), item.requestedTrainingPixels);
+    json.insert(QStringLiteral("trainingPixels"), item.trainingPixels);
+    json.insert(QStringLiteral("minCenters"), item.minCenters);
+    json.insert(QStringLiteral("maxCenters"), item.maxCenters);
+    return json;
+}
+
+ColorRecognitionGmmClassDiagnostics gmmClassFromJson(const QJsonObject &json)
+{
+    ColorRecognitionGmmClassDiagnostics item;
+    item.classId = json.value(QStringLiteral("classId")).toInt();
+    item.label = json.value(QStringLiteral("label")).toString().trimmed();
+    item.roiCount = json.value(QStringLiteral("roiCount")).toInt();
+    item.availablePixels = static_cast<qint64>(
+                json.value(QStringLiteral("availablePixels")).toDouble());
+    item.requestedTrainingPixels = json.value(QStringLiteral("requestedTrainingPixels"))
+            .toInt(json.value(QStringLiteral("trainingPixels")).toInt());
+    item.trainingPixels = json.value(QStringLiteral("trainingPixels")).toInt();
+    item.minCenters = json.value(QStringLiteral("minCenters")).toInt(1);
+    item.maxCenters = json.value(QStringLiteral("maxCenters")).toInt(1);
+    return item;
+}
+
+QJsonObject gmmModelToJson(const ColorRecognitionGmmModelData &model)
+{
+    QJsonArray classIds;
+    for (int classId : model.classIdOrder)
+        classIds.append(classId);
+    QJsonArray classes;
+    for (const ColorRecognitionGmmClassDiagnostics &item : model.classes)
+        classes.append(gmmClassToJson(item));
+    QJsonObject json;
+    json.insert(QStringLiteral("state"), model.state);
+    json.insert(QStringLiteral("status"), model.status);
+    json.insert(QStringLiteral("message"), model.message);
+    json.insert(QStringLiteral("algorithmVersion"), model.algorithmVersion);
+    json.insert(QStringLiteral("featureSchemaVersion"), model.featureSchemaVersion);
+    json.insert(QStringLiteral("samplingAlgorithmVersion"), model.samplingAlgorithmVersion);
+    json.insert(QStringLiteral("colorChannels"), model.colorChannels);
+    json.insert(QStringLiteral("trainingDataHash"), model.trainingDataHash);
+    json.insert(QStringLiteral("buildParamsHash"), model.buildParamsHash);
+    json.insert(QStringLiteral("serializedGmmBase64"), model.serializedGmmBase64);
+    json.insert(QStringLiteral("serializedSize"), static_cast<double>(model.serializedSize));
+    json.insert(QStringLiteral("serializedSha256"), model.serializedSha256);
+    json.insert(QStringLiteral("classIdOrder"), classIds);
+    json.insert(QStringLiteral("classes"), classes);
+    json.insert(QStringLiteral("builtAtUtc"), model.builtAtUtc);
+    return json;
+}
+
+ColorRecognitionGmmModelData gmmModelFromJson(const QJsonObject &json)
+{
+    ColorRecognitionGmmModelData model;
+    model.state = json.value(QStringLiteral("state")).toString(QStringLiteral("empty")).trimmed();
+    model.status = json.value(QStringLiteral("status")).toString();
+    model.message = json.value(QStringLiteral("message")).toString();
+    model.algorithmVersion = json.value(QStringLiteral("algorithmVersion")).toString();
+    model.featureSchemaVersion = json.value(QStringLiteral("featureSchemaVersion")).toString();
+    model.samplingAlgorithmVersion = json.value(
+                QStringLiteral("samplingAlgorithmVersion")).toString();
+    model.colorChannels = json.value(QStringLiteral("colorChannels")).toString(QStringLiteral("ab"));
+    model.trainingDataHash = json.value(QStringLiteral("trainingDataHash")).toString();
+    model.buildParamsHash = json.value(QStringLiteral("buildParamsHash")).toString();
+    model.serializedGmmBase64 = json.value(QStringLiteral("serializedGmmBase64")).toString();
+    model.serializedSize = static_cast<qint64>(json.value(QStringLiteral("serializedSize")).toDouble());
+    model.serializedSha256 = json.value(QStringLiteral("serializedSha256")).toString();
+    for (const QJsonValue &value : json.value(QStringLiteral("classIdOrder")).toArray())
+        model.classIdOrder.append(value.toInt());
+    for (const QJsonValue &value : json.value(QStringLiteral("classes")).toArray())
+        model.classes.append(gmmClassFromJson(value.toObject()));
+    model.builtAtUtc = json.value(QStringLiteral("builtAtUtc")).toString();
+    return model;
+}
+
+void validateLoadedGmmModel(ColorRecognitionTemplateData *colorTemplate)
+{
+    if (!colorTemplate)
+        return;
+    ColorRecognitionGmmModelData &model = colorTemplate->gmmModel;
+    if (model.state != QStringLiteral("ready") &&
+        model.state != QStringLiteral("ready_with_warning")) {
+        return;
+    }
+    const QString currentHash = colorRecognitionGmmTrainingDataHash(*colorTemplate);
+    if (currentHash.isEmpty() || currentHash != model.trainingDataHash ||
+        model.samplingAlgorithmVersion != colorRecognitionGmmSamplingAlgorithmVersion() ||
+        model.colorChannels != colorTemplate->gmmColorChannels) {
+        model.state = QStringLiteral("stale");
+        model.status = QStringLiteral("gmm_model_stale");
+        model.message = QStringLiteral("GMM training facts, channels, or sampling contract changed; rebuild the model.");
+        return;
+    }
+
+    ColorRecognitionGmmArtifact artifact;
+    artifact.serializedGmmBase64 = model.serializedGmmBase64;
+    artifact.serializedBytes = QByteArray::fromBase64(model.serializedGmmBase64.toLatin1());
+    artifact.serializedSize = model.serializedSize;
+    artifact.serializedSha256 = model.serializedSha256;
+    ColorRecognitionGmmBuildConfig config;
+    config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                QString(), &config.halconSoPathCandidates);
+    config.colorChannels = colorTemplate->gmmColorChannels;
+    config.maxSamplesPerClass = colorTemplate->gmmMaxSamplesPerClass;
+    for (const ColorRecognitionLabelData &label : colorTemplate->labels)
+        config.labels.append(ColorRecognitionGmmLabel{label.name, label.classId});
+    const ColorRecognitionGmmArtifactValidationResult validated =
+            ColorRecognitionHalconRunner().validateGmmModelArtifact(artifact, config);
+    if (!validated.success) {
+        model.state = QStringLiteral("invalid");
+        model.status = validated.status;
+        model.message = validated.message;
+    }
 }
 
 // 将完整颜色模板序列化为可保存/导出的 JSON 对象。
@@ -385,11 +532,33 @@ QJsonObject templateToJson(const ColorRecognitionTemplateData &colorTemplate)
     QJsonObject json;
     json.insert(QStringLiteral("templateId"), colorTemplate.templateId);
     json.insert(QStringLiteral("name"), colorTemplate.name);
+    json.insert(QStringLiteral("modelSchemaVersion"), colorTemplate.modelSchemaVersion);
+    json.insert(QStringLiteral("recognitionBackend"), colorTemplate.recognitionBackend);
+    json.insert(QStringLiteral("modelState"), colorTemplate.modelState);
+    json.insert(QStringLiteral("algorithmVersion"), colorTemplate.algorithmVersion);
+    json.insert(QStringLiteral("featureSchemaVersion"), colorTemplate.featureSchemaVersion);
     json.insert(QStringLiteral("featureType"), colorTemplate.featureType);
     json.insert(QStringLiteral("sensitivity"), colorTemplate.sensitivity);
     json.insert(QStringLiteral("brightnessEnabled"), colorTemplate.brightnessEnabled);
-    json.insert(QStringLiteral("knnK"), colorTemplate.knnK);
-    json.insert(QStringLiteral("knnDistance"), colorTemplate.knnDistance);
+    QJsonObject hsvConfig;
+    hsvConfig.insert(QStringLiteral("featureType"), colorTemplate.featureType);
+    hsvConfig.insert(QStringLiteral("sensitivity"), colorTemplate.sensitivity);
+    hsvConfig.insert(QStringLiteral("brightnessEnabled"), colorTemplate.brightnessEnabled);
+    hsvConfig.insert(QStringLiteral("classifierVersion"),
+                     colorTemplate.hsvClassifierVersion);
+    hsvConfig.insert(QStringLiteral("classifierParamsHash"),
+                     colorTemplate.hsvClassifierParamsHash);
+    QJsonObject gmmConfig;
+    gmmConfig.insert(QStringLiteral("colorChannels"), colorTemplate.gmmColorChannels);
+    gmmConfig.insert(QStringLiteral("maxSamplesPerClass"), colorTemplate.gmmMaxSamplesPerClass);
+    gmmConfig.insert(QStringLiteral("gmmRejectionThreshold"), colorTemplate.gmmRejectionThreshold);
+    QJsonObject backendConfigs;
+    backendConfigs.insert(QStringLiteral("hsvHistogram"), hsvConfig);
+    backendConfigs.insert(QStringLiteral("cielabGmm"), gmmConfig);
+    json.insert(QStringLiteral("backendConfigs"), backendConfigs);
+    QJsonObject backendModels;
+    backendModels.insert(QStringLiteral("cielabGmm"), gmmModelToJson(colorTemplate.gmmModel));
+    json.insert(QStringLiteral("backendModels"), backendModels);
     json.insert(QStringLiteral("labels"), labels);
     json.insert(QStringLiteral("samples"), samples);
     return json;
@@ -401,11 +570,45 @@ ColorRecognitionTemplateData templateFromJson(const QJsonObject &json)
     ColorRecognitionTemplateData colorTemplate;
     colorTemplate.templateId = json.value(QStringLiteral("templateId")).toString().trimmed();
     colorTemplate.name = json.value(QStringLiteral("name")).toString(QStringLiteral("颜色模板")).trimmed();
-    colorTemplate.featureType = json.value(QStringLiteral("featureType")).toString(QStringLiteral("histogram"));
-    colorTemplate.sensitivity = json.value(QStringLiteral("sensitivity")).toString(QStringLiteral("medium"));
-    colorTemplate.brightnessEnabled = json.value(QStringLiteral("brightnessEnabled")).toBool(true);
-    colorTemplate.knnK = qMax(1, json.value(QStringLiteral("knnK")).toInt(3));
-    colorTemplate.knnDistance = json.value(QStringLiteral("knnDistance")).toString(QStringLiteral("halcon_default"));
+    colorTemplate.modelSchemaVersion = json.value(QStringLiteral("modelSchemaVersion")).toInt(1);
+    colorTemplate.recognitionBackend = json.value(QStringLiteral("recognitionBackend"))
+            .toString(QStringLiteral("hsv_histogram")).trimmed();
+    colorTemplate.modelState = json.value(QStringLiteral("modelState")).toString(
+                colorTemplate.modelSchemaVersion >= 2 ? QStringLiteral("ready")
+                                                      : QStringLiteral("stale"));
+    colorTemplate.algorithmVersion = json.value(QStringLiteral("algorithmVersion")).toString();
+    colorTemplate.featureSchemaVersion = json.value(QStringLiteral("featureSchemaVersion")).toString();
+    const QJsonObject backendConfigs = json.value(QStringLiteral("backendConfigs")).toObject();
+    const QJsonObject hsvConfig = backendConfigs.value(QStringLiteral("hsvHistogram")).toObject();
+    const QJsonObject gmmConfig = backendConfigs.value(QStringLiteral("cielabGmm")).toObject();
+    colorTemplate.featureType = hsvConfig.value(QStringLiteral("featureType"))
+            .toString(json.value(QStringLiteral("featureType")).toString(QStringLiteral("histogram")));
+    colorTemplate.sensitivity = hsvConfig.value(QStringLiteral("sensitivity"))
+            .toString(json.value(QStringLiteral("sensitivity")).toString(QStringLiteral("medium")));
+    colorTemplate.brightnessEnabled = hsvConfig.contains(QStringLiteral("brightnessEnabled"))
+            ? hsvConfig.value(QStringLiteral("brightnessEnabled")).toBool(false)
+            : json.value(QStringLiteral("brightnessEnabled")).toBool(true);
+    if (hsvConfig.contains(QStringLiteral("classifierVersion"))) {
+        colorTemplate.hsvClassifierVersion = hsvConfig
+                .value(QStringLiteral("classifierVersion")).toString().trimmed();
+        colorTemplate.hsvClassifierParamsHash = hsvConfig
+                .value(QStringLiteral("classifierParamsHash")).toString().trimmed();
+    } else {
+        // 旧模板保持原“每类最佳单样本”结果；显式重建 HSV 特征后才升级分类器。
+        colorTemplate.hsvClassifierVersion = colorRecognitionHsvLegacyClassifierVersion();
+        colorTemplate.hsvClassifierParamsHash = colorRecognitionHsvClassifierParamsHash(
+                    colorTemplate.hsvClassifierVersion);
+    }
+    colorTemplate.gmmColorChannels = gmmConfig.value(QStringLiteral("colorChannels"))
+            .toString(QStringLiteral("ab"));
+    colorTemplate.gmmMaxSamplesPerClass = gmmConfig.value(QStringLiteral("maxSamplesPerClass"))
+            .toInt(10000);
+    colorTemplate.gmmRejectionThreshold = qBound(0.0,
+            gmmConfig.value(QStringLiteral("gmmRejectionThreshold"))
+            .toDouble(kColorRecognitionGmmDefaultRejectionThreshold), 1.0);
+    colorTemplate.gmmModel = gmmModelFromJson(
+                json.value(QStringLiteral("backendModels")).toObject()
+                .value(QStringLiteral("cielabGmm")).toObject());
 
     const QJsonArray labels = json.value(QStringLiteral("labels")).toArray();
     for (const QJsonValue &value : labels) {
@@ -417,9 +620,24 @@ ColorRecognitionTemplateData templateFromJson(const QJsonObject &json)
     const QJsonArray samples = json.value(QStringLiteral("samples")).toArray();
     for (const QJsonValue &value : samples) {
         const ColorRecognitionSampleData sample = sampleFromJson(value.toObject());
-        if (!sample.label.isEmpty() && sample.classId > 0 && !sample.feature.isEmpty())
+        if (!sample.label.isEmpty() && sample.classId > 0 &&
+            (!sample.feature.isEmpty() || !sample.gmmRoiImagePngBase64.isEmpty()))
             colorTemplate.samples.append(sample);
     }
+
+    colorTemplate.modelState = colorTemplate.samples.isEmpty()
+            ? QStringLiteral("empty") : QStringLiteral("ready");
+    QString hsvSignature;
+    for (const ColorRecognitionSampleData &sample : std::as_const(colorTemplate.samples)) {
+        if (sample.feature.isEmpty() || sample.featureSignature.trimmed().isEmpty() ||
+            (!hsvSignature.isEmpty() && sample.featureSignature != hsvSignature)) {
+            colorTemplate.modelState = QStringLiteral("stale");
+            break;
+        }
+        hsvSignature = sample.featureSignature;
+    }
+
+    validateLoadedGmmModel(&colorTemplate);
 
     return colorTemplate;
 }
@@ -462,6 +680,7 @@ ColorRecognitionDialog::ColorRecognitionDialog(QWidget *parent)
 {
     ui->setupUi(this);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->setNavigationEnabled(true);
     m_testRunTimer = new QTimer(this);
     m_testRunTimer->setInterval(kLiveTestIntervalMs);
     connect(m_testRunTimer, &QTimer::timeout, this, &ColorRecognitionDialog::performTestRun);
@@ -500,9 +719,19 @@ ColorRecognitionDialogConfig ColorRecognitionDialog::configuration() const
 {
     ColorRecognitionDialogConfig config;
     config.templates = m_templates;
+    for (ColorRecognitionTemplateData &colorTemplate : config.templates) {
+        if (colorTemplate.templateId == activeTemplateId()) {
+            colorTemplate.gmmRejectionThreshold = ui->gmmRejectionSpinBox->value();
+            break;
+        }
+    }
     config.activeTemplateId = activeTemplateId();
     config.judgeMode = judgeModeFromUi(ui->resultBasisComboBox->currentText());
     config.minScore = ui->minScoreSpinBox->value();
+    config.minCategoryConfidence = ui->minCategoryConfidenceSpinBox->value();
+    config.minClassifiedCoverage = ui->minClassifiedCoverageSpinBox->value();
+    config.expectedClassId = ui->expectedLabelComboBox->currentIndex() >= 0
+            ? ui->expectedLabelComboBox->currentData().toInt() : -1;
     config.expectedLabel = ui->expectedLabelComboBox->currentText().trimmed();
     return config;
 }
@@ -526,6 +755,7 @@ ToolConfig ColorRecognitionDialog::toToolConfig() const
                   ui->allSegmentButton->isChecked()
                   ? QStringLiteral("all")
                   : QStringLiteral("basic"));
+    params.insert(QStringLiteral("globalDetection"), m_globalDetection);
     params.insert(QStringLiteral("detectRegionType"),
                   (!m_globalDetection && m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid)
                   ? QStringLiteral("circle")
@@ -543,26 +773,28 @@ ToolConfig ColorRecognitionDialog::toToolConfig() const
                   m_maskPolygonNormalized.size() >= 3
                   ? QStringLiteral("UI configured; HALCON color runner applies mask during detection")
                   : QStringLiteral("not configured"));
-    params.insert(QStringLiteral("enablePositionCorrection"),
-                  ui->positionCorrectionSwitch->isChecked());
-    params.insert(QStringLiteral("positionCorrectionSource"),
-                  ui->positionCorrectionSourceComboBox->currentText());
+    PositionCorrection::writeParams(PositionCorrectionConfig{
+                                        ui->positionCorrectionSwitch->isChecked(),
+                                        ui->positionCorrectionSourceComboBox->currentText(),
+                                        PositionCorrection::defaultSourceId()},
+                                    &params);
     params.insert(QStringLiteral("colorDecisionMode"),
                   colorDecisionModeFromUi(ui->colorDecisionModeComboBox->currentText()));
     params.insert(QStringLiteral("colorModel"), colorModel);
     if (currentTemplate) {
+        params.insert(QStringLiteral("recognitionBackend"), currentTemplate->recognitionBackend);
         params.insert(QStringLiteral("featureType"), currentTemplate->featureType);
         params.insert(QStringLiteral("sensitivity"), currentTemplate->sensitivity);
         params.insert(QStringLiteral("brightnessEnabled"), currentTemplate->brightnessEnabled);
-        params.insert(QStringLiteral("knnK"), currentTemplate->knnK);
-        params.insert(QStringLiteral("knnDistance"), currentTemplate->knnDistance);
-        params.insert(QStringLiteral("knnDistanceApplied"), QStringLiteral("halcon_default"));
     }
 
     QJsonObject judgeRule;
     judgeRule.insert(QStringLiteral("mode"), colorConfig.judgeMode);
     judgeRule.insert(QStringLiteral("resultBasis"), ui->resultBasisComboBox->currentText());
     judgeRule.insert(QStringLiteral("minScore"), colorConfig.minScore);
+    judgeRule.insert(QStringLiteral("minCategoryConfidence"), colorConfig.minCategoryConfidence);
+    judgeRule.insert(QStringLiteral("minClassifiedCoverage"), colorConfig.minClassifiedCoverage);
+    judgeRule.insert(QStringLiteral("expectedClassId"), colorConfig.expectedClassId);
     judgeRule.insert(QStringLiteral("expectedLabel"), colorConfig.expectedLabel);
 
     ToolConfig config;
@@ -603,12 +835,16 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
     const QJsonObject colorModel = params.value(QStringLiteral("colorModel")).toObject();
     const QJsonObject judgeRule = config.judgeRule;
     setAllParamsMode(params.value(QStringLiteral("paramMode")).toString() == QStringLiteral("all"));
+    m_globalDetection = params.value(QStringLiteral("globalDetection")).toBool(false);
     m_detectRegionType = params.value(QStringLiteral("detectRegionType")).toString(QStringLiteral("rectangle")).trimmed().toLower();
     m_circleRoiNormalized = circleFromJson(params.value(QStringLiteral("detectCircleNormalized")).toObject());
-    if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid)
+    if (!m_globalDetection && m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid)
         m_roiNormalized = normalizedRoiOrDefault(m_circleRoiNormalized.boundingRectNormalized);
-    else
+    else {
         m_detectRegionType = QStringLiteral("rectangle");
+        if (m_globalDetection)
+            m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    }
     m_maskPolygonNormalized = pointsFromJson(params.value(QStringLiteral("detectMaskPolygon")).toArray());
     if (m_maskPolygonNormalized.size() < 3)
         m_maskPolygonNormalized.clear();
@@ -634,8 +870,6 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
         legacyTemplate.featureType = params.value(QStringLiteral("featureType")).toString(QStringLiteral("histogram"));
         legacyTemplate.sensitivity = params.value(QStringLiteral("sensitivity")).toString(QStringLiteral("medium"));
         legacyTemplate.brightnessEnabled = params.value(QStringLiteral("brightnessEnabled")).toBool(true);
-        legacyTemplate.knnK = qMax(1, params.value(QStringLiteral("knnK")).toInt(3));
-        legacyTemplate.knnDistance = params.value(QStringLiteral("knnDistance")).toString(QStringLiteral("halcon_default"));
 
         const QJsonArray labels = colorModel.value(QStringLiteral("labels")).toArray();
         for (const QJsonValue &value : labels) {
@@ -663,24 +897,23 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
                     colorDecisionModeToUi(params.value(QStringLiteral("colorDecisionMode"))
                                           .toString(QStringLiteral("dominant_ratio"))));
     ui->minScoreSpinBox->setValue(judgeRule.value(QStringLiteral("minScore")).toInt(ui->minScoreSpinBox->value()));
+    ui->minCategoryConfidenceSpinBox->setValue(
+                judgeRule.value(QStringLiteral("minCategoryConfidence")).toInt(80));
+    ui->minClassifiedCoverageSpinBox->setValue(
+                judgeRule.value(QStringLiteral("minClassifiedCoverage")).toInt(90));
     updateTemplateList();
     updateExpectedLabelCombo();
     setComboBoxText(ui->expectedLabelComboBox,
                     judgeRule.value(QStringLiteral("expectedLabel")).toString());
+    const int expectedClassId = judgeRule.value(QStringLiteral("expectedClassId")).toInt(-1);
+    const int expectedIndex = ui->expectedLabelComboBox->findData(expectedClassId);
+    if (expectedIndex >= 0)
+        ui->expectedLabelComboBox->setCurrentIndex(expectedIndex);
     updateJudgementControls();
     syncMaskControls();
     refreshPositionCorrectionControls();
 
-    if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid) {
-        const QSignalBlocker blockDraw(ui->regionDrawButton);
-        const QSignalBlocker blockRect(ui->regionRectButton);
-        const QSignalBlocker blockCircle(ui->regionCircleButton);
-        ui->regionDrawButton->setChecked(false);
-        ui->regionRectButton->setChecked(false);
-        ui->regionCircleButton->setChecked(true);
-    } else {
-        syncRegionButtons(true);
-    }
+    setEditState(EditState::None);
     m_referencePreviewSnapshot = ToolPreviewSnapshot();
     showPreviewImage();
     setViewerStatusText(roiStatusText(), roiStatusText());
@@ -693,9 +926,11 @@ QString ColorRecognitionDialog::summaryText() const
     if (!colorTemplate)
         return tr("未选择颜色模板；最低分 %1").arg(ui->minScoreSpinBox->value());
 
+    const QString backend = colorTemplate->recognitionBackend == QStringLiteral("cielab_gmm")
+            ? tr("CIELAB GMM") : tr("HSV 直方图");
     return tr("%1；%2；样本 %3；最低分 %4")
             .arg(colorTemplate->name,
-                 featureTypeToUi(colorTemplate->featureType))
+                 backend)
             .arg(sampleCount(*colorTemplate))
             .arg(ui->minScoreSpinBox->value());
 }
@@ -704,7 +939,6 @@ QString ColorRecognitionDialog::summaryText() const
 void ColorRecognitionDialog::resizeEvent(QResizeEvent *event)
 {
     QDialog::resizeEvent(event);
-    fitPreview();
 }
 
 // 点击完成时把当前 UI 状态固化为 ToolConfig，并通过 accept 交还调用方。
@@ -716,10 +950,7 @@ void ColorRecognitionDialog::finishConfiguration()
     }
 
     stopLiveTestRun();
-    if (m_previewHelper) {
-        m_previewHelper->setRoiDrawingEnabled(false);
-        m_previewHelper->setCircleDrawingEnabled(false);
-    }
+    setEditState(EditState::None);
     accept();
 }
 
@@ -739,11 +970,7 @@ void ColorRecognitionDialog::runTest()
     m_liveTestRunning = true;
     m_displayedSampleIndex = -1;
     updateBottomButtons();
-    if (m_previewHelper && !m_maskEditing && !m_globalDetection && m_displayedSampleIndex < 0) {
-        const bool circleMode = m_detectRegionType == QStringLiteral("circle");
-        m_previewHelper->setRoiDrawingEnabled(!circleMode);
-        m_previewHelper->setCircleDrawingEnabled(circleMode);
-    }
+    setEditState(m_editState);
     refreshDisplayedRoiOverlay();
     performTestRun();
     if (m_testRunTimer)
@@ -764,9 +991,13 @@ void ColorRecognitionDialog::rerunLiveTest()
         return;
 
     cv::Mat frame;
+    FrameInputMetadata metadata;
     bool referenceSource = false;
     if (m_liveTestSource == LiveTestSource::Reference) {
-        frame = ReferenceImageProvider::instance().referenceFrame();
+        const ReferenceFrameSnapshot snapshot =
+                ReferenceImageProvider::instance().referenceFrameSnapshot();
+        frame = snapshot.frame;
+        metadata = snapshot.metadata;
         referenceSource = true;
         if (frame.empty()) {
             displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
@@ -774,10 +1005,15 @@ void ColorRecognitionDialog::rerunLiveTest()
         }
     } else {
         // Camera：连续态用最新帧，停止/运行一次态用缓存的快照帧（即上一帧检测结果所在帧）。
-        if (m_testUiMode == TestUiMode::Continuous)
-            frame = CameraFrameProvider::instance().currentFrame();
-        else
+        if (m_testUiMode == TestUiMode::Continuous) {
+            const CameraFrameSnapshot snapshot =
+                    CameraFrameProvider::instance().currentFrameSnapshot();
+            frame = snapshot.frame;
+            metadata = snapshot.metadata;
+        } else {
             frame = m_liveTestFrameSnapshot;
+            metadata = m_liveTestFrameMetadata;
+        }
         if (frame.empty()) {
             displayError(QStringLiteral("image_empty"), tr("当前图像为空"));
             if (m_testUiMode == TestUiMode::Continuous) {
@@ -789,11 +1025,13 @@ void ColorRecognitionDialog::rerunLiveTest()
         }
     }
 
-    launchDetection(frame, referenceSource);
+    launchDetection(frame, metadata, referenceSource);
 }
 
 // 统一发起异步检测任务，处理在途请求排队、generation 标记和结果回调识别。
-void ColorRecognitionDialog::launchDetection(const cv::Mat &frame, bool referenceSource)
+void ColorRecognitionDialog::launchDetection(const cv::Mat &frame,
+                                             const FrameInputMetadata &metadata,
+                                             bool referenceSource)
 {
     if (m_testRunBusy) {
         // 检测在途：标记待补跑，等当前结束后用最新来源重跑，避免点击/绘制被吞。
@@ -810,12 +1048,15 @@ void ColorRecognitionDialog::launchDetection(const cv::Mat &frame, bool referenc
         refreshDisplayedRoiOverlay();
     }
 
-    if (!referenceSource)
+    if (!referenceSource) {
         m_liveTestFrameSnapshot = frame;  // 缓存为停止态重测的快照帧
+        m_liveTestFrameMetadata = metadata;
+    }
 
     ToolRequest request;
     request.config = toToolConfig();
     request.image = frame.clone();
+    request.runtimeContext.insert(QStringLiteral("input"), metadata.toJson());
     const int generation = ++m_testRunGeneration;
     m_testRunBusy = true;
     m_testRunWatcher->setFuture(QtConcurrent::run([request, referenceSource, generation]() mutable {
@@ -835,12 +1076,13 @@ void ColorRecognitionDialog::runReferenceTest()
     m_testUiMode = TestUiMode::Edit;
     updateBottomButtons();
 
-    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
-    if (frame.empty()) {
+    const ReferenceFrameSnapshot snapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    if (snapshot.frame.empty()) {
         displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
         return;
     }
-    launchDetection(frame, true);
+    launchDetection(snapshot.frame, snapshot.metadata, true);
     setViewerStatusText(tr("已进入基准图测试，可继续绘制检测区域，松开即自动判别"));
 }
 
@@ -850,7 +1092,10 @@ void ColorRecognitionDialog::runOnceInTestMode()
     stopLiveTestRun();
     m_testUiMode = TestUiMode::TestPaused;
     m_liveTestSource = LiveTestSource::Camera;
-    m_liveTestFrameSnapshot = CameraFrameProvider::instance().currentFrame();
+    const CameraFrameSnapshot snapshot =
+            CameraFrameProvider::instance().currentFrameSnapshot();
+    m_liveTestFrameSnapshot = snapshot.frame;
+    m_liveTestFrameMetadata = snapshot.metadata;
     updateBottomButtons();
     rerunLiveTest();
     setViewerStatusText(tr("已运行一次，视图锁定当前帧，可继续绘制检测区域即时重测"));
@@ -873,11 +1118,7 @@ void ColorRecognitionDialog::stopLiveTestRun()
         m_testRunTimer->stop();
     ++m_testRunGeneration;
     m_liveTestRunning = false;
-    if (m_previewHelper && !m_maskEditing && !m_globalDetection && m_displayedSampleIndex < 0) {
-        const bool circleMode = m_detectRegionType == QStringLiteral("circle");
-        m_previewHelper->setRoiDrawingEnabled(!circleMode);
-        m_previewHelper->setCircleDrawingEnabled(circleMode);
-    }
+    setEditState(m_editState);
 }
 
 // 根据编辑/连续/暂停测试态刷新底部按钮的显示、启用和文案。
@@ -924,6 +1165,8 @@ void ColorRecognitionDialog::setupUiState()
 
     ui->minScoreSpinBox->setRange(0, 100);
     ui->minScoreSpinBox->setValue(80);
+    ui->minCategoryConfidenceSpinBox->setRange(0, 100);
+    ui->minClassifiedCoverageSpinBox->setRange(0, 100);
     ui->viewerTitleLabel->setText(tr("基准图"));
     ui->previewGraphicsView->setBackgroundBrush(QBrush(QColor(255, 255, 255)));
     ui->viewerStatusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
@@ -931,6 +1174,13 @@ void ColorRecognitionDialog::setupUiState()
     ui->viewerStatusLabel->setWordWrap(false);
     ui->viewerStatusLabel->setTextFormat(Qt::PlainText);
     ui->viewerStatusLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->viewerGridButton->setToolTip(tr("网格显示（暂未实现）"));
+    ui->viewerGridButton->setEnabled(false);
+    ui->viewerZoomSearchButton->setToolTip(tr("适应窗口"));
+    ui->viewerZoomOutButton->setToolTip(tr("缩小视图"));
+    ui->viewerZoomInButton->setToolTip(tr("放大视图"));
+    ui->viewerFullButton->setToolTip(tr("恢复适应窗口"));
+    updateViewerZoomLabel(m_previewHelper ? m_previewHelper->viewScale() : 1.0);
     ui->positionCorrectionSwitch->setObjectName(QStringLiteral("positionCorrectionSwitch"));
     ui->positionCorrectionSwitch->setChecked(false);
     setComboBoxText(ui->positionCorrectionSourceComboBox,
@@ -1018,16 +1268,7 @@ void ColorRecognitionDialog::setupUiState()
     }
 
     setAllParamsMode(false);
-    if (m_detectRegionType == QStringLiteral("circle") && m_circleRoiNormalized.valid) {
-        const QSignalBlocker blockDraw(ui->regionDrawButton);
-        const QSignalBlocker blockRect(ui->regionRectButton);
-        const QSignalBlocker blockCircle(ui->regionCircleButton);
-        ui->regionDrawButton->setChecked(false);
-        ui->regionRectButton->setChecked(false);
-        ui->regionCircleButton->setChecked(true);
-    } else {
-        syncRegionButtons(true);
-    }
+    setEditState(EditState::None);
     updateTemplateList();
     updateJudgementControls();
     syncMaskControls();
@@ -1067,6 +1308,14 @@ void ColorRecognitionDialog::connectControls()
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &ColorRecognitionDialog::updateJudgementControls);
+    connect(ui->gmmRejectionSpinBox,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this,
+            [this](double value) {
+        if (ColorRecognitionTemplateData *colorTemplate = activeTemplate())
+            colorTemplate->gmmRejectionThreshold = value;
+        updateGmmRejectionHint(value);
+    });
     connect(ui->positionCorrectionSwitch,
             &QCheckBox::toggled,
             this,
@@ -1118,6 +1367,12 @@ void ColorRecognitionDialog::connectControls()
                      ui->colorDecisionModeComboBox,
                      ui->minScoreLabel,
                      ui->minScoreSpinBox,
+                     ui->gmmRejectionLabel,
+                     ui->gmmRejectionSpinBox,
+                     ui->minCategoryConfidenceLabel,
+                     ui->minCategoryConfidenceSpinBox,
+                     ui->minClassifiedCoverageLabel,
+                     ui->minClassifiedCoverageSpinBox,
                      ui->expectedLabelTitleLabel,
                      ui->expectedLabelComboBox});
 
@@ -1138,8 +1393,18 @@ void ColorRecognitionDialog::connectControls()
     connect(ui->regionDrawButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startGlobalDetection);
     connect(ui->regionRectButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startRectangleRoiEditing);
     connect(ui->regionCircleButton, &QToolButton::clicked, this, &ColorRecognitionDialog::startCircleRoiEditing);
+    connect(ui->viewerZoomOutButton, &QToolButton::clicked,
+            m_previewHelper, &FrameViewHelper::zoomOut);
+    connect(ui->viewerZoomInButton, &QToolButton::clicked,
+            m_previewHelper, &FrameViewHelper::zoomIn);
+    connect(ui->viewerZoomSearchButton, &QToolButton::clicked,
+            m_previewHelper, &FrameViewHelper::fitToView);
+    connect(ui->viewerFullButton, &QToolButton::clicked,
+            m_previewHelper, &FrameViewHelper::fitToView);
 
     if (m_previewHelper) {
+        connect(m_previewHelper, &FrameViewHelper::viewTransformChanged,
+                this, [this](qreal scale, bool) { updateViewerZoomLabel(scale); });
         connect(m_previewHelper,
                 &FrameViewHelper::roiChanged,
                 this,
@@ -1497,17 +1762,39 @@ void ColorRecognitionDialog::updateActiveTemplateSummary()
     if (!colorTemplate) {
         ui->activeTemplateSummaryLabel->setText(tr("未添加模板"));
         ui->allTemplateSummaryLabel->setText(tr("未添加模板"));
+        updateJudgementControls();
         return;
     }
 
-    const QString text = tr("%1 | %2 | 标签 %3 | 样本 %4 | K=%5")
+    const QString backend = colorTemplate->recognitionBackend == QStringLiteral("cielab_gmm")
+            ? tr("CIELAB GMM") : featureTypeToUi(colorTemplate->featureType);
+    const QString modelState = colorTemplate->recognitionBackend == QStringLiteral("cielab_gmm")
+            ? colorTemplate->gmmModel.state : colorTemplate->modelState;
+    const QString text = tr("%1 | %2 | 模型 %3 | 标签 %4 | 样本 %5")
             .arg(colorTemplate->name,
-                 featureTypeToUi(colorTemplate->featureType))
+                 backend,
+                 modelState)
             .arg(colorTemplate->labels.size())
-            .arg(colorTemplate->samples.size())
-            .arg(colorTemplate->knnK);
+            .arg(colorTemplate->samples.size());
     ui->activeTemplateSummaryLabel->setText(text);
     ui->allTemplateSummaryLabel->setText(text);
+    const QSignalBlocker rejectionBlock(ui->gmmRejectionSpinBox);
+    ui->gmmRejectionSpinBox->setValue(colorTemplate->gmmRejectionThreshold);
+    updateGmmRejectionHint(colorTemplate->gmmRejectionThreshold);
+    updateJudgementControls();
+}
+
+void ColorRecognitionDialog::updateGmmRejectionHint(double value)
+{
+    const bool unusuallyHigh = value >= 0.01;
+    ui->gmmRejectionLabel->setText(unusuallyHigh
+                                   ? tr("像素拒识阈值 ⚠")
+                                   : tr("像素拒识阈值"));
+    const QString hint = unusuallyHigh
+            ? tr("当前 K-sigma 阈值可能过高，会拒绝大量有效像素。HALCON 典型起点为 0.0001；数值越高，拒识越严格。")
+            : tr("HALCON K-sigma 像素拒识阈值；数值越高，拒识越严格。典型起点为 0.0001。");
+    ui->gmmRejectionLabel->setToolTip(hint);
+    ui->gmmRejectionSpinBox->setToolTip(hint);
 }
 
 // 根据当前模板标签刷新类别判定下拉框。
@@ -1529,10 +1816,20 @@ void ColorRecognitionDialog::updateExpectedLabelCombo()
 void ColorRecognitionDialog::updateJudgementControls()
 {
     const bool categoryMode = judgeModeFromUi(ui->resultBasisComboBox->currentText()) == QStringLiteral("category");
-    ui->minScoreLabel->setVisible(!categoryMode);
-    ui->minScoreSpinBox->setVisible(!categoryMode);
+    const ColorRecognitionTemplateData *colorTemplate = activeTemplate();
+    const bool gmm = colorTemplate && colorTemplate->recognitionBackend == QStringLiteral("cielab_gmm");
+    ui->minScoreLabel->setVisible(gmm || !categoryMode);
+    ui->minScoreSpinBox->setVisible(gmm || !categoryMode);
     ui->expectedLabelTitleLabel->setVisible(categoryMode);
     ui->expectedLabelComboBox->setVisible(categoryMode);
+    ui->gmmRejectionLabel->setVisible(gmm);
+    ui->gmmRejectionSpinBox->setVisible(gmm);
+    ui->minCategoryConfidenceLabel->setVisible(gmm);
+    ui->minCategoryConfidenceSpinBox->setVisible(gmm);
+    ui->minClassifiedCoverageLabel->setVisible(gmm);
+    ui->minClassifiedCoverageSpinBox->setVisible(gmm);
+    ui->colorDecisionModeLabel->setVisible(!gmm);
+    ui->colorDecisionModeComboBox->setVisible(!gmm);
 }
 
 // 处理模板列表点击，切换当前模板或定位到样本所属模板。
@@ -1641,6 +1938,7 @@ void ColorRecognitionDialog::showPreviewImage()
     }
 
     if (image.isNull()) {
+        setEditState(EditState::None);
         m_previewHelper->clear();
         ui->viewerTitleLabel->setText(tr("当前无图像"));
         const QString text = tr("当前无图像，ROI 默认全图");
@@ -1669,7 +1967,7 @@ void ColorRecognitionDialog::showFrameForRoiEditing()
     }
 
     if (image.isNull()) {
-        m_previewHelper->setRoiDrawingEnabled(false);
+        setEditState(EditState::None);
         m_previewHelper->clear();
         ui->viewerTitleLabel->setText(tr("当前无图像"));
         const QString text = tr("当前无图像，ROI 默认全图；请先设置基准图或提供当前图像后再框选");
@@ -1686,18 +1984,15 @@ void ColorRecognitionDialog::showFrameForRoiEditing()
 // 切换为整图检测，清理局部 ROI 选择并刷新测试结果。
 void ColorRecognitionDialog::startGlobalDetection()
 {
+    setEditState(EditState::None);
+    m_maskEditing = false;
     showFrameForRoiEditing();
     m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     m_detectRegionType = QStringLiteral("rectangle");
     m_circleRoiNormalized = CircleRoi();
     m_globalDetection = true;
     m_displayedSampleIndex = -1;
-    const QSignalBlocker blockDraw(ui->regionDrawButton);
-    const QSignalBlocker blockRect(ui->regionRectButton);
-    const QSignalBlocker blockCircle(ui->regionCircleButton);
-    ui->regionDrawButton->setChecked(true);
-    ui->regionRectButton->setChecked(false);
-    ui->regionCircleButton->setChecked(false);
+    refreshRegionButtons();
     if (m_previewHelper) {
         m_previewHelper->setRoiDrawingEnabled(false);
         m_previewHelper->setCircleDrawingEnabled(false);
@@ -1712,20 +2007,27 @@ void ColorRecognitionDialog::startGlobalDetection()
 // 启动矩形检测 ROI 框选。
 void ColorRecognitionDialog::startRectangleRoiEditing()
 {
+    if (m_editState == EditState::DetectRect) {
+        setEditState(EditState::None);
+        setViewerStatusText(tr("已退出矩形 ROI 绘制，可拖动或缩放查看图像"));
+        return;
+    }
+
+    m_maskEditing = false;
+    showFrameForRoiEditing();
+    if (!m_previewHelper || !m_previewHelper->hasImage()) {
+        setEditState(EditState::None);
+        return;
+    }
+
     m_globalDetection = false;
     m_detectRegionType = QStringLiteral("rectangle");
     m_circleRoiNormalized = CircleRoi();
     m_displayedSampleIndex = -1;
-    syncRegionButtons(true);
-    showFrameForRoiEditing();
-
-    if (!m_previewHelper || !m_previewHelper->hasImage())
-        return;
 
     m_previewHelper->setRoiRectNormalized(effectiveRoiNormalized());
     m_previewHelper->clearCircleRoi();
-    m_previewHelper->setCircleDrawingEnabled(false);
-    m_previewHelper->setRoiDrawingEnabled(true);
+    setEditState(EditState::DetectRect);
     const QString text = tr("请框选颜色识别矩形 ROI");
     setViewerStatusText(text, text);
 }
@@ -1733,28 +2035,29 @@ void ColorRecognitionDialog::startRectangleRoiEditing()
 // 启动圆形检测 ROI 框选。
 void ColorRecognitionDialog::startCircleRoiEditing()
 {
+    if (m_editState == EditState::DetectCircle) {
+        setEditState(EditState::None);
+        setViewerStatusText(tr("已退出圆形 ROI 绘制，可拖动或缩放查看图像"));
+        return;
+    }
+
+    m_maskEditing = false;
+    showFrameForRoiEditing();
+    if (!m_previewHelper || !m_previewHelper->hasImage()) {
+        setEditState(EditState::None);
+        return;
+    }
+
     m_globalDetection = false;
     m_detectRegionType = QStringLiteral("circle");
     m_displayedSampleIndex = -1;
-    showFrameForRoiEditing();
 
-    const QSignalBlocker blockDraw(ui->regionDrawButton);
-    const QSignalBlocker blockRect(ui->regionRectButton);
-    const QSignalBlocker blockCircle(ui->regionCircleButton);
-    ui->regionDrawButton->setChecked(false);
-    ui->regionRectButton->setChecked(false);
-    ui->regionCircleButton->setChecked(true);
-
-    if (!m_previewHelper || !m_previewHelper->hasImage())
-        return;
-
-    m_previewHelper->setRoiDrawingEnabled(false);
     m_previewHelper->clearRoi();
     if (m_circleRoiNormalized.valid)
         m_previewHelper->setCircleRoiNormalized(m_circleRoiNormalized);
     else
         m_previewHelper->clearCircleRoi();
-    m_previewHelper->setCircleDrawingEnabled(true);
+    setEditState(EditState::DetectCircle);
     const QString text = tr("请框选颜色识别圆形 ROI：按住左键从圆心拖拽半径");
     setViewerStatusText(text, text);
 }
@@ -1765,18 +2068,46 @@ void ColorRecognitionDialog::showUnsupportedRegionMessage()
     startRectangleRoiEditing();
 }
 
-// 同步矩形/圆形区域按钮 checked 状态，避免信号递归。
-void ColorRecognitionDialog::syncRegionButtons(bool rectangleRegion)
+void ColorRecognitionDialog::setEditState(EditState state)
 {
-    if (!rectangleRegion)
-        rectangleRegion = true;
+    m_editState = state;
+    if (m_previewHelper) {
+        const bool rectangle = state == EditState::DetectRect;
+        const bool circle = state == EditState::DetectCircle;
+        const bool polygon = state == EditState::DetectMaskPolygon;
+        if (m_previewHelper->isRoiDrawingEnabled() != rectangle)
+            m_previewHelper->setRoiDrawingEnabled(rectangle);
+        if (m_previewHelper->isCircleDrawingEnabled() != circle)
+            m_previewHelper->setCircleDrawingEnabled(circle);
+        if (m_previewHelper->isPolygonDrawingEnabled() != polygon)
+            m_previewHelper->setPolygonDrawingEnabled(polygon);
+    }
+    refreshRegionButtons();
+    syncMaskControls();
+}
+
+void ColorRecognitionDialog::toggleEditState(EditState state)
+{
+    setEditState(m_editState == state ? EditState::None : state);
+}
+
+void ColorRecognitionDialog::refreshRegionButtons()
+{
+    m_regionGroup->setExclusive(false);
 
     const QSignalBlocker blockDraw(ui->regionDrawButton);
     const QSignalBlocker blockRect(ui->regionRectButton);
     const QSignalBlocker blockCircle(ui->regionCircleButton);
-    ui->regionDrawButton->setChecked(!rectangleRegion);
-    ui->regionRectButton->setChecked(rectangleRegion);
-    ui->regionCircleButton->setChecked(false);
+    ui->regionDrawButton->setChecked(m_globalDetection && m_editState == EditState::None);
+    ui->regionRectButton->setChecked(m_editState == EditState::DetectRect);
+    ui->regionCircleButton->setChecked(m_editState == EditState::DetectCircle);
+    m_regionGroup->setExclusive(true);
+}
+
+void ColorRecognitionDialog::updateViewerZoomLabel(qreal scale)
+{
+    if (ui && ui->viewerZoomLabel)
+        ui->viewerZoomLabel->setText(QStringLiteral("%1%").arg(qRound(scale * 100.0)));
 }
 
 // 保存矩形 ROI 编辑结果，并在测试态下立即重跑检测。
@@ -1787,7 +2118,6 @@ void ColorRecognitionDialog::handleRoiChanged(const QRectF &roi)
     m_detectRegionType = QStringLiteral("rectangle");
     m_circleRoiNormalized = CircleRoi();
     m_displayedSampleIndex = -1;
-    syncRegionButtons(true);
     if (m_previewHelper) {
         m_previewHelper->clearToolOverlays();
         m_previewHelper->clearCircleRoi();
@@ -1820,13 +2150,6 @@ void ColorRecognitionDialog::handleCircleRoiChanged(const CircleRoi &roi)
     m_globalDetection = false;
     m_displayedSampleIndex = -1;
 
-    const QSignalBlocker blockDraw(ui->regionDrawButton);
-    const QSignalBlocker blockRect(ui->regionRectButton);
-    const QSignalBlocker blockCircle(ui->regionCircleButton);
-    ui->regionDrawButton->setChecked(false);
-    ui->regionRectButton->setChecked(false);
-    ui->regionCircleButton->setChecked(true);
-
     if (m_previewHelper) {
         m_previewHelper->clearToolOverlays();
         m_previewHelper->clearRoi();
@@ -1854,13 +2177,12 @@ void ColorRecognitionDialog::handleCircleRoiSelectionRejected()
 void ColorRecognitionDialog::startMaskEditing()
 {
     stopLiveTestRun();
+    setEditState(EditState::None);
     m_maskEditing = true;
     m_displayedSampleIndex = -1;
     showFrameForRoiEditing();
 
     if (m_previewHelper) {
-        m_previewHelper->setRoiDrawingEnabled(false);
-        m_previewHelper->setCircleDrawingEnabled(false);
         m_previewHelper->clearRoi();
         m_previewHelper->clearCircleRoi();
         m_previewHelper->clearToolOverlays();
@@ -1888,11 +2210,13 @@ void ColorRecognitionDialog::startMaskPolygonDrawing()
         return;
     }
 
-    m_previewHelper->setRoiDrawingEnabled(false);
-    m_previewHelper->setCircleDrawingEnabled(false);
-    m_previewHelper->setPolygonDrawingEnabled(true);
-    if (m_maskPolygonButton)
-        m_maskPolygonButton->setChecked(true);
+    if (m_editState == EditState::DetectMaskPolygon) {
+        setEditState(EditState::None);
+        setViewerStatusText(tr("已退出屏蔽区绘制，已有屏蔽多边形保持不变"));
+        return;
+    }
+
+    setEditState(EditState::DetectMaskPolygon);
     const QString text = tr("绘制屏蔽多边形：左键添加角点，双击完成；完成后可拖动整体或拖动顶点");
     setViewerStatusText(text, text);
 }
@@ -1903,9 +2227,9 @@ void ColorRecognitionDialog::finishMaskEditing()
     if (m_previewHelper) {
         if (m_previewHelper->isPolygonDrawingEnabled())
             m_previewHelper->finishPolygonDrawing();
-        m_previewHelper->setPolygonDrawingEnabled(false);
     }
 
+    setEditState(EditState::None);
     m_maskEditing = false;
     syncMaskControls();
     refreshDisplayedRoiOverlay();
@@ -1947,7 +2271,8 @@ void ColorRecognitionDialog::syncMaskControls()
         m_maskEditButton->setVisible(!m_maskEditing);
     if (m_maskPolygonButton) {
         m_maskPolygonButton->setVisible(m_maskEditing);
-        m_maskPolygonButton->setChecked(m_previewHelper && m_previewHelper->isPolygonDrawingEnabled());
+        const QSignalBlocker blocker(m_maskPolygonButton);
+        m_maskPolygonButton->setChecked(m_editState == EditState::DetectMaskPolygon);
     }
     if (m_maskFinishButton)
         m_maskFinishButton->setVisible(m_maskEditing);
@@ -1996,14 +2321,10 @@ void ColorRecognitionDialog::refreshDisplayedRoiOverlay()
 void ColorRecognitionDialog::displayResult(const ToolResult &result, bool referenceSource)
 {
     if (m_previewHelper) {
-        // 任何实时测试态（基准图 / 相机连续 / 单次）都保持检测区域可绘制，以便"绘制即重测"。
-        const bool keepDetectRoiEditable =
-                m_liveTestSource != LiveTestSource::None && !m_globalDetection &&
-                !m_maskEditing && m_displayedSampleIndex < 0;
-        const bool keepCircleEditable =
-                keepDetectRoiEditable && m_detectRegionType == QStringLiteral("circle");
-        m_previewHelper->setRoiDrawingEnabled(keepDetectRoiEditable && !keepCircleEditable);
-        m_previewHelper->setCircleDrawingEnabled(keepCircleEditable);
+        const bool keepDetectRoiEditable = m_editState == EditState::DetectRect ||
+                m_editState == EditState::DetectCircle;
+        const bool keepCircleEditable = m_editState == EditState::DetectCircle;
+        setEditState(m_editState);
         m_previewHelper->clearToolOverlays();
         m_previewHelper->setToolOverlays(keepDetectRoiEditable
                                          ? colorRecognitionPreviewOverlaysWithoutRoi(result.overlays)
@@ -2015,13 +2336,28 @@ void ColorRecognitionDialog::displayResult(const ToolResult &result, bool refere
     }
 
     const QString predictedLabel = result.payload.value(QStringLiteral("predictedLabel")).toString(result.text);
-    const QString displayText = tr("ColorRecognition: %1 | label:%2 | score:%3 | sample:%4 | %5")
+    const bool gmm = result.payload.value(QStringLiteral("backend")).toString() == QStringLiteral("cielab_gmm");
+    const QString metrics = gmm
+            ? tr(" | confidence:%1 | coverage:%2")
+              .arg(QString::number(result.payload.value(QStringLiteral("categoryConfidence")).toDouble(), 'f', 2),
+                   QString::number(result.payload.value(QStringLiteral("classifiedCoverage")).toDouble(), 'f', 2))
+            : QString();
+    QString message = result.message;
+    if (result.status == QStringLiteral("model_stale_needs_resample") ||
+        result.status == QStringLiteral("hsv_feature_stale")) {
+        message = tr("HSV 特征已失效，请编辑模板并点击“重新提取 HSV 特征”");
+    } else if (result.status == QStringLiteral("invalid_pixel_format_metadata") ||
+               result.status == QStringLiteral("input_metadata_mismatch")) {
+        message = tr("输入图像实际位深/通道与 pixelFormat 不一致");
+    } else if (result.status == QStringLiteral("gmm_model_stale")) {
+        message = tr("GMM 模型已失效，请编辑模板并重新建立模型");
+    }
+    const QString displayText = tr("ColorRecognition: %1 | label:%2 | score:%3%4 | sample:%5 | status:%6 | %7")
             .arg(result.success ? (result.ok ? QStringLiteral("OK") : QStringLiteral("NG"))
                                 : QStringLiteral("error"),
                  predictedLabel,
-                 QString::number(result.score, 'f', 2))
-            .arg(result.count)
-            .arg(result.message);
+                 QString::number(result.score, 'f', 2), metrics)
+            .arg(result.count).arg(result.status, message);
     setViewerStatusText(displayText, displayText);
 
     if (referenceSource && result.success) {

@@ -151,6 +151,7 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->contourPresenceButton, ContourPresence);
 
     //定位工具
+    ui->templateLocationButton->setCheckable(true);
     m_buttonGroup->addButton(ui->templateLocationButton, TemplateLocation); //模板定位
     m_buttonGroup->addButton(ui->edgeLocationButton, EdgeLocationButton);   //边缘定位
     m_buttonGroup->addButton(ui->circleLocationButton, CircleLocationButton);   //圆定位
@@ -244,6 +245,12 @@ void ToolLibraryDialog::confirmSelection()
 
     if (tool == PositionCorrectionTool) {
         m_selectedToolType = ToolType::PositionCorrection;
+        accept();
+        return;
+    }
+
+    if (tool == TemplateLocation) {
+        m_selectedToolType = ToolType::TemplateLocation;
         accept();
         return;
     }
@@ -362,10 +369,10 @@ void ToolLibraryDialog::updatePreview(int id)
         break;
 
 /*===========================tfk add===========================*/       
-    // case TemplateLocation:
-    //     ui->previewTitleLabel->setText(tr("模板定位"));
-    //     ui->previewDescriptionLabel->setText(tr("模板定位"));
-    //     break;
+    case TemplateLocation:
+        ui->previewTitleLabel->setText(tr("模板定位"));
+        ui->previewDescriptionLabel->setText(tr("在运行图中定位形状模板，输出 X/Y、角度、缩放和得分"));
+        break;
     // case EdgeLocationButton:
     //     ui->previewTitleLabel->setText(tr("边缘定位"));
     //     ui->previewDescriptionLabel->setText(tr("边缘定位"));

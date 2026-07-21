@@ -1,7 +1,7 @@
 # 颜色模板 GMM 建模反馈与参数显隐设计
 
 日期：2026-07-16  
-状态：已确认，待实施
+状态：已实施并通过 UI lifecycle 回归（2026-07-16）
 
 ## 1. 问题
 
@@ -67,3 +67,10 @@ stale          → 橙色
 6. 建模完成后保存、样本编辑和重新建模按钮恢复正确可用性。
 7. GMM B1/B2/B3 smoke、HSV Phase A 和 Qt 主工程构建继续通过。
 
+## 7. 实施记录
+
+- `featureTypeRowWidget` 统一承载 HSV 特征标题和下拉框，GMM 模式隐藏整行，切回 HSV 恢复原选择。
+- 建模按钮附近新增 `gmmBuildFeedbackLabel`，通过公共 `statusTone` 样式角色显示 neutral/building/success/warning/stale/error。
+- 同步建模前先切换 busy 状态并刷新 Qt 绘制事件；建模期间锁定模板、样本和算法编辑控件。
+- 成功弹窗显示模型状态、类别数、CIELAB 通道和耗时；失败路径统一保留红色状态及错误弹窗。
+- B2 lifecycle smoke 已验证 GMM/HSV 行显隐、样本偏少成功反馈和模型持久化。

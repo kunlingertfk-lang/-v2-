@@ -5,7 +5,7 @@ CONFIG += c++17
 TEMPLATE = app
 TARGET = qt_ui_test
 
-BUILD_ROOT = $$_PRO_FILE_PWD_/build/qt_ui_test
+isEmpty(BUILD_ROOT): BUILD_ROOT = $$_PRO_FILE_PWD_/build/qt_ui_test
 DESTDIR = $$BUILD_ROOT/bin
 OBJECTS_DIR = $$BUILD_ROOT/obj
 MOC_DIR = $$BUILD_ROOT/moc
@@ -14,33 +14,17 @@ UI_DIR = $$BUILD_ROOT/ui
 system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 
 INCLUDEPATH += src
-# 可选：每开发者可在 local_paths.pri（已 gitignore）中覆盖 OPENCV_ROOT / HALCON_ROOT
 exists($$_PRO_FILE_PWD_/local_paths.pri): include($$_PRO_FILE_PWD_/local_paths.pri)
-
-# OpenCV：设了 OPENCV_ROOT 用自编译安装(prefix+rpath)；否则用系统安装(apt libopencv-dev，头文件在 /usr/include/opencv4)
-OPENCV_ROOT = $$(OPENCV_ROOT)
-!isEmpty(OPENCV_ROOT) {
-    INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
-    LIBS += -L$$OPENCV_ROOT/lib -Wl,-rpath,$$OPENCV_ROOT/lib
-} else {
-    INCLUDEPATH += /usr/include/opencv4
-    message("OPENCV_ROOT 未设置，使用系统 OpenCV (/usr/include/opencv4)")
-}
-
-# HALCON：优先使用 HALCONROOT；未设置时使用当前部署目录 /opt/halcon。
-HALCON_ROOT = $$(HALCONROOT)
-isEmpty(HALCON_ROOT): HALCON_ROOT = /opt/halcon
-!exists($$HALCON_ROOT/include/HalconC.h) {
-    error("HALCONROOT=$$HALCON_ROOT 下找不到 include/HalconC.h，请确认 HALCON 安装路径。详见 README.md。")
-}
-!system(grep -Eq "HLIB_MAJOR_NUM[[:space:]]+20" $$HALCON_ROOT/include/HVersNum.h) {
-    error("颜色比较要求 HALCON 20.11，当前 HALCONROOT 不是 20.x：$$HALCON_ROOT")
-}
-!system(grep -Eq "HLIB_MINOR_NUM[[:space:]]+11" $$HALCON_ROOT/include/HVersNum.h) {
-    error("颜色比较要求 HALCON 20.11，当前 HALCONROOT 不是 20.11：$$HALCON_ROOT")
-}
-INCLUDEPATH += $$HALCON_ROOT/include
-message("HALCON root: $$HALCON_ROOT")
+OPENCV_ROOT_ENV = $$(OPENCV_ROOT)
+OPENCV_LIB_DIR_ENV = $$(OPENCV_LIB_DIR)
+HALCON_ROOT_ENV = $$(HALCONROOT)
+!isEmpty(OPENCV_ROOT_ENV): OPENCV_ROOT = $$OPENCV_ROOT_ENV
+!isEmpty(OPENCV_LIB_DIR_ENV): OPENCV_LIB_DIR = $$OPENCV_LIB_DIR_ENV
+!isEmpty(HALCON_ROOT_ENV): HALCON_ROOT = $$HALCON_ROOT_ENV
+include(qmake/opencv.pri)
+include(qmake/halcon_20_11.pri)
+INCLUDEPATH += $$HALCON_ROOT/include/halconcpp
+LIBS += -L$$HALCON_ROOT/lib/x64-linux -Wl,-rpath,$$HALCON_ROOT/lib/x64-linux -lhalconcpp -lhalcon
 
 SOURCES += \
     src/main.cpp \
@@ -51,6 +35,7 @@ SOURCES += \
     src/CameraParamsDialog.cpp \
     src/ReferenceImageDialog.cpp \
     src/PositionCorrectionDialog.cpp \
+    src/TemplateLocationDialog.cpp \
     src/ToolLibraryDialog.cpp \
     src/CharacterRecognitionDialog.cpp \
     src/ColorRecognitionDialog.cpp \
@@ -84,6 +69,7 @@ SOURCES += \
     src/tooladapters/ColorComparisonAdapter.cpp \
     src/tooladapters/RegisteredClassificationAdapter.cpp \
     src/tooladapters/PatternPresenceAdapter.cpp \
+    src/tooladapters/TemplateLocationAdapter.cpp \
     src/tooladapters/BlobPresenceAdapter.cpp \
     src/tooladapters/CirclePresenceAdapter.cpp \
     src/tooladapters/EdgePresenceAdapter.cpp \
@@ -92,9 +78,10 @@ SOURCES += \
     src/tooladapters/AiDetectionAdapter.cpp \
     src/algorithms/halcon/HalconRuntimePaths.cpp \
     src/algorithms/ocr/OcrHalconRunner.cpp \
+    src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp \
     src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
-    src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
     src/algorithms/recognition/ColorComparisonModel.cpp \
+    src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
@@ -106,6 +93,7 @@ SOURCES += \
     src/algorithms/presence/PatternPresenceHalconApi.cpp \
     src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
     src/algorithms/presence/PatternPresenceHalconRunner.cpp \
+    src/algorithms/location/TemplateLocationHalconRunner.cpp \
     src/algorithms/presence/BlobPresenceHalconRunner.cpp \
     src/algorithms/presence/CirclePresenceHalconRunner.cpp \
     src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -117,9 +105,11 @@ HEADERS += \
     src/MainWindow.h \
     src/SchemeStore.h \
     src/PlanDialogUtils.h \
+    src/UiStyleRoles.h \
     src/CameraParamsDialog.h \
     src/ReferenceImageDialog.h \
     src/PositionCorrectionDialog.h \
+    src/TemplateLocationDialog.h \
     src/ToolLibraryDialog.h \
     src/CharacterRecognitionDialog.h \
     src/ColorRecognitionDialog.h \
@@ -160,6 +150,7 @@ HEADERS += \
     src/tooladapters/ColorComparisonAdapter.h \
     src/tooladapters/RegisteredClassificationAdapter.h \
     src/tooladapters/PatternPresenceAdapter.h \
+    src/tooladapters/TemplateLocationAdapter.h \
     src/tooladapters/BlobPresenceAdapter.h \
     src/tooladapters/CirclePresenceAdapter.h \
     src/tooladapters/EdgePresenceAdapter.h \
@@ -168,9 +159,10 @@ HEADERS += \
     src/tooladapters/AiDetectionAdapter.h \
     src/algorithms/halcon/HalconRuntimePaths.h \
     src/algorithms/ocr/OcrHalconRunner.h \
+    src/algorithms/recognition/ColorRecognitionGmmHalconBackend.h \
     src/algorithms/recognition/ColorRecognitionHalconRunner.h \
-    src/algorithms/recognition/ColorComparisonHalconRunner.h \
     src/algorithms/recognition/ColorComparisonModel.h \
+    src/algorithms/recognition/ColorComparisonHalconRunner.h \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
     src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
@@ -182,6 +174,7 @@ HEADERS += \
     src/algorithms/presence/PatternPresenceHalconApi.h \
     src/algorithms/presence/PatternPresenceAutoModelDomain.h \
     src/algorithms/presence/PatternPresenceHalconRunner.h \
+    src/algorithms/location/TemplateLocationHalconRunner.h \
     src/algorithms/presence/BlobPresenceHalconRunner.h \
     src/algorithms/presence/CirclePresenceHalconRunner.h \
     src/algorithms/presence/EdgePresenceHalconRunner.h \
@@ -194,6 +187,7 @@ FORMS += \
     ui/CameraParamsDialog.ui \
     ui/ReferenceImageDialog.ui \
     ui/PositionCorrectionDialog.ui \
+    ui/TemplateLocationDialog.ui \
     ui/ToolLibraryDialog.ui \
     ui/CharacterRecognitionDialog.ui \
     ui/ColorRecognitionDialog.ui \
@@ -212,7 +206,4 @@ FORMS += \
 RESOURCES += \
     resources/resources.qrc
 
-# OpenCV库链接（移植自旧项目 qtt5_project_bak_327_10nrs_260328he/qtt5.pro）
-# -L/-rpath 已在上方 OPENCV_ROOT 分支按需添加；系统 OpenCV 无需指定库路径
-LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs
 LIBS += -ldl

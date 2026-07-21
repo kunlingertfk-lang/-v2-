@@ -55,6 +55,8 @@ struct PatternPresenceHalconApi
                                               Htuple *, Htuple *, Htuple *, Htuple *, Htuple *);
     using SetShapeModelParamFn = Herror (*)(const Htuple, const Htuple, const Htuple);
     using GetShapeModelContoursFn = Herror (*)(Hobject *, const Htuple, const Htuple);
+    using GetShapeModelParamsFn = Herror (*)(const Htuple, Htuple *, Htuple *, Htuple *, Htuple *,
+                                             Htuple *, Htuple *, Htuple *, Htuple *, Htuple *);
     using VectorAngleToRigidFn = Herror (*)(const Htuple, const Htuple, const Htuple,
                                             const Htuple, const Htuple, const Htuple,
                                             Htuple *);
@@ -103,6 +105,7 @@ struct PatternPresenceHalconApi
     FindScaledShapeModelFn findScaledShapeModel = nullptr;
     SetShapeModelParamFn setShapeModelParam = nullptr;
     GetShapeModelContoursFn getShapeModelContours = nullptr;
+    GetShapeModelParamsFn getShapeModelParams = nullptr;
     VectorAngleToRigidFn vectorAngleToRigid = nullptr;
     HomMat2dScaleLocalFn homMat2dScaleLocal = nullptr;
     AffineTransContourXldFn affineTransContourXld = nullptr;

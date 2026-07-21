@@ -16,6 +16,10 @@
         <file alias="icons/fit.svg">icons/fit.svg</file>
         <file alias="icons/fullscreen.svg">icons/fullscreen.svg</file>
         <file alias="icons/grid.svg">icons/grid.svg</file>
+        <file alias="icons/global-search.svg">icons/global-search.svg</file>
+        <file alias="icons/roi-rectangle.svg">icons/roi-rectangle.svg</file>
+        <file alias="icons/roi-circle.svg">icons/roi-circle.svg</file>
+        <file alias="icons/roi-polygon.svg">icons/roi-polygon.svg</file>
         <file alias="icons/io.svg">icons/io.svg</file>
         <file alias="icons/lock.svg">icons/lock.svg</file>
         <file alias="icons/measure.svg">icons/measure.svg</file>

@@ -2,28 +2,481 @@
 <ui version="4.0">
  <class>PositionCorrectionDialog</class>
  <widget class="QDialog" name="PositionCorrectionDialog">
-  <property name="geometry"><rect><x>0</x><y>0</y><width>1320</width><height>820</height></rect></property>
-  <property name="windowTitle"><string>位置修正</string></property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1320</width>
+    <height>820</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>位置修正</string>
+  </property>
   <layout class="QVBoxLayout" name="rootLayout">
-   <property name="spacing"><number>0</number></property><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property>
-   <item><widget class="QFrame" name="titleBar"><property name="minimumSize"><size><width>0</width><height>54</height></size></property><layout class="QHBoxLayout" name="titleLayout"><item><widget class="QLabel" name="windowTitleLabel"><property name="text"><string>位置修正</string></property><property name="role" stdset="0"><string>windowTitle</string></property></widget></item><item><spacer name="titleSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item><item><widget class="QToolButton" name="closeButton"><property name="text"><string>×</string></property><property name="toolTip"><string>关闭位置修正</string></property></widget></item></layout></widget></item>
-   <item><layout class="QHBoxLayout" name="bodyLayout"><property name="spacing"><number>0</number></property>
-    <item><widget class="QFrame" name="parameterPanel"><property name="minimumSize"><size><width>430</width><height>0</height></size></property><property name="maximumSize"><size><width>520</width><height>16777215</height></size></property><property name="panelRole" stdset="0"><string>parameterPanel</string></property><layout class="QVBoxLayout" name="parameterLayout">
-     <item><layout class="QHBoxLayout" name="modeLayout"><item><widget class="QPushButton" name="basicModeButton"><property name="text"><string>基础</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="allModeButton"><property name="text"><string>全部</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item>
-     <item><widget class="QFrame" name="subscriptionCard"><property name="panelRole" stdset="0"><string>configCard</string></property><layout class="QGridLayout" name="subscriptionLayout">
-      <item row="0" column="0" colspan="3"><widget class="QLabel" name="subscriptionTitle"><property name="text"><string>订阅基准范围</string></property><property name="role" stdset="0"><string>cardTitle</string></property></widget></item>
-      <item row="1" column="0"><widget class="QLabel" name="runXLabel"><property name="text"><string>运行点坐标X</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item><item row="1" column="1"><widget class="QLineEdit" name="runPointXEdit"><property name="readOnly"><bool>true</bool></property></widget></item><item row="1" column="2"><widget class="QPushButton" name="runPointXLinkButton"><property name="text"><string>链接</string></property><property name="toolTip"><string>选择运行点坐标X来源</string></property></widget></item>
-      <item row="2" column="0"><widget class="QLabel" name="runYLabel"><property name="text"><string>运行点坐标Y</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item><item row="2" column="1"><widget class="QLineEdit" name="runPointYEdit"><property name="readOnly"><bool>true</bool></property></widget></item><item row="2" column="2"><widget class="QPushButton" name="runPointYLinkButton"><property name="text"><string>链接</string></property><property name="toolTip"><string>选择运行点坐标Y来源</string></property></widget></item>
-      <item row="3" column="0"><widget class="QLabel" name="runAngleLabel"><property name="text"><string>运行角度</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item><item row="3" column="1"><widget class="QLineEdit" name="runAngleEdit"><property name="readOnly"><bool>true</bool></property></widget></item><item row="3" column="2"><widget class="QPushButton" name="runAngleLinkButton"><property name="text"><string>链接</string></property><property name="toolTip"><string>选择运行角度来源</string></property></widget></item>
-      <item row="4" column="0"><widget class="QLabel" name="createReferenceLabel"><property name="text"><string>创建基准</string></property><property name="role" stdset="0"><string>rowField</string></property></widget></item><item row="4" column="1" colspan="2"><widget class="QPushButton" name="createReferenceButton"><property name="text"><string>创建基准</string></property></widget></item>
-     </layout></widget></item>
-     <item><widget class="QFrame" name="templateCard"><property name="panelRole" stdset="0"><string>configCard</string></property><layout class="QVBoxLayout" name="templateLayout"><item><widget class="QLabel" name="templateTitle"><property name="text"><string>模板区域设置</string></property><property name="role" stdset="0"><string>cardTitle</string></property></widget></item><item><layout class="QHBoxLayout" name="templateToolsLayout"><item><widget class="QLabel" name="templateField"><property name="text"><string>模板区域</string></property></widget></item><item><spacer name="templateSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item><item><widget class="QPushButton" name="rectTemplateButton"><property name="text"><string>矩形</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="polygonTemplateButton"><property name="text"><string>多边形</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item></layout></widget></item>
-     <item><spacer name="parameterSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
-     <item><widget class="QLabel" name="statusLabel"><property name="text"><string>配置已保存，尚未测试</string></property><property name="wordWrap"><bool>true</bool></property><property name="hint" stdset="0"><bool>true</bool></property></widget></item>
-     <item><layout class="QHBoxLayout" name="actionLayout"><item><widget class="QPushButton" name="testRunButton"><property name="text"><string>测试运行</string></property></widget></item><item><widget class="QPushButton" name="finishButton"><property name="text"><string>完成</string></property><property name="actionRole" stdset="0"><string>primary</string></property></widget></item></layout></item>
-    </layout></widget></item>
-    <item><widget class="QFrame" name="previewPanel"><property name="panelRole" stdset="0"><string>previewPanel</string></property><layout class="QVBoxLayout" name="previewLayout"><item><widget class="QLabel" name="previewTitleLabel"><property name="text"><string>基准图</string></property><property name="role" stdset="0"><string>cardTitle</string></property></widget></item><item><widget class="QGraphicsView" name="previewGraphicsView"/></item></layout></widget></item>
-   </layout></item>
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="titleBar">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>54</height>
+      </size>
+     </property>
+     <layout class="QHBoxLayout" name="titleLayout">
+      <item>
+       <widget class="QLabel" name="windowTitleLabel">
+        <property name="text">
+         <string>位置修正</string>
+        </property>
+        <property name="role" stdset="0">
+         <string>windowTitle</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="titleSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QToolButton" name="closeButton">
+        <property name="toolTip">
+         <string>关闭位置修正</string>
+        </property>
+        <property name="text">
+         <string>×</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="bodyLayout">
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <item>
+      <widget class="QFrame" name="parameterPanel">
+       <property name="minimumSize">
+        <size>
+         <width>430</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>520</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="panelRole" stdset="0">
+        <string>parameterPanel</string>
+       </property>
+       <layout class="QVBoxLayout" name="parameterLayout">
+        <item>
+         <layout class="QHBoxLayout" name="modeLayout">
+          <item>
+           <widget class="QPushButton" name="basicModeButton">
+            <property name="text">
+             <string>基础</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="allModeButton">
+            <property name="text">
+             <string>全部</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QFrame" name="subscriptionCard">
+          <property name="panelRole" stdset="0">
+           <string>configCard</string>
+          </property>
+          <layout class="QGridLayout" name="subscriptionLayout">
+           <property name="horizontalSpacing">
+            <number>6</number>
+           </property>
+           <property name="verticalSpacing">
+            <number>22</number>
+           </property>
+           <item row="0" column="0" colspan="3">
+            <widget class="QLabel" name="subscriptionTitle">
+             <property name="text">
+              <string>订阅基准范围</string>
+             </property>
+             <property name="role" stdset="0">
+              <string>cardTitle</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="runXLabel">
+             <property name="text">
+              <string>运行点坐标X</string>
+             </property>
+             <property name="role" stdset="0">
+              <string>rowField</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="runPointXEdit">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <widget class="QPushButton" name="runPointXLinkButton">
+             <property name="toolTip">
+              <string>选择运行点坐标X来源</string>
+             </property>
+             <property name="text">
+              <string>链接</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="runYLabel">
+             <property name="text">
+              <string>运行点坐标Y</string>
+             </property>
+             <property name="role" stdset="0">
+              <string>rowField</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QLineEdit" name="runPointYEdit">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="2">
+            <widget class="QPushButton" name="runPointYLinkButton">
+             <property name="toolTip">
+              <string>选择运行点坐标Y来源</string>
+             </property>
+             <property name="text">
+              <string>链接</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="runAngleLabel">
+             <property name="text">
+              <string>运行角度</string>
+             </property>
+             <property name="role" stdset="0">
+              <string>rowField</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QLineEdit" name="runAngleEdit">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="2">
+            <widget class="QPushButton" name="runAngleLinkButton">
+             <property name="toolTip">
+              <string>选择运行角度来源</string>
+             </property>
+             <property name="text">
+              <string>链接</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QLabel" name="createReferenceLabel">
+             <property name="text">
+              <string>创建基准</string>
+             </property>
+             <property name="role" stdset="0">
+              <string>rowField</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1" colspan="2">
+            <widget class="QPushButton" name="createReferenceButton">
+             <property name="text">
+              <string>创建基准</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QFrame" name="templateCard">
+          <property name="panelRole" stdset="0">
+           <string>configCard</string>
+          </property>
+          <layout class="QVBoxLayout" name="templateLayout">
+           <item>
+            <widget class="QLabel" name="templateTitle">
+             <property name="text">
+              <string>模板区域设置</string>
+             </property>
+             <property name="role" stdset="0">
+              <string>cardTitle</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="templateToolsLayout">
+             <item>
+              <widget class="QLabel" name="templateField">
+               <property name="text">
+                <string>模板区域</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="rectTemplateButton">
+               <property name="text">
+                <string>矩形</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="polygonTemplateButton">
+               <property name="text">
+                <string>多边形</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="templateSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <spacer name="parameterSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="statusLabel">
+          <property name="text">
+           <string>配置已保存，尚未测试</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="hint" stdset="0">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="actionLayout">
+          <item>
+           <widget class="QPushButton" name="testRunButton">
+            <property name="text">
+             <string>测试运行</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="finishButton">
+            <property name="text">
+             <string>完成</string>
+            </property>
+            <property name="actionRole" stdset="0">
+             <string>primary</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="previewPanel">
+       <property name="panelRole" stdset="0">
+        <string>previewPanel</string>
+       </property>
+       <layout class="QVBoxLayout" name="previewLayout">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QFrame" name="viewerHeader">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>44</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>44</height>
+           </size>
+          </property>
+          <layout class="QHBoxLayout" name="viewerHeaderLayout">
+           <property name="leftMargin">
+            <number>16</number>
+           </property>
+           <property name="rightMargin">
+            <number>16</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="viewerTitleLabel">
+             <property name="text">
+              <string>基准图</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="viewerHeaderSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGraphicsView" name="previewGraphicsView"/>
+        </item>
+        <item>
+         <widget class="QFrame" name="viewerStatusBar">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>32</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>32</height>
+           </size>
+          </property>
+          <layout class="QHBoxLayout" name="viewerStatusLayout">
+           <property name="leftMargin">
+            <number>16</number>
+           </property>
+           <property name="rightMargin">
+            <number>16</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="viewerStatusLabel">
+             <property name="text">
+              <string>算法耗时: 0ms  工具耗时: 0ms</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="viewerStatusSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
   </layout>
  </widget>
  <resources/>

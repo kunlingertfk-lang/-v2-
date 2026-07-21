@@ -54,6 +54,7 @@
 #include "PlanDialogUtils.h"
 #include "RegisteredClassificationDialog.h"
 #include "RegisteredClassificationDetectionDialog.h"
+#include "TemplateLocationDialog.h"
 #include "SchemeStore.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
@@ -402,6 +403,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolEngine.registerAdapter(&m_linePresenceAdapter);
     m_toolEngine.registerAdapter(&m_aiDetectionAdapter);
     m_toolEngine.registerAdapter(&m_registeredClassificationAdapter);
+    m_toolEngine.registerAdapter(&m_templateLocationAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     m_toolChainWatcher = new QFutureWatcher<ToolChainRunOutput>(this);
     setupUiState();
@@ -1676,6 +1678,8 @@ QString MainWindow::toolDisplayName(const ToolConfig &config) const
         return tr("目标检测");
     case ToolType::AiClassification:
         return tr("分类");
+    case ToolType::TemplateLocation:
+        return tr("模板定位");
     default:
         return toolTypeToString(config.toolType);
     }
@@ -1784,6 +1788,9 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         break;
     case ToolType::AiClassification:
         accepted = runToolConfigDialog<ClassificationDialog>(this, originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::TemplateLocation:
+        accepted = runToolConfigDialog<TemplateLocationDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     default:
         qDebug() << "[MainWindow] Unsupported tool edit type:" << toolTypeToString(originalConfig.toolType);

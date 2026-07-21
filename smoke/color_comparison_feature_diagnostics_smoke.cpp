@@ -21,6 +21,19 @@ void check(bool condition, const char *message)
     }
 }
 
+bool vectorsNear(const QVector<double> &left,
+                 const QVector<double> &right,
+                 double tolerance = 1e-12)
+{
+    if (left.size() != right.size())
+        return false;
+    for (int index = 0; index < left.size(); ++index) {
+        if (std::abs(left.at(index) - right.at(index)) > tolerance)
+            return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -109,6 +122,92 @@ int main(int argc, char **argv)
         check(diagnostics.value(QStringLiteral("detectValueHistogram"))
               .toArray().size() == 32,
               "payload must contain 32 detection V values");
+
+        cv::Mat ownershipImage(64, 64, CV_8UC3);
+        ownershipImage(cv::Rect(0, 0, 32, 32)).setTo(cv::Scalar(20, 20, 220));
+        ownershipImage(cv::Rect(32, 0, 32, 32)).setTo(cv::Scalar(20, 220, 20));
+        ownershipImage(cv::Rect(0, 32, 32, 32)).setTo(cv::Scalar(220, 20, 20));
+        ownershipImage(cv::Rect(32, 32, 32, 32)).setTo(cv::Scalar(80, 180, 220));
+
+        const QVector<QPointF> topLeftMask = {
+            QPointF(0.0, 0.0), QPointF(0.5, 0.0),
+            QPointF(0.5, 0.5), QPointF(0.0, 0.5)
+        };
+        const QVector<QPointF> topRightMask = {
+            QPointF(0.5, 0.0), QPointF(1.0, 0.0),
+            QPointF(1.0, 0.5), QPointF(0.5, 0.5)
+        };
+
+        ColorComparisonHalconConfig syncMaskA = config;
+        syncMaskA.templateRegionMode = QStringLiteral("sync");
+        syncMaskA.detectRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+        syncMaskA.detectMaskPolygonNormalized = topLeftMask;
+        syncMaskA.templateMaskPolygonNormalized.clear();
+        ColorComparisonHalconConfig syncMaskB = syncMaskA;
+        syncMaskB.detectMaskPolygonNormalized = topRightMask;
+        const ColorComparisonTemplateBuildResult syncBuildA =
+                runner.buildTemplateModel(ownershipImage, syncMaskA);
+        const ColorComparisonTemplateBuildResult syncBuildB =
+                runner.buildTemplateModel(ownershipImage, syncMaskB);
+        check(syncBuildA.success && syncBuildB.success,
+              "sync ownership template builds must succeed");
+        if (syncBuildA.success && syncBuildB.success) {
+            check(vectorsNear(syncBuildA.model.values, syncBuildB.model.values)
+                  && vectorsNear(syncBuildA.model.valueHistogram,
+                                 syncBuildB.model.valueHistogram)
+                  && syncBuildA.model.effectivePixelCount
+                     == syncBuildB.model.effectivePixelCount,
+                  "detection mask must not alter a synchronized template feature");
+            check(syncBuildA.model.extractParamsHash
+                  == syncBuildB.model.extractParamsHash,
+                  "detection mask must not enter synchronized template hash");
+            const QJsonObject extractParams = syncBuildA.payload.value(
+                        QStringLiteral("extractParams")).toObject();
+            check(!extractParams.contains(
+                      QStringLiteral("syncDetectionMaskPolygon"))
+                  && extractParams.value(
+                      QStringLiteral("maskOwnershipContract")).toString()
+                     == QStringLiteral(
+                         "independent_template_and_detection_v1"),
+                  "template extract params must expose independent mask ownership");
+        }
+
+        ColorComparisonHalconConfig templateMaskA = config;
+        templateMaskA.templateRegionMode = QStringLiteral("custom");
+        templateMaskA.templateRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+        templateMaskA.detectRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+        templateMaskA.detectMaskPolygonNormalized = topLeftMask;
+        templateMaskA.templateMaskPolygonNormalized = topLeftMask;
+        ColorComparisonHalconConfig templateMaskB = templateMaskA;
+        templateMaskB.templateMaskPolygonNormalized = topRightMask;
+        const ColorComparisonTemplateBuildResult templateBuildA =
+                runner.buildTemplateModel(ownershipImage, templateMaskA);
+        const ColorComparisonTemplateBuildResult templateBuildB =
+                runner.buildTemplateModel(ownershipImage, templateMaskB);
+        check(templateBuildA.success && templateBuildB.success,
+              "independent template mask builds must succeed");
+        if (templateBuildA.success && templateBuildB.success) {
+            templateMaskA.model = templateBuildA.model;
+            templateMaskB.model = templateBuildB.model;
+            const ColorComparisonHalconResult detectWithTemplateMaskA =
+                    runner.run(ownershipImage, templateMaskA);
+            const ColorComparisonHalconResult detectWithTemplateMaskB =
+                    runner.run(ownershipImage, templateMaskB);
+            check(detectWithTemplateMaskA.success
+                  && detectWithTemplateMaskB.success
+                  && detectWithTemplateMaskA.measurementValid
+                  && detectWithTemplateMaskB.measurementValid,
+                  "independent template masks must preserve valid detection");
+            check(detectWithTemplateMaskA.payload.value(
+                      QStringLiteral("effectiveDetectionPixels")).toDouble()
+                  == detectWithTemplateMaskB.payload.value(
+                      QStringLiteral("effectiveDetectionPixels")).toDouble()
+                  && vectorsNear(detectWithTemplateMaskA.detectFeature,
+                                 detectWithTemplateMaskB.detectFeature)
+                  && vectorsNear(detectWithTemplateMaskA.detectValueHistogram,
+                                 detectWithTemplateMaskB.detectValueHistogram),
+                  "template mask must not alter detection feature extraction");
+        }
 
         ColorComparisonHalconConfig fallbackConfig = config;
         fallbackConfig.brightnessCompensation = true;

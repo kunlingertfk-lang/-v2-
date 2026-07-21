@@ -1,12 +1,19 @@
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QColor>
+#include <QComboBox>
 #include <QDialog>
+#include <QDir>
+#include <QFile>
 #include <QFrame>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
+#include <QPushButton>
 #include <QRectF>
 #include <QScrollArea>
+#include <QToolButton>
 #include <QVector>
 #include <QWidget>
 
@@ -112,7 +119,16 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
 
+    const QString stylePath = QDir(QCoreApplication::applicationDirPath())
+            .absoluteFilePath(QStringLiteral("../../../../styles/app.qss"));
+    QFile styleFile(stylePath);
+    check(styleFile.open(QIODevice::ReadOnly | QIODevice::Text),
+          "public app.qss must be available to the dialog integration smoke");
+    if (styleFile.isOpen())
+        app.setStyleSheet(QString::fromUtf8(styleFile.readAll()));
+
     ColorComparisonDialog dialog;
+    dialog.show();
     QApplication::processEvents();
 
     check(dialog.objectName() == QStringLiteral("ColorComparisonDialog"),
@@ -135,6 +151,270 @@ int main(int argc, char **argv)
           "dialog must construct its FrameViewHelper");
     check(dialog.m_previewHelper && dialog.m_previewHelper->navigationEnabled(),
           "ColorComparisonDialog must explicitly opt in to image navigation");
+
+    const QStringList comboObjectNames = {
+        QStringLiteral("colorComparisonTemplateRegionModeCombo"),
+        QStringLiteral("colorComparisonFeatureTypeCombo"),
+        QStringLiteral("colorComparisonPositionCorrectionCombo"),
+        QStringLiteral("colorComparisonSensitivityCombo")
+    };
+    for (const QString &objectName : comboObjectNames) {
+        QComboBox *combo = dialog.findChild<QComboBox *>(objectName);
+        check(combo != nullptr,
+              qPrintable(QStringLiteral("missing combo: %1").arg(objectName)));
+        check(combo
+              && combo->property("uiRole").toString()
+                 == QStringLiteral("lightField")
+              && combo->view()
+              && combo->view()->property("uiRole").toString()
+                 == QStringLiteral("lightComboPopup")
+              && combo->view()->viewport()
+              && combo->view()->viewport()->property("uiRole").toString()
+                 == QStringLiteral("lightComboPopupViewport")
+              && combo->view()->parentWidget()
+              && combo->view()->parentWidget()->property("uiRole").toString()
+                 == QStringLiteral("lightComboPopupContainer"),
+              qPrintable(QStringLiteral("combo popup role missing: %1")
+                         .arg(objectName)));
+
+        if (combo && objectName
+                == QStringLiteral("colorComparisonTemplateRegionModeCombo")) {
+            combo->showPopup();
+            QApplication::processEvents();
+            const QImage popupImage = combo->view()->viewport()->grab().toImage();
+            int lightPixels = 0;
+            const int pixelCount = popupImage.width() * popupImage.height();
+            for (int y = 0; y < popupImage.height(); ++y) {
+                for (int x = 0; x < popupImage.width(); ++x) {
+                    if (qGray(popupImage.pixel(x, y)) >= 150)
+                        ++lightPixels;
+                }
+            }
+            check(!popupImage.isNull() && pixelCount > 0,
+                  "combo popup must render in the offscreen smoke");
+            check(pixelCount > 0 && lightPixels * 100 / pixelCount >= 65,
+                  "light combo popup must not render as a dark or gray panel");
+            combo->hidePopup();
+        }
+    }
+
+    const auto checkedDetectDrawingButtons = [&dialog]() {
+        return (dialog.m_detectRectButton->isChecked() ? 1 : 0)
+                + (dialog.m_detectCircleButton->isChecked() ? 1 : 0);
+    };
+    check(dialog.m_editState == ColorComparisonDialog::EditState::None,
+          "saved rectangle ROI must not imply active drawing");
+    check(checkedDetectDrawingButtons() == 0,
+          "detection drawing buttons must be idle initially");
+
+    dialog.m_detectRectButton->click();
+    QApplication::processEvents();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::DetectRect
+          && dialog.m_detectRectButton->isChecked()
+          && dialog.m_previewHelper->isRoiDrawingEnabled(),
+          "first rectangle click must enter and highlight rectangle drawing");
+
+    const QRectF redrawnRect(0.18, 0.22, 0.31, 0.27);
+    dialog.handleRoiChanged(redrawnRect);
+    check(dialog.m_editState == ColorComparisonDialog::EditState::DetectRect
+          && dialog.m_previewHelper->isRoiDrawingEnabled(),
+          "finishing one rectangle must keep continuous drawing active");
+    dialog.m_detectRectButton->click();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::None
+          && !dialog.m_detectRectButton->isChecked()
+          && !dialog.m_previewHelper->isRoiDrawingEnabled(),
+          "second rectangle click must exit drawing");
+    check(dialog.m_detectRoi == redrawnRect,
+          "exiting rectangle drawing must preserve the last ROI");
+
+    // Isolate the remaining checks even when running against the pre-fix RED
+    // implementation, which cannot exit by clicking the active tool.
+    dialog.setEditState(ColorComparisonDialog::EditState::None);
+    dialog.m_detectRectButton->click();
+    dialog.m_detectCircleButton->click();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::DetectCircle
+          && !dialog.m_detectRectButton->isChecked()
+          && dialog.m_detectCircleButton->isChecked()
+          && !dialog.m_previewHelper->isRoiDrawingEnabled()
+          && dialog.m_previewHelper->isCircleDrawingEnabled()
+          && checkedDetectDrawingButtons() == 1,
+          "switching rectangle to circle must leave only circle drawing active");
+
+    CircleRoi drawnCircle;
+    drawnCircle.centerNormalized = QPointF(0.55, 0.48);
+    drawnCircle.radiusNormalized = 0.12;
+    drawnCircle.valid = true;
+    dialog.m_previewImage = QImage(640, 480, QImage::Format_RGB32);
+    dialog.handleCircleChanged(drawnCircle);
+    const CircleRoi savedCircle = dialog.m_detectCircle;
+    dialog.m_detectCircleButton->click();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::None
+          && !dialog.m_detectCircleButton->isChecked()
+          && !dialog.m_previewHelper->isCircleDrawingEnabled(),
+          "second circle click must exit drawing");
+    check(dialog.m_detectCircle.valid == savedCircle.valid
+          && dialog.m_detectCircle.centerNormalized
+             == savedCircle.centerNormalized
+          && qFuzzyCompare(dialog.m_detectCircle.radiusNormalized,
+                           savedCircle.radiusNormalized),
+          "exiting circle drawing must preserve the last circle ROI");
+
+    dialog.setEditState(ColorComparisonDialog::EditState::None);
+    dialog.m_detectRectButton->click();
+    dialog.m_detectGlobalButton->click();
+    check(dialog.m_globalDetection
+          && dialog.m_editState == ColorComparisonDialog::EditState::None
+          && checkedDetectDrawingButtons() == 0
+          && !dialog.m_previewHelper->isRoiDrawingEnabled()
+          && !dialog.m_previewHelper->isCircleDrawingEnabled(),
+          "selecting global detection must exit every drawing mode");
+
+    dialog.setEditState(ColorComparisonDialog::EditState::None);
+    dialog.m_templateRectButton->click();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::TemplateRect
+          && dialog.m_templateRectButton->isChecked(),
+          "template rectangle icon must enter drawing");
+    const QRectF savedTemplateRoi = dialog.m_templateRoi;
+    dialog.m_templateRectButton->click();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::None
+          && !dialog.m_templateRectButton->isChecked()
+          && dialog.m_templateRoi == savedTemplateRoi,
+          "second template rectangle click must exit without clearing ROI");
+
+    const QVector<QPointF> polygon = {
+        QPointF(0.2, 0.2), QPointF(0.7, 0.2), QPointF(0.5, 0.7)
+    };
+    dialog.setEditState(ColorComparisonDialog::EditState::None);
+    dialog.m_templateMaskPolygonButton->click();
+    check(dialog.m_editState
+          == ColorComparisonDialog::EditState::TemplateMaskPolygon
+          && dialog.m_previewHelper->isPolygonDrawingEnabled(),
+          "template mask icon must enter polygon drawing");
+    dialog.m_previewHelper->setPolygonDrawingEnabled(false);
+    dialog.handlePolygonChanged(polygon);
+    check(!dialog.m_previewHelper->isPolygonDrawingEnabled()
+          && dialog.m_previewHelper->polygonRoiNormalized() == polygon,
+          "completed template mask must stay available for vertex editing");
+    dialog.m_templateMaskRedrawButton->click();
+    check(dialog.m_previewHelper->isPolygonDrawingEnabled()
+          && dialog.m_templateMask == polygon,
+          "template mask redraw must preserve the saved polygon until completion");
+    dialog.m_previewHelper->setPolygonDrawingEnabled(false);
+    dialog.m_templateMaskPolygonButton->click();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::None
+          && !dialog.m_templateMaskPolygonButton->isChecked()
+          && dialog.m_templateMask == polygon,
+          "second template mask click must exit and preserve polygon");
+
+    dialog.setEditState(ColorComparisonDialog::EditState::None);
+    dialog.m_detectMaskPolygonButton->click();
+    check(dialog.m_editState
+          == ColorComparisonDialog::EditState::DetectMaskPolygon
+          && dialog.m_previewHelper->isPolygonDrawingEnabled(),
+          "detection mask icon must enter polygon drawing");
+    dialog.m_previewHelper->setPolygonDrawingEnabled(false);
+    dialog.handlePolygonChanged(polygon);
+    check(!dialog.m_previewHelper->isPolygonDrawingEnabled()
+          && dialog.m_previewHelper->polygonRoiNormalized() == polygon,
+          "completed detection mask must stay available for vertex editing");
+    dialog.m_detectMaskPolygonButton->click();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::None
+          && !dialog.m_detectMaskPolygonButton->isChecked()
+          && dialog.m_detectMask == polygon,
+          "second detection mask click must exit and preserve polygon");
+
+    dialog.m_model.state = ColorComparisonModelState::Ready;
+    dialog.m_modelStatus = QStringLiteral("ok");
+    dialog.m_templateRegionMode = QStringLiteral("sync");
+    dialog.handleDetectionMaskChanged(QStringLiteral("detect_mask_changed"));
+    check(dialog.m_model.state == ColorComparisonModelState::Ready,
+          "detection mask must not stale a synchronized template model");
+    dialog.handleDetectionGeometryChanged(QStringLiteral("detect_roi_changed"));
+    check(dialog.m_model.state == ColorComparisonModelState::Stale,
+          "detection geometry must stale a synchronized template model");
+
+    dialog.m_templateRegionMode = QStringLiteral("sync");
+    dialog.refreshTemplateRegionControls();
+    check(!dialog.m_templateRectButton->isEnabled()
+          && dialog.m_templateSyncHintLabel->isVisible(),
+          "sync mode must disable template rectangle and explain independent mask ownership");
+    dialog.setEditState(ColorComparisonDialog::EditState::TemplateRect);
+    check(dialog.m_editState != ColorComparisonDialog::EditState::TemplateRect,
+          "sync mode must reject template rectangle activation beyond button state");
+    dialog.m_templateRegionMode = QStringLiteral("custom");
+    dialog.refreshTemplateRegionControls();
+    check(dialog.m_templateRectButton->isEnabled(),
+          "custom mode must restore template rectangle editing");
+
+    dialog.m_previewImage = QImage(640, 480, QImage::Format_RGB32);
+    dialog.m_templateRoi = QRectF(0.05, 0.05, 0.25, 0.30);
+    dialog.m_templateMask = polygon;
+    dialog.m_detectRegionType = QStringLiteral("rectangle");
+    dialog.m_globalDetection = false;
+    dialog.m_detectRoi = QRectF(0.40, 0.15, 0.30, 0.35);
+    dialog.m_detectMask = {
+        QPointF(0.45, 0.20), QPointF(0.60, 0.20), QPointF(0.55, 0.35)
+    };
+    dialog.m_liveTestSource = ColorComparisonDialog::LiveTestSource::None;
+    dialog.setEditState(ColorComparisonDialog::EditState::None);
+    const QVector<ToolOverlay> configuredOverlays =
+            dialog.configurationGeometryOverlays();
+    int templateOverlays = 0;
+    int detectOverlays = 0;
+    int maskOverlays = 0;
+    for (const ToolOverlay &overlay : configuredOverlays) {
+        const QString owner = overlay.extra.value(
+                    QStringLiteral("owner")).toString();
+        if (owner == QStringLiteral("template"))
+            ++templateOverlays;
+        if (owner == QStringLiteral("detect"))
+            ++detectOverlays;
+        if (overlay.extra.value(QStringLiteral("displayRole")).toString()
+                .endsWith(QStringLiteral("_mask"))) {
+            ++maskOverlays;
+            check(!overlay.extra.value(QStringLiteral("clipGeometry"))
+                  .toObject().isEmpty(),
+                  "each mask overlay must be clipped by its owner ROI");
+        }
+    }
+    check(templateOverlays >= 3 && detectOverlays >= 3 && maskOverlays == 2,
+          "configuration view must retain template/detection ROI and masks together");
+    dialog.m_liveTestSource = ColorComparisonDialog::LiveTestSource::Camera;
+    const QVector<ToolOverlay> detectionOverlays =
+            dialog.detectionGeometryOverlays();
+    bool testContainsTemplate = false;
+    for (const ToolOverlay &overlay : detectionOverlays) {
+        if (overlay.extra.value(QStringLiteral("owner")).toString()
+                == QStringLiteral("template"))
+            testContainsTemplate = true;
+    }
+    check(!testContainsTemplate && !detectionOverlays.isEmpty(),
+          "test frame geometry must contain detection owner only");
+    dialog.m_liveTestSource = ColorComparisonDialog::LiveTestSource::None;
+
+    dialog.m_model.state = ColorComparisonModelState::Ready;
+    dialog.m_templateRegionMode = QStringLiteral("custom");
+    const QRectF templateBeforeClear = dialog.m_templateRoi;
+    dialog.clearTemplateMask();
+    check(dialog.m_templateMask.isEmpty()
+          && dialog.m_templateRoi == templateBeforeClear
+          && dialog.m_model.state == ColorComparisonModelState::Stale,
+          "clearing template mask must preserve ROI and stale the template model");
+    dialog.m_model.state = ColorComparisonModelState::Ready;
+    dialog.m_templateRegionMode = QStringLiteral("sync");
+    const QRectF detectBeforeClear = dialog.m_detectRoi;
+    dialog.clearDetectionMask();
+    check(dialog.m_detectMask.isEmpty()
+          && dialog.m_detectRoi == detectBeforeClear
+          && dialog.m_model.state == ColorComparisonModelState::Ready,
+          "clearing detection mask must preserve ROI without staling sync template");
+
+    dialog.setEditState(ColorComparisonDialog::EditState::None);
+    dialog.m_detectRegionType = QStringLiteral("circle");
+    dialog.runReferenceTest();
+    check(dialog.m_editState == ColorComparisonDialog::EditState::None
+          && checkedDetectDrawingButtons() == 0,
+          "test mode must not activate drawing from the saved ROI type");
 
     ToolResult valid = validDiagnosticResult();
     check(dialog.updateDetectionFeaturePreview(valid),

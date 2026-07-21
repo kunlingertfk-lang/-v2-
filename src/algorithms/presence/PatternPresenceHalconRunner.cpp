@@ -435,6 +435,11 @@ QString buildShapeModelCacheKey(const PatternPresenceHalconConfig &config,
             QStringLiteral("contrast=%1:minContrast=%2")
                     .arg(contrastSettings.contrast)
                     .arg(contrastSettings.minContrast),
+            QStringLiteral("contrastMode=%1:manual=%2:%3:numLevels=%4")
+                    .arg(config.contrastMode.trimmed())
+                    .arg(config.contrast)
+                    .arg(config.minContrast)
+                    .arg(config.numLevels),
             QStringLiteral("autoModelDomain=%1:thresholds=%2:minAreaRatio=%3:maxAreaRatio=%4:opening=%5:closing=%6:dilation=%7")
                     .arg(autoParams.version)
                     .arg(intsToKey(autoParams.thresholdHighCandidates))
@@ -2059,6 +2064,15 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
     Htuple displayScaleXTuple = HTUPLE_INITIALIZER;
     Htuple displayScaleYTuple = HTUPLE_INITIALIZER;
     Htuple displayScaledHomMatTuple = HTUPLE_INITIALIZER;
+    Htuple paramsNumLevelsTuple = HTUPLE_INITIALIZER;
+    Htuple paramsAngleStartTuple = HTUPLE_INITIALIZER;
+    Htuple paramsAngleExtentTuple = HTUPLE_INITIALIZER;
+    Htuple paramsAngleStepTuple = HTUPLE_INITIALIZER;
+    Htuple paramsScaleMinTuple = HTUPLE_INITIALIZER;
+    Htuple paramsScaleMaxTuple = HTUPLE_INITIALIZER;
+    Htuple paramsScaleStepTuple = HTUPLE_INITIALIZER;
+    Htuple paramsMetricTuple = HTUPLE_INITIALIZER;
+    Htuple paramsMinContrastTuple = HTUPLE_INITIALIZER;
     QVector<Htuple *> createdTuples;
     QSharedPointer<CachedShapeModel> shapeModel;
     bool localModelCreated = false;
@@ -2338,7 +2352,10 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
         const QString metric = halconMetricForPolarity(config.polarity, &polarityFallback);
         const ShapeModelContrastSettings contrastSettings = shapeModelContrastSettings(config);
 
-        createStringTuple(createNumLevelsTuple, QByteArray("auto"));
+        if (config.numLevels > 0)
+            createIntTuple(createNumLevelsTuple, static_cast<Hlong>(qBound(1, config.numLevels, 10)));
+        else
+            createStringTuple(createNumLevelsTuple, QByteArray("auto"));
         createDoubleTuple(angleStartTuple, angleStartRad);
         createDoubleTuple(angleExtentTuple, angleExtentRad);
         createStringTuple(angleStepTuple, QByteArray("auto"));
@@ -2347,17 +2364,31 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
         createStringTuple(scaleStepTuple, QByteArray("auto"));
         createStringTuple(optimizationTuple, QByteArray("auto"));
         createStringTuple(metricTuple, metric.toLatin1());
-        createIntTuple(contrastTuple, static_cast<Hlong>(contrastSettings.contrast));
-        createIntTuple(minContrastTuple, static_cast<Hlong>(contrastSettings.minContrast));
+        const QString contrastMode = config.contrastMode.trimmed().toLower();
+        if (contrastMode == QStringLiteral("auto")) {
+            createStringTuple(contrastTuple, QByteArray("auto"));
+            createStringTuple(minContrastTuple, QByteArray("auto"));
+        } else if (contrastMode == QStringLiteral("manual")) {
+            createIntTuple(contrastTuple, static_cast<Hlong>(qBound(2, config.contrast, 255)));
+            createIntTuple(minContrastTuple,
+                           static_cast<Hlong>(qBound(1, config.minContrast,
+                                                     qMax(1, qBound(2, config.contrast, 255) - 1))));
+        } else {
+            createIntTuple(contrastTuple, static_cast<Hlong>(contrastSettings.contrast));
+            createIntTuple(minContrastTuple, static_cast<Hlong>(contrastSettings.minContrast));
+        }
         createStringTuple(timeoutParamNameTuple, QByteArray("timeout"));
         createIntTuple(timeoutValueTuple, static_cast<Hlong>(qMax(0, config.timeoutMs)));
         createIntTuple(contourLevelTuple, 1);
         createDoubleTuple(minScoreTuple, minScore);
         createIntTuple(numMatchesTuple, static_cast<Hlong>(numMatches));
         createDoubleTuple(maxOverlapTuple, 0.5);
-        createStringTuple(subPixelTuple, QByteArray("least_squares"));
-        createIntTuple(findNumLevelsTuple, 0);
-        createDoubleTuple(greedinessTuple, 0.5);
+        createStringTuple(subPixelTuple,
+                          config.subPixel.trimmed().toLower() == QStringLiteral("none")
+                                  ? QByteArray("none") : QByteArray("least_squares"));
+        createIntTuple(findNumLevelsTuple,
+                       static_cast<Hlong>(config.numLevels > 0 ? qBound(1, config.numLevels, 10) : 0));
+        createDoubleTuple(greedinessTuple, qBound(0.0, config.greediness, 1.0));
 
         result.payload.insert(QStringLiteral("scaleRangeFallback"), scaleSettings.fallback);
         result.payload.insert(QStringLiteral("scaleRangeFallbackReason"), scaleSettings.fallbackReason);
@@ -2369,6 +2400,7 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
         result.payload.insert(QStringLiteral("judgeScoreThresholdUsed"), normalizedScore(config.scoreThreshold));
         result.payload.insert(QStringLiteral("metricUsed"), metric);
         result.payload.insert(QStringLiteral("polarityFallback"), polarityFallback);
+        result.payload.insert(QStringLiteral("contrastMode"), contrastMode);
 
         {
             QMutexLocker cacheLocker(&shapeModelCacheMutex());
@@ -2621,6 +2653,44 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
                 }
             }
         }
+
+        if (api->getShapeModelParams) {
+            QMutexLocker modelLocker(&shapeModel->mutex);
+            const Herror paramsStatus = api->getShapeModelParams(shapeModel->modelIdTuple,
+                                                                 &paramsNumLevelsTuple,
+                                                                 &paramsAngleStartTuple,
+                                                                 &paramsAngleExtentTuple,
+                                                                 &paramsAngleStepTuple,
+                                                                 &paramsScaleMinTuple,
+                                                                 &paramsScaleMaxTuple,
+                                                                 &paramsScaleStepTuple,
+                                                                 &paramsMetricTuple,
+                                                                 &paramsMinContrastTuple);
+            trackTuple(paramsNumLevelsTuple);
+            trackTuple(paramsAngleStartTuple);
+            trackTuple(paramsAngleExtentTuple);
+            trackTuple(paramsAngleStepTuple);
+            trackTuple(paramsScaleMinTuple);
+            trackTuple(paramsScaleMaxTuple);
+            trackTuple(paramsScaleStepTuple);
+            trackTuple(paramsMetricTuple);
+            trackTuple(paramsMinContrastTuple);
+            if (patternPresenceHalconStatusOk(paramsStatus)) {
+                if (paramsNumLevelsTuple.num > 0)
+                    result.payload.insert(QStringLiteral("numLevelsUsed"),
+                                          api->getDouble(&paramsNumLevelsTuple, 0));
+                if (paramsMinContrastTuple.num > 0)
+                    result.payload.insert(QStringLiteral("minContrastUsed"),
+                                          api->getDouble(&paramsMinContrastTuple, 0));
+            } else {
+                result.payload.insert(QStringLiteral("shapeModelParamsWarning"),
+                                      library->errorText(paramsStatus));
+            }
+        }
+        result.payload.insert(QStringLiteral("contrastUsed"),
+                              contrastMode == QStringLiteral("manual")
+                                      ? QJsonValue(qBound(2, config.contrast, 255))
+                                      : QJsonValue(QStringLiteral("auto")));
 
         if (!shapeModel) {
             HalconFailure failure;

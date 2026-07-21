@@ -138,6 +138,7 @@ bool PatternPresenceHalconLibrary::load(const QString &path,
     resolveOptional(m_handle, api.areaCenter, "T_area_center");
     resolveOptional(m_handle, api.genContourRegionXld, "gen_contour_region_xld");
     resolveOptional(m_handle, api.getShapeModelContours, "T_get_shape_model_contours");
+    resolveOptional(m_handle, api.getShapeModelParams, "T_get_shape_model_params");
     resolveOptional(m_handle, api.vectorAngleToRigid, "T_vector_angle_to_rigid");
     resolveOptional(m_handle, api.homMat2dScaleLocal, "T_hom_mat2d_scale_local");
     resolveOptional(m_handle, api.affineTransContourXld, "T_affine_trans_contour_xld");

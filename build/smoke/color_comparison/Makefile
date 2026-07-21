@@ -17,7 +17,7 @@ CXX           = g++
 DEFINES       = -DQT_NO_DEBUG -DQT_GUI_LIB -DQT_CORE_LIB
 CFLAGS        = -pipe -O2 -Wall -Wextra -D_REENTRANT -fPIC $(DEFINES)
 CXXFLAGS      = -pipe -O2 -std=gnu++1z -Wall -Wextra -D_REENTRANT -fPIC $(DEFINES)
-INCPATH       = -I../../../smoke -I. -I../../../src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -Imoc -I/usr/include/libdrm -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++
+INCPATH       = -I../../../smoke -I. -I../../../src -I/home/tt/.local/opencv-4.8.0/include/opencv4 -I/opt/halcon/include -I/home/tt/Qt/5.15.2/gcc_64/include -I/home/tt/Qt/5.15.2/gcc_64/include/QtGui -I/home/tt/Qt/5.15.2/gcc_64/include/QtCore -Imoc -I/usr/include/libdrm -I/home/tt/Qt/5.15.2/gcc_64/mkspecs/linux-g++
 QMAKE         = /home/tt/Qt/5.15.2/gcc_64/bin/qmake
 DEL_FILE      = rm -f
 CHK_DIR_EXISTS= test -d
@@ -258,6 +258,7 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/exclusive_builds.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/toolchain.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_pre.prf \
+		/home/tt/tfk/WorkerSpace/project/qmake/halcon_20_11.pri \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resolve_config.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_post.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/warn_on.prf \
@@ -487,6 +488,7 @@ Makefile: ../../../smoke/color_comparison_smoke.pro /home/tt/Qt/5.15.2/gcc_64/mk
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/exclusive_builds.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/toolchain.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_pre.prf \
+		../../../qmake/halcon_20_11.pri \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resolve_config.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_post.prf \
 		/home/tt/Qt/5.15.2/gcc_64/mkspecs/features/warn_on.prf \
@@ -702,6 +704,7 @@ Makefile: ../../../smoke/color_comparison_smoke.pro /home/tt/Qt/5.15.2/gcc_64/mk
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/exclusive_builds.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/toolchain.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_pre.prf:
+../../../qmake/halcon_20_11.pri:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/resolve_config.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/default_post.prf:
 /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/warn_on.prf:
@@ -781,9 +784,9 @@ compiler_clean: compiler_moc_predefs_clean
 ####### Compile
 
 obj/color_comparison_smoke.o: ../../../smoke/color_comparison_smoke.cpp ../../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
-		../../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../../src/algorithms/recognition/ColorComparisonModel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -856,17 +859,12 @@ obj/color_comparison_smoke.o: ../../../smoke/color_comparison_smoke.cpp ../../..
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
+		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
@@ -882,12 +880,20 @@ obj/color_comparison_smoke.o: ../../../smoke/color_comparison_smoke.cpp ../../..
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
+		../../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
@@ -897,6 +903,7 @@ obj/color_comparison_smoke.o: ../../../smoke/color_comparison_smoke.cpp ../../..
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
 		../../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		../../../src/algorithms/halcon/HalconRuntimePaths.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCoreApplication \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreapplication.h \
@@ -1058,6 +1065,7 @@ obj/ColorRecognitionHalconRunner.o: ../../../src/algorithms/recognition/ColorRec
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QByteArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
@@ -1089,38 +1097,44 @@ obj/ColorRecognitionHalconRunner.o: ../../../src/algorithms/recognition/ColorRec
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HalconCDefs.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HBase.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HIntDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/hclib/hclib_types.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HConst.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HDeclSpec.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HErrorDef.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HExtern.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HMacro.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HParallel.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/IPType.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HInterfaceC.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/halconc/Hvector.h \
-		/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/include/HProto.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDebug \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QCryptographicHash \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcryptographichash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonDocument \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsondocument.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutex \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QMutexLocker \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/imgproc/segmentation.hpp
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorRecognitionHalconRunner.o ../../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp
 
 obj/ColorComparisonHalconRunner.o: ../../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp ../../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
-		../../../src/toolcore/ToolOverlay.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		../../../src/algorithms/recognition/ColorComparisonModel.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
@@ -1193,17 +1207,12 @@ obj/ColorComparisonHalconRunner.o: ../../../src/algorithms/recognition/ColorComp
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
+		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvdef.h \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/version.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/hal/interface.h \
@@ -1219,12 +1228,20 @@ obj/ColorComparisonHalconRunner.o: ../../../src/algorithms/recognition/ColorComp
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/vsx_utils.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/check.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/traits.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/matx.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/saturate.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/types.hpp \
-		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/bufferpool.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/mat.inl.hpp \
+		../../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/persistence.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/operations.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/cvstd.inl.hpp \
@@ -1233,11 +1250,28 @@ obj/ColorComparisonHalconRunner.o: ../../../src/algorithms/recognition/ColorComp
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/utils/tls.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/optim.hpp \
 		/home/tt/.local/opencv-4.8.0/include/opencv4/opencv2/core/ovx.hpp \
-		../../../src/algorithms/recognition/ColorRecognitionHalconRunner.h \
+		../../../src/algorithms/halcon/HalconRuntimePaths.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPair \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o obj/ColorComparisonHalconRunner.o ../../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp
 
 ####### Install

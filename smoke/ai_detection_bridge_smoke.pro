@@ -5,7 +5,11 @@ TEMPLATE = app
 TARGET = ai_detection_bridge_smoke
 
 INCLUDEPATH += ../src
-INCLUDEPATH += /usr/include/opencv4
+OPENCV_ROOT = $$(OPENCV_ROOT)
+isEmpty(OPENCV_ROOT) {
+    OPENCV_ROOT = $$(HOME)/.local/opencv-4.8.0
+}
+INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
 
 BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/ai_detection_bridge
 DESTDIR = $$BUILD_ROOT/bin
@@ -30,4 +34,6 @@ HEADERS += \
     ../src/toolcore/ToolResult.h \
     ../src/toolcore/ToolTypes.h
 
+LIBS += -L$$OPENCV_ROOT/lib
+LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
 LIBS += -lopencv_core -lopencv_imgcodecs

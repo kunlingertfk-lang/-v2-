@@ -110,6 +110,23 @@ int main(int argc, char **argv)
           && referenceRoundTrip.templateRoiNormalized == referenceConfig.templateRoiNormalized,
           "scheme reference correction must round trip enabled state and template ROI");
 
+    ReferencePositionCorrectionConfig polygonConfig;
+    polygonConfig.enabled = true;
+    polygonConfig.templateRegionType = QStringLiteral("polygon");
+    polygonConfig.templateRoiNormalized = QRectF(0.1, 0.1, 0.7, 0.6);
+    polygonConfig.templatePolygonNormalized = QJsonArray{
+        QJsonObject{{QStringLiteral("x"), 0.1}, {QStringLiteral("y"), 0.2}},
+        QJsonObject{{QStringLiteral("x"), 0.8}, {QStringLiteral("y"), 0.1}},
+        QJsonObject{{QStringLiteral("x"), 0.6}, {QStringLiteral("y"), 0.7}}
+    };
+    const ReferencePositionCorrectionConfig polygonRoundTrip =
+            PositionCorrection::referenceFromJson(
+                PositionCorrection::referenceToJson(polygonConfig));
+    check(polygonRoundTrip.templateRegionType == QStringLiteral("polygon")
+          && polygonRoundTrip.templatePolygonNormalized == polygonConfig.templatePolygonNormalized
+          && polygonRoundTrip.templateRoiNormalized == polygonConfig.templateRoiNormalized,
+          "scheme reference correction must round trip polygon ROI and its bounding rect");
+
     QJsonObject payload;
     PositionCorrection::writeNotAppliedPayload(parsed, &payload);
     check(payload.value(QStringLiteral("enablePositionCorrection")).toBool(false),

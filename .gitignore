@@ -5,6 +5,7 @@ docs/
 projects/
 test/
 tests/
+smoke/
 AGENTS.*
 
 *.user
@@ -16,8 +17,6 @@ debug/
 release/
 Debug/
 Release/
-docs/
-test/
 Makefile
 *.o
 *.obj
@@ -59,6 +58,21 @@ AGENTS.*
 
 # 便携化:每开发者本地路径覆盖，不入库
 local_paths.pri
+/scripts/dependencies.env
 
 # AI 训练数据(纯开发资料，非构建/运行所需)，不入库
 rk_ai_materials/
+
+# TemplateLocation 功能文档与 smoke 源码属于交付内容；仅构建产物继续忽略。
+!docs/
+docs/*
+!docs/FID/
+docs/FID/*
+!docs/FID/TemplateLocation/
+!docs/FID/TemplateLocation/*.md
+!smoke/
+smoke/*
+!smoke/template_location_smoke.cpp
+!smoke/template_location_smoke.pro
+!smoke/template_location_ui_smoke.cpp
+!smoke/template_location_ui_smoke.pro

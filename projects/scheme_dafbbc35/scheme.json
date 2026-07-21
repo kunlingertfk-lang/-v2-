@@ -8781,6 +8781,28 @@
         }
     },
     "referenceImage": "reference.png",
+    "referenceInputMetadata": {
+        "bitShift": -1,
+        "colorMode": "unknown",
+        "originalChannels": 0,
+        "originalDepth": -1,
+        "pixelFormat": "",
+        "source": "",
+        "validBits": -1
+    },
+    "referencePositionCorrection": {
+        "enabled": false,
+        "templatePolygonNormalized": [
+        ],
+        "templateRegionType": "rectangle",
+        "templateRoiNormalized": {
+            "height": 0,
+            "width": 0,
+            "x": 0,
+            "y": 0
+        },
+        "version": 1
+    },
     "schemaVersion": 1,
     "schemeId": "scheme_dafbbc35",
     "schemeName": "直线",
@@ -8817,5 +8839,5 @@
             "toolType": "LinePresence"
         }
     ],
-    "updatedAt": "2026-06-10T14:39:14"
+    "updatedAt": "2026-07-16T10:50:27"
 }

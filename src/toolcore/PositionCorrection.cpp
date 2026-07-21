@@ -4,6 +4,7 @@
 
 namespace {
 
+// 兼容读取 JSON 布尔值及旧配置中的 true/false、1/0、yes/no 字符串。
 bool boolParam(const QJsonObject &object, const QString &key, bool defaultValue)
 {
     const QJsonValue value = object.value(key);
@@ -18,6 +19,7 @@ bool boolParam(const QJsonObject &object, const QString &key, bool defaultValue)
     return defaultValue;
 }
 
+// 读取并清理字符串参数；字段缺失或为空时返回调用方提供的默认值。
 QString stringParam(const QJsonObject &object,
                     const QString &key,
                     const QString &defaultValue)
@@ -28,21 +30,25 @@ QString stringParam(const QJsonObject &object,
 
 } // namespace
 
+// 提供给界面及旧配置兼容字段使用的基准图来源显示文本。
 QString PositionCorrection::defaultSource()
 {
     return QStringLiteral("1 基准图.位置修正信息");
 }
 
+// 返回不会随界面序号变化的方案级基准图固定来源 ID。
 QString PositionCorrection::defaultSourceId()
 {
     return QStringLiteral("reference.positionCorrection");
 }
 
+// 返回 UI 阶段统一的未实现原因，防止上层伪造位置修正成功状态。
 QString PositionCorrection::notImplementedReason()
 {
     return QStringLiteral("not implemented");
 }
 
+// 从 ToolConfig.params 解析消费配置，并为旧方案补齐稳定来源 ID。
 PositionCorrectionConfig PositionCorrection::fromParams(
         const QJsonObject &params,
         bool defaultEnabled,
@@ -61,6 +67,7 @@ PositionCorrectionConfig PositionCorrection::fromParams(
     return config;
 }
 
+// 将消费配置写回参数对象，同时保留显示文本以兼容旧版本方案。
 void PositionCorrection::writeParams(const PositionCorrectionConfig &config,
                                      QJsonObject *params)
 {
@@ -74,6 +81,7 @@ void PositionCorrection::writeParams(const PositionCorrectionConfig &config,
                    config.source.trimmed().isEmpty() ? defaultSource() : config.source);
 }
 
+// 写入明确的“未应用”结果，供后端未接入期间的 UI 和日志展示。
 void PositionCorrection::writeNotAppliedPayload(const PositionCorrectionConfig &config,
                                                 QJsonObject *payload)
 {
@@ -89,6 +97,7 @@ void PositionCorrection::writeNotAppliedPayload(const PositionCorrectionConfig &
     payload->insert(QStringLiteral("positionCorrectionReason"), notImplementedReason());
 }
 
+// 按执行顺序收集基准图及消费工具之前已启用的位置修正实例。
 QVector<PositionCorrectionSource> PositionCorrection::sourcesBefore(
         const QVector<ToolConfig> &tools,
         int consumerIndex,
@@ -122,6 +131,7 @@ QVector<PositionCorrectionSource> PositionCorrection::sourcesBefore(
     return sources;
 }
 
+// 使用稳定来源 ID 检查已保存引用是否仍然有效，不按显示文本匹配。
 bool PositionCorrection::isSourceAvailable(
         const QVector<PositionCorrectionSource> &sources,
         const QString &sourceId)
@@ -134,6 +144,7 @@ bool PositionCorrection::isSourceAvailable(
     return false;
 }
 
+// 解析方案级基准图位置修正配置，缺失字段按向后兼容默认值处理。
 ReferencePositionCorrectionConfig PositionCorrection::referenceFromJson(
         const QJsonObject &json)
 {
@@ -153,6 +164,7 @@ ReferencePositionCorrectionConfig PositionCorrection::referenceFromJson(
     return config;
 }
 
+// 序列化方案级基准图配置，包括归一化矩形和多边形模板区域。
 QJsonObject PositionCorrection::referenceToJson(
         const ReferencePositionCorrectionConfig &config)
 {

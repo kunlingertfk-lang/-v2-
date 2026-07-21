@@ -4,11 +4,12 @@
 
 ## 功能文档索引
 
-- 颜色识别：`docs/FID/ColorRecognition/颜色识别提示词规范.md`、`docs/FID/ColorRecognition/color_recognition_function_implementation.md`
+- 颜色识别：`docs/FID/ColorRecognition/颜色识别提示词规范.md`、`docs/FID/ColorRecognition/color_recognition_function_implementation.md`、`docs/FID/ColorRecognition/颜色识别算法V2整理设计.md`
 - 颜色比较：`docs/FID/ColorComparison/颜色比较V2设计说明.md`、`docs/FID/ColorComparison/颜色比较V2提示词规范.md`、`docs/FID/ColorComparison/color_comparison_function_implementation.md`（V1 历史提示词仅供追溯）
 - 注册分类：`docs/FID/RegisteredClassification/注册分类提示词规范.md`、`docs/FID/RegisteredClassification/registered_classification_function_implementation.md`、`docs/FID/RegisteredClassification/注册分类算法当前实现说明.md`
 - 注册目标检测：`docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md`、`docs/FID/RegisteredClassificationDetection/registered_classification_detection_function_implementation.md`
 - 位置修正：`docs/FID/PositionCorrection/位置修正UI设计规范.md`、`docs/FID/PositionCorrection/位置修正提示词规范.md`、`docs/FID/PositionCorrection/position_correction_function_implementation.md`
+- 模板定位：`docs/FID/TemplateLocation/模板定位UI与交互设计.md`、`docs/FID/TemplateLocation/template_location_function_implementation.md`、`docs/FID/TemplateLocation/模板定位与位置修正衔接.md`、`docs/FID/TemplateLocation/HANDOFF.md`
 
 ## 约束优先级
 
@@ -73,6 +74,10 @@ ToolResult / overlays / payload
 
 实现必须满足以下约束：
 
+- 绘制图标采用 toggle 语义：第一次点击进入绘制并高亮；未再次点击时保持绘制模式并允许连续重绘；再次点击当前图标退出绘制并取消高亮。
+- 点击另一个绘制图标时直接切换到新绘制模式，任一时刻最多只有一个绘制模式活动。图标 checked 只表示当前活动绘制状态，不得表示已经保存的 ROI 类型、Mask 是否存在或几何数据是否有效。
+- 活动绘制状态必须与 ROI/Mask 配置数据分离。退出绘制只关闭交互并恢复普通缩放、平移，不得清空最后一次有效几何数据；配置加载和回显也不得仅根据已保存的 ROI 类型自动进入绘制状态。
+- 矩形、圆形、多边形、线带、模板 ROI、检测 ROI 和 Mask 等绘制入口均应遵守上述合同。颜色比较和颜色识别已接入；其他现有功能后续改造时按本规范迁移。
 - 鼠标按下时锁定本次拖动的操作模式；拖动过程中按下或松开 `Ctrl` 不得在平移与 ROI 绘制之间切换。
 - 缩放以鼠标指针下的图像位置为锚点，默认范围为“适应窗口”到 `8×`；达到上下限后继续滚轮不得产生额外变换。
 - 双击非 ROI 操作区域或调用公共“适应窗口”动作时恢复初始比例。
@@ -132,6 +137,17 @@ ToolResult / overlays / payload
 - 弹窗或二级窗口的内容区不得使用未命名、未设样式的普通 `QWidget` 承接布局；必须使用设置了 `objectName` 或 `panelRole` 的 `QFrame` / `QWidget`，并在 QSS 中显式声明背景色和文字色。
 - 严禁依赖系统 palette 或父窗口默认背景来决定内容区底色；深色系统主题下也必须保持白底深字或等价高对比组合。
 - 对关键弹窗应增加自动化检查，至少断言内容容器存在明确样式属性；能渲染采样时，应验证内容区实际像素不是深色背景。
+
+### QSS 作用域、优先级与公共语义角色
+
+- `styles/app.qss` 是唯一的应用级样式入口。功能 Dialog 不得通过整段 `setStyleSheet()` 重复定义通用输入框、按钮和弹层样式；确需局部差异时，应设置稳定的 `objectName`、`panelRole`、`actionRole` 或 `uiRole`，由 `app.qss` 统一选择。
+- 禁止新增 `QWidget`、`QLabel`、`QComboBox` 等无属性限定的全局背景或文字规则。现有文件开头的深色 `QWidget` 规则属于历史兼容基线；新增浅色页面必须显式标记根容器和控件语义，待旧页面完成角色迁移后再统一收窄该基线。
+- 公共规则使用“语义角色”，不使用单功能名称。例如浅色输入框使用 `uiRole="lightField"`，浅色下拉弹层使用 `uiRole="lightComboPopup"`。需要复用时优先调用 `UiStyleRoles` 中的公共 helper，不得复制一套功能专用 QSS。
+- `QComboBox` 展开后的 popup 容器、`QAbstractItemView` 和 viewport 可能被 Qt 重设为顶层窗口或独立绘制层，不能使用 `QDialog#某窗口 QAbstractItemView` 这类祖先选择器。必须给三层分别设置动态属性，并使用不依赖 Dialog 祖先的公共选择器。
+- 若目标 Qt/平台样式没有把应用级 QSS 传播到 `QComboBoxPrivateContainer`，允许 `UiStyleRoles` 公共 helper 对 popup view 设置统一的高优先级样式作为兼容兜底；该样式只能集中维护在公共 helper 中，功能 Dialog 仍不得自行调用 `view()->setStyleSheet()` 复制样式。
+- 公共语义角色规则应放在 `app.qss` 的旧式宽泛规则之后，保证相同优先级下由公共角色覆盖历史默认值；不要通过不断提高选择器层级或添加功能内联样式解决覆盖问题。
+- 调整动态属性后若控件已经显示，应按需执行 `unpolish/polish` 或重新创建 popup 使样式刷新；构造阶段设置属性不需要额外刷新。
+- 自动化验证至少检查：控件和 popup 具备预期语义属性；QSS 可被 Qt 正常解析；深色系统主题下展开项仍保持高对比；禁用、hover、选中状态文字均可读。
 
 ### 注册训练和检测控件样式
 

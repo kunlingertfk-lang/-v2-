@@ -2,6 +2,7 @@
 
 #include "ColorComparisonFeatureView.h"
 #include "PlanDialogUtils.h"
+#include "UiStyleRoles.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
@@ -908,9 +909,19 @@ void ColorComparisonDialog::buildUi()
             m_templateRegionModeComboBox->addItem(tr("自定义"),
                                                    QStringLiteral("custom"));
             m_templateRegionModeComboBox->setCurrentIndex(1);
+            UiStyleRoles::applyLightComboBox(m_templateRegionModeComboBox);
         }
         templateLayout->addLayout(row(tr("模板区域"),
                                       m_templateRegionModeComboBox));
+        if (!m_templateSyncHintLabel) {
+            m_templateSyncHintLabel = new QLabel(
+                        tr("模板 ROI 跟随检测区域，模板屏蔽区保持独立"),
+                        templateCard);
+            m_templateSyncHintLabel->setObjectName(
+                        QStringLiteral("colorComparisonTemplateSyncHint"));
+            m_templateSyncHintLabel->setWordWrap(true);
+        }
+        templateLayout->addWidget(m_templateSyncHintLabel);
         QWidget *templateEditRow = new QWidget(templateCard);
         QHBoxLayout *templateEditLayout = new QHBoxLayout(templateEditRow);
         templateEditLayout->setContentsMargins(0, 0, 0, 0);
@@ -952,12 +963,22 @@ void ColorComparisonDialog::buildUi()
         }
         m_templateMaskPolygonButton->setObjectName(
                     QStringLiteral("colorComparisonTemplateMaskPolygonButton"));
+        if (!m_templateMaskRedrawButton)
+            m_templateMaskRedrawButton = new QPushButton(tr("重画"), this);
+        m_templateMaskRedrawButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateMaskRedrawButton"));
+        if (!m_templateMaskClearButton)
+            m_templateMaskClearButton = new QPushButton(tr("清除"), this);
+        m_templateMaskClearButton->setObjectName(
+                    QStringLiteral("colorComparisonTemplateMaskClearButton"));
         if (!m_templateMaskFinishButton)
             m_templateMaskFinishButton = new QPushButton(tr("完成"), this);
         m_templateMaskFinishButton->setObjectName(
                     QStringLiteral("colorComparisonTemplateMaskFinishButton"));
         maskLayout->addWidget(m_templateMaskEditButton);
         maskLayout->addWidget(m_templateMaskPolygonButton);
+        maskLayout->addWidget(m_templateMaskRedrawButton);
+        maskLayout->addWidget(m_templateMaskClearButton);
         maskLayout->addWidget(m_templateMaskFinishButton);
         templateLayout->addWidget(maskRow);
         layout->addWidget(templateCard);
@@ -1006,6 +1027,7 @@ void ColorComparisonDialog::buildUi()
                     if (QStandardItem *item = model->item(1))
                         item->setEnabled(false);
                 }
+                UiStyleRoles::applyLightComboBox(m_featureTypeComboBox);
             }
             if (!m_brightnessCheckBox) {
                 m_brightnessCheckBox = new QCheckBox(
@@ -1082,7 +1104,10 @@ void ColorComparisonDialog::buildUi()
             positionSourceLayout->addWidget(positionSourceLabel);
             positionSourceLayout->addStretch(1);
             m_positionCorrectionComboBox = new QComboBox(m_positionCorrectionSourceRow);
+            m_positionCorrectionComboBox->setObjectName(
+                        QStringLiteral("colorComparisonPositionCorrectionCombo"));
             m_positionCorrectionComboBox->addItem(QStringLiteral("1 基准图.位置修正信息"));
+            UiStyleRoles::applyLightComboBox(m_positionCorrectionComboBox);
             positionSourceLayout->addWidget(m_positionCorrectionComboBox);
         }
         positionPanelLayout->addWidget(positionEnableRow);
@@ -1111,12 +1136,22 @@ void ColorComparisonDialog::buildUi()
             }
             m_detectMaskPolygonButton->setObjectName(
                         QStringLiteral("colorComparisonDetectMaskPolygonButton"));
+            if (!m_detectMaskRedrawButton)
+                m_detectMaskRedrawButton = new QPushButton(tr("重画"), this);
+            m_detectMaskRedrawButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectMaskRedrawButton"));
+            if (!m_detectMaskClearButton)
+                m_detectMaskClearButton = new QPushButton(tr("清除"), this);
+            m_detectMaskClearButton->setObjectName(
+                        QStringLiteral("colorComparisonDetectMaskClearButton"));
             if (!m_detectMaskFinishButton)
                 m_detectMaskFinishButton = new QPushButton(tr("完成"), this);
             m_detectMaskFinishButton->setObjectName(
                         QStringLiteral("colorComparisonDetectMaskFinishButton"));
             detectMaskLayout->addWidget(m_detectMaskEditButton);
             detectMaskLayout->addWidget(m_detectMaskPolygonButton);
+            detectMaskLayout->addWidget(m_detectMaskRedrawButton);
+            detectMaskLayout->addWidget(m_detectMaskClearButton);
             detectMaskLayout->addWidget(m_detectMaskFinishButton);
             detectLayout->addWidget(detectMaskRow);
         }
@@ -1135,6 +1170,7 @@ void ColorComparisonDialog::buildUi()
             m_sensitivityComboBox->addItem(tr("低（宽松）"),
                                             QStringLiteral("low"));
             m_sensitivityComboBox->setCurrentIndex(1);
+            UiStyleRoles::applyLightComboBox(m_sensitivityComboBox);
         }
         settingsLayout->addLayout(row(tr("灵敏度"), m_sensitivityComboBox));
         layout->addWidget(settingsCard);
@@ -1216,9 +1252,8 @@ void ColorComparisonDialog::buildUi()
     m_previewHelper->setNavigationEnabled(true);
 
     setAllParamsMode(false);
-    if (m_detectRectButton)
-        m_detectRectButton->setChecked(true);
     refreshEditControls();
+    refreshTemplateRegionControls();
     refreshPositionCorrectionControls();
 
     connect(closeButton, &QToolButton::clicked, this, &ColorComparisonDialog::reject);
@@ -1237,14 +1272,33 @@ void ColorComparisonDialog::connectControls()
                     return;
                 m_templateRegionMode = m_templateRegionModeComboBox->itemData(index)
                         .toString();
+                if (m_templateRegionMode == QStringLiteral("sync")
+                        && m_editState == EditState::TemplateRect) {
+                    setEditState(EditState::None);
+                }
                 markModelStale(QStringLiteral("template_region_mode_changed"));
                 updateTemplatePreview();
+                refreshTemplateRegionControls();
+                refreshGeometryOverlays();
             });
-    connect(m_templateEditButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::TemplateRect); });
-    connect(m_templateRectButton, &QToolButton::clicked, this, [this]() { setEditState(EditState::TemplateRect); });
+    connect(m_templateEditButton, &QPushButton::clicked, this, [this]() {
+        toggleEditState(EditState::TemplateRect);
+    });
+    connect(m_templateRectButton, &QToolButton::clicked, this, [this]() {
+        toggleEditState(EditState::TemplateRect);
+    });
     connect(m_templateFinishButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::None); });
-    connect(m_templateMaskEditButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::TemplateMaskPolygon); });
-    connect(m_templateMaskPolygonButton, &QToolButton::clicked, this, [this]() { setEditState(EditState::TemplateMaskPolygon); });
+    connect(m_templateMaskEditButton, &QPushButton::clicked, this, [this]() {
+        toggleEditState(EditState::TemplateMaskPolygon);
+    });
+    connect(m_templateMaskPolygonButton, &QToolButton::clicked, this, [this]() {
+        toggleEditState(EditState::TemplateMaskPolygon);
+    });
+    connect(m_templateMaskRedrawButton, &QPushButton::clicked, this, [this]() {
+        beginMaskRedraw(EditState::TemplateMaskPolygon);
+    });
+    connect(m_templateMaskClearButton, &QPushButton::clicked,
+            this, &ColorComparisonDialog::clearTemplateMask);
     connect(m_templateMaskFinishButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::None); });
     connect(m_detectGlobalButton, &QToolButton::clicked, this, [this]() {
         m_globalDetection = true;
@@ -1253,22 +1307,30 @@ void ColorComparisonDialog::connectControls()
         m_detectCircle = CircleRoi();
         setEditState(EditState::None);
         refreshDetectRegionButtons();
-        handleDetectionConfigChanged(QStringLiteral("detect_region_changed"));
+        handleDetectionGeometryChanged(QStringLiteral("detect_region_changed"));
     });
     connect(m_detectRectButton, &QToolButton::clicked, this, [this]() {
-        m_globalDetection = false;
-        m_detectRegionType = QStringLiteral("rectangle");
-        m_detectCircle = CircleRoi();
-        setEditState(EditState::DetectRect);
+        const bool activating = m_editState != EditState::DetectRect;
+        if (activating) {
+            m_globalDetection = false;
+            m_detectRegionType = QStringLiteral("rectangle");
+            m_detectCircle = CircleRoi();
+        }
+        toggleEditState(EditState::DetectRect);
         refreshDetectRegionButtons();
-        handleDetectionConfigChanged(QStringLiteral("detect_region_changed"));
+        if (activating)
+            handleDetectionGeometryChanged(QStringLiteral("detect_region_changed"));
     });
     connect(m_detectCircleButton, &QToolButton::clicked, this, [this]() {
-        m_globalDetection = false;
-        m_detectRegionType = QStringLiteral("circle");
-        setEditState(EditState::DetectCircle);
+        const bool activating = m_editState != EditState::DetectCircle;
+        if (activating) {
+            m_globalDetection = false;
+            m_detectRegionType = QStringLiteral("circle");
+        }
+        toggleEditState(EditState::DetectCircle);
         refreshDetectRegionButtons();
-        handleDetectionConfigChanged(QStringLiteral("detect_region_changed"));
+        if (activating)
+            handleDetectionGeometryChanged(QStringLiteral("detect_region_changed"));
     });
     connect(m_positionCorrectionCheckBox, &QCheckBox::toggled, this, [this](bool checked) {
         m_positionCorrectionEnabled = checked;
@@ -1313,9 +1375,20 @@ void ColorComparisonDialog::connectControls()
                     rerunLiveComparison();
             });
     if (m_detectMaskEditButton)
-        connect(m_detectMaskEditButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::DetectMaskPolygon); });
+        connect(m_detectMaskEditButton, &QPushButton::clicked, this, [this]() {
+            toggleEditState(EditState::DetectMaskPolygon);
+        });
     if (m_detectMaskPolygonButton)
-        connect(m_detectMaskPolygonButton, &QToolButton::clicked, this, [this]() { setEditState(EditState::DetectMaskPolygon); });
+        connect(m_detectMaskPolygonButton, &QToolButton::clicked, this, [this]() {
+            toggleEditState(EditState::DetectMaskPolygon);
+        });
+    if (m_detectMaskRedrawButton)
+        connect(m_detectMaskRedrawButton, &QPushButton::clicked, this, [this]() {
+            beginMaskRedraw(EditState::DetectMaskPolygon);
+        });
+    if (m_detectMaskClearButton)
+        connect(m_detectMaskClearButton, &QPushButton::clicked,
+                this, &ColorComparisonDialog::clearDetectionMask);
     if (m_detectMaskFinishButton)
         connect(m_detectMaskFinishButton, &QPushButton::clicked, this, [this]() { setEditState(EditState::None); });
     connect(m_rebuildModelButton,
@@ -1356,11 +1429,21 @@ void ColorComparisonDialog::setAllParamsMode(bool allMode)
 
 void ColorComparisonDialog::setEditState(EditState state)
 {
+    if (state == EditState::TemplateRect
+            && m_templateRegionMode == QStringLiteral("sync")) {
+        updateStatus(tr("模板 ROI 已跟随检测区域；模板屏蔽区仍可独立编辑"));
+        return;
+    }
     const bool templateEdit = state == EditState::TemplateRect
             || state == EditState::TemplateMaskPolygon;
     if (templateEdit && m_liveTestSource == LiveTestSource::Camera) {
         updateStatus(tr("相机测试态不可编辑模板区域，请先退出测试"));
         return;
+    }
+
+    if (m_maskRedrawInProgress && state != m_editState) {
+        m_maskRedrawInProgress = false;
+        m_maskBeforeRedraw.clear();
     }
 
     m_editState = state;
@@ -1378,8 +1461,23 @@ void ColorComparisonDialog::setEditState(EditState state)
         m_previewHelper->setRoiDrawingEnabled(true);
     if (state == EditState::DetectCircle)
         m_previewHelper->setCircleDrawingEnabled(true);
-    if (state == EditState::TemplateMaskPolygon || state == EditState::DetectMaskPolygon)
-        m_previewHelper->setPolygonDrawingEnabled(true);
+    if (state == EditState::TemplateMaskPolygon) {
+        if (m_templateMask.size() >= 3) {
+            m_previewHelper->setPolygonRoiNormalized(m_templateMask);
+        } else {
+            m_maskBeforeRedraw.clear();
+            m_maskRedrawInProgress = true;
+            m_previewHelper->setPolygonDrawingEnabled(true);
+        }
+    } else if (state == EditState::DetectMaskPolygon) {
+        if (m_detectMask.size() >= 3) {
+            m_previewHelper->setPolygonRoiNormalized(m_detectMask);
+        } else {
+            m_maskBeforeRedraw.clear();
+            m_maskRedrawInProgress = true;
+            m_previewHelper->setPolygonDrawingEnabled(true);
+        }
+    }
     refreshRoiOverlay();
 
     QString statusText = tr("ROI 编辑完成");
@@ -1405,6 +1503,68 @@ void ColorComparisonDialog::setEditState(EditState state)
     updateStatus(statusText);
 }
 
+void ColorComparisonDialog::toggleEditState(EditState requestedState)
+{
+    setEditState(m_editState == requestedState
+                 ? EditState::None
+                 : requestedState);
+}
+
+void ColorComparisonDialog::beginMaskRedraw(EditState state)
+{
+    if (state != EditState::TemplateMaskPolygon
+            && state != EditState::DetectMaskPolygon)
+        return;
+    if (m_editState != state)
+        setEditState(state);
+    if (m_editState != state || !m_previewHelper)
+        return;
+
+    m_maskBeforeRedraw = state == EditState::TemplateMaskPolygon
+            ? m_templateMask : m_detectMask;
+    m_maskRedrawInProgress = true;
+    m_previewHelper->clearPolygonRoi();
+    m_previewHelper->setPolygonDrawingEnabled(true);
+    updateStatus(state == EditState::TemplateMaskPolygon
+                 ? tr("请重画模板屏蔽多边形，双击完成；取消将保留原区域")
+                 : tr("请重画检测屏蔽多边形，双击完成；取消将保留原区域"));
+}
+
+void ColorComparisonDialog::clearTemplateMask()
+{
+    if (m_templateMask.isEmpty())
+        return;
+    m_templateMask.clear();
+    m_maskBeforeRedraw.clear();
+    m_maskRedrawInProgress = false;
+    if (m_editState == EditState::TemplateMaskPolygon && m_previewHelper) {
+        m_previewHelper->clearPolygonRoi();
+        m_previewHelper->setPolygonDrawingEnabled(true);
+        m_maskRedrawInProgress = true;
+    }
+    markModelStale(QStringLiteral("template_mask_cleared"));
+    updateTemplatePreview();
+    refreshEditControls();
+    refreshGeometryOverlays();
+}
+
+void ColorComparisonDialog::clearDetectionMask()
+{
+    if (m_detectMask.isEmpty())
+        return;
+    m_detectMask.clear();
+    m_maskBeforeRedraw.clear();
+    m_maskRedrawInProgress = false;
+    if (m_editState == EditState::DetectMaskPolygon && m_previewHelper) {
+        m_previewHelper->clearPolygonRoi();
+        m_previewHelper->setPolygonDrawingEnabled(true);
+        m_maskRedrawInProgress = true;
+    }
+    handleDetectionMaskChanged(QStringLiteral("detect_mask_cleared"));
+    refreshEditControls();
+    refreshGeometryOverlays();
+}
+
 void ColorComparisonDialog::showPreviewImage()
 {
     const ReferenceFrameSnapshot reference =
@@ -1422,11 +1582,11 @@ void ColorComparisonDialog::showPreviewImage()
     }
     const QImage image = imageFromFrame(frame);
     m_previewImage = image;
-    if (m_previewHelper)
-        m_previewHelper->clearToolOverlays();
+    m_runtimeResultOverlays.clear();
     if (!image.isNull()) {
         m_previewHelper->setImage(image);
         updateTemplatePreview();
+        refreshGeometryOverlays();
     } else {
         m_previewImage = QImage();
         if (m_previewHelper)
@@ -1444,7 +1604,7 @@ void ColorComparisonDialog::showFrameImage(const cv::Mat &frame, const QString &
     if (!m_previewHelper)
         return;
 
-    m_previewHelper->clearToolOverlays();
+    m_runtimeResultOverlays.clear();
     if (!image.isNull()) {
         m_previewHelper->setImage(image);
         updateTemplatePreview();
@@ -1476,6 +1636,206 @@ void ColorComparisonDialog::refreshRoiOverlay()
         m_previewHelper->setPolygonRoiNormalized(m_templateMask);
     else if (m_editState == EditState::DetectMaskPolygon && m_detectMask.size() >= 3)
         m_previewHelper->setPolygonRoiNormalized(m_detectMask);
+    refreshGeometryOverlays();
+}
+
+QVector<ToolOverlay> ColorComparisonDialog::configurationGeometryOverlays() const
+{
+    QVector<ToolOverlay> overlays;
+    if (m_previewImage.isNull())
+        return overlays;
+
+    const int width = m_previewImage.width();
+    const int height = m_previewImage.height();
+    const bool templateActive = m_editState == EditState::TemplateRect
+            || m_editState == EditState::TemplateMaskPolygon;
+    const bool detectActive = m_editState == EditState::DetectRect
+            || m_editState == EditState::DetectCircle
+            || m_editState == EditState::DetectMaskPolygon;
+    const auto emphasisFor = [templateActive, detectActive](bool templateOwner) {
+        if (!templateActive && !detectActive)
+            return QStringLiteral("normal");
+        if ((templateOwner && templateActive)
+                || (!templateOwner && detectActive))
+            return QStringLiteral("active");
+        return QStringLiteral("muted");
+    };
+    const auto rectPixels = [width, height](const QRectF &normalized) {
+        return QRectF(normalized.x() * width,
+                      normalized.y() * height,
+                      normalized.width() * width,
+                      normalized.height() * height);
+    };
+    const auto pointsPixels = [width, height](const QVector<QPointF> &points) {
+        QVector<QPointF> pixels;
+        pixels.reserve(points.size());
+        for (const QPointF &point : points) {
+            pixels.append(QPointF(point.x() * qMax(0, width - 1),
+                                  point.y() * qMax(0, height - 1)));
+        }
+        return pixels;
+    };
+    const auto rectJson = [](const QRectF &rect) {
+        return QJsonObject{
+            {QStringLiteral("x"), rect.x()},
+            {QStringLiteral("y"), rect.y()},
+            {QStringLiteral("width"), rect.width()},
+            {QStringLiteral("height"), rect.height()}
+        };
+    };
+    const auto pointJson = [](const QPointF &point) {
+        return QJsonObject{
+            {QStringLiteral("x"), point.x()},
+            {QStringLiteral("y"), point.y()}
+        };
+    };
+
+    struct DisplayGeometry {
+        ToolOverlayType type = ToolOverlayType::Rect;
+        QRectF rect;
+        QPointF center;
+        double radius = 0.0;
+        QJsonObject clip;
+        QPointF labelAnchor;
+    };
+    const auto detectionGeometry = [&]() {
+        DisplayGeometry geometry;
+        if (!m_globalDetection
+                && m_detectRegionType == QStringLiteral("circle")
+                && m_detectCircle.valid) {
+            geometry.type = ToolOverlayType::Circle;
+            geometry.center = QPointF(
+                        m_detectCircle.centerNormalized.x() * width,
+                        m_detectCircle.centerNormalized.y() * height);
+            geometry.radius = m_detectCircle.radiusNormalized
+                    * qMax(width, height);
+            geometry.clip = QJsonObject{
+                {QStringLiteral("type"), QStringLiteral("circle")},
+                {QStringLiteral("center"), pointJson(geometry.center)},
+                {QStringLiteral("radius"), geometry.radius}
+            };
+            geometry.labelAnchor = geometry.center
+                    - QPointF(geometry.radius, geometry.radius);
+        } else {
+            geometry.type = ToolOverlayType::Rect;
+            geometry.rect = rectPixels(m_globalDetection
+                                       ? QRectF(0.0, 0.0, 1.0, 1.0)
+                                       : m_detectRoi);
+            geometry.clip = QJsonObject{
+                {QStringLiteral("type"), QStringLiteral("rect")},
+                {QStringLiteral("rect"), rectJson(geometry.rect)}
+            };
+            geometry.labelAnchor = geometry.rect.topLeft();
+        }
+        return geometry;
+    };
+    const DisplayGeometry detectGeometry = detectionGeometry();
+    DisplayGeometry templateGeometry = detectGeometry;
+    if (m_templateRegionMode != QStringLiteral("sync")) {
+        templateGeometry.type = ToolOverlayType::Rect;
+        templateGeometry.rect = rectPixels(m_templateRoi);
+        templateGeometry.center = QPointF();
+        templateGeometry.radius = 0.0;
+        templateGeometry.clip = QJsonObject{
+            {QStringLiteral("type"), QStringLiteral("rect")},
+            {QStringLiteral("rect"), rectJson(templateGeometry.rect)}
+        };
+        templateGeometry.labelAnchor = templateGeometry.rect.topLeft();
+    }
+
+    const auto appendOwner = [&](bool templateOwner,
+                                 const DisplayGeometry &geometry,
+                                 const QVector<QPointF> &mask) {
+        const QString owner = templateOwner ? QStringLiteral("template")
+                                            : QStringLiteral("detect");
+        const QString roiRole = templateOwner
+                ? QStringLiteral("color_template_roi")
+                : QStringLiteral("color_detect_roi");
+        const QString maskRole = templateOwner
+                ? QStringLiteral("color_template_mask")
+                : QStringLiteral("color_detect_mask");
+        const QString emphasis = emphasisFor(templateOwner);
+
+        ToolOverlay roi;
+        roi.type = geometry.type;
+        roi.rect = geometry.rect;
+        roi.center = geometry.center;
+        roi.radius = geometry.radius;
+        roi.label = templateOwner ? QStringLiteral("T")
+                                  : QStringLiteral("D");
+        roi.extra.insert(QStringLiteral("displayRole"), roiRole);
+        roi.extra.insert(QStringLiteral("emphasis"), emphasis);
+        roi.extra.insert(QStringLiteral("owner"), owner);
+        overlays.append(roi);
+
+        ToolOverlay label;
+        label.type = ToolOverlayType::Text;
+        label.p1 = geometry.labelAnchor + QPointF(5.0, 5.0);
+        label.text = roi.label;
+        label.label = QStringLiteral("color_geometry_label_%1").arg(owner);
+        label.extra.insert(QStringLiteral("displayRole"), roiRole);
+        label.extra.insert(QStringLiteral("emphasis"), emphasis);
+        label.extra.insert(QStringLiteral("owner"), owner);
+        overlays.append(label);
+
+        if (mask.size() >= 3) {
+            ToolOverlay maskOverlay;
+            maskOverlay.type = ToolOverlayType::Polygon;
+            maskOverlay.points = pointsPixels(mask);
+            maskOverlay.label = templateOwner ? QStringLiteral("T-Mask")
+                                              : QStringLiteral("D-Mask");
+            maskOverlay.extra.insert(QStringLiteral("displayRole"), maskRole);
+            maskOverlay.extra.insert(QStringLiteral("emphasis"), emphasis);
+            maskOverlay.extra.insert(QStringLiteral("owner"), owner);
+            maskOverlay.extra.insert(QStringLiteral("clipGeometry"),
+                                     geometry.clip);
+            overlays.append(maskOverlay);
+        }
+    };
+
+    appendOwner(true, templateGeometry, m_templateMask);
+    appendOwner(false, detectGeometry, m_detectMask);
+    return overlays;
+}
+
+QVector<ToolOverlay> ColorComparisonDialog::detectionGeometryOverlays() const
+{
+    QVector<ToolOverlay> detection;
+    const QVector<ToolOverlay> configured = configurationGeometryOverlays();
+    for (ToolOverlay overlay : configured) {
+        if (overlay.extra.value(QStringLiteral("owner")).toString()
+                != QStringLiteral("detect"))
+            continue;
+        overlay.extra.insert(QStringLiteral("emphasis"),
+                             QStringLiteral("normal"));
+        detection.append(overlay);
+    }
+    return detection;
+}
+
+QVector<ToolOverlay> ColorComparisonDialog::combinedDisplayOverlays() const
+{
+    QVector<ToolOverlay> overlays = m_liveTestSource == LiveTestSource::None
+            ? configurationGeometryOverlays()
+            : detectionGeometryOverlays();
+    for (const ToolOverlay &runtime : m_runtimeResultOverlays) {
+        const QString role = runtime.extra.value(
+                    QStringLiteral("role")).toString();
+        const QString label = runtime.label.trimmed().toLower();
+        if (role == QStringLiteral("detect_roi")
+                || role == QStringLiteral("detect_mask")
+                || label == QStringLiteral("detection roi")
+                || label == QStringLiteral("detection mask"))
+            continue;
+        overlays.append(runtime);
+    }
+    return overlays;
+}
+
+void ColorComparisonDialog::refreshGeometryOverlays()
+{
+    if (m_previewHelper)
+        m_previewHelper->setToolOverlays(combinedDisplayOverlays());
 }
 
 void ColorComparisonDialog::updateStatus(const QString &text)
@@ -1521,7 +1881,7 @@ void ColorComparisonDialog::handleRoiChanged(const QRectF &roi)
         m_detectRoi = normalizedRoiOrDefault(roi);
         m_globalDetection = false;
         refreshRoiOverlay();
-        handleDetectionConfigChanged(QStringLiteral("detect_roi_changed"));
+        handleDetectionGeometryChanged(QStringLiteral("detect_roi_changed"));
     }
 }
 
@@ -1546,7 +1906,7 @@ void ColorComparisonDialog::handleCircleChanged(const CircleRoi &circle)
     m_globalDetection = false;
     m_detectRoi = exactBounds;
     refreshRoiOverlay();
-    handleDetectionConfigChanged(QStringLiteral("detect_circle_changed"));
+    handleDetectionGeometryChanged(QStringLiteral("detect_circle_changed"));
 }
 
 void ColorComparisonDialog::handlePolygonChanged(const QVector<QPointF> &points)
@@ -1557,7 +1917,15 @@ void ColorComparisonDialog::handlePolygonChanged(const QVector<QPointF> &points)
         updateTemplatePreview();
     } else if (m_editState == EditState::DetectMaskPolygon) {
         m_detectMask = points.size() >= 3 ? points : QVector<QPointF>();
-        handleDetectionConfigChanged(QStringLiteral("detect_mask_changed"));
+        handleDetectionMaskChanged(QStringLiteral("detect_mask_changed"));
+    }
+    if (points.size() >= 3) {
+        m_maskRedrawInProgress = false;
+        m_maskBeforeRedraw.clear();
+        if (m_previewHelper) {
+            m_previewHelper->setPolygonDrawingEnabled(false);
+            m_previewHelper->setPolygonRoiNormalized(points);
+        }
     }
     refreshRoiOverlay();
 }
@@ -1630,31 +1998,56 @@ void ColorComparisonDialog::refreshEditControls()
     const bool editingDetectMask = m_editState == EditState::DetectMaskPolygon;
 
     if (m_templateEditButton)
-        m_templateEditButton->setVisible(!editingTemplate);
+        m_templateEditButton->setVisible(false);
     if (m_templateRectButton) {
-        m_templateRectButton->setVisible(editingTemplate);
+        m_templateRectButton->setVisible(true);
         m_templateRectButton->setChecked(editingTemplate);
     }
     if (m_templateFinishButton)
         m_templateFinishButton->setVisible(editingTemplate);
 
     if (m_templateMaskEditButton)
-        m_templateMaskEditButton->setVisible(!editingTemplateMask);
+        m_templateMaskEditButton->setVisible(false);
     if (m_templateMaskPolygonButton) {
-        m_templateMaskPolygonButton->setVisible(editingTemplateMask);
+        m_templateMaskPolygonButton->setVisible(true);
         m_templateMaskPolygonButton->setChecked(editingTemplateMask);
+    }
+    if (m_templateMaskRedrawButton)
+        m_templateMaskRedrawButton->setVisible(editingTemplateMask);
+    if (m_templateMaskClearButton) {
+        m_templateMaskClearButton->setVisible(true);
+        m_templateMaskClearButton->setEnabled(!m_templateMask.isEmpty());
     }
     if (m_templateMaskFinishButton)
         m_templateMaskFinishButton->setVisible(editingTemplateMask);
 
     if (m_detectMaskEditButton)
-        m_detectMaskEditButton->setVisible(!editingDetectMask);
+        m_detectMaskEditButton->setVisible(false);
     if (m_detectMaskPolygonButton) {
-        m_detectMaskPolygonButton->setVisible(editingDetectMask);
+        m_detectMaskPolygonButton->setVisible(true);
         m_detectMaskPolygonButton->setChecked(editingDetectMask);
+    }
+    if (m_detectMaskRedrawButton)
+        m_detectMaskRedrawButton->setVisible(editingDetectMask);
+    if (m_detectMaskClearButton) {
+        m_detectMaskClearButton->setVisible(true);
+        m_detectMaskClearButton->setEnabled(!m_detectMask.isEmpty());
     }
     if (m_detectMaskFinishButton)
         m_detectMaskFinishButton->setVisible(editingDetectMask);
+}
+
+void ColorComparisonDialog::refreshTemplateRegionControls()
+{
+    const bool synchronized = m_templateRegionMode == QStringLiteral("sync");
+    if (m_templateRectButton)
+        m_templateRectButton->setEnabled(!synchronized
+                                         && !m_invalidConfigReadOnly);
+    if (m_templateEditButton)
+        m_templateEditButton->setEnabled(!synchronized
+                                         && !m_invalidConfigReadOnly);
+    if (m_templateSyncHintLabel)
+        m_templateSyncHintLabel->setVisible(synchronized);
 }
 
 void ColorComparisonDialog::refreshDetectRegionButtons()
@@ -1665,10 +2058,15 @@ void ColorComparisonDialog::refreshDetectRegionButtons()
     const QSignalBlocker blockGlobal(m_detectGlobalButton);
     const QSignalBlocker blockRect(m_detectRectButton);
     const QSignalBlocker blockCircle(m_detectCircleButton);
+    const bool wasExclusive = m_detectRegionGroup
+            && m_detectRegionGroup->exclusive();
+    if (m_detectRegionGroup)
+        m_detectRegionGroup->setExclusive(false);
     m_detectGlobalButton->setChecked(m_globalDetection);
-    m_detectRectButton->setChecked(!m_globalDetection
-                                   && m_detectRegionType == QStringLiteral("rectangle"));
-    m_detectCircleButton->setChecked(m_detectRegionType == QStringLiteral("circle"));
+    m_detectRectButton->setChecked(m_editState == EditState::DetectRect);
+    m_detectCircleButton->setChecked(m_editState == EditState::DetectCircle);
+    if (m_detectRegionGroup)
+        m_detectRegionGroup->setExclusive(wasExclusive);
 }
 
 void ColorComparisonDialog::refreshPositionCorrectionControls()
@@ -1688,7 +2086,7 @@ void ColorComparisonDialog::refreshPositionCorrectionControls()
     }
 }
 
-void ColorComparisonDialog::handleDetectionConfigChanged(const QString &reason)
+void ColorComparisonDialog::handleDetectionGeometryChanged(const QString &reason)
 {
     if (m_loadingConfig)
         return;
@@ -1700,6 +2098,17 @@ void ColorComparisonDialog::handleDetectionConfigChanged(const QString &reason)
         invalidateAsyncWork();
     }
 
+    if (m_liveTestSource != LiveTestSource::None)
+        rerunLiveComparison();
+}
+
+void ColorComparisonDialog::handleDetectionMaskChanged(const QString &reason)
+{
+    Q_UNUSED(reason)
+    if (m_loadingConfig)
+        return;
+
+    invalidateAsyncWork();
     if (m_liveTestSource != LiveTestSource::None)
         rerunLiveComparison();
 }
@@ -1953,6 +2362,7 @@ void ColorComparisonDialog::updateInvalidConfigReadOnlyUi()
     }
     if (m_positionCorrectionPanel)
         m_positionCorrectionPanel->setEnabled(false);
+    refreshTemplateRegionControls();
 }
 
 void ColorComparisonDialog::enterInvalidConfigReadOnly(
@@ -2159,7 +2569,11 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
                     config.judgeRule.value(QStringLiteral("minScore")).toInt(80));
     }
 
+    // Loading saved geometry must not implicitly leave or enter a drawing
+    // interaction. The user explicitly activates drawing through a tool icon.
+    setEditState(EditState::None);
     setAllParamsMode(brightnessEnabled || m_detectMask.size() >= 3);
+    refreshTemplateRegionControls();
     refreshDetectRegionButtons();
     refreshPositionCorrectionControls();
     refreshEditControls();
@@ -2189,7 +2603,6 @@ void ColorComparisonDialog::runTest()
     if (m_testUiMode == TestUiMode::Continuous) {
         stopContinuousRun();
         m_testUiMode = TestUiMode::TestPaused;
-        applyDetectRoiEditState();
         updateBottomButtons();
         updateStatus(tr("连续运行已停止，视图保留最后一帧，可继续绘制检测区域即时重测"));
         return;
@@ -2206,7 +2619,6 @@ void ColorComparisonDialog::runReferenceTest()
     stopContinuousRun();
     m_liveTestSource = LiveTestSource::Reference;
     m_testUiMode = TestUiMode::Edit;
-    applyDetectRoiEditState();
     updateBottomButtons();
 
     const ReferenceFrameSnapshot snapshot =
@@ -2235,7 +2647,10 @@ void ColorComparisonDialog::startContinuousRun()
     invalidateAsyncWork();
     m_testUiMode = TestUiMode::Continuous;
     m_liveTestSource = LiveTestSource::Camera;
-    applyDetectRoiEditState();
+    if (m_editState == EditState::TemplateRect
+            || m_editState == EditState::TemplateMaskPolygon) {
+        setEditState(EditState::None);
+    }
     updateBottomButtons();
     if (m_continuousTimer && !m_continuousTimer->isActive())
         m_continuousTimer->start();
@@ -2283,7 +2698,10 @@ void ColorComparisonDialog::runSingleShotTest()
             CameraFrameProvider::instance().currentFrameSnapshot();
     m_liveTestFrameSnapshot = snapshot.frame.clone();
     m_liveTestFrameMetadata = snapshot.metadata;
-    applyDetectRoiEditState();
+    if (m_editState == EditState::TemplateRect
+            || m_editState == EditState::TemplateMaskPolygon) {
+        setEditState(EditState::None);
+    }
     updateBottomButtons();
 
     if (m_liveTestFrameSnapshot.empty()) {
@@ -2341,16 +2759,6 @@ void ColorComparisonDialog::rerunLiveComparison()
 
     showFrameImage(frame, title);
     runComparisonOnFrame(frame, metadata, title, referenceSource);
-}
-
-void ColorComparisonDialog::applyDetectRoiEditState()
-{
-    if (m_detectRegionType == QStringLiteral("circle"))
-        setEditState(EditState::DetectCircle);
-    else if (m_detectRegionType == QStringLiteral("rectangle"))
-        setEditState(EditState::DetectRect);
-    else
-        setEditState(EditState::None);
 }
 
 void ColorComparisonDialog::exitTestMode()
@@ -2498,8 +2906,8 @@ void ColorComparisonDialog::handleTestFinished()
 
 void ColorComparisonDialog::displayResult(const ToolResult &result, bool referenceSource)
 {
-    if (m_previewHelper)
-        m_previewHelper->setToolOverlays(result.overlays);
+    m_runtimeResultOverlays = result.overlays;
+    refreshGeometryOverlays();
     const bool featureAvailable = updateDetectionFeaturePreview(result);
     const QJsonObject brightness = result.payload.value(
                 QStringLiteral("brightnessCompensation")).toObject();

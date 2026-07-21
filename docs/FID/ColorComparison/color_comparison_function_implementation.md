@@ -15,10 +15,38 @@
 当前规范入口：
 
 - `docs/FID/ColorComparison/颜色比较V2设计说明.md`
+- `docs/FID/ColorComparison/颜色比较检测特征可视化设计.md`
 - `docs/superpowers/specs/2026-07-13-color-comparison-v2-design.md`
 - `docs/superpowers/plans/2026-07-13-color-comparison-v2.md`
 
 以下第一版方案和历次实现记录仅用于解释现有代码来源，不得直接作为新实现提示词。
+
+## 2026-07-15 - 模板/检测特征对比与点击放大
+
+### 实现内容
+
+- `ColorComparisonHalconResult` 增加 32 维检测 V 直方图；成功 payload 新增 `histogramDiagnostics`，包含 1024 维检测 H/S、32 维检测 V、32×32 bins、`hue_major` 和 `rawIntersection`。失败路径明确输出 `available=false`。
+- 新增 `ColorComparisonFeatureView.{h,cpp}`，将特征投影、绘制和放大交互从 `ColorComparisonDialog` 中隔离：
+  - H/S/V 各显示 32 bins，模板使用实心柱，检测使用空心柱，重合使用斜纹；同一图中的模板与检测共用最大值纵轴。
+  - 二维图直接显示 32×32 H/S 联合分布，横轴 H、纵轴 S、低 S 在下；绿色表示重合，橙色表示模板超出，青色表示检测超出。
+  - 图例和指标区显示 HS 联合重合、当前得分和判定阈值。
+  - H/S/V/HS 四图均可点击放大；支持右上角关闭、Esc 和点击遮罩关闭，不触发 Dialog 接受、拒绝或测试停止。
+- `ColorComparisonDialog` 从 `ToolResult.payload.histogramDiagnostics` 防御性解析检测特征，只接受正确维度、layout、有限非负且归一化的数据；失败帧和退出测试立即清空检测层。
+- 连续运行继续沿用现有 generation 门禁，放大层随最新有效结果刷新；切换基础页、退出测试、加载无效模型及关闭 Dialog 时关闭放大层。
+- 检测特征只存在于运行期 `ToolResult`，不写入 `ToolConfig`、方案 JSON 或模板模型；评分、灵敏度、光照补偿和 `minScore` 判定未修改。
+
+### 自动验证
+
+- `color_comparison_feature_view_smoke`：offscreen 通过，覆盖 1024→H/S 32-bin 投影、检测数据校验、点击 H 图打开、关闭按钮、Esc、遮罩点击和零质量直方图拒绝。
+- `color_comparison_feature_diagnostics_smoke`：无 license preflight 通过；`RUN_HALCON_LICENSED_SMOKE=1` 使用 HALCON 20.11 和当前有效 license 通过，确认实际检测 H/S=1024、V=32 以及 payload 字段完整。
+- 主工程在 `build/` 中加载 `scripts/dependencies.env` 后重新执行 qmake 和 `make -j8`，编译链接通过。
+- 目标源码和文档执行 `git diff --check` 无格式错误。
+
+### 待人工验收
+
+- 在 1920×1080 桌面环境打开颜色比较“全部”页，检查左侧滚动高度、图例辨识度、32 根柱的清晰度和二维图尺寸。
+- 使用真实相机验证连续运行时小图和已打开的放大层持续刷新，失败帧不残留上一帧检测特征。
+- 分别操作 H/S/V/HS 放大、右上角关闭、Esc、遮罩关闭、基础/全部切换和退出测试，确认不关闭主对话框且不误保存。
 
 ## 2026-07-13 - 颜色比较 V2 实施与验证记录
 
@@ -127,7 +155,7 @@ V2 核心算法实际动态解析并调用以下 HALCON C 接口：
 6. 灵敏度只控制有限位移搜索半径：high=0、medium=1、low=2；Hue 位移循环回绕，Saturation 位移不回绕。
 7. 每个位移使用 `T_tuple_select + T_tuple_min2 + T_tuple_sum` 计算直方图交集，取最大值，`score=clamp(intersection*100,0,100)`。
 
-`sync` 模板建模的有效区域顺序固定为：检测几何 → `difference` 检测 Mask → `difference` 模板 Mask。`custom` 模板只使用自定义模板矩形和模板 Mask，检测 ROI/圆/检测 Mask 不进入模板提取哈希。
+`sync` 模板建模只复用检测区域的类型和归一化几何，然后仅 `difference` 模板 Mask；检测 Mask 不进入模板 Region，也不进入模板提取哈希。`custom` 模板只使用自定义模板矩形和模板 Mask。检测有效区域独立按检测几何 `difference` 检测 Mask。
 
 光照补偿默认关闭。开启时使用 HALCON `T_intensity` 计算 V 均值，以受限比例同时缩放 R/G/B，再 `compose3` 和 HSV 转换；允许模板/检测均值范围 `[8,247]`、scale 范围 `[0.75,1.3333333333]`、最大截断比例 `0.02`。超出范围返回 `invalid_illumination` 及完整 diagnostics；V 通道差异不直接加入最终颜色得分。
 
@@ -137,12 +165,13 @@ V2 核心算法实际动态解析并调用以下 HALCON C 接口：
 
 - 参考图变化。
 - 模板模式、custom 模板 ROI、模板 Mask、特征类型、光照补偿变化。
-- `sync` 模式下检测全图/矩形/圆形几何或检测 Mask 变化。
+- `sync` 模式下检测全图/矩形/圆形几何变化。
 - 加载其他配置、接受、拒绝、关闭和析构会使旧异步结果无效。
 
 不会使 ready 模型 stale：
 
-- `custom` 模式下检测全图/矩形/圆形和检测 Mask 变化。
+- 任意模式下检测 Mask 变化。
+- `custom` 模式下检测全图/矩形/圆形变化。
 - 灵敏度、最低分、位置修正预留状态变化。
 - 基础/全部切换、测试启动/停止。
 
@@ -154,7 +183,7 @@ V2 核心算法实际动态解析并调用以下 HALCON C 接口：
 - 成功模型重建会先使旧 active/pending 检测请求失效，再发布新模型，旧 score、overlay 或 reference preview 不能覆盖新模型状态。
 - 关闭 Dialog 不等待 HALCON worker；QObject 生命周期和 generation 门禁阻止回调写入已关闭界面。
 - H/S 图由 1024 维联合直方图求边缘分布，V 图使用 `valueHistogram`；非 ready 模型清空三张统计图。
-- 当前图只显示检测 ROI/检测 Mask/结果 overlay；模板 ROI/同步检测 Mask/模板 Mask 只在独立模板预览中显示。
+- 配置态主视图同时显示模板 ROI、模板 Mask、检测 ROI 和检测 Mask，使用 T/D 标签、不同颜色及活动/弱化层级区分归属；测试态当前图只显示检测 ROI、检测 Mask 和结果 overlay。
 
 ### 结果 payload
 
@@ -1367,6 +1396,32 @@ minScore
 
 - 需要在具备有效 HALCON license 的目标机上用 GUI 复测截图场景，确认同色高分有梯度、相近偏色不再过快塌到 0。
 
+### 2026-07-15 - 检测特征弹窗样式与左侧布局修正
+
+#### 已实现功能
+
+- 颜色特征图和放大弹窗不再使用控件内联字体/颜色样式，统一通过稳定的 `objectName`、`role`、`panelRole`、`actionRole` 接入公共 `styles/app.qss`。
+- 放大弹窗使用白色内容卡、蓝色可见边框、22px 标题、18px 说明文字和 20px 关闭按钮，避免全局深色样式造成文字不可读。
+- 左侧参数内容放入纵向滚动区；底部测试/完成按钮栏保持在滚动区之外，不随参数内容增长而被窗口底边遮挡。
+- 底部按钮由固定 120px 改为等宽自适应，保持 48px 高度和 18px 字体。
+
+#### 本次更改
+
+- `src/ColorComparisonDialog.cpp`：移除对话框级通配内联 QSS，增加公共样式选择器标识、参数滚动区和固定底部操作栏。
+- `src/ColorComparisonFeatureView.cpp`：移除新增特征控件的内联 QSS，增加公共样式角色，并提高图内 H/S/V 标识字号。
+- `styles/app.qss`：增加仅作用于 `ColorComparisonDialog` 和特征放大层的样式规则。
+- `smoke/color_comparison_feature_view_smoke.cpp`：增加公共样式角色及“不得使用内联样式”的防回归断言。
+
+#### 验证
+
+- `color_comparison_feature_view_smoke` 在 `QT_QPA_PLATFORM=offscreen` 下通过，包含打开、关闭、Esc、点击遮罩和样式角色检查。
+- `qmake qt_ui_test.pro -o build/Makefile && make -C build -j8` 编译、链接通过。
+- `git diff --check`（本次涉及源码、QSS、smoke）通过。
+
+#### 剩余事项
+
+- 需在 Ubuntu 虚拟机实际 GUI 中检查 1920×1200 和较低高度窗口：底部按钮始终可见，参数区出现滚动条，放大弹窗标题和说明文字清晰可读。
+
 ### 2026-07-15 - 直方图显示增强与图片导航
 
 #### 已实现功能
@@ -1410,6 +1465,66 @@ minScore
 
 - 在可交互桌面复测自定义矩形、同步矩形、同步圆和 Mask 的缩略图与 HALCON Region 一致性。
 - 使用现有产线样本记录旧分数、新分数和建议阈值，评估评分公式变化后的阈值迁移。
+
+### 2026-07-16 - 绘制图标 Toggle 状态修复
+
+#### 已实现功能
+
+- 颜色比较使用 `EditState` 作为唯一活动绘制状态源，已保存的检测区域类型不再使矩形或圆形图标长期高亮。
+- 矩形、圆形、模板 ROI、模板 Mask 和检测 Mask 图标支持第一次点击进入、保持连续绘制、再次点击退出；退出后保留最后一次有效几何数据。
+- 点击另一个绘制图标时直接切换，任一时刻只保留一个活动绘制状态；点击全图退出当前绘制。
+- 测试运行、暂停和基准图测试不再按保存的 ROI 类型自动进入绘制状态。
+- 多边形完成后，只要对应 Mask 编辑状态仍活动，就重新准备下一次多边形绘制。
+
+#### 本次更改
+
+- `src/ColorComparisonDialog.h/.cpp`：增加 `toggleEditState()`，分离按钮高亮与 `m_detectRegionType`，移除 `applyDetectRoiEditState()` 自动激活链路。
+- `smoke/color_comparison_dialog_integration_smoke.cpp`：增加初始空闲、再次点击退出、类型切换、全图退出、几何保留、多边形连续绘制和测试态不自动激活回归。
+- `docs/FID/Function_Docs.md`：增加项目公共绘制工具 toggle 交互合同；其他功能后续按规范迁移。
+
+#### 出现的问题与处理
+
+- 问题：`refreshDetectRegionButtons()` 使用保存的 `m_detectRegionType` 设置 checked，导致保存矩形/圆形后图标永久高亮。
+  处理：矩形和圆形 checked 仅由 `m_editState` 推导，保存类型只负责算法配置。
+- 问题：`FrameViewHelper` 完成多边形后会关闭 polygon drawing，而 Dialog 仍处于 Mask 编辑状态。
+  处理：颜色比较收到有效多边形后，在活动 Mask 状态下重新启用 polygon drawing，支持连续重绘。
+
+#### 验证
+
+- `color_comparison_dialog_integration_smoke`：offscreen 通过，覆盖全部上述状态转换和数据保留合同。
+- 主工程 shadow qmake/make：加载 `scripts/dependencies.env` 后在 `build/verify_ui` 完整编译、链接通过。
+
+#### 剩余事项
+
+- 在 Ubuntu 图形环境手动确认图标高亮、连续拖拽、再次点击退出以及普通缩放/平移恢复。
+- 其他现有工具暂未批量改造，后续修改对应绘制功能时按公共合同接入。
+
+### 2026-07-16 - 模板与检测 Mask 独立化
+
+#### 已实现功能
+
+- 固定有效区域合同：模板只扣模板 Mask，检测只扣检测 Mask；同步模式只复用 ROI 几何。
+- 配置态同时显示 T/T-mask/D/D-mask 四层，使用颜色、标签、活动高亮与非活动弱化区分归属；测试态仅保留检测组和结果。
+- Mask 支持已有多边形编辑、显式重画、取消保留以及独立清除；同步模式禁用模板 ROI 绘制但保留模板 Mask 编辑。
+- 原始 ROI、特征输入与所有 overlay 继续分离，Mask 斜线填充裁剪在所属 ROI 内。
+
+#### 本次更改
+
+- `ColorComparisonHalconRunner`：移除同步检测 Mask 对模板 Region 和模板提取哈希的影响，增加独立所有权合同字段。
+- `ColorComparisonDialog`：拆分检测几何与检测 Mask 的模型失效逻辑，增加四层持久 overlay、归属提示以及 Mask 重画/清除交互。
+- `FrameViewHelper`：按 overlay displayRole/emphasis 绘制模板/检测配色、弱化层级和裁剪斜线 Mask。
+- 三个 smoke 用例增加独立 Mask、同步几何、模型生命周期、显示分层及编辑状态回归。
+
+#### 验证
+
+- `color_comparison_feature_diagnostics_smoke`：HALCON licensed 模式通过；检测 Mask 变化不改变同步模板特征、像素数或提取哈希，模板 Mask 变化不改变检测特征。
+- `color_comparison_dialog_integration_smoke`：offscreen 通过；覆盖同步模型生命周期、四层/检测态 overlay、已有 Mask 编辑、重画保留、清除和同步模板 ROI 禁用。
+- `frame_view_helper_navigation_smoke`：offscreen 通过；覆盖活动/弱化配色及 Mask 裁剪斜线显示。
+- 主工程 shadow qmake/make：完整编译和链接通过；主程序 offscreen 启动 4 秒无崩溃或 QSS 错误。
+
+#### 剩余事项
+
+- 在 Ubuntu 可交互桌面手动确认四层颜色、Mask 斜线、重画/取消/清除以及同步模式提示的视觉和鼠标体验。
 
 ## 后续记录模板
 

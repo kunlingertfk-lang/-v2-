@@ -283,13 +283,11 @@ QJsonObject templateExtractParams(const ColorComparisonHalconConfig &config)
         {QStringLiteral("templateGeometry"), geometry},
         {QStringLiteral("templateMaskPolygon"),
          pointsToJson(config.templateMaskPolygonNormalized)},
+        {QStringLiteral("maskOwnershipContract"),
+         QStringLiteral("independent_template_and_detection_v1")},
         {QStringLiteral("brightnessCompensation"), config.brightnessCompensation},
         {QStringLiteral("brightnessConstants"), brightnessConstantsJson()}
     };
-    if (mode == QStringLiteral("sync")) {
-        params.insert(QStringLiteral("syncDetectionMaskPolygon"),
-                      pointsToJson(config.detectMaskPolygonNormalized));
-    }
     return params;
 }
 
@@ -989,8 +987,6 @@ void createEffectiveRegion(HalconCApi *api,
                            HalconObject *baseRegion,
                            HalconObject *maskRegion,
                            HalconObject *differenceRegion,
-                           HalconObject *additionalMaskRegion,
-                           HalconObject *additionalDifferenceRegion,
                            Hobject *effectiveRegion,
                            bool *maskApplied)
 {
@@ -1017,10 +1013,12 @@ void createEffectiveRegion(HalconCApi *api,
 
     *effectiveRegion = baseRegion->value();
     *maskApplied = false;
-    if (templateRegion && templateMode == QStringLiteral("sync")
-            && !config.detectMaskPolygonNormalized.isEmpty()) {
+    const QVector<QPointF> &ownerMask = templateRegion
+            ? config.templateMaskPolygonNormalized
+            : config.detectMaskPolygonNormalized;
+    if (!ownerMask.isEmpty()) {
         createPolygonRegion(api,
-                            config.detectMaskPolygonNormalized,
+                            ownerMask,
                             image.cols,
                             image.rows,
                             maskRegion,
@@ -1031,28 +1029,6 @@ void createEffectiveRegion(HalconCApi *api,
                                     differenceRegion->ptr()),
                     stage + QStringLiteral(".difference"));
         *effectiveRegion = differenceRegion->value();
-        *maskApplied = true;
-    }
-
-    const QVector<QPointF> &finalMask = templateRegion
-            ? config.templateMaskPolygonNormalized
-            : config.detectMaskPolygonNormalized;
-    if (!finalMask.isEmpty()) {
-        HalconObject *finalMaskRegion = *maskApplied ? additionalMaskRegion : maskRegion;
-        HalconObject *finalDifferenceRegion = *maskApplied
-                ? additionalDifferenceRegion : differenceRegion;
-        createPolygonRegion(api,
-                            finalMask,
-                            image.cols,
-                            image.rows,
-                            finalMaskRegion,
-                            stage);
-        checkHalcon(api,
-                    api->difference(*effectiveRegion,
-                                    finalMaskRegion->value(),
-                                    finalDifferenceRegion->ptr()),
-                    stage + QStringLiteral(".difference"));
-        *effectiveRegion = finalDifferenceRegion->value();
         *maskApplied = true;
     }
 
@@ -1319,8 +1295,6 @@ ExtractedFeature extractFeature(HalconCApi *api,
     HalconObject baseRegion(api);
     HalconObject maskRegion(api);
     HalconObject differenceRegion(api);
-    HalconObject additionalMaskRegion(api);
-    HalconObject additionalDifferenceRegion(api);
     Hobject effectiveRegion = NO_OBJECTS;
     bool maskApplied = false;
     createEffectiveRegion(api,
@@ -1330,8 +1304,6 @@ ExtractedFeature extractFeature(HalconCApi *api,
                           &baseRegion,
                           &maskRegion,
                           &differenceRegion,
-                          &additionalMaskRegion,
-                          &additionalDifferenceRegion,
                           &effectiveRegion,
                           &maskApplied);
     Q_UNUSED(maskApplied)
