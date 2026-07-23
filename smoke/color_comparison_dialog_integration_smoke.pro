@@ -35,9 +35,12 @@ SOURCES += \
     ../src/tooladapters/PositionCorrectionAdapter.cpp \
     ../src/tooladapters/TemplateLocationAdapter.cpp \
     ../src/toolcore/PositionCorrection.cpp \
+    ../src/toolcore/PositionCorrectionConsumer.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp \
     ../src/toolcore/ToolEngine.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
     ../src/algorithms/location/PositionCorrectionHalconRunner.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
     ../src/algorithms/location/TemplateLocationHalconRunner.cpp \
     ../src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
     ../src/algorithms/recognition/ColorComparisonModel.cpp

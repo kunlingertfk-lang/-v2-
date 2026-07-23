@@ -114,6 +114,7 @@ private:
     QVector<ToolConfig> m_schemeToolConfigs;
     QMap<QString, ToolPreviewSnapshot> m_referencePreviewSnapshots;
     QMap<QString, ToolPreviewSnapshot> m_lastRunSnapshots;
+    QVector<ToolOverlay> m_lastReferenceCorrectionOverlays;
     QImage m_lastRunImage;
     int m_selectedToolIndex = -1;
     QFutureWatcher<ToolChainRunOutput> *m_toolChainWatcher = nullptr;

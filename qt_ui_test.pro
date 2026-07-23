@@ -63,6 +63,8 @@ SOURCES += \
     src/frame/MatImageConverter.cpp \
     src/frame/ReferenceImageProvider.cpp \
     src/toolcore/PositionCorrection.cpp \
+    src/toolcore/PositionCorrectionConsumer.cpp \
+    src/toolcore/PositionCorrectionTransform.cpp \
     src/toolcore/ToolEngine.cpp \
     src/tooladapters/OcrAdapter.cpp \
     src/tooladapters/ColorRecognitionAdapter.cpp \
@@ -96,6 +98,7 @@ SOURCES += \
     src/algorithms/presence/PatternPresenceHalconRunner.cpp \
     src/algorithms/location/TemplateLocationHalconRunner.cpp \
     src/algorithms/location/PositionCorrectionHalconRunner.cpp \
+    src/algorithms/location/PositionCorrectionHalconTransform.cpp \
     src/algorithms/presence/BlobPresenceHalconRunner.cpp \
     src/algorithms/presence/CirclePresenceHalconRunner.cpp \
     src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -144,6 +147,8 @@ HEADERS += \
     src/toolcore/ToolResult.h \
     src/toolcore/ToolOverlay.h \
     src/toolcore/PositionCorrection.h \
+    src/toolcore/PositionCorrectionConsumer.h \
+    src/toolcore/PositionCorrectionTransform.h \
     src/toolcore/ToolPreviewSnapshot.h \
     src/toolcore/ToolAdapter.h \
     src/toolcore/ToolEngine.h \
@@ -178,6 +183,7 @@ HEADERS += \
     src/algorithms/presence/PatternPresenceAutoModelDomain.h \
     src/algorithms/presence/PatternPresenceHalconRunner.h \
     src/algorithms/location/TemplateLocationHalconRunner.h \
+    src/algorithms/location/PositionCorrectionHalconTransform.h \
     src/algorithms/location/PositionCorrectionHalconRunner.h \
     src/algorithms/presence/BlobPresenceHalconRunner.h \
     src/algorithms/presence/CirclePresenceHalconRunner.h \

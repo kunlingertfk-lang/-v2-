@@ -88,6 +88,8 @@ SOURCES       = ../../src/main.cpp \
 		../../src/frame/MatImageConverter.cpp \
 		../../src/frame/ReferenceImageProvider.cpp \
 		../../src/toolcore/PositionCorrection.cpp \
+		../../src/toolcore/PositionCorrectionConsumer.cpp \
+		../../src/toolcore/PositionCorrectionTransform.cpp \
 		../../src/toolcore/ToolEngine.cpp \
 		../../src/tooladapters/OcrAdapter.cpp \
 		../../src/tooladapters/ColorRecognitionAdapter.cpp \
@@ -121,6 +123,7 @@ SOURCES       = ../../src/main.cpp \
 		../../src/algorithms/presence/PatternPresenceHalconRunner.cpp \
 		../../src/algorithms/location/TemplateLocationHalconRunner.cpp \
 		../../src/algorithms/location/PositionCorrectionHalconRunner.cpp \
+		../../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.cpp \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.cpp \
 		../../src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -191,6 +194,8 @@ OBJECTS       = ../qt_ui_test/obj/main.o \
 		../qt_ui_test/obj/MatImageConverter.o \
 		../qt_ui_test/obj/ReferenceImageProvider.o \
 		../qt_ui_test/obj/PositionCorrection.o \
+		../qt_ui_test/obj/PositionCorrectionConsumer.o \
+		../qt_ui_test/obj/PositionCorrectionTransform.o \
 		../qt_ui_test/obj/ToolEngine.o \
 		../qt_ui_test/obj/OcrAdapter.o \
 		../qt_ui_test/obj/ColorRecognitionAdapter.o \
@@ -224,6 +229,7 @@ OBJECTS       = ../qt_ui_test/obj/main.o \
 		../qt_ui_test/obj/PatternPresenceHalconRunner.o \
 		../qt_ui_test/obj/TemplateLocationHalconRunner.o \
 		../qt_ui_test/obj/PositionCorrectionHalconRunner.o \
+		../qt_ui_test/obj/PositionCorrectionHalconTransform.o \
 		../qt_ui_test/obj/BlobPresenceHalconRunner.o \
 		../qt_ui_test/obj/CirclePresenceHalconRunner.o \
 		../qt_ui_test/obj/EdgePresenceHalconRunner.o \
@@ -518,6 +524,8 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolOverlay.h \
 		../../src/toolcore/PositionCorrection.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
+		../../src/toolcore/PositionCorrectionTransform.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolEngine.h \
@@ -552,6 +560,7 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/algorithms/presence/PatternPresenceAutoModelDomain.h \
 		../../src/algorithms/presence/PatternPresenceHalconRunner.h \
 		../../src/algorithms/location/TemplateLocationHalconRunner.h \
+		../../src/algorithms/location/PositionCorrectionHalconTransform.h \
 		../../src/algorithms/location/PositionCorrectionHalconRunner.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
@@ -593,6 +602,8 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/frame/MatImageConverter.cpp \
 		../../src/frame/ReferenceImageProvider.cpp \
 		../../src/toolcore/PositionCorrection.cpp \
+		../../src/toolcore/PositionCorrectionConsumer.cpp \
+		../../src/toolcore/PositionCorrectionTransform.cpp \
 		../../src/toolcore/ToolEngine.cpp \
 		../../src/tooladapters/OcrAdapter.cpp \
 		../../src/tooladapters/ColorRecognitionAdapter.cpp \
@@ -626,6 +637,7 @@ DIST          = /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/spec_pre.prf \
 		../../src/algorithms/presence/PatternPresenceHalconRunner.cpp \
 		../../src/algorithms/location/TemplateLocationHalconRunner.cpp \
 		../../src/algorithms/location/PositionCorrectionHalconRunner.cpp \
+		../../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.cpp \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.cpp \
 		../../src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -1100,8 +1112,8 @@ distdir: FORCE
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents ../../resources/resources.qrc $(DISTDIR)/
 	$(COPY_FILE) --parents /home/tt/Qt/5.15.2/gcc_64/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../../src/LoginWindow.h ../../src/MainWindow.h ../../src/SchemeStore.h ../../src/PlanDialogUtils.h ../../src/UiStyleRoles.h ../../src/CameraParamsDialog.h ../../src/ReferenceImageDialog.h ../../src/PositionCorrectionDialog.h ../../src/TemplateLocationDialog.h ../../src/ToolLibraryDialog.h ../../src/CharacterRecognitionDialog.h ../../src/ColorRecognitionDialog.h ../../src/ColorComparisonDialog.h ../../src/ColorComparisonFeatureView.h ../../src/RegisteredClassificationDialog.h ../../src/RegisteredClassificationDetectionDialog.h ../../src/RegisteredClassificationDetectionTrainingDialog.h ../../src/RegisteredClassificationTrainingDialog.h ../../src/RegisteredClassificationModelManagementDialog.h ../../src/ColorTemplateDialog.h ../../src/ClassificationDialog.h ../../src/ObjectDetectionDialog.h ../../src/PatternPresenceDialog.h ../../src/BlobPresenceDialog.h ../../src/CirclePresenceDialog.h ../../src/EdgePresenceDialog.h ../../src/LinePresenceDialog.h ../../src/ContourPresenceDialog.h ../../src/ToolsDialog.h ../../src/OutputDialog.h ../../src/frame/CameraFrameProvider.h ../../src/frame/FrameInputMetadata.h ../../src/frame/FrameViewHelper.h ../../src/frame/MatImageConverter.h ../../src/frame/ReferenceImageProvider.h ../../src/toolcore/ToolTypes.h ../../src/toolcore/ToolConfig.h ../../src/toolcore/ToolRequest.h ../../src/toolcore/ToolResult.h ../../src/toolcore/ToolOverlay.h ../../src/toolcore/PositionCorrection.h ../../src/toolcore/ToolPreviewSnapshot.h ../../src/toolcore/ToolAdapter.h ../../src/toolcore/ToolEngine.h ../../src/tooladapters/OcrAdapter.h ../../src/tooladapters/ColorRecognitionAdapter.h ../../src/tooladapters/ColorComparisonAdapter.h ../../src/tooladapters/RegisteredClassificationAdapter.h ../../src/tooladapters/PatternPresenceAdapter.h ../../src/tooladapters/TemplateLocationAdapter.h ../../src/tooladapters/PositionCorrectionAdapter.h ../../src/tooladapters/BlobPresenceAdapter.h ../../src/tooladapters/CirclePresenceAdapter.h ../../src/tooladapters/EdgePresenceAdapter.h ../../src/tooladapters/LinePresenceAdapter.h ../../src/tooladapters/ContourPresenceAdapter.h ../../src/tooladapters/AiDetectionAdapter.h ../../src/algorithms/halcon/HalconRuntimePaths.h ../../src/algorithms/ocr/OcrHalconRunner.h ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.h ../../src/algorithms/recognition/ColorRecognitionHalconRunner.h ../../src/algorithms/recognition/ColorComparisonModel.h ../../src/algorithms/recognition/ColorComparisonHalconRunner.h ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h ../../src/algorithms/recognition/RegisteredClassificationModelPackage.h ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h ../../src/algorithms/ai/AiDetectionRunner.h ../../src/algorithms/presence/PatternPresenceHalconApi.h ../../src/algorithms/presence/PatternPresenceAutoModelDomain.h ../../src/algorithms/presence/PatternPresenceHalconRunner.h ../../src/algorithms/location/TemplateLocationHalconRunner.h ../../src/algorithms/location/PositionCorrectionHalconRunner.h ../../src/algorithms/presence/BlobPresenceHalconRunner.h ../../src/algorithms/presence/CirclePresenceHalconRunner.h ../../src/algorithms/presence/EdgePresenceHalconRunner.h ../../src/algorithms/presence/LinePresenceHalconRunner.h ../../src/algorithms/presence/ContourPresenceHalconRunner.h $(DISTDIR)/
-	$(COPY_FILE) --parents ../../src/main.cpp ../../src/LoginWindow.cpp ../../src/MainWindow.cpp ../../src/SchemeStore.cpp ../../src/PlanDialogUtils.cpp ../../src/CameraParamsDialog.cpp ../../src/ReferenceImageDialog.cpp ../../src/PositionCorrectionDialog.cpp ../../src/TemplateLocationDialog.cpp ../../src/ToolLibraryDialog.cpp ../../src/CharacterRecognitionDialog.cpp ../../src/ColorRecognitionDialog.cpp ../../src/ColorComparisonDialog.cpp ../../src/ColorComparisonFeatureView.cpp ../../src/RegisteredClassificationDialog.cpp ../../src/RegisteredClassificationDetectionDialog.cpp ../../src/RegisteredClassificationDetectionTrainingDialog.cpp ../../src/RegisteredClassificationTrainingDialog.cpp ../../src/RegisteredClassificationModelManagementDialog.cpp ../../src/ColorTemplateDialog.cpp ../../src/ClassificationDialog.cpp ../../src/ObjectDetectionDialog.cpp ../../src/PatternPresenceDialog.cpp ../../src/BlobPresenceDialog.cpp ../../src/CirclePresenceDialog.cpp ../../src/EdgePresenceDialog.cpp ../../src/LinePresenceDialog.cpp ../../src/ContourPresenceDialog.cpp ../../src/ToolsDialog.cpp ../../src/OutputDialog.cpp ../../src/frame/CameraFrameProvider.cpp ../../src/frame/FrameInputMetadata.cpp ../../src/frame/FrameViewHelper.cpp ../../src/frame/MatImageConverter.cpp ../../src/frame/ReferenceImageProvider.cpp ../../src/toolcore/PositionCorrection.cpp ../../src/toolcore/ToolEngine.cpp ../../src/tooladapters/OcrAdapter.cpp ../../src/tooladapters/ColorRecognitionAdapter.cpp ../../src/tooladapters/ColorComparisonAdapter.cpp ../../src/tooladapters/RegisteredClassificationAdapter.cpp ../../src/tooladapters/PatternPresenceAdapter.cpp ../../src/tooladapters/TemplateLocationAdapter.cpp ../../src/tooladapters/PositionCorrectionAdapter.cpp ../../src/tooladapters/BlobPresenceAdapter.cpp ../../src/tooladapters/CirclePresenceAdapter.cpp ../../src/tooladapters/EdgePresenceAdapter.cpp ../../src/tooladapters/LinePresenceAdapter.cpp ../../src/tooladapters/ContourPresenceAdapter.cpp ../../src/tooladapters/AiDetectionAdapter.cpp ../../src/algorithms/halcon/HalconRuntimePaths.cpp ../../src/algorithms/ocr/OcrHalconRunner.cpp ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp ../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp ../../src/algorithms/recognition/ColorComparisonModel.cpp ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp ../../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp ../../src/algorithms/ai/AiDetectionRunner.cpp ../../src/algorithms/presence/PatternPresenceHalconApi.cpp ../../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp ../../src/algorithms/presence/PatternPresenceHalconRunner.cpp ../../src/algorithms/location/TemplateLocationHalconRunner.cpp ../../src/algorithms/location/PositionCorrectionHalconRunner.cpp ../../src/algorithms/presence/BlobPresenceHalconRunner.cpp ../../src/algorithms/presence/CirclePresenceHalconRunner.cpp ../../src/algorithms/presence/EdgePresenceHalconRunner.cpp ../../src/algorithms/presence/LinePresenceHalconRunner.cpp ../../src/algorithms/presence/ContourPresenceHalconRunner.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents ../../src/LoginWindow.h ../../src/MainWindow.h ../../src/SchemeStore.h ../../src/PlanDialogUtils.h ../../src/UiStyleRoles.h ../../src/CameraParamsDialog.h ../../src/ReferenceImageDialog.h ../../src/PositionCorrectionDialog.h ../../src/TemplateLocationDialog.h ../../src/ToolLibraryDialog.h ../../src/CharacterRecognitionDialog.h ../../src/ColorRecognitionDialog.h ../../src/ColorComparisonDialog.h ../../src/ColorComparisonFeatureView.h ../../src/RegisteredClassificationDialog.h ../../src/RegisteredClassificationDetectionDialog.h ../../src/RegisteredClassificationDetectionTrainingDialog.h ../../src/RegisteredClassificationTrainingDialog.h ../../src/RegisteredClassificationModelManagementDialog.h ../../src/ColorTemplateDialog.h ../../src/ClassificationDialog.h ../../src/ObjectDetectionDialog.h ../../src/PatternPresenceDialog.h ../../src/BlobPresenceDialog.h ../../src/CirclePresenceDialog.h ../../src/EdgePresenceDialog.h ../../src/LinePresenceDialog.h ../../src/ContourPresenceDialog.h ../../src/ToolsDialog.h ../../src/OutputDialog.h ../../src/frame/CameraFrameProvider.h ../../src/frame/FrameInputMetadata.h ../../src/frame/FrameViewHelper.h ../../src/frame/MatImageConverter.h ../../src/frame/ReferenceImageProvider.h ../../src/toolcore/ToolTypes.h ../../src/toolcore/ToolConfig.h ../../src/toolcore/ToolRequest.h ../../src/toolcore/ToolResult.h ../../src/toolcore/ToolOverlay.h ../../src/toolcore/PositionCorrection.h ../../src/toolcore/PositionCorrectionConsumer.h ../../src/toolcore/PositionCorrectionTransform.h ../../src/toolcore/ToolPreviewSnapshot.h ../../src/toolcore/ToolAdapter.h ../../src/toolcore/ToolEngine.h ../../src/tooladapters/OcrAdapter.h ../../src/tooladapters/ColorRecognitionAdapter.h ../../src/tooladapters/ColorComparisonAdapter.h ../../src/tooladapters/RegisteredClassificationAdapter.h ../../src/tooladapters/PatternPresenceAdapter.h ../../src/tooladapters/TemplateLocationAdapter.h ../../src/tooladapters/PositionCorrectionAdapter.h ../../src/tooladapters/BlobPresenceAdapter.h ../../src/tooladapters/CirclePresenceAdapter.h ../../src/tooladapters/EdgePresenceAdapter.h ../../src/tooladapters/LinePresenceAdapter.h ../../src/tooladapters/ContourPresenceAdapter.h ../../src/tooladapters/AiDetectionAdapter.h ../../src/algorithms/halcon/HalconRuntimePaths.h ../../src/algorithms/ocr/OcrHalconRunner.h ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.h ../../src/algorithms/recognition/ColorRecognitionHalconRunner.h ../../src/algorithms/recognition/ColorComparisonModel.h ../../src/algorithms/recognition/ColorComparisonHalconRunner.h ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h ../../src/algorithms/recognition/RegisteredClassificationModelPackage.h ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.h ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.h ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.h ../../src/algorithms/ai/AiDetectionRunner.h ../../src/algorithms/presence/PatternPresenceHalconApi.h ../../src/algorithms/presence/PatternPresenceAutoModelDomain.h ../../src/algorithms/presence/PatternPresenceHalconRunner.h ../../src/algorithms/location/TemplateLocationHalconRunner.h ../../src/algorithms/location/PositionCorrectionHalconTransform.h ../../src/algorithms/location/PositionCorrectionHalconRunner.h ../../src/algorithms/presence/BlobPresenceHalconRunner.h ../../src/algorithms/presence/CirclePresenceHalconRunner.h ../../src/algorithms/presence/EdgePresenceHalconRunner.h ../../src/algorithms/presence/LinePresenceHalconRunner.h ../../src/algorithms/presence/ContourPresenceHalconRunner.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../../src/main.cpp ../../src/LoginWindow.cpp ../../src/MainWindow.cpp ../../src/SchemeStore.cpp ../../src/PlanDialogUtils.cpp ../../src/CameraParamsDialog.cpp ../../src/ReferenceImageDialog.cpp ../../src/PositionCorrectionDialog.cpp ../../src/TemplateLocationDialog.cpp ../../src/ToolLibraryDialog.cpp ../../src/CharacterRecognitionDialog.cpp ../../src/ColorRecognitionDialog.cpp ../../src/ColorComparisonDialog.cpp ../../src/ColorComparisonFeatureView.cpp ../../src/RegisteredClassificationDialog.cpp ../../src/RegisteredClassificationDetectionDialog.cpp ../../src/RegisteredClassificationDetectionTrainingDialog.cpp ../../src/RegisteredClassificationTrainingDialog.cpp ../../src/RegisteredClassificationModelManagementDialog.cpp ../../src/ColorTemplateDialog.cpp ../../src/ClassificationDialog.cpp ../../src/ObjectDetectionDialog.cpp ../../src/PatternPresenceDialog.cpp ../../src/BlobPresenceDialog.cpp ../../src/CirclePresenceDialog.cpp ../../src/EdgePresenceDialog.cpp ../../src/LinePresenceDialog.cpp ../../src/ContourPresenceDialog.cpp ../../src/ToolsDialog.cpp ../../src/OutputDialog.cpp ../../src/frame/CameraFrameProvider.cpp ../../src/frame/FrameInputMetadata.cpp ../../src/frame/FrameViewHelper.cpp ../../src/frame/MatImageConverter.cpp ../../src/frame/ReferenceImageProvider.cpp ../../src/toolcore/PositionCorrection.cpp ../../src/toolcore/PositionCorrectionConsumer.cpp ../../src/toolcore/PositionCorrectionTransform.cpp ../../src/toolcore/ToolEngine.cpp ../../src/tooladapters/OcrAdapter.cpp ../../src/tooladapters/ColorRecognitionAdapter.cpp ../../src/tooladapters/ColorComparisonAdapter.cpp ../../src/tooladapters/RegisteredClassificationAdapter.cpp ../../src/tooladapters/PatternPresenceAdapter.cpp ../../src/tooladapters/TemplateLocationAdapter.cpp ../../src/tooladapters/PositionCorrectionAdapter.cpp ../../src/tooladapters/BlobPresenceAdapter.cpp ../../src/tooladapters/CirclePresenceAdapter.cpp ../../src/tooladapters/EdgePresenceAdapter.cpp ../../src/tooladapters/LinePresenceAdapter.cpp ../../src/tooladapters/ContourPresenceAdapter.cpp ../../src/tooladapters/AiDetectionAdapter.cpp ../../src/algorithms/halcon/HalconRuntimePaths.cpp ../../src/algorithms/ocr/OcrHalconRunner.cpp ../../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp ../../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp ../../src/algorithms/recognition/ColorComparisonModel.cpp ../../src/algorithms/recognition/ColorComparisonHalconRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp ../../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp ../../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp ../../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp ../../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp ../../src/algorithms/recognition/RegisteredClassificationHalconRunner.cpp ../../src/algorithms/ai/AiDetectionRunner.cpp ../../src/algorithms/presence/PatternPresenceHalconApi.cpp ../../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp ../../src/algorithms/presence/PatternPresenceHalconRunner.cpp ../../src/algorithms/location/TemplateLocationHalconRunner.cpp ../../src/algorithms/location/PositionCorrectionHalconRunner.cpp ../../src/algorithms/location/PositionCorrectionHalconTransform.cpp ../../src/algorithms/presence/BlobPresenceHalconRunner.cpp ../../src/algorithms/presence/CirclePresenceHalconRunner.cpp ../../src/algorithms/presence/EdgePresenceHalconRunner.cpp ../../src/algorithms/presence/LinePresenceHalconRunner.cpp ../../src/algorithms/presence/ContourPresenceHalconRunner.cpp $(DISTDIR)/
 	$(COPY_FILE) --parents ../../ui/LoginWindow.ui ../../ui/MainWindow.ui ../../ui/CameraParamsDialog.ui ../../ui/ReferenceImageDialog.ui ../../ui/PositionCorrectionDialog.ui ../../ui/TemplateLocationDialog.ui ../../ui/ToolLibraryDialog.ui ../../ui/CharacterRecognitionDialog.ui ../../ui/ColorRecognitionDialog.ui ../../ui/ColorComparisonDialog.ui ../../ui/ClassificationDialog.ui ../../ui/ObjectDetectionDialog.ui ../../ui/PatternPresenceDialog.ui ../../ui/BlobPresenceDialog.ui ../../ui/CirclePresenceDialog.ui ../../ui/EdgePresenceDialog.ui ../../ui/LinePresenceDialog.ui ../../ui/ContourPresenceDialog.ui ../../ui/ToolsDialog.ui ../../ui/OutputDialog.ui $(DISTDIR)/
 
 
@@ -1488,6 +1500,7 @@ compiler_moc_header_clean:
 		../../src/algorithms/presence/PatternPresenceHalconRunner.h \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/tooladapters/CirclePresenceAdapter.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
@@ -2574,11 +2587,12 @@ compiler_moc_header_clean:
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
@@ -3868,12 +3882,13 @@ compiler_moc_header_clean:
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolResult.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		../../src/toolcore/ToolEngine.h \
@@ -5470,6 +5485,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		../../src/algorithms/presence/PatternPresenceHalconRunner.h \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/tooladapters/CirclePresenceAdapter.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
@@ -5673,6 +5689,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		../../src/algorithms/presence/PatternPresenceHalconRunner.h \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/tooladapters/CirclePresenceAdapter.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
@@ -6150,6 +6167,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		../../src/algorithms/presence/PatternPresenceHalconRunner.h \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/tooladapters/CirclePresenceAdapter.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
@@ -7933,11 +7951,12 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
 		../../src/algorithms/recognition/ColorComparisonHalconRunner.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/toolcore/ToolPreviewSnapshot.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QDateTime \
@@ -10286,12 +10305,13 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		../../src/toolcore/ToolAdapter.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolResult.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
 		../../src/toolcore/ToolEngine.h \
@@ -11433,6 +11453,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QObject \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/CameraParamsDialog.h \
 		../../src/ColorComparisonDialog.h \
 		../../src/algorithms/recognition/ColorComparisonModel.h \
@@ -11733,6 +11754,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		../../src/algorithms/presence/PatternPresenceHalconRunner.h \
 		../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/tooladapters/CirclePresenceAdapter.h \
 		../../src/algorithms/presence/CirclePresenceHalconRunner.h \
 		../../src/tooladapters/ColorComparisonAdapter.h \
@@ -12422,6 +12444,191 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o ../qt_ui_test/obj/PositionCorrection.o ../../src/toolcore/PositionCorrection.cpp
 
+../qt_ui_test/obj/PositionCorrectionConsumer.o: ../../src/toolcore/PositionCorrectionConsumer.cpp ../../src/toolcore/PositionCorrectionConsumer.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/toolcore/ToolRequest.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
+		../../src/toolcore/PositionCorrection.h \
+		../../src/toolcore/ToolResult.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o ../qt_ui_test/obj/PositionCorrectionConsumer.o ../../src/toolcore/PositionCorrectionConsumer.cpp
+
+../qt_ui_test/obj/PositionCorrectionTransform.o: ../../src/toolcore/PositionCorrectionTransform.cpp ../../src/toolcore/PositionCorrectionTransform.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPolygonF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o ../qt_ui_test/obj/PositionCorrectionTransform.o ../../src/toolcore/PositionCorrectionTransform.cpp
+
 ../qt_ui_test/obj/ToolEngine.o: ../../src/toolcore/ToolEngine.cpp ../../src/toolcore/ToolEngine.h \
 		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
@@ -12801,6 +13008,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
@@ -12809,11 +13017,11 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolResult.h \
 		../../src/algorithms/halcon/HalconRuntimePaths.h \
 		../../src/toolcore/PositionCorrection.h
@@ -13211,6 +13419,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 
 ../qt_ui_test/obj/BlobPresenceAdapter.o: ../../src/tooladapters/BlobPresenceAdapter.cpp ../../src/tooladapters/BlobPresenceAdapter.h \
 		../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
@@ -13295,15 +13504,16 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
-		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
-		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolRequest.h \
 		../../src/toolcore/ToolConfig.h \
 		../../src/toolcore/ToolTypes.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/ToolAdapter.h \
 		../../src/toolcore/ToolResult.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonValue \
-		../../src/algorithms/halcon/HalconRuntimePaths.h
+		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		../../src/toolcore/PositionCorrection.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o ../qt_ui_test/obj/BlobPresenceAdapter.o ../../src/tooladapters/BlobPresenceAdapter.cpp
 
 ../qt_ui_test/obj/CirclePresenceAdapter.o: ../../src/tooladapters/CirclePresenceAdapter.cpp ../../src/tooladapters/CirclePresenceAdapter.h \
@@ -14376,6 +14586,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
@@ -14384,8 +14595,12 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
+		../../src/toolcore/ToolRequest.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		../../src/algorithms/halcon/HalconRuntimePaths.h \
+		../../src/algorithms/location/PositionCorrectionHalconTransform.h \
 		/opt/halcon/include/HalconC.h \
 		/opt/halcon/include/HalconCDefs.h \
 		/opt/halcon/include/HParallel.h \
@@ -14401,6 +14616,7 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/opt/halcon/include/HInterfaceC.h \
 		/opt/halcon/include/halconc/Hvector.h \
 		/opt/halcon/include/HProto.h \
+		../../src/toolcore/PositionCorrectionTransform.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
@@ -15937,7 +16153,111 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o ../qt_ui_test/obj/PositionCorrectionHalconRunner.o ../../src/algorithms/location/PositionCorrectionHalconRunner.cpp
 
+../qt_ui_test/obj/PositionCorrectionHalconTransform.o: ../../src/algorithms/location/PositionCorrectionHalconTransform.cpp ../../src/algorithms/location/PositionCorrectionHalconTransform.h \
+		/opt/halcon/include/HalconC.h \
+		/opt/halcon/include/HalconCDefs.h \
+		/opt/halcon/include/HParallel.h \
+		/opt/halcon/include/HIntDef.h \
+		/opt/halcon/include/hclib/hclib_types.h \
+		/opt/halcon/include/HDeclSpec.h \
+		/opt/halcon/include/HErrorDef.h \
+		/opt/halcon/include/HConst.h \
+		/opt/halcon/include/HBase.h \
+		/opt/halcon/include/IPType.h \
+		/opt/halcon/include/HMacro.h \
+		/opt/halcon/include/HExtern.h \
+		/opt/halcon/include/HInterfaceC.h \
+		/opt/halcon/include/halconc/Hvector.h \
+		/opt/halcon/include/HProto.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstring.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qchar.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig-bootstrapped.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qconfig.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtcore-config.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsystemdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qprocessordetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcompilerdetection.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtypeinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsysinfo.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlogging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qflags.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbasicatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_bootstrap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qgenericatomic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_cxx11.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qatomic_msvc.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qglobalstatic.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmutex.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnumeric.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qversiontagging.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrefcount.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qnamespace.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qarraydata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringliteral.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringview.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringbuilder.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvector.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qalgorithms.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiterator.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhashfunctions.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpair.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainertools_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qpoint.h \
+		../../src/toolcore/PositionCorrectionTransform.h \
+		../../src/toolcore/ToolOverlay.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qshareddata.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qhash.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qbytearraylist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringlist.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregexp.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qstringmatcher.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborvalue.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdatetime.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcborcommon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobjectdefs_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmetatype.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvarlengtharray.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontainerfwd.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qdebug.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmap.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qtextstream.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qiodevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcoreevent.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qscopedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qobject_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qlocale.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qvariant.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qset.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qcontiguouscache.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsharedpointer_impl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qregularexpression.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurl.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qurlquery.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/quuid.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonObject \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonobject.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QPointF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRectF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qrect.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qmargins.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o ../qt_ui_test/obj/PositionCorrectionHalconTransform.o ../../src/algorithms/location/PositionCorrectionHalconTransform.cpp
+
 ../qt_ui_test/obj/BlobPresenceHalconRunner.o: ../../src/algorithms/presence/BlobPresenceHalconRunner.cpp ../../src/algorithms/presence/BlobPresenceHalconRunner.h \
+		../../src/toolcore/PositionCorrectionConsumer.h \
 		../../src/toolcore/ToolOverlay.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QJsonArray \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qjsonarray.h \
@@ -16022,8 +16342,12 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qsize.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QString \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QVector \
+		../../src/toolcore/ToolRequest.h \
+		../../src/toolcore/ToolConfig.h \
+		../../src/toolcore/ToolTypes.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QStringList \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QtGlobal \
+		../../src/algorithms/location/PositionCorrectionHalconTransform.h \
 		/opt/halcon/include/HalconC.h \
 		/opt/halcon/include/HalconCDefs.h \
 		/opt/halcon/include/HParallel.h \
@@ -16039,12 +16363,17 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 		/opt/halcon/include/HInterfaceC.h \
 		/opt/halcon/include/halconc/Hvector.h \
 		/opt/halcon/include/HProto.h \
+		../../src/toolcore/PositionCorrectionTransform.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QElapsedTimer \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qelapsedtimer.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QFileInfo \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfileinfo.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfile.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/qfiledevice.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/QPolygonF \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qpolygon.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtguiglobal.h \
+		/home/tt/Qt/5.15.2/gcc_64/include/QtGui/qtgui-config.h \
 		/home/tt/Qt/5.15.2/gcc_64/include/QtCore/QRect
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o ../qt_ui_test/obj/BlobPresenceHalconRunner.o ../../src/algorithms/presence/BlobPresenceHalconRunner.cpp
 

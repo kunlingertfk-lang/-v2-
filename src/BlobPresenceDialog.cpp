@@ -4,12 +4,16 @@
 #include "PlanDialogUtils.h"
 
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDebug>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFontMetrics>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSignalBlocker>
@@ -22,6 +26,7 @@
 #include <QtGlobal>
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -30,6 +35,9 @@
 #include "toolcore/ToolRequest.h"
 
 namespace {
+
+// 临时入口显隐开关：后续不需要 PC 导入时改为 false 即可。
+constexpr bool kShowPcImportButton = true;
 
 QImage imageFromFrame(const cv::Mat &frame)
 {
@@ -174,6 +182,38 @@ void setComboBoxValue(QComboBox *comboBox, const QString &value)
         comboBox->setCurrentIndex(index);
 }
 
+void populatePositionCorrectionCombo(
+        QComboBox *comboBox,
+        const QVector<PositionCorrectionSource> &sources,
+        const QString &selectedId,
+        const QString &selectedText)
+{
+    if (!comboBox)
+        return;
+
+    const QSignalBlocker blocker(comboBox);
+    comboBox->clear();
+    int selectedIndex = -1;
+    for (const PositionCorrectionSource &source : sources) {
+        comboBox->addItem(source.displayText, source.sourceId);
+        if (source.sourceId == selectedId)
+            selectedIndex = comboBox->count() - 1;
+    }
+    if (selectedIndex < 0 && !selectedId.trimmed().isEmpty()) {
+        comboBox->insertItem(
+                    0,
+                    QObject::tr("来源不可用：%1").arg(
+                        selectedText.trimmed().isEmpty()
+                        ? selectedId : selectedText),
+                    selectedId);
+        selectedIndex = 0;
+    }
+    if (selectedIndex < 0 && comboBox->count() > 0)
+        selectedIndex = 0;
+    if (selectedIndex >= 0)
+        comboBox->setCurrentIndex(selectedIndex);
+}
+
 void configureRoiToolButton(QToolButton *button,
                             const QString &text,
                             const QString &tooltip)
@@ -201,8 +241,11 @@ BlobPresenceDialog::BlobPresenceDialog(QWidget *parent)
     , m_resultPresenceGroup(new QButtonGroup(this))
 {
     ui->setupUi(this);
+    ui->blobPcImportButton->setVisible(kShowPcImportButton);
     m_toolId = QStringLiteral("blob_presence_%1")
             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_testToolEngine.registerAdapter(&m_testTemplateLocationAdapter);
+    m_testToolEngine.registerAdapter(&m_testPositionCorrectionAdapter);
     m_testToolEngine.registerAdapter(&m_testBlobPresenceAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     setupUiState();
@@ -237,6 +280,13 @@ BlobPresenceConfig BlobPresenceDialog::configuration() const
     config.positionCorrectionSource = basicMode
             ? ui->basicPositionCorrectionComboBox->currentText()
             : ui->positionCorrectionComboBox->currentText();
+    config.positionCorrectionSourceId = basicMode
+            ? ui->basicPositionCorrectionComboBox->currentData().toString().trimmed()
+            : ui->positionCorrectionComboBox->currentData().toString().trimmed();
+    if (config.positionCorrectionSourceId.isEmpty())
+        config.positionCorrectionSourceId = m_loadedPositionCorrectionSourceId;
+    config.showPositionCorrectionMatchContour =
+            m_showPositionCorrectionMatchContour;
     config.grayMin = basicMode ? ui->basicMinGraySpinBox->value() : ui->minGraySpinBox->value();
     config.grayMax = basicMode ? ui->basicMaxGraySpinBox->value() : ui->maxGraySpinBox->value();
     config.invertRange = basicMode ? false : ui->invertRangeSwitch->isChecked();
@@ -261,8 +311,13 @@ ToolConfig BlobPresenceDialog::toToolConfig() const
                   pointsToJson(blobConfig.detectPolygonNormalized));
     params.insert(QStringLiteral("detectCircleNormalized"),
                   circleToJson(blobConfig.detectCircleNormalized));
-    params.insert(QStringLiteral("enablePositionCorrection"), blobConfig.enablePositionCorrection);
-    params.insert(QStringLiteral("positionCorrectionSource"), blobConfig.positionCorrectionSource);
+    PositionCorrectionConfig correctionConfig;
+    correctionConfig.enabled = blobConfig.enablePositionCorrection;
+    correctionConfig.source = blobConfig.positionCorrectionSource;
+    correctionConfig.sourceId = blobConfig.positionCorrectionSourceId;
+    PositionCorrection::writeParams(correctionConfig, &params);
+    params.insert(QStringLiteral("showPositionCorrectionMatchContour"),
+                  blobConfig.showPositionCorrectionMatchContour);
     params.insert(QStringLiteral("grayMin"), blobConfig.grayMin);
     params.insert(QStringLiteral("grayMax"), blobConfig.grayMax);
     params.insert(QStringLiteral("invertRange"), blobConfig.invertRange);
@@ -310,6 +365,11 @@ void BlobPresenceDialog::loadFromConfig(const ToolConfig &config)
         m_roiNormalized = config.roiNormalized;
 
     const QJsonObject params = config.params;
+    const PositionCorrectionConfig correctionConfig =
+            PositionCorrection::fromParams(params);
+    m_loadedPositionCorrectionSourceId = correctionConfig.sourceId;
+    m_showPositionCorrectionMatchContour = params.value(
+                QStringLiteral("showPositionCorrectionMatchContour")).toBool(true);
     const bool allMode = params.contains(QStringLiteral("areaMin"))
             || params.value(QStringLiteral("invertRange")).toBool(false)
             || params.value(QStringLiteral("maskOutputEnabled")).toBool(false);
@@ -317,11 +377,11 @@ void BlobPresenceDialog::loadFromConfig(const ToolConfig &config)
     ui->allSegmentButton->setChecked(allMode);
     ui->spotParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
 
-    const bool positionCorrection = params.value(QStringLiteral("enablePositionCorrection")).toBool(ui->basicPositionCorrectionSwitch->isChecked());
+    const bool positionCorrection = correctionConfig.enabled;
     ui->basicPositionCorrectionSwitch->setChecked(positionCorrection);
     ui->positionCorrectionSwitch->setChecked(positionCorrection);
-    setComboBoxValue(ui->basicPositionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
-    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    setComboBoxValue(ui->basicPositionCorrectionComboBox, correctionConfig.source);
+    setComboBoxValue(ui->positionCorrectionComboBox, correctionConfig.source);
     const int grayMin = params.value(QStringLiteral("grayMin")).toInt(ui->basicMinGraySpinBox->value());
     const int grayMax = params.value(QStringLiteral("grayMax")).toInt(ui->basicMaxGraySpinBox->value());
     ui->basicMinGraySpinBox->setValue(grayMin);
@@ -441,6 +501,8 @@ void BlobPresenceDialog::connectControls()
     connect(ui->headerCloseButton, &QToolButton::clicked, this, &BlobPresenceDialog::reject);
     connect(ui->referenceTestButton, &QPushButton::clicked, this, &BlobPresenceDialog::runReferenceTest);
     connect(ui->testRunButton, &QPushButton::clicked, this, &BlobPresenceDialog::runCameraTest);
+    connect(ui->blobPcImportButton, &QPushButton::clicked,
+            this, &BlobPresenceDialog::importTestImageFromPc);
     connect(ui->finishButton, &QPushButton::clicked, this, &BlobPresenceDialog::finishConfiguration);
 
     m_segmentGroup->setExclusive(true);
@@ -451,6 +513,41 @@ void BlobPresenceDialog::connectControls()
     });
     connect(ui->allSegmentButton, &QPushButton::clicked, this, [this]() {
         ui->spotParamsStackedWidget->setCurrentWidget(ui->allParamsPage);
+    });
+    connect(ui->basicPositionCorrectionSwitch,
+            &QCheckBox::toggled,
+            ui->positionCorrectionSwitch,
+            &QCheckBox::setChecked);
+    connect(ui->positionCorrectionSwitch,
+            &QCheckBox::toggled,
+            ui->basicPositionCorrectionSwitch,
+            &QCheckBox::setChecked);
+    const auto syncPositionCorrectionSource =
+            [](QComboBox *source, QComboBox *target, int index) {
+        if (!source || !target || index < 0)
+            return;
+        const QString sourceId = source->itemData(index).toString();
+        const int targetIndex = target->findData(sourceId);
+        if (targetIndex >= 0 && targetIndex != target->currentIndex())
+            target->setCurrentIndex(targetIndex);
+    };
+    connect(ui->basicPositionCorrectionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this, syncPositionCorrectionSource](int index) {
+        syncPositionCorrectionSource(
+                    ui->basicPositionCorrectionComboBox,
+                    ui->positionCorrectionComboBox,
+                    index);
+    });
+    connect(ui->positionCorrectionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this, syncPositionCorrectionSource](int index) {
+        syncPositionCorrectionSource(
+                    ui->positionCorrectionComboBox,
+                    ui->basicPositionCorrectionComboBox,
+                    index);
     });
 
     m_basicDetectionRegionGroup->setExclusive(true);
@@ -606,7 +703,10 @@ void BlobPresenceDialog::runReferenceTest()
 
 void BlobPresenceDialog::runCameraTest()
 {
-    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    const bool useImportedFrame = !m_importedTestFrame.empty();
+    const cv::Mat frame = useImportedFrame
+            ? m_importedTestFrame.clone()
+            : CameraFrameProvider::instance().currentFrame();
     if (frame.empty()) {
         displayBlobPresenceError(QStringLiteral("image_empty"),
                                  tr("当前图像为空，无法测试"));
@@ -615,16 +715,57 @@ void BlobPresenceDialog::runCameraTest()
 
     const cv::Mat snapshot = frame.clone();
     const QImage image = imageFromFrame(snapshot);
+    const QString imageTitle = useImportedFrame
+            ? (m_importedTestImageTitle.trimmed().isEmpty()
+               ? tr("PC导入图片") : m_importedTestImageTitle)
+            : tr("测试图像");
     if (!image.isNull() && m_previewHelper) {
-        ui->viewerTitleLabel->setText(tr("测试图像"));
+        ui->viewerTitleLabel->setText(imageTitle);
         m_previewHelper->setImage(image);
         refreshDisplayedRoiOverlay();
     }
 
     runBlobPresenceOnFrame(snapshot,
                            ReferenceImageProvider::instance().referenceFrame(),
-                           tr("测试图像"),
+                           imageTitle,
                            tr("当前图像为空，无法测试"));
+}
+
+void BlobPresenceDialog::importTestImageFromPc()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this,
+                tr("PC导入测试图片"),
+                QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+
+    const cv::Mat frame = cv::imread(fileName.toLocal8Bit().constData(),
+                                     cv::IMREAD_UNCHANGED);
+    if (frame.empty()) {
+        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
+        return;
+    }
+
+    m_importedTestFrame = frame.clone();
+    m_importedTestImageTitle = QFileInfo(fileName).fileName();
+    ui->testRunButton->setText(tr("测试运行（导入图）"));
+    ui->testRunButton->setToolTip(
+                tr("重新填充并测试当前 PC 导入图片：%1")
+                .arg(m_importedTestImageTitle));
+    const QImage image = imageFromFrame(m_importedTestFrame);
+    if (!image.isNull() && m_previewHelper) {
+        ui->viewerTitleLabel->setText(m_importedTestImageTitle);
+        m_previewHelper->setImage(image);
+        refreshDisplayedRoiOverlay();
+    }
+
+    runBlobPresenceOnFrame(
+                m_importedTestFrame,
+                ReferenceImageProvider::instance().referenceFrame(),
+                m_importedTestImageTitle,
+                tr("导入图片为空，无法测试"));
 }
 
 void BlobPresenceDialog::applyAdaptiveWindowSize()
@@ -653,6 +794,38 @@ void BlobPresenceDialog::showReferenceImage()
     ui->viewerTitleLabel->setText(tr("基准图"));
     m_previewHelper->setImage(image);
     refreshDisplayedRoiOverlay();
+}
+
+void BlobPresenceDialog::setToolChainTestContext(
+        const QVector<ToolConfig> &toolConfigs,
+        int currentToolIndex,
+        ToolEngine *sharedToolEngine,
+        const ReferencePositionCorrectionConfig &referencePositionCorrection)
+{
+    m_toolChainTestConfigs = toolConfigs;
+    m_toolChainTestIndex = qBound(0, currentToolIndex, toolConfigs.size());
+    m_sharedToolEngine = sharedToolEngine;
+    m_referencePositionCorrection = referencePositionCorrection;
+
+    const BlobPresenceConfig current = configuration();
+    const QString selectedId = current.positionCorrectionSourceId.trimmed().isEmpty()
+            ? m_loadedPositionCorrectionSourceId
+            : current.positionCorrectionSourceId;
+    const QVector<PositionCorrectionSource> sources =
+            PositionCorrection::sourcesBefore(
+                m_toolChainTestConfigs,
+                m_toolChainTestIndex,
+                m_referencePositionCorrection.enabled);
+    populatePositionCorrectionCombo(
+                ui->basicPositionCorrectionComboBox,
+                sources,
+                selectedId,
+                current.positionCorrectionSource);
+    populatePositionCorrectionCombo(
+                ui->positionCorrectionComboBox,
+                sources,
+                selectedId,
+                current.positionCorrectionSource);
 }
 
 void BlobPresenceDialog::showFrameForRoiEditing()
@@ -947,13 +1120,63 @@ void BlobPresenceDialog::runBlobPresenceOnFrame(const cv::Mat &frame,
 
     ToolConfig config = toToolConfig();
     config.roiNormalized = effectiveRoiNormalized();
+    config.enabled = true;
 
-    ToolRequest request;
-    request.config = config;
-    request.image = frame.clone();
-    request.referenceImage = referenceImage.empty() ? cv::Mat() : referenceImage.clone();
+    ToolResult result;
+    const PositionCorrectionConfig correctionConfig =
+            PositionCorrection::fromParams(config.params);
+    if (correctionConfig.enabled) {
+        if (m_toolChainTestIndex < 0
+                || m_toolChainTestIndex > m_toolChainTestConfigs.size()) {
+            m_blobPresenceRunning = false;
+            displayBlobPresenceError(
+                        QStringLiteral("position_correction_test_context_missing"),
+                        tr("位置修正测试缺少当前方案的前置工具配置"));
+            return;
+        }
 
-    const ToolResult result = m_testToolEngine.runTool(request);
+        QVector<ToolConfig> testConfigs;
+        testConfigs.reserve(m_toolChainTestIndex + 1);
+        for (int index = 0; index < m_toolChainTestIndex; ++index)
+            testConfigs.append(m_toolChainTestConfigs.at(index));
+        testConfigs.append(config);
+
+        QJsonObject runtimeContext;
+        runtimeContext.insert(
+                    QStringLiteral("referencePositionCorrection"),
+                    PositionCorrection::referenceToJson(
+                        m_referencePositionCorrection));
+        ToolResult referenceCorrectionResult;
+        ToolEngine *testEngine = m_sharedToolEngine
+                ? m_sharedToolEngine : &m_testToolEngine;
+        const QVector<ToolResult> results =
+                testEngine->runTools(
+                    testConfigs,
+                    frame.clone(),
+                    referenceImage.empty() ? cv::Mat() : referenceImage.clone(),
+                    runtimeContext,
+                    &referenceCorrectionResult);
+        for (auto it = results.crbegin(); it != results.crend(); ++it) {
+            if (it->toolId == config.toolId) {
+                result = *it;
+                break;
+            }
+        }
+        if (result.toolId.isEmpty()) {
+            result = ToolResult::error(
+                        config.toolId,
+                        config.toolType,
+                        tr("前置工具链没有返回斑点检测结果"),
+                        QStringLiteral("tool_chain_result_missing"));
+        }
+    } else {
+        ToolRequest request;
+        request.config = config;
+        request.image = frame.clone();
+        request.referenceImage =
+                referenceImage.empty() ? cv::Mat() : referenceImage.clone();
+        result = m_testToolEngine.runTool(request);
+    }
     if (!imageTitle.isEmpty())
         ui->viewerTitleLabel->setText(imageTitle);
     displayBlobPresenceResult(result);
@@ -981,7 +1204,28 @@ void BlobPresenceDialog::displayBlobPresenceResult(const ToolResult &result)
     setViewerStatusText(displayText, makeBlobPresenceStatusTooltipText(result));
 
     if (m_previewHelper) {
-        refreshDisplayedRoiOverlay();
+        bool hasRuntimeDetectRoi = false;
+        for (const ToolOverlay &overlay : result.overlays) {
+            const QString role =
+                    overlay.extra.value(QStringLiteral("role")).toString();
+            const QString label = overlay.label.trimmed().toLower();
+            if (role == QStringLiteral("detect_roi")
+                    || label == QStringLiteral("detect_roi")
+                    || label == QStringLiteral("detection roi")) {
+                hasRuntimeDetectRoi = true;
+                break;
+            }
+        }
+
+        // Runner 返回的 detect_roi 已使用与 HALCON Region 相同的位置修正矩阵。
+        // 运行成功后必须移除配置阶段的基准 ROI，避免画布同时显示两套检测区域。
+        if (hasRuntimeDetectRoi) {
+            m_previewHelper->clearRoi();
+            m_previewHelper->clearPolygonRoi();
+            m_previewHelper->clearCircleRoi();
+        } else {
+            refreshDisplayedRoiOverlay();
+        }
         m_previewHelper->setToolOverlays(result.overlays);
     }
 }

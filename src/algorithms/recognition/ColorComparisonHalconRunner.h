@@ -2,7 +2,7 @@
 #define ALGORITHMS_RECOGNITION_COLORCOMPARISONHALCONRUNNER_H
 
 #include "algorithms/recognition/ColorComparisonModel.h"
-#include "toolcore/ToolOverlay.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonObject>
 #include <QPointF>
@@ -29,12 +29,7 @@ struct ColorComparisonHalconConfig
     ColorComparisonInputSignature inputSignature;
     QString sensitivity = QStringLiteral("medium");
     bool brightnessCompensation = false;
-    bool positionCorrectionRequested = false;
-    bool positionCorrectionApplied = false;
-    bool showPositionCorrectionMatchContour = true;
-    QString positionCorrectionSourceId;
-    QVector<double> referenceToRunHomMat2D;
-    QVector<ToolOverlay> positionCorrectionMatchContours;
+    PositionCorrectionContext positionCorrection;
     int minScore = 80;
 };
 

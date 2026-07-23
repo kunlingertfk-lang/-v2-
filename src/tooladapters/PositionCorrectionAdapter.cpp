@@ -223,9 +223,23 @@ ToolResult PositionCorrectionAdapter::run(const ToolRequest &request)
     result.payload.insert(QStringLiteral("frameMeta"),
                           request.runtimeContext.value(QStringLiteral("frameMeta")).toObject());
     const ToolResult producerToolResult = ToolResult::fromJson(producerResult);
-    for (const ToolOverlay &overlay : producerToolResult.overlays) {
-        if (overlay.label == QStringLiteral("match_result"))
-            result.overlays.append(overlay);
+    for (ToolOverlay overlay : producerToolResult.overlays) {
+        if (overlay.label == QStringLiteral("match_result")) {
+            overlay.extra.insert(
+                        QStringLiteral("role"),
+                        QStringLiteral("position_correction_match_contour"));
+        } else if (overlay.label == QStringLiteral("match_center")
+                   || overlay.extra.value(QStringLiteral("role")).toString()
+                   == QStringLiteral("match_origin")) {
+            overlay.extra.insert(
+                        QStringLiteral("role"),
+                        QStringLiteral("position_correction_match_origin"));
+        } else {
+            continue;
+        }
+        overlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                             config.toolId);
+        result.overlays.append(overlay);
     }
     return result;
 }

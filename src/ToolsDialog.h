@@ -10,6 +10,7 @@
 #include "toolcore/ToolPreviewSnapshot.h"
 
 class FrameViewHelper;
+class ToolEngine;
 class QEvent;
 class QFrame;
 class QObject;
@@ -35,6 +36,8 @@ public:
     bool openedOutputDialog() const;
     QVector<PositionCorrectionSource> positionCorrectionSourcesFor(
             const ToolConfig *consumer) const;
+    void setToolEngineForTesting(ToolEngine *engine);
+    ToolEngine *toolEngineForTesting() const;
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -77,6 +80,7 @@ private:
     QVector<QFrame *> m_toolCards;
     QMap<QString, ToolPreviewSnapshot> m_toolPreviewSnapshots;
     FrameViewHelper *m_previewHelper = nullptr;
+    ToolEngine *m_toolEngineForTesting = nullptr;
     bool m_openedOutputDialog = false;
 };
 

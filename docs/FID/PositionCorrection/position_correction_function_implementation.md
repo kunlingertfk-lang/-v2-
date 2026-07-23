@@ -610,3 +610,28 @@ timeoutMs = 2000
 - 海康官方语义核对后确认：工具 Dialog 订阅的是运行姿态 X/Y/角度；创建基准时在基准图上执行同一来源，将当次姿态保存为 `referencePose`，后续帧输出为 `runPose`。内部需要两组姿态，但 UI 不再单独绑定一套基准字段。
 - 当前占位代码的 `runPointX/runPointY/runAngle` 键名与“基准点坐标/基准角度”默认显示文本冲突；正式接入时迁移为 `runPoseSource` 并统一显示为运行点语义。
 - 配置迁移、运行上下文、分阶段实现和验证清单见 `位置修正下一阶段实施计划.md`。
+
+### 2026-07-23 - 公共消费辅助层
+
+- 新增 `src/toolcore/PositionCorrectionConsumer.*`：
+  - 只负责取得和校验本帧修正上下文。
+  - 统一返回来源、正逆矩阵、尺度、匹配轮廓和稳定错误码。
+  - 不拥有、不保存也不移动 ROI。
+- 新增 `src/toolcore/PositionCorrectionTransform.*`：
+  - 负责点、线、矩形、圆、多边形、文本锚点和 Overlay 的坐标变换。
+  - 圆半径通过同一矩阵变换圆心和半径点计算。
+- 新增 `src/algorithms/location/PositionCorrectionHalconTransform.*`：
+  - 负责实际 HALCON Region 的 `affine_trans_region` 和图像域裁剪。
+  - 通过最小 HALCON C API 函数表兼容各 Runner 现有动态运行时加载方式。
+- 颜色比较 Adapter/Runner 已迁移到公共层，原有得分算法、模型合同和 UI 配置保持不变。
+- Blob 作为第二个通用性验证工具完成接入：位置修正开启时在全图坐标中创建基准 Region，变换后执行 `reduce_domain`；关闭时保留原裁剪路径。
+- 对应执行步骤和验证记录见 `位置修正公共消费辅助层实施计划.md`。
+
+### 2026-07-23 - 运行态轮廓与匹配原点显示
+
+- 模板定位输出的两条 `match_center` 交叉线标记为通用 `match_origin`；使用的是应用质心/自定义模板原点后的实际运行位姿。
+- 工具级位置修正不再只保留 `match_result`，现同时透传匹配轮廓和匹配原点，并写入稳定来源 ID。
+- 公共 Consumer 增加 `matchOrigins`，公共 Transform 增加 `matchOriginOverlays`；标准角色为 `position_correction_match_origin`。
+- 全局基准图位置修正结果通过 `ToolEngine` 的独立输出参数交给 `MainWindow`，作为运行辅助 Overlay 合并显示，不改变普通工具结果数量和顺序。
+- 颜色比较与 Blob 均显示实际匹配原点；现有“显示匹配轮廓”开关只控制轮廓，不控制匹配原点。
+- 五组位置修正专项 smoke 和主工程影子构建均通过；真实桌面仍需按规划文档的人工验收项检查颜色、重合和上一帧残留。

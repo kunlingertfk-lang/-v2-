@@ -11655,3 +11655,575 @@
 2026-07-23T14:47:06.177 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
 2026-07-23T14:47:11.190 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
 2026-07-23T14:47:16.422 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T15:19:37.741 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x56bef75b3210, name="MainWindow") reuseExisting= true
+2026-07-23T15:19:37.752 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T15:19:41.183 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T15:19:42.624 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T15:19:42.660 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T15:19:42.660 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T15:19:42.661 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T15:19:42.661 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T15:19:42.661 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T15:19:42.661 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T15:19:42.676 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T15:19:42.677 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T15:19:42.681 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T15:19:42.681 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T15:19:42.681 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T15:19:42.681 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T15:19:42.681 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T15:19:42.682 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T15:19:42.682 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T15:19:42.684 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T15:19:42.685 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T15:19:42.685 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T15:19:42.685 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T15:19:42.685 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T15:19:42.685 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T15:19:42.686 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T15:19:42.686 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T15:19:42.689 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T15:19:42.689 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T15:19:42.689 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T15:19:42.689 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T15:19:42.689 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T15:19:42.689 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T15:19:48.996 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x592b9431fe20, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T15:19:49.283 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T15:19:49.316 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x592b9431fe20, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T15:19:49.317 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T15:19:49.318 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T15:19:49.318 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T15:19:49.318 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T15:19:49.318 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T15:19:49.318 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T15:19:49.319 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T15:19:49.319 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T15:19:49.321 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T15:19:49.321 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T15:19:49.322 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T15:19:49.322 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T15:19:49.322 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T15:20:11.287 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T15:20:11.288 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T15:20:11.288 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T15:20:11.288 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T15:20:11.288 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T15:20:11.288 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T15:20:11.288 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T15:20:18.976 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T15:20:24.968 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T15:21:21.691 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T15:21:39.307 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T15:21:41.848 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T17:11:34.305 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x592b9431fe20, name="MainWindow") reuseExisting= true
+2026-07-23T17:11:34.323 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T17:12:03.185 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T17:12:08.338 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T17:12:08.366 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T17:12:08.366 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T17:12:08.367 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T17:12:08.367 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T17:12:08.367 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T17:12:08.367 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T17:12:08.394 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T17:12:08.394 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T17:12:08.400 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T17:12:08.400 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T17:12:08.400 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T17:12:08.400 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T17:12:08.400 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T17:12:08.400 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T17:12:08.400 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T17:12:08.402 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T17:12:08.403 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T17:12:08.403 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T17:12:08.403 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T17:12:08.403 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T17:12:08.403 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T17:12:08.403 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T17:12:08.403 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T17:12:08.404 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T17:12:08.404 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T17:12:08.404 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T17:12:08.404 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T17:12:08.404 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T17:12:08.404 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T17:12:15.524 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x58ac73680f90, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T17:12:15.653 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T17:12:15.684 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x58ac73680f90, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T17:12:15.684 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T17:12:15.684 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T17:12:15.685 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T17:12:15.685 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T17:12:15.685 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T17:12:15.685 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T17:12:15.685 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T17:12:15.685 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T17:12:15.686 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T17:12:15.686 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T17:12:15.686 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T17:12:15.686 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T17:12:15.686 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T17:12:17.643 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T17:12:17.643 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T17:12:17.643 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T17:12:17.643 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T17:12:17.644 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T17:12:17.644 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T17:12:17.644 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T17:13:05.252 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T17:13:15.604 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T17:16:59.944 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T17:17:22.803 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.347665,0.424759 0.134173x0.140845)
+2026-07-23T17:17:29.317 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:17:37.161 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.326909,0.409933 0.343958x0.375093)
+2026-07-23T17:17:39.435 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:17:43.496 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.394366,0.16086 0.210526x0.197183)
+2026-07-23T17:17:44.855 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:17:48.414 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.346182,0.430689 0.335063x0.163084)
+2026-07-23T17:17:49.869 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:17:52.872 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.320237,0.405486 0.17791x0.196442)
+2026-07-23T17:17:54.169 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:17:57.784 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.289103,0.349889 0.0674574x0.0370645)
+2026-07-23T17:17:58.984 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:18:03.528 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.329874,0.415122 0.175686x0.180875)
+2026-07-23T17:18:05.113 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:18:06.989 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.312083,0.36768 0.0622683x0.0489251)
+2026-07-23T17:18:08.251 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:18:11.334 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.346924,0.417346 0.315048x0.335804)
+2026-07-23T17:18:12.432 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:18:14.132 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.301705,0.368421 0.0533729x0.0348406)
+2026-07-23T17:18:19.042 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.332098,0.4255 0.157153x0.15493)
+2026-07-23T17:18:20.660 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:18:23.539 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.388436,0.464789 0.0496664x0.0555967)
+2026-07-23T17:18:24.925 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:18:31.822 [DEBUG] [BlobPresenceDialog] ROI normalized: QRectF(0.334322,0.432172 0.140845x0.132691)
+2026-07-23T17:18:38.343 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.408451,0.498147) radius: 0.0674737 bounding: QRectF(0.340977,0.430673 0.134947x0.134947)
+2026-07-23T17:18:40.292 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:22:01.521 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:22:06.436 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=22" message= "BlobPresence: found count=22" score= 1 count= 22 ok= true
+2026-07-23T17:22:13.849 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.514455,0.445515) radius: 0.0468833 bounding: QRectF(0.467572,0.398632 0.0937666x0.0937666)
+2026-07-23T17:22:16.112 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.303929,0.296516) radius: 0.042571 bounding: QRectF(0.261358,0.253945 0.0851419x0.0851419)
+2026-07-23T17:22:17.762 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: missing count=0" message= "BlobPresence: missing count=0" score= 0 count= 0 ok= false
+2026-07-23T17:23:54.828 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: missing count=0" message= "BlobPresence: missing count=0" score= 0 count= 0 ok= false
+2026-07-23T17:23:55.479 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: missing count=0" message= "BlobPresence: missing count=0" score= 0 count= 0 ok= false
+2026-07-23T17:23:59.379 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.412157,0.670867) radius: 0.0451457 bounding: QRectF(0.367011,0.625722 0.0902914x0.0902914)
+2026-07-23T17:24:00.773 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:24:05.928 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.40252,0.667902) radius: 0.0703757 bounding: QRectF(0.332145,0.597526 0.140751x0.140751)
+2026-07-23T17:24:07.167 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:24:12.922 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.407709,0.676798) radius: 0.0767978 bounding: QRectF(0.330912,0.6 0.153596x0.153596)
+2026-07-23T17:24:14.773 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:24:23.484 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.404744,0.487769) radius: 0.0714105 bounding: QRectF(0.333334,0.416358 0.142821x0.142821)
+2026-07-23T17:24:24.692 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=23" message= "BlobPresence: found count=23" score= 1 count= 23 ok= true
+2026-07-23T17:24:27.472 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.581913,0.504818) radius: 0.0759053 bounding: QRectF(0.506007,0.428913 0.151811x0.151811)
+2026-07-23T17:24:28.473 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: missing count=0" message= "BlobPresence: missing count=0" score= 0 count= 0 ok= false
+2026-07-23T17:24:31.788 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.412157,0.660489) radius: 0.079266 bounding: QRectF(0.332891,0.581223 0.158532x0.158532)
+2026-07-23T17:24:32.813 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:24:35.868 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.585619,0.501112) radius: 0.0613527 bounding: QRectF(0.524266,0.439759 0.122705x0.122705)
+2026-07-23T17:24:36.711 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: missing count=0" message= "BlobPresence: missing count=0" score= 0 count= 0 ok= false
+2026-07-23T17:24:42.090 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.407709,0.681245) radius: 0.0680212 bounding: QRectF(0.339688,0.613224 0.136042x0.136042)
+2026-07-23T17:24:43.345 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:24:52.085 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:25:28.084 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:25:29.138 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:25:37.637 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:25:39.894 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:25:54.061 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:25:54.395 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:25:54.577 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:25:58.470 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.40252,0.66642) radius: 0.0652377 bounding: QRectF(0.337283,0.601182 0.130475x0.130475)
+2026-07-23T17:25:59.873 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:04.684 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.408451,0.673091) radius: 0.0801828 bounding: QRectF(0.328268,0.592908 0.160366x0.160366)
+2026-07-23T17:26:05.945 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:07.891 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:26:11.031 [DEBUG] [BlobPresenceDialog] ToolResult status= "image_empty" message= "当前图像为空，无法测试" score= 0 count= 0 ok= false
+2026-07-23T17:26:11.725 [DEBUG] [BlobPresenceDialog] ToolResult status= "image_empty" message= "当前图像为空，无法测试" score= 0 count= 0 ok= false
+2026-07-23T17:26:12.796 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:26:23.406 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:43.186 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:43.964 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:44.158 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:48.526 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T17:26:51.043 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:51.822 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T17:26:55.888 [DEBUG] [ToolsDialog] 选中工具 index= 3 toolId= "blob_presence_fe3ae3c0-2e5f-42ac-9e5c-6e836f356c0e" toolType= "BlobPresence"
+2026-07-23T17:27:07.336 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T18:25:17.850 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x58ac73680f90, name="MainWindow") reuseExisting= true
+2026-07-23T18:25:17.914 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T18:26:23.044 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T18:26:31.008 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T18:26:31.054 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T18:26:31.054 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T18:26:31.055 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T18:26:31.055 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T18:26:31.055 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T18:26:31.055 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T18:26:31.093 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T18:26:31.094 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T18:26:31.103 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T18:26:31.103 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T18:26:31.103 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T18:26:31.103 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T18:26:31.103 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T18:26:31.104 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T18:26:31.104 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T18:26:31.106 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T18:26:31.106 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T18:26:31.106 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T18:26:31.106 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T18:26:31.107 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T18:26:31.107 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T18:26:31.107 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T18:26:31.108 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T18:26:31.109 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T18:26:31.110 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T18:26:31.110 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T18:26:31.110 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T18:26:31.110 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T18:26:31.110 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T18:41:51.234 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x641d7799c2a0, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T18:41:51.352 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T18:41:51.387 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x641d7799c2a0, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T18:41:51.387 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T18:41:51.388 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T18:41:51.388 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T18:41:51.388 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T18:41:51.388 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T18:41:51.388 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T18:41:51.388 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T18:41:51.388 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T18:41:51.389 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T18:41:51.389 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T18:41:51.389 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T18:41:51.389 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T18:41:51.389 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T18:42:00.494 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T18:42:00.494 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T18:42:00.494 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T18:42:00.494 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T18:42:00.494 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T18:42:00.494 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T18:42:00.494 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T18:42:32.765 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T18:42:33.923 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T18:42:41.955 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T18:42:43.310 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T18:42:44.396 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T18:42:45.623 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T18:42:50.451 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T18:42:51.768 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T18:42:52.358 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T18:42:53.494 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T18:43:05.659 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T18:43:07.667 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T18:43:48.744 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T18:43:52.526 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T18:43:57.781 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T18:43:58.529 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T18:43:58.738 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T18:44:02.058 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T18:44:07.154 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T18:44:07.367 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_source_missing" message= "Position correction results are unavailable for this frame." score= 0 count= 0 ok= false
+2026-07-23T19:50:30.647 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x641d7799c2a0, name="MainWindow") reuseExisting= true
+2026-07-23T19:50:30.686 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T19:50:50.477 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T19:50:58.488 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:50:58.515 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T19:50:58.515 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T19:50:58.516 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T19:50:58.516 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T19:50:58.516 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T19:50:58.516 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T19:50:58.539 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T19:50:58.539 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T19:50:58.545 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T19:50:58.545 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T19:50:58.545 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:50:58.545 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:50:58.545 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T19:50:58.545 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:50:58.546 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:50:58.547 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T19:50:58.547 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T19:50:58.547 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T19:50:58.547 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T19:50:58.547 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T19:50:58.547 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T19:50:58.548 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T19:50:58.548 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T19:50:58.548 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T19:50:58.548 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T19:50:58.549 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:50:58.549 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:50:58.549 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T19:50:58.549 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:51:04.658 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5b8ecee9f2f0, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T19:51:04.776 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T19:51:04.802 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5b8ecee9f2f0, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T19:51:04.802 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T19:51:04.802 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T19:51:04.802 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T19:51:04.802 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T19:51:04.802 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T19:51:04.802 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T19:51:04.803 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T19:51:04.803 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T19:51:04.804 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T19:51:04.804 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T19:51:04.804 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:51:04.804 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:51:04.804 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:51:18.669 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T19:51:18.669 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:51:18.669 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T19:51:18.669 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:51:18.669 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:51:18.669 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:51:18.669 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:51:30.488 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T19:51:35.212 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:51:58.585 [DEBUG] [ToolsDialog] 选中工具 index= 3 toolId= "blob_presence_fe3ae3c0-2e5f-42ac-9e5c-6e836f356c0e" toolType= "BlobPresence"
+2026-07-23T19:52:05.422 [DEBUG] [ToolsDialog] 选中工具 index= 3 toolId= "blob_presence_fe3ae3c0-2e5f-42ac-9e5c-6e836f356c0e" toolType= "BlobPresence"
+2026-07-23T19:52:15.376 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:52:25.683 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:52:26.370 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:52:26.562 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:52:45.578 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.406227,0.673832) radius: 0.0640133 bounding: QRectF(0.342214,0.609819 0.128027x0.128027)
+2026-07-23T19:52:59.848 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:53:32.711 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:53:33.219 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:53:33.496 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:53:33.698 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:53:34.258 [DEBUG] [ToolsDialog] 选中工具 index= 4 toolId= "blob_presence_8d211999-33b5-41f9-ae8b-4ea9c5a1026c" toolType= "BlobPresence"
+2026-07-23T19:53:36.936 [DEBUG] [ToolsDialog] 选中工具 index= 4 toolId= "blob_presence_8d211999-33b5-41f9-ae8b-4ea9c5a1026c" toolType= "BlobPresence"
+2026-07-23T19:53:38.701 [DEBUG] [ToolsDialog] 选中工具 index= 4 toolId= "blob_presence_8d211999-33b5-41f9-ae8b-4ea9c5a1026c" toolType= "BlobPresence"
+2026-07-23T19:53:38.885 [DEBUG] [ToolsDialog] 选中工具 index= 4 toolId= "blob_presence_8d211999-33b5-41f9-ae8b-4ea9c5a1026c" toolType= "BlobPresence"
+2026-07-23T19:53:42.269 [DEBUG] [BlobPresenceDialog] ToolResult status= "image_empty" message= "当前图像为空，无法测试" score= 0 count= 0 ok= false
+2026-07-23T19:53:44.543 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:53:44.744 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:53:44.951 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_test_context_missing" message= "位置修正测试需要执行前置工具链，请从方案工具页面打开后重试" score= 0 count= 0 ok= false
+2026-07-23T19:57:29.131 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x5b8ecee9f2f0, name="MainWindow") reuseExisting= true
+2026-07-23T19:57:29.135 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T19:57:35.920 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T19:57:39.546 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:57:39.559 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T19:57:39.559 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T19:57:39.559 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T19:57:39.559 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T19:57:39.559 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T19:57:39.559 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T19:57:39.568 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T19:57:39.568 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T19:57:39.571 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T19:57:39.571 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T19:57:39.571 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:57:39.571 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:57:39.571 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T19:57:39.571 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:57:39.571 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:57:39.573 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T19:57:39.573 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T19:57:39.573 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T19:57:39.573 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T19:57:39.573 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T19:57:39.573 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T19:57:39.573 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T19:57:39.574 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T19:57:39.575 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T19:57:39.575 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T19:57:39.575 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:57:39.575 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:57:39.575 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T19:57:39.575 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T19:57:47.183 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x62449af38ce0, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T19:57:47.302 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T19:57:47.320 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x62449af38ce0, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T19:57:47.321 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T19:57:47.322 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T19:57:47.322 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T19:57:47.323 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:57:47.323 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:57:47.323 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T19:57:48.620 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T19:57:48.621 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:57:48.621 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T19:57:48.621 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:57:48.621 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:57:48.621 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:57:48.621 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T19:57:55.129 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T19:58:04.399 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T19:58:04.953 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T19:58:05.698 [DEBUG] [BlobPresenceDialog] ToolResult status= "image_empty" message= "当前图像为空，无法测试" score= 0 count= 0 ok= false
+2026-07-23T19:58:06.794 [DEBUG] [BlobPresenceDialog] ToolResult status= "image_empty" message= "当前图像为空，无法测试" score= 0 count= 0 ok= false
+2026-07-23T19:58:14.190 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.405486,0.668643) radius: 0.0493167 bounding: QRectF(0.356169,0.619327 0.0986333x0.0986333)
+2026-07-23T19:58:18.843 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.418829,0.685693) radius: 0.059985 bounding: QRectF(0.358844,0.625708 0.11997x0.11997)
+2026-07-23T19:58:20.710 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.416605,0.688658) radius: 0.0577445 bounding: QRectF(0.35886,0.630914 0.115489x0.115489)
+2026-07-23T19:58:22.206 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T19:58:27.562 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.589325,0.497405) radius: 0.0593449 bounding: QRectF(0.529981,0.438061 0.11869x0.11869)
+2026-07-23T19:58:28.851 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: missing count=0" message= "BlobPresence: missing count=0" score= 0 count= 0 ok= false
+2026-07-23T19:58:35.401 [DEBUG] [BlobPresenceDialog] Circle ROI center: QPointF(0.409933,0.674574) radius: 0.0670324 bounding: QRectF(0.342901,0.607541 0.134065x0.134065)
+2026-07-23T19:58:36.611 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T20:01:17.876 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x62449af38ce0, name="MainWindow") reuseExisting= true
+2026-07-23T20:01:17.881 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T20:01:21.693 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T20:01:23.594 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T20:01:23.605 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T20:01:23.605 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T20:01:23.605 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T20:01:23.606 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T20:01:23.606 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T20:01:23.606 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T20:01:23.620 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T20:01:23.620 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T20:01:23.623 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T20:01:23.623 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T20:01:23.623 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T20:01:23.623 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T20:01:23.623 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T20:01:23.624 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T20:01:23.624 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T20:01:23.625 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T20:01:23.625 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T20:01:23.625 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T20:01:23.625 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T20:01:23.625 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T20:01:23.625 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T20:01:23.626 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T20:01:23.626 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T20:01:23.626 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T20:01:23.627 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T20:01:23.627 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T20:01:23.627 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T20:01:23.627 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T20:01:23.627 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T20:01:31.894 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x6354a1bc8a60, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T20:01:32.004 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T20:01:32.020 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x6354a1bc8a60, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T20:01:32.021 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T20:01:32.021 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T20:01:32.021 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T20:01:32.021 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T20:01:32.021 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T20:01:32.021 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T20:01:32.022 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T20:01:32.022 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T20:01:32.023 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T20:01:32.023 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T20:01:32.023 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T20:01:32.024 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T20:01:32.024 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T20:01:35.498 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T20:01:35.498 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T20:01:35.498 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T20:01:35.499 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T20:01:35.499 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T20:01:35.499 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T20:01:35.499 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T20:01:49.224 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T20:02:04.660 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T20:02:07.772 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T20:02:12.756 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T20:02:15.540 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T20:02:16.404 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T20:02:16.604 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T20:02:23.769 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:21:44.365 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:21:44.545 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:21:50.811 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:21:56.243 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=2" message= "BlobPresence: found count=2" score= 1 count= 2 ok= true
+2026-07-23T22:21:59.090 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=2" message= "BlobPresence: found count=2" score= 1 count= 2 ok= true
+2026-07-23T22:21:59.986 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=2" message= "BlobPresence: found count=2" score= 1 count= 2 ok= true
+2026-07-23T22:22:00.706 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=2" message= "BlobPresence: found count=2" score= 1 count= 2 ok= true
+2026-07-23T22:22:09.995 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T22:22:14.642 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T22:22:20.661 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:22:26.147 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:22:31.121 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=2" message= "BlobPresence: found count=2" score= 1 count= 2 ok= true
+2026-07-23T22:32:27.882 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x6354a1bc8a60, name="MainWindow") reuseExisting= true
+2026-07-23T22:32:27.920 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T22:32:33.809 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T22:32:36.992 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T22:32:37.053 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T22:32:37.053 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T22:32:37.054 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T22:32:37.054 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T22:32:37.054 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T22:32:37.055 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T22:32:37.111 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T22:32:37.111 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T22:32:37.122 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T22:32:37.123 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T22:32:37.123 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T22:32:37.123 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T22:32:37.123 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T22:32:37.123 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T22:32:37.124 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T22:32:37.126 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T22:32:37.126 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T22:32:37.127 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T22:32:37.127 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T22:32:37.127 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T22:32:37.127 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T22:32:37.127 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T22:32:37.127 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T22:32:37.129 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T22:32:37.129 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T22:32:37.129 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T22:32:37.129 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T22:32:37.129 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T22:32:37.129 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T22:32:46.525 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5e2b9002f660, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T22:32:46.754 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T22:32:46.853 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5e2b9002f660, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T22:32:46.854 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T22:32:46.854 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T22:32:46.854 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T22:32:46.854 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T22:32:46.854 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T22:32:46.854 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T22:32:46.855 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T22:32:46.856 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T22:32:46.858 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T22:32:46.858 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T22:32:46.858 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T22:32:46.858 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T22:32:46.858 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T22:32:50.814 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T22:32:50.815 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:32:50.815 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T22:32:50.815 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:32:50.815 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:32:50.815 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:32:50.815 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:33:08.457 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:33:14.333 [DEBUG] [BlobPresenceDialog] ToolResult status= "image_empty" message= "当前图像为空，无法测试" score= 0 count= 0 ok= false
+2026-07-23T22:33:16.181 [DEBUG] [BlobPresenceDialog] ToolResult status= "image_empty" message= "当前图像为空，无法测试" score= 0 count= 0 ok= false
+2026-07-23T22:33:56.210 [DEBUG] [BlobPresenceDialog] ToolResult status= "position_correction_match_not_found" message= "位置修正未找到匹配轮廓：TemplateLocation: no match reached the minimum score" score= 0 count= 0 ok= false
+2026-07-23T22:33:59.604 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:34:05.254 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:34:11.679 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:34:14.820 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:34:20.270 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:34:24.761 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=1" message= "BlobPresence: found count=1" score= 1 count= 1 ok= true
+2026-07-23T22:34:28.645 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=2" message= "BlobPresence: found count=2" score= 1 count= 2 ok= true
+2026-07-23T22:34:34.826 [DEBUG] [BlobPresenceDialog] ToolResult status= "BlobPresence: found count=2" message= "BlobPresence: found count=2" score= 1 count= 2 ok= true
+2026-07-23T22:34:37.563 [DEBUG] [ToolsDialog] 选中工具 index= 3 toolId= "blob_presence_fe3ae3c0-2e5f-42ac-9e5c-6e836f356c0e" toolType= "BlobPresence"
+2026-07-23T22:34:39.953 [DEBUG] [OutputDialogSize] window size= QSize(2626, 1575) min= QSize(1118, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T22:34:39.953 [DEBUG] [OutputDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:34:39.953 [DEBUG] [OutputDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T22:34:39.954 [DEBUG] [OutputDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:34:39.954 [DEBUG] [OutputDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:34:39.954 [DEBUG] [OutputDialogSize] scrollArea size= QSize(562, 1296) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:34:39.954 [DEBUG] [OutputDialogSize] contentWidget size= QSize(562, 1296) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T22:34:43.574 [DEBUG] [SCHEME-RETURN] OutputDialog returnToSourceMainWindow mainWindow= MainWindow(0x5e2b9002f660, name="MainWindow") sourceMainWindowValid= true
+2026-07-23T22:34:43.577 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T22:34:43.759 [DEBUG] [MainWindow] 当前方案工具链数量: 5

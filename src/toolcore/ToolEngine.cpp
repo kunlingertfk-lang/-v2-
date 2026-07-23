@@ -186,7 +186,24 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
     result.score = located.score;
     result.count = located.count;
     result.elapsedMs = located.elapsedMs + corrected.elapsedMs;
-    result.overlays = located.overlays;
+    for (ToolOverlay overlay : located.overlays) {
+        if (overlay.label == QStringLiteral("match_result")) {
+            overlay.extra.insert(
+                        QStringLiteral("role"),
+                        QStringLiteral("position_correction_match_contour"));
+        } else if (overlay.label == QStringLiteral("match_center")
+                   || overlay.extra.value(QStringLiteral("role")).toString()
+                   == QStringLiteral("match_origin")) {
+            overlay.extra.insert(
+                        QStringLiteral("role"),
+                        QStringLiteral("position_correction_match_origin"));
+        } else {
+            continue;
+        }
+        overlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                             PositionCorrection::defaultSourceId());
+        result.overlays.append(overlay);
+    }
     result.payload = corrected.payload;
     result.payload.insert(QStringLiteral("sourceKind"), QStringLiteral("reference"));
     result.payload.insert(QStringLiteral("scope"), QStringLiteral("global"));
@@ -250,7 +267,8 @@ ToolResult ToolEngine::runTool(const ToolRequest &request) const
 QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
                                          const cv::Mat &image,
                                          const cv::Mat &referenceImage,
-                                         const QJsonObject &runtimeContext) const
+                                         const QJsonObject &runtimeContext,
+                                         ToolResult *referenceCorrectionResult) const
 {
     QVector<ToolResult> results;
     results.reserve(configs.size());
@@ -262,6 +280,8 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
 
     const ToolResult referenceCorrection =
             runReferencePositionCorrection(image, referenceImage, frameContext);
+    if (referenceCorrectionResult)
+        *referenceCorrectionResult = referenceCorrection;
     if (!referenceCorrection.toolId.trimmed().isEmpty())
         registerResultInContext(referenceCorrection, &frameContext);
 

@@ -278,6 +278,8 @@ void addMatchOverlays(QVector<ToolOverlay> *overlays,
     horizontal.label = QStringLiteral("match_center");
     horizontal.score = score;
     horizontal.extra.insert(QStringLiteral("matchIndex"), index);
+    horizontal.extra.insert(QStringLiteral("role"),
+                            QStringLiteral("match_origin"));
     horizontal.p1 = QPointF(globalColumn - crossRadius, globalRow);
     horizontal.p2 = QPointF(globalColumn + crossRadius, globalRow);
     overlays->append(horizontal);

@@ -74,6 +74,7 @@ struct MainWindow::ToolChainRunOutput
     QImage frameImage;
     QVector<ToolConfig> enabledConfigs;
     QVector<ToolResult> results;
+    ToolResult referenceCorrectionResult;
     qint64 elapsedMs = 0;
     qint64 startedWallMs = 0;
     qint64 frameCopyMs = 0;
@@ -600,6 +601,7 @@ void MainWindow::openToolsDialog()
     applyCurrentSchemeState();
     ToolsDialog dialog(this);
     dialog.setAttribute(Qt::WA_DeleteOnClose, false);
+    dialog.setToolEngineForTesting(&m_toolEngine);
     dialog.setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);
     PlanDialogUtils::setSessionInfo(&dialog,
                                     ui->headerDeviceComboBox->currentText(),
@@ -851,6 +853,7 @@ void MainWindow::applyCurrentSchemeState()
     m_schemeToolConfigs = scheme.toolConfigs;
     m_referencePreviewSnapshots = scheme.referencePreviewSnapshots;
     m_lastRunSnapshots.clear();
+    m_lastReferenceCorrectionOverlays.clear();
     m_lastRunImage = QImage();
     m_selectedToolIndex = -1;
     syncSnapshotMapsWithConfigs();
@@ -1203,10 +1206,12 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
         output.results = engine->runTools(enabledConfigs,
                                           image,
                                           referenceImage,
-                                          runtimeContext);
+                                          runtimeContext,
+                                          &output.referenceCorrectionResult);
         output.engineMs = timer.elapsed();
 
         output.overallOk = !output.results.isEmpty();
+        output.overlayCount += output.referenceCorrectionResult.overlays.size();
         for (const ToolResult &result : output.results) {
             output.overlayCount += result.overlays.size();
             if (!result.success || !result.ok)
@@ -1263,6 +1268,8 @@ void MainWindow::applyToolChainRunResult(ToolChainRunOutput output)
     uiTimer.start();
 
     storeLastRunSnapshots(output.enabledConfigs, output.results);
+    m_lastReferenceCorrectionOverlays =
+            output.referenceCorrectionResult.overlays;
     m_lastRunImage = output.frameImage;
 
     if (!m_lastRunImage.isNull()) {
@@ -1601,7 +1608,7 @@ void MainWindow::showToolSnapshot(int row,
 
 void MainWindow::showAllLastRunOverlays()
 {
-    QVector<ToolOverlay> overlays;
+    QVector<ToolOverlay> overlays = m_lastReferenceCorrectionOverlays;
     for (const ToolConfig &config : m_schemeToolConfigs) {
         if (!config.enabled)
             continue;
@@ -1775,8 +1782,29 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::BlobPresence:
-        accepted = runToolConfigDialog<BlobPresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
+    {
+        BlobPresenceDialog dialog(this);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+        dialog.loadFromConfig(originalConfig);
+        dialog.setToolChainTestContext(
+                    m_schemeToolConfigs,
+                    row,
+                    &m_toolEngine,
+                    SchemeStore::instance().currentScheme()
+                    .referencePositionCorrection);
+        QTimer::singleShot(0, &dialog, [&dialog]() {
+            dialog.raise();
+            dialog.activateWindow();
+        });
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
         break;
+    }
     case ToolType::CirclePresence:
         accepted = runToolConfigDialog<CirclePresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;

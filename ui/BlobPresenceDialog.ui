@@ -320,6 +320,25 @@
             </spacer>
            </item>
            <item>
+            <widget class="QPushButton" name="blobPcImportButton">
+             <property name="minimumSize">
+              <size>
+               <width>118</width>
+               <height>42</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>PC导入图片</string>
+             </property>
+             <property name="actionRole" stdset="0">
+              <string>secondary</string>
+             </property>
+             <property name="optionalEntry" stdset="0">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QFrame" name="segmentFrame">
              <property name="minimumSize">
               <size>

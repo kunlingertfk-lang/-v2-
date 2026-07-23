@@ -56,6 +56,7 @@ public:
     QLabel *editorTitleLabel;
     QToolButton *spotExternalEditButton;
     QSpacerItem *horizontalSpacer_editorHeader;
+    QPushButton *blobPcImportButton;
     QFrame *segmentFrame;
     QHBoxLayout *horizontalLayout_segment;
     QPushButton *basicSegmentButton;
@@ -331,6 +332,13 @@ public:
         horizontalSpacer_editorHeader = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout_editorHeader->addItem(horizontalSpacer_editorHeader);
+
+        blobPcImportButton = new QPushButton(setupEditorPanel);
+        blobPcImportButton->setObjectName(QString::fromUtf8("blobPcImportButton"));
+        blobPcImportButton->setMinimumSize(QSize(118, 42));
+        blobPcImportButton->setProperty("optionalEntry", QVariant(true));
+
+        horizontalLayout_editorHeader->addWidget(blobPcImportButton);
 
         segmentFrame = new QFrame(setupEditorPanel);
         segmentFrame->setObjectName(QString::fromUtf8("segmentFrame"));
@@ -1203,6 +1211,8 @@ public:
         setupSaveAsButton->setText(QCoreApplication::translate("BlobPresenceDialog", "\345\217\246\345\255\230\344\270\272", nullptr));
         setupExportButton->setText(QCoreApplication::translate("BlobPresenceDialog", "IO\350\276\223\345\207\272", nullptr));
         editorTitleLabel->setText(QCoreApplication::translate("BlobPresenceDialog", "\346\226\221\347\202\271\346\234\211\346\227\240", nullptr));
+        blobPcImportButton->setText(QCoreApplication::translate("BlobPresenceDialog", "PC\345\257\274\345\205\245\345\233\276\347\211\207", nullptr));
+        blobPcImportButton->setProperty("actionRole", QVariant(QCoreApplication::translate("BlobPresenceDialog", "secondary", nullptr)));
         basicSegmentButton->setText(QCoreApplication::translate("BlobPresenceDialog", "\345\237\272\347\241\200", nullptr));
         allSegmentButton->setText(QCoreApplication::translate("BlobPresenceDialog", "\345\205\250\351\203\250", nullptr));
         basicDetectionAreaCard->setProperty("panelRole", QVariant(QCoreApplication::translate("BlobPresenceDialog", "configCard", nullptr)));

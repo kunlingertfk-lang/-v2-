@@ -217,6 +217,28 @@ void configureProducerContext(PositionCorrectionDialog *dialog,
                                   referenceProducers);
 }
 
+void configureProducerContext(BlobPresenceDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    int index = toolsDialog->toolConfigs().size();
+    if (initialConfig) {
+        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
+            if (toolsDialog->toolConfigs().at(i).toolId
+                    == initialConfig->toolId) {
+                index = i;
+                break;
+            }
+        }
+    }
+    dialog->setToolChainTestContext(
+                toolsDialog->toolConfigs(),
+                index,
+                toolsDialog->toolEngineForTesting(),
+                SchemeStore::instance().currentScheme()
+                .referencePositionCorrection);
+}
+
 template <typename Dialog>
 bool runToolConfigDialog(QWidget *parent,
                          const ToolConfig *initialConfig,
@@ -324,6 +346,16 @@ void ToolsDialog::setInitialToolState(const QVector<ToolConfig> &configs,
 bool ToolsDialog::openedOutputDialog() const
 {
     return m_openedOutputDialog;
+}
+
+void ToolsDialog::setToolEngineForTesting(ToolEngine *engine)
+{
+    m_toolEngineForTesting = engine;
+}
+
+ToolEngine *ToolsDialog::toolEngineForTesting() const
+{
+    return m_toolEngineForTesting;
 }
 
 QVector<PositionCorrectionSource> ToolsDialog::positionCorrectionSourcesFor(
