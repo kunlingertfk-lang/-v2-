@@ -4,6 +4,30 @@
 
 本文档记录位置修正的产品边界、当前工程状态、目标链路、配置合同、实施阶段和验证要求。UI 细节以 `位置修正UI设计规范.md` 为准，项目级规则以根目录 `AGENTS.md` 和 `docs/FID/Function_Docs.md` 为准。
 
+## 2026-07-22 - 基准图位姿加入链接来源
+
+- 工具级位置修正的链接菜单新增基准图位姿来源；仅当方案级基准图位置修正已开启、
+  已创建基准且位姿有效时显示。
+- 基准图来源使用稳定 ID `reference.positionCorrection`，X/Y/角度可作为一组统一订阅，
+  不使用显示序号做运行引用。
+- 来源接口采用列表形式，能够逐项展示上层传入的多个有效基准来源；当前方案模型实际只保存
+  一张基准图，多基准图的文件存储和导入槽位仍需单独扩展。
+- 选择基准图来源后，“创建基准”直接导入其真实基准位姿，不再得到全 0 占位值。
+- 测试运行改用当前运行帧生成运行位姿，禁止再以基准图冒充运行图；图像右上角显示订阅来源、
+  基准位姿和运行位姿。
+- 方案级基准位置修正运行结果补充顶层 `x/y/angle/angleDeg`，供工具级位置修正稳定订阅。
+
+验证：`position_correction_ui_smoke`、`position_correction_engine_context_smoke`、
+`color_comparison_position_correction_smoke` 通过；主工程 qmake/make 通过。
+
+## 2026-07-22 - 下游失败原因透传
+
+- 位置修正执行失败的结果也注册到本帧 `positionCorrectionsById`。
+- 下游可区分来源缺失、模板未找到和其他来源执行失败；模板未命中使用
+  `position_correction_match_not_found`。
+- 位置修正已启用但尚未创建基准姿态时输出 `reference_pose_missing`，不再静默表现为来源缺失。
+- 自动回归和主工程构建均通过。
+
 ## 功能目标
 
 位置修正用于根据基准姿态与运行姿态生成统一的平移、旋转修正信息，供后续视觉工具修正检测区域。功能必须支持：
@@ -237,6 +261,294 @@ positionCorrectionReason = "not implemented"
 - 不把未实现能力写成已完成。
 - Markdown 相对路径有效。
 - `git diff --check` 通过。
+
+## 2026-07-21 阶段 A/B/C 实施记录
+
+本节记录“位置修正下一阶段实施计划”的当前落地状态。上方 2026-07-10 旧状态段落保留为历史背景；判断当前代码能力时以本节和当前源码为准。
+
+### HALCON runtime、license 与算子核对
+
+本机 HALCON 能力已核对，允许继续算法实现：
+
+- `HALCONROOT=/opt/halcon`
+- `libhalconc.so` 解析到 `libhalconc.so.20.11.1`
+- license 文件存在且可读：`HALCON_LICENSE_FILE=/home/tt/tfk/WorkerSpace/Software/HALCON-24.11.1.0-Progress-Steady/license/license_support_halcon24.11_steady_2026_07.dat`
+- `ldd` 需要运行环境显式带上 `/opt/halcon/lib/x64-linux`，否则 `libhalcon.so.20.11.1` 会显示 `not found`
+- 已确认声明与动态符号：
+  - `vector_angle_to_rigid`
+  - `affine_trans_region`
+  - `affine_trans_contour_xld`
+  - `hom_mat2d_invert`
+  - `hom_mat2d_compose`
+
+本阶段核心变换使用 HALCON `VectorAngleToRigid`、`HomMat2dScale` 和
+`HomMat2dInvert`，没有使用 OpenCV 或自写算法替代核心算法。
+
+### 阶段 A：姿态来源与配置合同
+
+已完成：
+
+- 在 `src/toolcore/PositionCorrection.{h,cpp}` 中新增位置姿态字段、姿态生产者、运行姿态来源结构。
+- 当前仅 `ToolType::TemplateLocation` 声明可作为位置修正姿态生产者；UI 显示字段仍为
+  `x / y / angle`，尺度通过同一生产者的 `scale` 输出隐式传递，不增加绑定控件。
+- 工具级位置修正使用 `runPoseSource` version 2 合同，要求 X/Y/角度来自同一个上游实例；
+  `scaleKey` 缺省为 `scale`。
+- 旧配置 `runPointX/runPointY/runAngle` 可迁移到 `runPoseSource`；若三项来自不同生产者，返回 `inconsistent_pose_source`，不静默兼容。
+- 写回新配置时同步保留旧 `runPointX/runPointY/runAngle`，用于旧界面或旧配置读取兼容。
+- `PositionCorrectionDialog` 的三项显示语义修正为“运行点 X / 运行点 Y / 运行角度”，不再误写“基准点”。
+- `PositionCorrectionDialog` 绑定菜单只列出前置真实姿态生产者；不再把基准图节点或任意工具虚构为 X/Y/角度来源。
+- 完成校验要求存在有效 `runPoseSource`，并且生产者仍位于当前工具之前。
+
+### 阶段 B：运行上下文传递
+
+已完成：
+
+- `ToolEngine::runTools` 改为维护逐帧可变 `frameContext`。
+- 每个工具运行后，结果写入 `runtimeContext.toolResultsById[toolId]`，后续工具可读取前置工具输出。
+- 若工具结果标记 `positionCorrectionApplied=true`，同步注册到 `runtimeContext.positionCorrectionsById[sourceId]`。
+- 该逻辑保持顺序执行语义，未引入后向引用或循环依赖。
+
+### 阶段 C：工具级位置修正 HALCON 后端
+
+已完成安全可执行部分：
+
+- 新增 `src/algorithms/location/PositionCorrectionHalconRunner.{h,cpp}`。
+- 新增 `src/tooladapters/PositionCorrectionAdapter.{h,cpp}`。
+- `MainWindow` 注册 `PositionCorrectionAdapter`，`qt_ui_test.pro` 纳入新增源文件。
+- Adapter 读取 `runPoseSource`，从 `runtimeContext.toolResultsById[producerId]` 获取同一上游实例输出的运行姿态。
+- Adapter 要求 `referenceCreated=true` 且存在 `referencePose`；当前工具级位置修正不执行模板匹配。
+- `referencePose.scale` 在创建基准时从同一模板定位实例自动保存；旧配置或旧结果缺少
+  `scale` 时按 `1.0` 兼容。
+- Runner 先使用 HALCON `VectorAngleToRigid(referencePose, runPose)` 计算刚性位姿，
+  再以运行锚点为固定点调用 `HomMat2dScale` 应用
+  `scaleRatio = runScale / referenceScale`，最后用 `HomMat2dInvert` 生成逆矩阵，输出：
+  - `referenceToRunHomMat2D`
+  - `runToReferenceHomMat2D`
+  - `deltaX`
+  - `deltaY`
+  - `deltaAngleDeg`
+  - `referenceScale`
+  - `runScale`
+  - `scaleRatio`
+  - `referencePose`
+  - `runPose`
+- `referenceToRunHomMat2D` 是下游 ROI 从基准图移动到运行图时使用的矩阵；反向矩阵仅用于诊断或明确需要反向时使用。
+- HALCON `HomMat2D` 六元组保持 HALCON native row/col 语义。对 region/contour 变换应直接交给 HALCON `affine_trans_region` / `affine_trans_contour_xld`，不要手动按 X/Y 猜测索引。
+
+错误状态：
+
+| 状态 | 含义 |
+| --- | --- |
+| `inconsistent_pose_source` | 旧三字段迁移发现 X/Y/角度来源不一致 |
+| `incomplete_input_binding` | 运行姿态来源字段不完整 |
+| `reference_pose_missing` | 尚未创建基准或缺少 `referencePose` |
+| `source_unavailable` | 上游实例结果不存在 |
+| `source_invalid` | 上游实例本帧失败或 NG |
+| `input_binding_not_found` | 上游结果缺少绑定字段 |
+| `invalid_pose` | 基准姿态或运行姿态存在非有限数值 |
+| `invalid_pose_scale` | 基准或运行尺度不是有限正数 |
+| `halcon_error` | HALCON 抛出异常 |
+| `execution_error` | 非 HALCON 运行异常 |
+
+### 验证记录
+
+全部验证均使用 `/tmp` 影子目录构建，未要求提交构建产物：
+
+- `position_correction_smoke`: passed
+- `position_correction_ui_smoke`: passed
+- `position_correction_engine_context_smoke`: passed
+- `position_correction_backend_smoke`: passed
+- 主工程 `qmake qt_ui_test.pro BUILD_ROOT=/tmp/.../out && make -j$(nproc)`: passed
+
+运行 HALCON 相关 smoke 和主程序时，应确保运行环境包含：
+
+```bash
+export LD_LIBRARY_PATH=/opt/halcon/lib/x64-linux:${OPENCV_ROOT}/lib:${QT_ROOT}/lib:${LD_LIBRARY_PATH:-}
+```
+
+### 仍未完成
+
+- 基准图方案级位置修正的私有模板定位器尚未接入本轮后端。
+- 工具级位置修正 Dialog 的“创建基准”已在后续记录中接入；本小节原状态保留为阶段 C 当时边界。
+- 下游视觉工具尚未在执行核心检测前统一应用 `referenceToRunHomMat2D` 修正 ROI。
+- 尚未接入 `affine_trans_region` / `affine_trans_contour_xld` 到具体下游 ROI 消费链路。
+- 触发、曝光、增益、像素格式一致性约束已确认暂不纳入本阶段判断。
+
+## 2026-07-21 续：工具级创建基准与测试运行
+
+在上一节工具级位置修正 HALCON 后端基础上，继续完成 `PositionCorrectionDialog` 的可操作闭环。
+
+### 已完成
+
+- `PositionCorrectionDialog` 的“创建基准”按钮已接入真实执行逻辑：
+  - 读取当前 `runPoseSource`；
+  - 查找同一个前置 `TemplateLocation` 实例；
+  - 使用 `ReferenceImageProvider` 当前基准图作为测试图和参考图；
+  - 调用 `TemplateLocationAdapter` 在基准图上执行一次同一上游实例；
+  - 只有上游定位 `success && ok` 且 payload 中存在绑定的 X/Y/角度字段时，才写入：
+    - `referenceCreated=true`
+    - `referencePose`
+    - `referencePoseSourceId`
+    - `referencePoseSource`
+    - `referencePoseStatus`
+    - `referencePoseScore`
+    - `referencePoseElapsedMs`
+  - 失败时清除 `referencePose` 并保持 `referenceCreated=false`。
+- `PositionCorrectionDialog` 的“测试运行”按钮已接入真实工具级测试：
+  - 要求已创建 `referencePose`；
+  - 先在基准图上执行同一上游 `TemplateLocation` 取得运行姿态；
+  - 再调用 `PositionCorrectionAdapter` 计算 `referenceToRunHomMat2D`、`runToReferenceHomMat2D` 和 delta；
+  - 成功时只显示位置修正测试结果，不伪造下游 ROI 修正结果。
+- `toolConfig().summary` 已由“后端尚未实现”改为基于 `referenceCreated` 的真实状态。
+- `position_correction_ui_smoke.pro` 已补齐 `TemplateLocationAdapter`、`PositionCorrectionAdapter` 和两个 HALCON runner 的链接依赖。
+
+### 验证记录
+
+全部验证继续使用 `/tmp` 影子目录：
+
+- `position_correction_smoke`: passed
+- `position_correction_ui_smoke`: passed
+- `position_correction_engine_context_smoke`: passed
+- `position_correction_backend_smoke`: passed
+- 主工程 `qmake qt_ui_test.pro BUILD_ROOT=/tmp/.../out && make -j$(nproc)`: passed
+
+### 当前仍不可声明完成的范围
+
+- 基准图方案级位置修正仍未实现私有模板定位器；基准图页面的位置修正不能作为完整产品功能测试。
+- 下游视觉工具尚未实际应用 `referenceToRunHomMat2D` 修正 ROI。
+- 当前工具级“测试运行”使用基准图作为测试帧验证链路；真实相机运行帧下的 UI 联调仍需结合主运行链路与下游 ROI 消费阶段完成。
+
+## 2026-07-21 续：基准图私有模板建模与自匹配
+
+基准图方案级位置修正已接入私有 HALCON 模板定位器的创建与自匹配验证。该能力只负责让基准图位置修正节点变为“可用来源”，下游 ROI 实际应用仍在后续阶段。
+
+### 已完成
+
+- `ReferencePositionCorrectionConfig` 升级到 version 2，并新增持久字段：
+  - `referenceCreated`
+  - `referencePose`
+  - `modelCacheKey`
+  - `status`
+  - `message`
+  - `score`
+  - `elapsedMs`
+- `ReferenceImageDialog` 持有私有 `TemplateLocationHalconRunner`。
+- 基准图位置修正 ROI 发生变化时，立即将旧模型状态失效：
+  - `referenceCreated=false`
+  - 清空 `referencePose`
+  - `status=editing` 或 `pending_validation`
+- 点击基准图位置修正 ROI 的“完成”后，会立即执行：
+  - 校验基准图存在；
+  - 校验矩形或多边形模板 ROI 有效；
+  - 构造私有 `TemplateLocationHalconConfig`；
+  - 使用当前基准图作为 reference 和 run image 调用 HALCON shape model；
+  - 自匹配 `success && ok` 且 payload 含有限的 `x/y/angleDeg` 后，才写入 `referenceCreated=true` 和 `referencePose`。
+- 抓取或导入新的基准图后，旧基准图位置修正模型会失效，要求重新完成 ROI。
+- 基准图位置修正“测试运行”按钮现在显示私有模型自匹配状态，不再显示“后端尚未实现”。
+
+当前默认参数：
+
+```text
+modelCacheKey = reference.positionCorrection.private_template
+searchRegionType = full
+searchRoiNormalized = full image
+minScore = 50
+angleStart = -45
+angleExtent = 90
+scaleMin = 100
+scaleMax = 100
+maxMatches = 1
+minMatchCount = 1
+maxMatchCount = 1
+originMode = centroid
+timeoutMs = 2000
+```
+
+### 验证记录
+
+全部验证使用 `/tmp` 影子目录：
+
+- `position_correction_smoke`: passed
+- `position_correction_ui_smoke`: passed
+- `position_correction_engine_context_smoke`: passed
+- `position_correction_backend_smoke`: passed
+- `reference_position_correction_private_model_smoke`: passed
+- 主工程 `qmake qt_ui_test.pro BUILD_ROOT=/tmp/.../out && make -j$(nproc)`: passed
+
+### 仍未完成
+
+- 下游视觉工具尚未读取基准图位置修正源 `reference.positionCorrection` 并应用 `referenceToRunHomMat2D`。
+- 基准图位置修正在运行图上的实时匹配和变换结果注册已在后续记录中接入；本条保留为本节当时边界。
+- `affine_trans_region` / `affine_trans_contour_xld` 尚未接到下游 ROI 消费链路。
+- 基准图私有模板定位器参数目前使用保守默认值，尚未暴露高级 UI 参数。
+
+## 2026-07-21 续：基准图位置修正运行期注册
+
+已将方案级基准图位置修正接入主运行链路的前置阶段。该阶段只负责生成和注册修正结果，不直接修改下游工具 ROI。
+
+### 已完成
+
+- `MainWindow` 在构造 `runtimeContext` 时写入当前方案的 `referencePositionCorrection` JSON。
+- `ToolEngine::runTools()` 在执行工具列表前，会检查 `runtimeContext.referencePositionCorrection`：
+  - 未启用或 `referenceCreated=false` 时跳过；
+  - 启用且已有 `referencePose` 时，先用私有 `TemplateLocationHalconRunner` 在运行图上定位；
+  - 再用 `PositionCorrectionHalconRunner` 计算 `referenceToRunHomMat2D` 和 `runToReferenceHomMat2D`；
+  - 成功后注册到 `positionCorrectionsById[reference.positionCorrection]`；
+  - 同时写入 `toolResultsById[reference.positionCorrection]`，便于诊断和后续工具读取。
+- 基准图位置修正运行结果 payload 标记：
+  - `sourceKind=reference`
+  - `scope=global`
+  - `sourceId=reference.positionCorrection`
+  - `positionCorrectionApplied=true`
+
+### 验证记录
+
+全部验证继续使用 `/tmp` 影子目录：
+
+- `position_correction_smoke`: passed
+- `position_correction_ui_smoke`: passed
+- `position_correction_engine_context_smoke`: passed
+- `position_correction_backend_smoke`: passed
+- `reference_position_correction_private_model_smoke`: passed
+- 主工程 `qmake qt_ui_test.pro BUILD_ROOT=/tmp/.../out && make -j$(nproc)`: passed
+
+### 当前仍未完成
+
+- 除颜色比较外，其他下游视觉工具尚未实际消费 `positionCorrectionsById` 并用 HALCON `referenceToRunHomMat2D` 修正 ROI。
+- 工具级局部位置修正和基准图全局位置修正的下游单来源选择，目前只落到颜色比较 Adapter。
+- `affine_trans_region` 已接入颜色比较有效检测区域；其他具体 ROI 消费链路仍待实现。
+
+## 2026-07-21：颜色比较首个下游消费工具
+
+### 已完成
+
+- `ColorComparisonAdapter` 在位置修正开启时，只读取当前工具选中的一个稳定来源 ID，并从本帧 `runtimeContext.positionCorrectionsById[sourceId]` 取结果。
+- 来源结果必须同时满足 `success=true`、`ok=true`、`positionCorrectionApplied=true`，且 payload 的 `sourceId` 与选择值一致。
+- 只读取 `referenceToRunHomMat2D`；没有读取或回退到 `runToReferenceHomMat2D`。
+- 来源不存在返回 `position_correction_source_missing`，来源本帧失败或合同不成立返回 `source_invalid`，矩阵不是 6 个有限值时返回 `invalid_position_correction_matrix`。
+- `ColorComparisonHalconRunner` 在本次运行中先按图像尺寸生成基准检测区域及屏蔽区的有效区域，再使用 HALCON `affine_trans_region` 应用绝对矩阵，最后用 HALCON `clip_region` 裁剪到当前图像范围。
+- 修正后的临时区域只供本帧颜色直方图提取使用，不写回 `detectRoiNormalized`、圆形区域或屏蔽区配置。
+- 检测 overlay 同步显示修正后的矩形多边形、圆心和屏蔽区，并记录实际来源 ID。
+- 颜色比较 Dialog 的位置修正控件已解除禁用，保存稳定来源 ID；旧版把基准图显示文本写进 `sourceId` 的配置会迁移到 `reference.positionCorrection`。
+
+### 模板边界说明
+
+- 工具级位置修正不拥有也不执行内部模板匹配。
+- 基准图位置修正继续保留私有 `TemplateLocationHalconRunner` 和独立 `modelCacheKey`，这是它生成运行位姿所必需的能力。
+- 普通模板定位工具仍使用自己的工具实例与缓存键；三者不共享模型。
+- 颜色比较的模板是颜色直方图样本模型，不是位置模板，不参与位置修正定位，也不会与上述模板缓存冲突。
+
+### 验证记录
+
+- `/tmp/color-pc-smoke.783srr`：`color_comparison_position_correction_smoke` passed；覆盖 X 正向位移、反向矩阵不命中、HALCON 区域变换、非法矩阵和来源缺失失败。
+- `/tmp/color-pc-ui.*`：`color_comparison_dialog_integration_smoke` 在影子布局中 passed。
+- `/tmp/color-pc-main.yAskT0`：主工程 qmake/make passed。
+- `git diff --check`：本次相关文件 passed。
+
+### 后续范围
+
+- 本阶段只接入颜色比较；其他下游视觉工具仍未消费位置修正结果。
+- 颜色比较 Dialog 内的单工具预览不具备整条前序工具执行上下文；正式位置修正联调应通过 `ToolEngine` 顺序运行方案。
 
 ### UI 第一阶段
 

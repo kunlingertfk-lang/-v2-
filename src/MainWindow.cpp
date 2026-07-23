@@ -404,6 +404,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolEngine.registerAdapter(&m_aiDetectionAdapter);
     m_toolEngine.registerAdapter(&m_registeredClassificationAdapter);
     m_toolEngine.registerAdapter(&m_templateLocationAdapter);
+    m_toolEngine.registerAdapter(&m_positionCorrectionAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     m_toolChainWatcher = new QFutureWatcher<ToolChainRunOutput>(this);
     setupUiState();
@@ -1136,10 +1137,15 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
     const qint64 referenceCopyMs = referenceCopyTimer.elapsed();
 
     QJsonObject runtimeContext;
+    runtimeContext.insert(QStringLiteral("frameId"),
+                          QString::number(actualFrameIndex));
     runtimeContext.insert(QStringLiteral("input"),
                           cameraSnapshot.metadata.toJson());
     runtimeContext.insert(QStringLiteral("referenceInput"),
                           referenceSnapshot.metadata.toJson());
+    runtimeContext.insert(QStringLiteral("referencePositionCorrection"),
+                          PositionCorrection::referenceToJson(
+                              SchemeStore::instance().currentScheme().referencePositionCorrection));
 
     QElapsedTimer displayImageTimer;
     displayImageTimer.start();

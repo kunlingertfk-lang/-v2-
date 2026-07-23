@@ -3,12 +3,14 @@
 
 #include <QDialog>
 
+#include "algorithms/location/TemplateLocationHalconRunner.h"
 #include "toolcore/PositionCorrection.h"
 
 class FrameViewHelper;
 class QPushButton;
 class QFrame;
 class QLabel;
+class QComboBox;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -72,6 +74,18 @@ private:
     bool hasReferencePositionTemplateRoi() const;
     /** 生成当前模板 ROI 的可读状态文本。 */
     QString referencePositionRoiStatusText() const;
+    /** ROI 完成后立即用基准图创建私有 HALCON 模型并自匹配验证，成功才标记可用。 */
+    bool buildAndValidateReferencePositionModel();
+    /** 显示基准图私有模板自匹配返回的轮廓和质心十字。 */
+    void showReferencePositionMatchOverlays(const QVector<ToolOverlay> &overlays);
+    /** 清除已经失效或不属于当前画面的模板匹配标记。 */
+    void clearReferencePositionMatchOverlays();
+    /** 根据定位点模式更新选择按钮和坐标文本。 */
+    void updateReferencePositionOriginControls();
+    /** 结束基准图定位点选择，恢复普通画布交互。 */
+    void stopReferencePositionOriginSelection();
+    /** 同时绘制自定义基准点与当前自匹配轮廓/定位点。 */
+    void renderReferencePositionOverlays();
 
     Ui::ReferenceImageDialog *ui;
     FrameViewHelper *m_previewHelper = nullptr;
@@ -83,10 +97,15 @@ private:
     QPushButton *m_positionPolygonButton = nullptr;
     QPushButton *m_positionFinishButton = nullptr;
     QPushButton *m_positionTestButton = nullptr;
+    QComboBox *m_positionOriginModeComboBox = nullptr;
+    QPushButton *m_positionSelectOriginButton = nullptr;
+    QLabel *m_positionOriginValueLabel = nullptr;
     bool m_liveCaptureMode = false;
     PositionCorrectionRoiEditMode m_positionRoiEditMode =
             PositionCorrectionRoiEditMode::None;
     ReferencePositionCorrectionConfig m_referencePositionCorrection;
+    TemplateLocationHalconRunner m_referencePositionRunner;
+    QVector<ToolOverlay> m_referencePositionMatchOverlays;
 };
 
 #endif // REFERENCEIMAGEDIALOG_H

@@ -1,6 +1,7 @@
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QColor>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
 #include <QDir>
@@ -151,6 +152,45 @@ int main(int argc, char **argv)
           "dialog must construct its FrameViewHelper");
     check(dialog.m_previewHelper && dialog.m_previewHelper->navigationEnabled(),
           "ColorComparisonDialog must explicitly opt in to image navigation");
+    check(dialog.m_pcImportButton != nullptr
+          && dialog.m_pcImportButton->objectName()
+                 == QStringLiteral("colorComparisonPcImportButton")
+          && dialog.m_pcImportButton->isVisible(),
+          "PC image import button must be visible and independently addressable");
+    check(dialog.m_pcImportButton && dialog.m_basicButton
+          && dialog.m_pcImportButton->geometry().left()
+                 < dialog.m_basicButton->geometry().left(),
+          "PC image import button must be placed to the left of Basic");
+
+    dialog.setAllParamsMode(true);
+    dialog.m_positionCorrectionEnabled = true;
+    dialog.refreshPositionCorrectionControls();
+    QApplication::processEvents();
+    check(dialog.m_positionCorrectionContourCheckBox != nullptr
+          && dialog.m_positionCorrectionContourCheckBox->objectName()
+             == QStringLiteral("positionCorrectionContourSwitch")
+          && dialog.m_positionCorrectionContourRow->isVisible()
+          && dialog.m_positionCorrectionContourCheckBox->isChecked(),
+          "position-correction contour switch must be visible and default on");
+    dialog.m_positionCorrectionContourCheckBox->click();
+    const ToolConfig contourOffConfig = dialog.toToolConfig();
+    check(!contourOffConfig.params.value(QStringLiteral("colorComparison"))
+          .toObject().value(QStringLiteral("positionCorrection")).toObject()
+          .value(QStringLiteral("showMatchContour")).toBool(true),
+          "contour switch state must be serialized");
+    dialog.loadFromConfig(contourOffConfig);
+    check(!dialog.m_showPositionCorrectionMatchContour
+          && !dialog.m_positionCorrectionContourCheckBox->isChecked(),
+          "saved contour switch state must be restored");
+    dialog.setAllParamsMode(false);
+
+    const cv::Mat testFrame(16, 16, CV_8UC3, cv::Scalar(0, 0, 0));
+    const ToolRequest testRequest = dialog.makeTestRequest(
+                testFrame,
+                FrameInputMetadata::fromMat(testFrame, QStringLiteral("smoke")));
+    check(testRequest.runtimeContext.value(
+              QStringLiteral("referencePositionCorrection")).isObject(),
+          "dialog test request must carry the scheme reference position correction config");
 
     const QStringList comboObjectNames = {
         QStringLiteral("colorComparisonTemplateRegionModeCombo"),
@@ -390,6 +430,58 @@ int main(int argc, char **argv)
     }
     check(!testContainsTemplate && !detectionOverlays.isEmpty(),
           "test frame geometry must contain detection owner only");
+
+    ToolOverlay correctedRuntimeRoi;
+    correctedRuntimeRoi.type = ToolOverlayType::Polygon;
+    correctedRuntimeRoi.label = QStringLiteral("Detection ROI");
+    correctedRuntimeRoi.points = {
+        QPointF(320.0, 140.0), QPointF(470.0, 180.0),
+        QPointF(430.0, 340.0), QPointF(280.0, 300.0)
+    };
+    correctedRuntimeRoi.extra.insert(QStringLiteral("role"),
+                                     QStringLiteral("detect_roi"));
+    ToolOverlay correctedRuntimeMask;
+    correctedRuntimeMask.type = ToolOverlayType::Polygon;
+    correctedRuntimeMask.label = QStringLiteral("Detection Mask");
+    correctedRuntimeMask.points = {
+        QPointF(340.0, 190.0), QPointF(390.0, 205.0),
+        QPointF(360.0, 250.0)
+    };
+    correctedRuntimeMask.extra.insert(QStringLiteral("role"),
+                                      QStringLiteral("detect_mask"));
+    dialog.m_runtimeResultOverlays = {
+        correctedRuntimeRoi, correctedRuntimeMask
+    };
+    const QVector<ToolOverlay> correctedDisplay =
+            dialog.combinedDisplayOverlays();
+    bool retainedRuntimeRoi = false;
+    bool retainedConfiguredGeometry = false;
+    for (const ToolOverlay &overlay : correctedDisplay) {
+        if (overlay.extra.value(QStringLiteral("role")).toString()
+                == QStringLiteral("detect_roi")
+                && overlay.points == correctedRuntimeRoi.points) {
+            retainedRuntimeRoi = true;
+        }
+        if (overlay.extra.value(QStringLiteral("owner")).toString()
+                == QStringLiteral("detect")) {
+            retainedConfiguredGeometry = true;
+        }
+    }
+    check(retainedRuntimeRoi && !retainedConfiguredGeometry,
+          "successful test display must prefer the Runner-corrected ROI over configured geometry");
+
+    dialog.m_runtimeResultOverlays.clear();
+    const QVector<ToolOverlay> failedDisplayFallback =
+            dialog.combinedDisplayOverlays();
+    bool retainedFailureReferenceRoi = false;
+    for (const ToolOverlay &overlay : failedDisplayFallback) {
+        if (overlay.extra.value(QStringLiteral("owner")).toString()
+                == QStringLiteral("detect")) {
+            retainedFailureReferenceRoi = true;
+        }
+    }
+    check(retainedFailureReferenceRoi,
+          "failed test without a runtime ROI must retain configured geometry for diagnostics");
     dialog.m_liveTestSource = ColorComparisonDialog::LiveTestSource::None;
 
     dialog.m_model.state = ColorComparisonModelState::Ready;

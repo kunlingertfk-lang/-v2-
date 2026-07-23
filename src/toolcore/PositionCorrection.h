@@ -3,6 +3,7 @@
 
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QPointF>
 #include <QRectF>
 #include <QString>
 #include <QVector>
@@ -36,13 +37,59 @@ struct PositionCorrectionSource
     bool referenceSource = false;
 };
 
+struct PositionPoseField
+{
+    QString outputKey;
+    QString displayText;
+    QString valueKind;
+};
+
+struct PositionPoseProducer
+{
+    QString producerId;
+    QString displayText;
+    int toolIndex = -1;
+    QVector<PositionPoseField> fields;
+};
+
+struct PositionReferencePoseProducer
+{
+    QString sourceId;
+    QString displayText;
+    QJsonObject referencePose;
+    QJsonObject runtimeConfig;
+};
+
+struct PositionRunPoseSource
+{
+    int version = 2;
+    QString producerId;
+    QString xKey = QStringLiteral("x");
+    QString yKey = QStringLiteral("y");
+    QString angleKey = QStringLiteral("angle");
+    QString scaleKey = QStringLiteral("scale");
+    QString displayText;
+    bool valid = false;
+    bool inconsistent = false;
+    QString errorCode;
+};
+
 struct ReferencePositionCorrectionConfig
 {
-    int version = 1;
+    int version = 2;
     bool enabled = false;
     QString templateRegionType = QStringLiteral("rectangle");
     QRectF templateRoiNormalized;
     QJsonArray templatePolygonNormalized;
+    QString originMode = QStringLiteral("centroid");
+    QPointF customOriginNormalized = QPointF(0.5, 0.5);
+    bool referenceCreated = false;
+    QJsonObject referencePose;
+    QString modelCacheKey;
+    QString status;
+    QString message;
+    double score = 0.0;
+    qint64 elapsedMs = 0;
 };
 
 namespace PositionCorrection {
@@ -72,6 +119,16 @@ QVector<PositionCorrectionSource> sourcesBefore(const QVector<ToolConfig> &tools
 /** 判断稳定来源 ID 是否仍存在于当前有效来源集合中。 */
 bool isSourceAvailable(const QVector<PositionCorrectionSource> &sources,
                        const QString &sourceId);
+/** 返回指定工具真实声明的位置姿态输出字段；当前仅模板定位声明 x/y/angle。 */
+QVector<PositionPoseField> poseFieldsForTool(const ToolConfig &tool);
+/** 返回消费工具之前真实可作为 runPoseSource 的位姿生产者。 */
+QVector<PositionPoseProducer> poseProducersBefore(const QVector<ToolConfig> &tools,
+                                                  int consumerIndex);
+/** 兼容读取新版 runPoseSource，或从旧 runPointX/runPointY/runAngle 收敛迁移。 */
+PositionRunPoseSource runPoseSourceFromConfig(const QJsonObject &positionCorrection);
+/** 将 runPoseSource 与旧三字段回显兼容对象同时写入配置。 */
+void writeRunPoseSource(const PositionRunPoseSource &source,
+                        QJsonObject *positionCorrection);
 /** 从方案 JSON 解析独立的基准图位置修正配置。 */
 ReferencePositionCorrectionConfig referenceFromJson(const QJsonObject &json);
 /** 将独立的基准图位置修正配置序列化为方案 JSON。 */

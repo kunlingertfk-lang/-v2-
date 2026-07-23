@@ -606,7 +606,17 @@
         "validBits": 8
     },
     "referencePositionCorrection": {
+        "customOriginNormalized": {
+            "x": 0.5,
+            "y": 0.5
+        },
+        "elapsedMs": 0,
         "enabled": true,
+        "originMode": "centroid",
+        "referenceCreated": false,
+        "referencePose": {
+        },
+        "score": 0,
         "templatePolygonNormalized": [
             {
                 "x": 0.08174542682926829,
@@ -933,5 +943,5 @@
             "toolType": "PositionCorrection"
         }
     ],
-    "updatedAt": "2026-07-21T11:36:03"
+    "updatedAt": "2026-07-23T14:46:48"
 }

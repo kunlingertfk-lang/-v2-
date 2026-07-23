@@ -23,8 +23,8 @@ QT_BEGIN_MOC_NAMESPACE
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 struct qt_meta_stringdata_FrameViewHelper_t {
-    QByteArrayData data[21];
-    char stringdata0[301];
+    QByteArrayData data[23];
+    char stringdata0[331];
 };
 #define QT_MOC_LITERAL(idx, ofs, len) \
     Q_STATIC_BYTE_ARRAY_DATA_HEADER_INITIALIZER_WITH_OFFSET(len, \
@@ -51,9 +51,11 @@ QT_MOC_LITERAL(14, 195, 13), // "circleChanged"
 QT_MOC_LITERAL(15, 209, 9), // "CircleRoi"
 QT_MOC_LITERAL(16, 219, 3), // "roi"
 QT_MOC_LITERAL(17, 223, 23), // "circleSelectionRejected"
-QT_MOC_LITERAL(18, 247, 15), // "lineBandChanged"
-QT_MOC_LITERAL(19, 263, 11), // "LineBandRoi"
-QT_MOC_LITERAL(20, 275, 25) // "lineBandSelectionRejected"
+QT_MOC_LITERAL(18, 247, 13), // "pointSelected"
+QT_MOC_LITERAL(19, 261, 15), // "pointNormalized"
+QT_MOC_LITERAL(20, 277, 15), // "lineBandChanged"
+QT_MOC_LITERAL(21, 293, 11), // "LineBandRoi"
+QT_MOC_LITERAL(22, 305, 25) // "lineBandSelectionRejected"
 
     },
     "FrameViewHelper\0viewTransformChanged\0"
@@ -62,7 +64,8 @@ QT_MOC_LITERAL(20, 275, 25) // "lineBandSelectionRejected"
     "polygonChanged\0QVector<QPointF>\0"
     "pointsNormalized\0polygonSelectionRejected\0"
     "pointCount\0circleChanged\0CircleRoi\0"
-    "roi\0circleSelectionRejected\0lineBandChanged\0"
+    "roi\0circleSelectionRejected\0pointSelected\0"
+    "pointNormalized\0lineBandChanged\0"
     "LineBandRoi\0lineBandSelectionRejected"
 };
 #undef QT_MOC_LITERAL
@@ -73,23 +76,24 @@ static const uint qt_meta_data_FrameViewHelper[] = {
        8,       // revision
        0,       // classname
        0,    0, // classinfo
-       9,   14, // methods
+      10,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
        0,       // flags
-       9,       // signalCount
+      10,       // signalCount
 
  // signals: name, argc, parameters, tag, flags
-       1,    2,   59,    2, 0x06 /* Public */,
-       5,    1,   64,    2, 0x06 /* Public */,
-       7,    1,   67,    2, 0x06 /* Public */,
-       9,    1,   70,    2, 0x06 /* Public */,
-      12,    1,   73,    2, 0x06 /* Public */,
-      14,    1,   76,    2, 0x06 /* Public */,
-      17,    0,   79,    2, 0x06 /* Public */,
-      18,    1,   80,    2, 0x06 /* Public */,
-      20,    0,   83,    2, 0x06 /* Public */,
+       1,    2,   64,    2, 0x06 /* Public */,
+       5,    1,   69,    2, 0x06 /* Public */,
+       7,    1,   72,    2, 0x06 /* Public */,
+       9,    1,   75,    2, 0x06 /* Public */,
+      12,    1,   78,    2, 0x06 /* Public */,
+      14,    1,   81,    2, 0x06 /* Public */,
+      17,    0,   84,    2, 0x06 /* Public */,
+      18,    1,   85,    2, 0x06 /* Public */,
+      20,    1,   88,    2, 0x06 /* Public */,
+      22,    0,   91,    2, 0x06 /* Public */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::QReal, QMetaType::Bool,    3,    4,
@@ -99,7 +103,8 @@ static const uint qt_meta_data_FrameViewHelper[] = {
     QMetaType::Void, QMetaType::Int,   13,
     QMetaType::Void, 0x80000000 | 15,   16,
     QMetaType::Void,
-    QMetaType::Void, 0x80000000 | 19,   16,
+    QMetaType::Void, QMetaType::QPointF,   19,
+    QMetaType::Void, 0x80000000 | 21,   16,
     QMetaType::Void,
 
        0        // eod
@@ -118,8 +123,9 @@ void FrameViewHelper::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int 
         case 4: _t->polygonSelectionRejected((*reinterpret_cast< int(*)>(_a[1]))); break;
         case 5: _t->circleChanged((*reinterpret_cast< const CircleRoi(*)>(_a[1]))); break;
         case 6: _t->circleSelectionRejected(); break;
-        case 7: _t->lineBandChanged((*reinterpret_cast< const LineBandRoi(*)>(_a[1]))); break;
-        case 8: _t->lineBandSelectionRejected(); break;
+        case 7: _t->pointSelected((*reinterpret_cast< const QPointF(*)>(_a[1]))); break;
+        case 8: _t->lineBandChanged((*reinterpret_cast< const LineBandRoi(*)>(_a[1]))); break;
+        case 9: _t->lineBandSelectionRejected(); break;
         default: ;
         }
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
@@ -185,16 +191,23 @@ void FrameViewHelper::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int 
             }
         }
         {
+            using _t = void (FrameViewHelper::*)(const QPointF & );
+            if (*reinterpret_cast<_t *>(_a[1]) == static_cast<_t>(&FrameViewHelper::pointSelected)) {
+                *result = 7;
+                return;
+            }
+        }
+        {
             using _t = void (FrameViewHelper::*)(const LineBandRoi & );
             if (*reinterpret_cast<_t *>(_a[1]) == static_cast<_t>(&FrameViewHelper::lineBandChanged)) {
-                *result = 7;
+                *result = 8;
                 return;
             }
         }
         {
             using _t = void (FrameViewHelper::*)();
             if (*reinterpret_cast<_t *>(_a[1]) == static_cast<_t>(&FrameViewHelper::lineBandSelectionRejected)) {
-                *result = 8;
+                *result = 9;
                 return;
             }
         }
@@ -230,13 +243,13 @@ int FrameViewHelper::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 9)
+        if (_id < 10)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 9;
+        _id -= 10;
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 9)
+        if (_id < 10)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 9;
+        _id -= 10;
     }
     return _id;
 }
@@ -290,16 +303,23 @@ void FrameViewHelper::circleSelectionRejected()
 }
 
 // SIGNAL 7
-void FrameViewHelper::lineBandChanged(const LineBandRoi & _t1)
+void FrameViewHelper::pointSelected(const QPointF & _t1)
 {
     void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))) };
     QMetaObject::activate(this, &staticMetaObject, 7, _a);
 }
 
 // SIGNAL 8
+void FrameViewHelper::lineBandChanged(const LineBandRoi & _t1)
+{
+    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))) };
+    QMetaObject::activate(this, &staticMetaObject, 8, _a);
+}
+
+// SIGNAL 9
 void FrameViewHelper::lineBandSelectionRejected()
 {
-    QMetaObject::activate(this, &staticMetaObject, 8, nullptr);
+    QMetaObject::activate(this, &staticMetaObject, 9, nullptr);
 }
 QT_WARNING_POP
 QT_END_MOC_NAMESPACE

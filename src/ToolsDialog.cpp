@@ -202,7 +202,19 @@ void configureProducerContext(PositionCorrectionDialog *dialog,
             }
         }
     }
-    dialog->setAvailableProducers(toolsDialog->toolConfigs(), index);
+    QVector<PositionReferencePoseProducer> referenceProducers;
+    const ReferencePositionCorrectionConfig &reference =
+            SchemeStore::instance().currentScheme().referencePositionCorrection;
+    if (reference.enabled && reference.referenceCreated
+            && !reference.referencePose.isEmpty()) {
+        referenceProducers.append(PositionReferencePoseProducer{
+                                      PositionCorrection::defaultSourceId(),
+                                      QStringLiteral("1 基准图"),
+                                      reference.referencePose,
+                                      PositionCorrection::referenceToJson(reference)});
+    }
+    dialog->setAvailableProducers(toolsDialog->toolConfigs(), index,
+                                  referenceProducers);
 }
 
 template <typename Dialog>

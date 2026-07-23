@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QPolygonF>
 #include <QtGlobal>
 
 #include <algorithm>
@@ -239,6 +240,14 @@ QJsonArray stringsToJson(const QStringList &strings)
     return array;
 }
 
+QJsonArray doublesToJson(const QVector<double> &values)
+{
+    QJsonArray array;
+    for (double value : values)
+        array.append(value);
+    return array;
+}
+
 QJsonObject brightnessConstantsJson()
 {
     return {
@@ -334,11 +343,19 @@ QJsonObject detectionRoiJson(const ColorComparisonHalconConfig &config,
 
 QJsonObject positionCorrectionJson(const ColorComparisonHalconConfig &config)
 {
-    return {
+    QJsonObject json = {
         {QStringLiteral("requested"), config.positionCorrectionRequested},
-        {QStringLiteral("applied"), false},
+        {QStringLiteral("applied"), config.positionCorrectionApplied},
+        {QStringLiteral("showMatchContour"),
+         config.showPositionCorrectionMatchContour},
+        {QStringLiteral("matchContourAvailable"),
+         !config.positionCorrectionMatchContours.isEmpty()},
         {QStringLiteral("sourceId"), config.positionCorrectionSourceId}
     };
+    if (config.positionCorrectionApplied)
+        json.insert(QStringLiteral("referenceToRunHomMat2D"),
+                    doublesToJson(config.referenceToRunHomMat2D));
+    return json;
 }
 
 QJsonObject emptyBrightnessDiagnostics(const ColorComparisonHalconConfig &config)
@@ -458,6 +475,19 @@ RunnerFailure validateGeometry(const ColorComparisonHalconConfig &config,
                                int imageWidth,
                                int imageHeight)
 {
+    if (config.positionCorrectionApplied) {
+        if (config.referenceToRunHomMat2D.size() != 6) {
+            return {QStringLiteral("invalid_position_correction_matrix"),
+                    QStringLiteral("referenceToRunHomMat2D must contain six values.")};
+        }
+        for (double value : config.referenceToRunHomMat2D) {
+            if (!finiteValue(value)) {
+                return {QStringLiteral("invalid_position_correction_matrix"),
+                        QStringLiteral("referenceToRunHomMat2D contains a non-finite value.")};
+            }
+        }
+    }
+
     const QString templateMode = normalizedTemplateRegionMode(config.templateRegionMode);
     if (templateMode != QStringLiteral("custom")
             && templateMode != QStringLiteral("sync")) {
@@ -526,6 +556,10 @@ struct HalconCApi
     using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
     using GenCircleFn = Herror (*)(Hobject *, double, double, double);
     using GenRegionPolygonFilledFn = Herror (*)(Hobject *, const Htuple, const Htuple);
+    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple,
+                                           const Htuple);
+    using ClipRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple,
+                                    const Htuple, const Htuple, const Htuple);
     using DifferenceFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using AreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
     using Histo2DimFn = Herror (*)(const Hobject, const Hobject, const Hobject, Hobject *);
@@ -562,6 +596,8 @@ struct HalconCApi
     GenRectangle1Fn genRectangle1 = nullptr;
     GenCircleFn genCircle = nullptr;
     GenRegionPolygonFilledFn genRegionPolygonFilled = nullptr;
+    AffineTransRegionFn affineTransRegion = nullptr;
+    ClipRegionFn clipRegion = nullptr;
     DifferenceFn difference = nullptr;
     AreaCenterFn areaCenter = nullptr;
     Histo2DimFn histo2Dim = nullptr;
@@ -648,6 +684,10 @@ public:
                 || !resolveRequired(m_handle, api.genCircle, "gen_circle", message)
                 || !resolveRequired(m_handle, api.genRegionPolygonFilled,
                                     "T_gen_region_polygon_filled", message)
+                || !resolveRequired(m_handle, api.affineTransRegion,
+                                    "T_affine_trans_region", message)
+                || !resolveRequired(m_handle, api.clipRegion,
+                                    "T_clip_region", message)
                 || !resolveRequired(m_handle, api.difference, "difference", message)
                 || !resolveRequired(m_handle, api.areaCenter, "T_area_center", message)
                 || !resolveRequired(m_handle, api.histo2Dim, "T_histo_2dim", message)
@@ -1295,6 +1335,8 @@ ExtractedFeature extractFeature(HalconCApi *api,
     HalconObject baseRegion(api);
     HalconObject maskRegion(api);
     HalconObject differenceRegion(api);
+    HalconObject transformedRegion(api);
+    HalconObject clippedRegion(api);
     Hobject effectiveRegion = NO_OBJECTS;
     bool maskApplied = false;
     createEffectiveRegion(api,
@@ -1307,6 +1349,40 @@ ExtractedFeature extractFeature(HalconCApi *api,
                           &effectiveRegion,
                           &maskApplied);
     Q_UNUSED(maskApplied)
+
+    if (!templateRegion && config.positionCorrectionApplied) {
+        HalconTuple homMat = vectorTuple(api, config.referenceToRunHomMat2D);
+        HalconTuple interpolation = stringTuple(api, "nearest_neighbor");
+        checkHalcon(api,
+                    api->affineTransRegion(effectiveRegion,
+                                           transformedRegion.ptr(),
+                                           homMat.value(),
+                                           interpolation.value()),
+                    QStringLiteral("detect_region.affine_trans_region"));
+        HalconTuple row1 = scalarTuple(api, 0.0);
+        HalconTuple column1 = scalarTuple(api, 0.0);
+        HalconTuple row2 = scalarTuple(api, continuous.rows - 1.0);
+        HalconTuple column2 = scalarTuple(api, continuous.cols - 1.0);
+        checkHalcon(api,
+                    api->clipRegion(transformedRegion.value(),
+                                    clippedRegion.ptr(),
+                                    row1.value(),
+                                    column1.value(),
+                                    row2.value(),
+                                    column2.value()),
+                    QStringLiteral("detect_region.clip_region"));
+        effectiveRegion = clippedRegion.value();
+        const double correctedArea = regionArea(
+                    api, effectiveRegion,
+                    QStringLiteral("detect_region.corrected"));
+        if (correctedArea < static_cast<double>(
+                    kColorComparisonMinimumEffectivePixels)) {
+            throw RunnerFailure{
+                QStringLiteral("corrected_detect_roi_empty"),
+                QStringLiteral("Corrected detection ROI is outside the current image.")
+            };
+        }
+    }
 
     ExtractedFeature extracted;
     extracted.effectivePixelCount = qRound64(regionArea(
@@ -1673,6 +1749,30 @@ QVector<QPointF> normalizedPointsToPixels(const QVector<QPointF> &points,
     return pixels;
 }
 
+QPointF transformPixelPoint(const ColorComparisonHalconConfig &config,
+                            const QPointF &point)
+{
+    if (!config.positionCorrectionApplied
+            || config.referenceToRunHomMat2D.size() != 6) {
+        return point;
+    }
+    const QVector<double> &matrix = config.referenceToRunHomMat2D;
+    const double row = point.y();
+    const double column = point.x();
+    return QPointF(matrix.at(3) * row + matrix.at(4) * column + matrix.at(5),
+                   matrix.at(0) * row + matrix.at(1) * column + matrix.at(2));
+}
+
+QVector<QPointF> transformPixelPoints(const ColorComparisonHalconConfig &config,
+                                     const QVector<QPointF> &points)
+{
+    QVector<QPointF> transformed;
+    transformed.reserve(points.size());
+    for (const QPointF &point : points)
+        transformed.append(transformPixelPoint(config, point));
+    return transformed;
+}
+
 ToolOverlay resultTextOverlay(const QRectF &anchorRect,
                               double score,
                               bool passed)
@@ -1707,28 +1807,61 @@ QVector<ToolOverlay> detectionOverlays(const ColorComparisonHalconConfig &config
                     image.cols,
                     image.rows);
         roi.type = ToolOverlayType::Circle;
-        roi.center = geometry.center;
-        roi.radius = geometry.radius;
-        anchorRect = QRectF(geometry.center.x() - geometry.radius,
-                            geometry.center.y() - geometry.radius,
-                            geometry.radius * 2.0,
-                            geometry.radius * 2.0);
+        roi.center = transformPixelPoint(config, geometry.center);
+        const QPointF transformedRadiusPoint = transformPixelPoint(
+                    config,
+                    QPointF(geometry.center.x() + geometry.radius,
+                            geometry.center.y()));
+        roi.radius = std::hypot(transformedRadiusPoint.x() - roi.center.x(),
+                                transformedRadiusPoint.y() - roi.center.y());
+        anchorRect = QRectF(roi.center.x() - roi.radius,
+                            roi.center.y() - roi.radius,
+                            roi.radius * 2.0,
+                            roi.radius * 2.0);
     } else {
-        roi.type = ToolOverlayType::Rect;
-        roi.rect = normalizedRectToPixels(config.detectRoiNormalized, image);
-        anchorRect = roi.rect;
+        const QRectF referenceRect = normalizedRectToPixels(
+                    config.detectRoiNormalized, image);
+        if (config.positionCorrectionApplied) {
+            roi.type = ToolOverlayType::Polygon;
+            roi.points = transformPixelPoints(config, QVector<QPointF>{
+                referenceRect.topLeft(), referenceRect.topRight(),
+                referenceRect.bottomRight(), referenceRect.bottomLeft()
+            });
+            anchorRect = QPolygonF(roi.points).boundingRect();
+        } else {
+            roi.type = ToolOverlayType::Rect;
+            roi.rect = referenceRect;
+            anchorRect = roi.rect;
+        }
     }
     roi.label = QStringLiteral("Detection ROI");
     roi.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
+    roi.extra.insert(QStringLiteral("positionCorrectionApplied"),
+                     config.positionCorrectionApplied);
+    if (config.positionCorrectionApplied)
+        roi.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                         config.positionCorrectionSourceId);
     overlays.append(roi);
 
     if (!config.detectMaskPolygonNormalized.isEmpty()) {
         ToolOverlay mask;
         mask.type = ToolOverlayType::Polygon;
-        mask.points = normalizedPointsToPixels(config.detectMaskPolygonNormalized, image);
+        mask.points = transformPixelPoints(
+                    config,
+                    normalizedPointsToPixels(config.detectMaskPolygonNormalized, image));
         mask.label = QStringLiteral("Detection Mask");
         mask.extra.insert(QStringLiteral("role"), QStringLiteral("detect_mask"));
         overlays.append(mask);
+    }
+    if (config.positionCorrectionApplied
+            && config.showPositionCorrectionMatchContour) {
+        for (ToolOverlay contour : config.positionCorrectionMatchContours) {
+            contour.extra.insert(QStringLiteral("role"),
+                                 QStringLiteral("position_correction_match_contour"));
+            contour.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                                 config.positionCorrectionSourceId);
+            overlays.append(contour);
+        }
     }
     overlays.append(resultTextOverlay(anchorRect, score, passed));
     return overlays;
@@ -1892,6 +2025,12 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
     timer.start();
     QStringList warnings;
 
+    if (config.positionCorrectionApplied
+            && config.showPositionCorrectionMatchContour
+            && config.positionCorrectionMatchContours.isEmpty()) {
+        warnings.append(QStringLiteral("position_correction_contour_unavailable"));
+    }
+
     if (image.empty()) {
         return runFailure(QStringLiteral("image_empty"),
                           QStringLiteral("Input image is empty."),
@@ -1975,9 +2114,6 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           image.cols,
                           image.rows);
     }
-    if (config.positionCorrectionRequested)
-        warnings.append(QStringLiteral("position_correction_not_implemented"));
-
     if (!runtimeExists(config)) {
         return runFailure(QStringLiteral("halcon_so_not_found"),
                           runtimeNotFoundMessage(config),

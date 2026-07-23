@@ -2,17 +2,24 @@
 
 #include "ColorComparisonFeatureView.h"
 #include "PlanDialogUtils.h"
+#include "SchemeStore.h"
 #include "UiStyleRoles.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/ToolEngine.h"
+#include "tooladapters/PositionCorrectionAdapter.h"
+#include "tooladapters/TemplateLocationAdapter.h"
 
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDateTime>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QFutureWatcher>
 #include <QGraphicsView>
@@ -20,6 +27,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPen>
 #include <QPixmap>
@@ -40,10 +48,88 @@
 
 #include <cmath>
 #include <limits>
+#include <opencv2/imgcodecs.hpp>
 
 namespace {
 
 constexpr int kActionButtonFlashMs = 120;
+// 临时入口显隐开关：后续不需要 PC 导入时改为 false 即可。
+constexpr bool kShowPcImportButton = true;
+// 轮廓显示入口显隐开关：隐藏入口不改变已保存配置和运行行为。
+constexpr bool kShowPositionCorrectionContourSwitch = true;
+
+int toolIndexById(const QVector<ToolConfig> &tools,
+                  const QString &toolId,
+                  int beforeIndex)
+{
+    const QString stableId = toolId.trimmed();
+    const int limit = qBound(0, beforeIndex, tools.size());
+    if (stableId.isEmpty())
+        return -1;
+    for (int index = 0; index < limit; ++index) {
+        if (tools.at(index).toolId.trimmed() == stableId)
+            return index;
+    }
+    return -1;
+}
+
+void appendTestDependency(const ToolConfig &config,
+                          QVector<ToolConfig> *chain)
+{
+    if (!chain || config.toolId.trimmed().isEmpty())
+        return;
+    for (const ToolConfig &existing : *chain) {
+        if (existing.toolId.trimmed() == config.toolId.trimmed())
+            return;
+    }
+    chain->append(config);
+}
+
+QVector<ToolConfig> colorComparisonTestChain(const ToolConfig &consumer)
+{
+    QVector<ToolConfig> chain;
+    const QVector<ToolConfig> tools =
+            SchemeStore::instance().currentScheme().toolConfigs;
+    int consumerIndex = tools.size();
+    for (int index = 0; index < tools.size(); ++index) {
+        if (tools.at(index).toolId.trimmed() == consumer.toolId.trimmed()) {
+            consumerIndex = index;
+            break;
+        }
+    }
+
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(consumer.params);
+    if (correction.enabled
+            && correction.sourceId != PositionCorrection::defaultSourceId()) {
+        const int correctionIndex = toolIndexById(
+                    tools, correction.sourceId, consumerIndex);
+        if (correctionIndex >= 0
+                && tools.at(correctionIndex).toolType
+                == ToolType::PositionCorrection) {
+            const ToolConfig &correctionTool = tools.at(correctionIndex);
+            const PositionRunPoseSource poseSource =
+                    PositionCorrection::runPoseSourceFromConfig(
+                        correctionTool.params.value(
+                            QStringLiteral("positionCorrection")).toObject());
+            if (poseSource.valid
+                    && poseSource.producerId
+                    != PositionCorrection::defaultSourceId()) {
+                const int producerIndex = toolIndexById(
+                            tools, poseSource.producerId, correctionIndex);
+                if (producerIndex >= 0
+                        && tools.at(producerIndex).toolType
+                        == ToolType::TemplateLocation) {
+                    appendTestDependency(tools.at(producerIndex), &chain);
+                }
+            }
+            appendTestDependency(correctionTool, &chain);
+        }
+    }
+
+    appendTestDependency(consumer, &chain);
+    return chain;
+}
 
 bool finiteValue(qreal value)
 {
@@ -465,6 +551,12 @@ V2DialogConfigValidation validateV2DialogConfig(const ToolConfig &config)
                         QStringLiteral("invalid_position_correction"),
                         QStringLiteral("positionCorrection.sourceId must be a string."));
         }
+        if (position.contains(QStringLiteral("showMatchContour"))
+                && !position.value(QStringLiteral("showMatchContour")).isBool()) {
+            return invalidV2DialogConfig(
+                        QStringLiteral("invalid_position_correction"),
+                        QStringLiteral("positionCorrection.showMatchContour must be boolean."));
+        }
         if (position.contains(QStringLiteral("interfaceVersion"))) {
             int interfaceVersion = 0;
             if (!strictJsonInteger(
@@ -866,8 +958,12 @@ void ColorComparisonDialog::buildUi()
     QHBoxLayout *titleLayout = new QHBoxLayout;
     QLabel *dialogTitle = new QLabel(tr("颜色比较"), leftPanel);
     dialogTitle->setProperty("role", QStringLiteral("cardTitle"));
+    m_pcImportButton = new QPushButton(tr("PC导入图片"), leftPanel);
     m_basicButton = new QPushButton(tr("基础"), leftPanel);
     m_allButton = new QPushButton(tr("全部"), leftPanel);
+    m_pcImportButton->setObjectName(
+                QStringLiteral("colorComparisonPcImportButton"));
+    m_pcImportButton->setVisible(kShowPcImportButton);
     m_basicButton->setObjectName(QStringLiteral("colorComparisonBasicButton"));
     m_allButton->setObjectName(QStringLiteral("colorComparisonAllButton"));
     m_basicButton->setCheckable(true);
@@ -876,6 +972,7 @@ void ColorComparisonDialog::buildUi()
     m_segmentGroup->addButton(m_allButton, 1);
     titleLayout->addWidget(dialogTitle);
     titleLayout->addStretch(1);
+    titleLayout->addWidget(m_pcImportButton);
     titleLayout->addWidget(m_basicButton);
     titleLayout->addWidget(m_allButton);
     leftLayout->addLayout(titleLayout);
@@ -1106,16 +1203,37 @@ void ColorComparisonDialog::buildUi()
             m_positionCorrectionComboBox = new QComboBox(m_positionCorrectionSourceRow);
             m_positionCorrectionComboBox->setObjectName(
                         QStringLiteral("colorComparisonPositionCorrectionCombo"));
-            m_positionCorrectionComboBox->addItem(QStringLiteral("1 基准图.位置修正信息"));
+            m_positionCorrectionComboBox->addItem(
+                        PositionCorrection::defaultSource(),
+                        PositionCorrection::defaultSourceId());
             UiStyleRoles::applyLightComboBox(m_positionCorrectionComboBox);
             positionSourceLayout->addWidget(m_positionCorrectionComboBox);
         }
         positionPanelLayout->addWidget(positionEnableRow);
         positionPanelLayout->addWidget(m_positionCorrectionSourceRow);
+        if (!m_positionCorrectionContourRow) {
+            m_positionCorrectionContourRow = new QWidget(m_positionCorrectionPanel);
+            m_positionCorrectionContourRow->setObjectName(
+                        QStringLiteral("positionCorrectionContourRow"));
+            QHBoxLayout *contourLayout =
+                    new QHBoxLayout(m_positionCorrectionContourRow);
+            contourLayout->setContentsMargins(0, 0, 0, 0);
+            QLabel *contourLabel = new QLabel(
+                        tr("显示匹配轮廓"), m_positionCorrectionContourRow);
+            contourLabel->setMinimumWidth(118);
+            contourLabel->setProperty("role", QStringLiteral("rowField"));
+            contourLayout->addWidget(contourLabel);
+            contourLayout->addStretch(1);
+            m_positionCorrectionContourCheckBox =
+                    new QCheckBox(m_positionCorrectionContourRow);
+            m_positionCorrectionContourCheckBox->setObjectName(
+                        QStringLiteral("positionCorrectionContourSwitch"));
+            contourLayout->addWidget(m_positionCorrectionContourCheckBox);
+        }
+        positionPanelLayout->addWidget(m_positionCorrectionContourRow);
         QLabel *positionHint = new QLabel(
-                    tr("接口预留，暂未实现"), m_positionCorrectionPanel);
+                    tr("运行时使用所选来源的绝对位置修正矩阵"), m_positionCorrectionPanel);
         positionPanelLayout->addWidget(positionHint);
-        m_positionCorrectionPanel->setEnabled(false);
         detectLayout->addWidget(m_positionCorrectionPanel);
 
         if (allMode) {
@@ -1262,6 +1380,8 @@ void ColorComparisonDialog::buildUi()
 
 void ColorComparisonDialog::connectControls()
 {
+    connect(m_pcImportButton, &QPushButton::clicked,
+            this, &ColorComparisonDialog::importTestImageFromPc);
     connect(m_basicButton, &QPushButton::clicked, this, [this]() { setAllParamsMode(false); });
     connect(m_allButton, &QPushButton::clicked, this, [this]() { setAllParamsMode(true); });
     connect(m_templateRegionModeComboBox,
@@ -1337,9 +1457,24 @@ void ColorComparisonDialog::connectControls()
         refreshPositionCorrectionControls();
         invalidateAsyncWork();
     });
-    connect(m_positionCorrectionComboBox, &QComboBox::currentTextChanged, this, [this](const QString &text) {
-        m_positionCorrectionSource = text;
+    connect(m_positionCorrectionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int index) {
+        const QString sourceId = index >= 0
+                ? m_positionCorrectionComboBox->itemData(index).toString().trimmed()
+                : QString();
+        m_positionCorrectionSource = sourceId.isEmpty()
+                ? m_positionCorrectionComboBox->currentText().trimmed()
+                : sourceId;
         invalidateAsyncWork();
+    });
+    connect(m_positionCorrectionContourCheckBox, &QCheckBox::toggled,
+            this, [this](bool checked) {
+        m_showPositionCorrectionMatchContour = checked;
+        invalidateAsyncWork();
+        if (m_liveTestSource != LiveTestSource::None)
+            rerunLiveComparison();
     });
     connect(m_sensitivityComboBox,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -1818,15 +1953,27 @@ QVector<ToolOverlay> ColorComparisonDialog::combinedDisplayOverlays() const
     QVector<ToolOverlay> overlays = m_liveTestSource == LiveTestSource::None
             ? configurationGeometryOverlays()
             : detectionGeometryOverlays();
+
+    bool hasRuntimeDetectionGeometry = false;
     for (const ToolOverlay &runtime : m_runtimeResultOverlays) {
         const QString role = runtime.extra.value(
                     QStringLiteral("role")).toString();
         const QString label = runtime.label.trimmed().toLower();
         if (role == QStringLiteral("detect_roi")
-                || role == QStringLiteral("detect_mask")
-                || label == QStringLiteral("detection roi")
-                || label == QStringLiteral("detection mask"))
-            continue;
+                || label == QStringLiteral("detection roi")) {
+            hasRuntimeDetectionGeometry = true;
+            break;
+        }
+    }
+
+    // 成功运行时 Runner 返回的检测几何已经包含位置修正矩阵变换。
+    // 测试态必须以该几何为准，不能继续显示基准坐标下的配置 ROI。
+    if (m_liveTestSource != LiveTestSource::None
+            && hasRuntimeDetectionGeometry) {
+        overlays.clear();
+    }
+
+    for (const ToolOverlay &runtime : m_runtimeResultOverlays) {
         overlays.append(runtime);
     }
     return overlays;
@@ -2077,8 +2224,20 @@ void ColorComparisonDialog::refreshPositionCorrectionControls()
     }
     if (m_positionCorrectionSourceRow)
         m_positionCorrectionSourceRow->setVisible(m_positionCorrectionEnabled);
+    if (m_positionCorrectionContourRow) {
+        m_positionCorrectionContourRow->setVisible(
+                    kShowPositionCorrectionContourSwitch
+                    && m_positionCorrectionEnabled);
+    }
+    if (m_positionCorrectionContourCheckBox) {
+        const QSignalBlocker block(m_positionCorrectionContourCheckBox);
+        m_positionCorrectionContourCheckBox->setChecked(
+                    m_showPositionCorrectionMatchContour);
+    }
     if (m_positionCorrectionComboBox) {
-        const int index = m_positionCorrectionComboBox->findText(m_positionCorrectionSource);
+        int index = m_positionCorrectionComboBox->findData(m_positionCorrectionSource);
+        if (index < 0)
+            index = m_positionCorrectionComboBox->findText(m_positionCorrectionSource);
         if (index >= 0) {
             const QSignalBlocker block(m_positionCorrectionComboBox);
             m_positionCorrectionComboBox->setCurrentIndex(index);
@@ -2293,7 +2452,12 @@ QJsonObject ColorComparisonDialog::colorComparisonParams() const
     params.insert(QStringLiteral("positionCorrection"),
                   QJsonObject{
                       {QStringLiteral("enabled"), m_positionCorrectionEnabled},
-                      {QStringLiteral("sourceId"), m_positionCorrectionSource},
+                      {QStringLiteral("showMatchContour"),
+                       m_showPositionCorrectionMatchContour},
+                      {QStringLiteral("sourceId"),
+                       m_positionCorrectionSource.trimmed().isEmpty()
+                               ? PositionCorrection::defaultSourceId()
+                               : m_positionCorrectionSource.trimmed()},
                       {QStringLiteral("interfaceVersion"), 1}
                   });
     return params;
@@ -2318,6 +2482,13 @@ ToolConfig ColorComparisonDialog::toToolConfig() const
             : m_detectRoi;
     QJsonObject params;
     params.insert(QStringLiteral("colorComparison"), colorComparisonParams());
+    PositionCorrectionConfig positionConfig;
+    positionConfig.enabled = m_positionCorrectionEnabled;
+    positionConfig.sourceId = m_positionCorrectionSource;
+    positionConfig.source = m_positionCorrectionComboBox
+            ? m_positionCorrectionComboBox->currentText()
+            : PositionCorrection::defaultSource();
+    PositionCorrection::writeParams(positionConfig, &params);
     config.params = params;
     QJsonObject judge;
     judge.insert(QStringLiteral("mode"), QStringLiteral("min_score"));
@@ -2340,6 +2511,8 @@ ToolPreviewSnapshot ColorComparisonDialog::referencePreviewSnapshot() const
 void ColorComparisonDialog::updateInvalidConfigReadOnlyUi()
 {
     const bool editable = !m_invalidConfigReadOnly;
+    if (m_pcImportButton)
+        m_pcImportButton->setEnabled(editable);
     if (m_basicButton)
         m_basicButton->setEnabled(editable);
     if (m_allButton)
@@ -2361,7 +2534,7 @@ void ColorComparisonDialog::updateInvalidConfigReadOnlyUi()
                         || !m_modelBuildWatcher->isRunning()));
     }
     if (m_positionCorrectionPanel)
-        m_positionCorrectionPanel->setEnabled(false);
+        m_positionCorrectionPanel->setEnabled(editable);
     refreshTemplateRegionControls();
 }
 
@@ -2515,10 +2688,16 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
             .value(QStringLiteral("enabled"))
             .toBool(colorComparison.value(QStringLiteral("enablePositionCorrection"))
                     .toBool(false));
-    m_positionCorrectionSource = position
-            .value(QStringLiteral("sourceId"))
-            .toString(colorComparison.value(QStringLiteral("positionCorrectionSource"))
-                      .toString(QStringLiteral("1 基准图.位置修正信息")));
+    m_showPositionCorrectionMatchContour = position
+            .value(QStringLiteral("showMatchContour")).toBool(true);
+    m_positionCorrectionSource = config.params
+            .value(QStringLiteral("positionCorrectionSourceId"))
+            .toString(position.value(QStringLiteral("sourceId"))
+                      .toString(colorComparison.value(QStringLiteral("positionCorrectionSource"))
+                                .toString(PositionCorrection::defaultSourceId())))
+            .trimmed();
+    if (m_positionCorrectionSource == PositionCorrection::defaultSource())
+        m_positionCorrectionSource = PositionCorrection::defaultSourceId();
 
     const ReferenceFrameSnapshot reference =
             ReferenceImageProvider::instance().referenceFrameSnapshot();
@@ -2645,8 +2824,12 @@ void ColorComparisonDialog::startContinuousRun()
         return;
 
     invalidateAsyncWork();
+    const bool keepImportedSource =
+            m_liveTestSource == LiveTestSource::Imported
+            && !m_liveTestFrameSnapshot.empty();
     m_testUiMode = TestUiMode::Continuous;
-    m_liveTestSource = LiveTestSource::Camera;
+    if (!keepImportedSource)
+        m_liveTestSource = LiveTestSource::Camera;
     if (m_editState == EditState::TemplateRect
             || m_editState == EditState::TemplateMaskPolygon) {
         setEditState(EditState::None);
@@ -2672,6 +2855,21 @@ void ColorComparisonDialog::runContinuousTick()
     if (m_testUiMode != TestUiMode::Continuous)
         return;
 
+    if (m_liveTestSource == LiveTestSource::Imported) {
+        if (m_liveTestFrameSnapshot.empty()) {
+            displayError(QStringLiteral("image_empty"), tr("导入图片为空"));
+            return;
+        }
+        const QString title = m_liveTestImageTitle.trimmed().isEmpty()
+                ? tr("PC导入图片") : m_liveTestImageTitle;
+        showFrameImage(m_liveTestFrameSnapshot, title);
+        runComparisonOnFrame(m_liveTestFrameSnapshot,
+                             m_liveTestFrameMetadata,
+                             title,
+                             false);
+        return;
+    }
+
     const CameraFrameSnapshot snapshot =
             CameraFrameProvider::instance().currentFrameSnapshot();
     if (snapshot.frame.empty()) {
@@ -2691,6 +2889,21 @@ void ColorComparisonDialog::runSingleShotTest()
     if (blockInvalidConfigAction())
         return;
 
+    if (m_liveTestSource == LiveTestSource::Imported
+            && !m_liveTestFrameSnapshot.empty()) {
+        stopContinuousRun();
+        m_testUiMode = TestUiMode::TestPaused;
+        updateBottomButtons();
+        const QString title = m_liveTestImageTitle.trimmed().isEmpty()
+                ? tr("PC导入图片") : m_liveTestImageTitle;
+        showFrameImage(m_liveTestFrameSnapshot, title);
+        runComparisonOnFrame(m_liveTestFrameSnapshot,
+                             m_liveTestFrameMetadata,
+                             title,
+                             false);
+        return;
+    }
+
     stopContinuousRun();
     m_testUiMode = TestUiMode::TestPaused;
     m_liveTestSource = LiveTestSource::Camera;
@@ -2698,6 +2911,7 @@ void ColorComparisonDialog::runSingleShotTest()
             CameraFrameProvider::instance().currentFrameSnapshot();
     m_liveTestFrameSnapshot = snapshot.frame.clone();
     m_liveTestFrameMetadata = snapshot.metadata;
+    m_liveTestImageTitle = tr("单次测试快照");
     if (m_editState == EditState::TemplateRect
             || m_editState == EditState::TemplateMaskPolygon) {
         setEditState(EditState::None);
@@ -2713,6 +2927,47 @@ void ColorComparisonDialog::runSingleShotTest()
     runComparisonOnFrame(m_liveTestFrameSnapshot,
                          m_liveTestFrameMetadata,
                          tr("单次测试快照"),
+                         false);
+}
+
+void ColorComparisonDialog::importTestImageFromPc()
+{
+    if (blockInvalidConfigAction())
+        return;
+
+    const QString fileName = QFileDialog::getOpenFileName(
+                this,
+                tr("PC导入测试图片"),
+                QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+
+    const cv::Mat frame = cv::imread(fileName.toLocal8Bit().constData(),
+                                     cv::IMREAD_UNCHANGED);
+    if (frame.empty()) {
+        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
+        return;
+    }
+
+    stopContinuousRun();
+    m_testUiMode = TestUiMode::TestPaused;
+    m_liveTestSource = LiveTestSource::Imported;
+    m_liveTestFrameSnapshot = frame.clone();
+    m_liveTestFrameMetadata = FrameInputMetadata::fromMat(
+                m_liveTestFrameSnapshot, QStringLiteral("file"));
+    m_liveTestImageTitle = QFileInfo(fileName).fileName();
+    setEditState(EditState::None);
+    updateBottomButtons();
+    showFrameImage(m_liveTestFrameSnapshot, m_liveTestImageTitle);
+
+    if (m_model.state != ColorComparisonModelState::Ready) {
+        displayStoredModelInstruction();
+        return;
+    }
+    runComparisonOnFrame(m_liveTestFrameSnapshot,
+                         m_liveTestFrameMetadata,
+                         m_liveTestImageTitle,
                          false);
 }
 
@@ -2737,6 +2992,15 @@ void ColorComparisonDialog::rerunLiveComparison()
         title = tr("基准图");
         if (frame.empty()) {
             displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
+            return;
+        }
+    } else if (m_liveTestSource == LiveTestSource::Imported) {
+        frame = m_liveTestFrameSnapshot;
+        metadata = m_liveTestFrameMetadata;
+        title = m_liveTestImageTitle.trimmed().isEmpty()
+                ? tr("PC导入图片") : m_liveTestImageTitle;
+        if (frame.empty()) {
+            displayError(QStringLiteral("image_empty"), tr("导入图片为空"));
             return;
         }
     } else {
@@ -2765,6 +3029,7 @@ void ColorComparisonDialog::exitTestMode()
 {
     stopContinuousRun();
     m_liveTestSource = LiveTestSource::None;
+    m_liveTestImageTitle.clear();
     m_testUiMode = TestUiMode::Edit;
     setEditState(EditState::None);
     updateBottomButtons();
@@ -2829,6 +3094,11 @@ ToolRequest ColorComparisonDialog::makeTestRequest(
     request.referenceImage = reference.frame.clone();
     request.runtimeContext.insert(QStringLiteral("referenceInput"),
                                   reference.metadata.toJson());
+    request.runtimeContext.insert(
+                QStringLiteral("referencePositionCorrection"),
+                PositionCorrection::referenceToJson(
+                    SchemeStore::instance().currentScheme()
+                    .referencePositionCorrection));
     return request;
 }
 
@@ -2863,13 +3133,36 @@ void ColorComparisonDialog::launchTestRequest(const ToolRequest &inputRequest,
     ToolRequest request = inputRequest;
     request.image = inputRequest.image.clone();
     request.referenceImage = inputRequest.referenceImage.clone();
+    const QVector<ToolConfig> testChain =
+            colorComparisonTestChain(request.config);
     m_activeTestGeneration = generation;
     m_activeImageTitle = imageTitle;
     m_activeReferenceSource = referenceSource;
     updateStatus(tr("运行中…"));
-    m_testWatcher->setFuture(QtConcurrent::run([request]() {
-        ColorComparisonAdapter adapter;
-        return adapter.run(request);
+    m_testWatcher->setFuture(QtConcurrent::run([request, testChain]() {
+        TemplateLocationAdapter templateLocationAdapter;
+        PositionCorrectionAdapter positionCorrectionAdapter;
+        ColorComparisonAdapter colorComparisonAdapter;
+        ToolEngine engine;
+        engine.registerAdapter(&templateLocationAdapter);
+        engine.registerAdapter(&positionCorrectionAdapter);
+        engine.registerAdapter(&colorComparisonAdapter);
+        const QVector<ToolResult> results = engine.runTools(
+                    testChain,
+                    request.image,
+                    request.referenceImage,
+                    request.runtimeContext);
+        for (auto it = results.crbegin(); it != results.crend(); ++it) {
+            if (it->toolId == request.config.toolId)
+                return *it;
+        }
+
+        ToolResult result;
+        result.toolId = request.config.toolId;
+        result.toolType = ToolType::ColorComparison;
+        result.status = QStringLiteral("test_tool_not_executed");
+        result.message = QStringLiteral("Color comparison test tool was not executed.");
+        return result;
     }));
 }
 

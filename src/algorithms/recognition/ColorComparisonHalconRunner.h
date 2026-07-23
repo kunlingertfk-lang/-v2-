@@ -30,7 +30,11 @@ struct ColorComparisonHalconConfig
     QString sensitivity = QStringLiteral("medium");
     bool brightnessCompensation = false;
     bool positionCorrectionRequested = false;
+    bool positionCorrectionApplied = false;
+    bool showPositionCorrectionMatchContour = true;
     QString positionCorrectionSourceId;
+    QVector<double> referenceToRunHomMat2D;
+    QVector<ToolOverlay> positionCorrectionMatchContours;
     int minScore = 80;
 };
 

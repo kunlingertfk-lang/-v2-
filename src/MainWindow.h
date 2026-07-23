@@ -25,6 +25,7 @@
 #include "tooladapters/AiDetectionAdapter.h"
 #include "tooladapters/RegisteredClassificationAdapter.h"
 #include "tooladapters/TemplateLocationAdapter.h"
+#include "tooladapters/PositionCorrectionAdapter.h"
 
 class FrameViewHelper;
 class QEvent;
@@ -150,6 +151,7 @@ private:
     AiDetectionAdapter m_aiDetectionAdapter;
     RegisteredClassificationAdapter m_registeredClassificationAdapter;
     TemplateLocationAdapter m_templateLocationAdapter;
+    PositionCorrectionAdapter m_positionCorrectionAdapter;
     ToolEngine m_toolEngine;
     FrameViewHelper *m_previewHelper = nullptr;
     Ui::MainWindow *ui;

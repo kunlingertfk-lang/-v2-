@@ -21,6 +21,94 @@
 
 以下第一版方案和历次实现记录仅用于解释现有代码来源，不得直接作为新实现提示词。
 
+## 2026-07-23 - 工具级位置修正支持尺度并同步缩放检测 ROI
+
+- 不增加位置修正或颜色比较 UI 参数，也不扩大基准模板区域。创建基准时自动保存同一
+  `TemplateLocation` 的 `scale`；运行时自动读取当前 `scale`，缺失时按 `1.0` 兼容。
+- 位置修正使用 HALCON `VectorAngleToRigid + HomMat2dScale + HomMat2dInvert` 生成
+  平移、旋转和等比例缩放的相似矩阵，尺度比为 `runScale/referenceScale`。
+- 矩形检测 ROI、检测 Mask 和 HALCON 有效 Region 使用同一六参数矩阵；圆形 overlay
+  同时变换圆心和径向点，从而让显示半径与实际检测 Region 一致。
+- 非有限或小于等于零的尺度明确返回 `invalid_pose_scale`，不静默生成错误矩阵。
+- `position_correction_backend_smoke` 覆盖组合平移、90°旋转、1.2 倍尺度、正逆矩阵、
+  旧配置无尺度及非法尺度；`color_comparison_position_correction_smoke` 覆盖 1.5 倍
+  矩形宽高和圆形半径同步缩放，并验证修正 Region 仍得到正确颜色得分。
+
+## 2026-07-23 - 测试态显示 Runner 修正后的检测 ROI
+
+- 修复位置修正匹配成功后，HALCON 实际使用了修正 Region，但对话框仍显示基准坐标配置框的问题。
+- 根因是 `combinedDisplayOverlays()` 先生成未修正的配置 ROI，又过滤了 Runner 返回的
+  `role=detect_roi/detect_mask`，导致修正后的旋转多边形无法进入预览。
+- 测试态检测到 Runner 返回 `detect_roi` 后，现在清除配置态检测几何，完整采用 Runner 的
+  修正后 ROI、修正后 Mask、匹配轮廓和结果文字；坐标不做第二次变换。
+- 匹配失败且 Runner 没有返回检测 ROI 时，仍保留原始配置 ROI，便于判断基准位置与目标偏差。
+- `color_comparison_dialog_integration_smoke` 增加旋转多边形优先显示和失败态配置 ROI
+  回退验证。
+
+## 2026-07-23 - 位置修正匹配轮廓显示与开关
+
+- 颜色比较“全部”页的位置修正区域新增“显示匹配轮廓”开关，对象名为
+  `positionCorrectionContourSwitch`，配置字段为
+  `colorComparison.positionCorrection.showMatchContour`，新旧配置缺省均为开启。
+- 开关入口由 `ColorComparisonDialog.cpp` 中
+  `kShowPositionCorrectionContourSwitch` 控制；改为 `false` 后隐藏整行，但继续保留配置保存、
+  回显和运行能力，与 PC 导入图片入口的显隐模式一致。
+- 基准图位置修正和独立位置修正工具均透传 HALCON 模板定位产生的真实
+  `match_result`。颜色比较只合并轮廓，不合并搜索 ROI、中心十字或定位得分文字，并标记
+  `role=position_correction_match_contour`。
+- 显示开关只影响 overlay，不改变修正后的检测 Region/Mask、颜色特征、评分或 OK/NG；
+  定位轮廓已经是当前帧像素坐标，不做第二次矩阵变换。
+- 独立位置修正现在保留上游 `not_found` 和原始消息，使颜色比较统一返回
+  `position_correction_match_not_found`。位置修正成功但轮廓数组为空时，结果保持原判断，
+  payload 增加 `positionCorrectionContourStatus=position_correction_contour_unavailable`，
+  状态栏显示明确提示。
+
+自动验证覆盖：`color_comparison_position_correction_smoke`（开/关、轮廓为空、基准图来源）、
+`position_correction_backend_smoke`（独立来源轮廓过滤与 not_found 保真）、
+`color_comparison_dialog_integration_smoke`（入口、默认值、保存与回显）。
+
+## 2026-07-22 - 对话框测试补齐工具级位置修正依赖链
+
+- 修复颜色比较选择工具级位置修正后，对话框单次、连续和 PC 导入测试误报
+  `position_correction_source_missing` 的问题。
+- 根因是对话框此前只执行当前颜色比较配置；方案中的位置修正节点及其订阅的模板定位节点
+  没有进入临时 `ToolEngine`，因此当前帧上下文不存在所选来源。
+- 测试请求现在按稳定 ID 和方案顺序只收集实际依赖，执行顺序为
+  `模板定位（如需要） → 位置修正 → 颜色比较`；位置修正订阅方案级基准图位姿时，
+  继续由 `ToolEngine` 的基准图前置步骤提供结果。
+- 临时引擎注册模板定位、位置修正和颜色比较三个 Adapter，结束后按颜色比较自身
+  `toolId` 取最终结果，不会把上游结果显示为检测结果。
+- 来源确实不存在、被禁用或位于消费工具之后时仍保持严格失败，不自动回退。
+
+验证：`color_comparison_dialog_integration_smoke`、
+`position_correction_ui_smoke`、`position_correction_engine_context_smoke`、
+`color_comparison_position_correction_smoke` 全部通过；主工程 qmake/make 通过。
+
+## 2026-07-22 - 区分位置修正来源缺失与模板未找到
+
+- `position_correction_source_missing` 现在只表示所选来源未配置、未启用或本帧未执行。
+- 位置修正已执行但 HALCON 模板定位没有命中时，颜色比较返回
+  `position_correction_match_not_found`，并保留定位器原始错误信息。
+- 其他已执行但失败的来源返回 `position_correction_source_failed`，错误信息包含上游状态，
+  不再统一误报为来源缺失。
+- `ToolEngine` 会把成功和失败的位置修正结果都写入本帧
+  `positionCorrectionsById`，供下游判断执行状态。
+
+验证：`color_comparison_position_correction_smoke`、
+`position_correction_engine_context_smoke` 通过；主工程 qmake/make 通过。
+
+## 2026-07-22 - 增加 PC 导入测试图片入口
+
+- 颜色比较对话框标题行新增“PC导入图片”按钮，位于“基础”按钮左侧，对象名为 `colorComparisonPcImportButton`。
+- 点击后可选择 PNG/JPG/JPEG/BMP/TIF/TIFF；读取成功后进入单图测试状态，显示文件名并立即执行当前颜色比较配置。
+- 导入图保存在当前 Dialog 的测试快照中；调整灵敏度、阈值、检测区等参数时可继续针对该图重测，不写入方案或替换基准图。
+- 导入图模式下点击“连续运行”或“运行一次”继续使用该导入图，不切回相机；避免无相机帧时出现 `image_empty` 并覆盖导入图的检测结果。
+- 导入图测试沿用 `ToolEngine` 链路，因此选择方案级基准图位置修正时会先生成并注入修正矩阵。
+- 入口显隐由 `ColorComparisonDialog.cpp` 中 `kShowPcImportButton` 控制；后续将其改为 `false` 即可隐藏，无需删除布局或功能代码。
+- OpenCV 仅用于文件读取和图像容器，颜色比较及位置修正核心算法仍由 HALCON 执行。
+
+验证：主工程 qmake/make 通过；`color_comparison_dialog_integration_smoke` 通过，并检查按钮可见、对象名稳定且位于“基础”左侧。
+
 ## 2026-07-15 - 模板/检测特征对比与点击放大
 
 ### 实现内容

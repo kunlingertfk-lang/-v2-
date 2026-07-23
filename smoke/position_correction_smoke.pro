@@ -4,7 +4,7 @@ CONFIG -= app_bundle
 TEMPLATE = app
 TARGET = position_correction_smoke
 
-BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/position_correction
+isEmpty(BUILD_ROOT): BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/position_correction
 DESTDIR = $$BUILD_ROOT/bin
 OBJECTS_DIR = $$BUILD_ROOT/obj
 MOC_DIR = $$BUILD_ROOT/moc

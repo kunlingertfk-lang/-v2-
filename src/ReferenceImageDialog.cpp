@@ -2,6 +2,7 @@
 
 #include <QDebug>
 #include <QButtonGroup>
+#include <QComboBox>
 #include <QFileDialog>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -14,10 +15,13 @@
 #include <QPushButton>
 #include <QSize>
 #include <QSizePolicy>
+#include <QSignalBlocker>
 #include <QToolButton>
 
+#include <cmath>
 #include <opencv2/imgproc.hpp>
 
+#include "algorithms/halcon/HalconRuntimePaths.h"
 #include "CameraParamsDialog.h"
 #include "OutputDialog.h"
 #include "PlanDialogUtils.h"
@@ -82,6 +86,38 @@ bool validNormalizedRect(const QRectF &rect)
     return rect.isValid() && rect.width() > 0.0 && rect.height() > 0.0;
 }
 
+bool validNormalizedPoint(const QPointF &point)
+{
+    return std::isfinite(point.x()) && std::isfinite(point.y())
+            && point.x() >= 0.0 && point.x() <= 1.0
+            && point.y() >= 0.0 && point.y() <= 1.0;
+}
+
+QVector<QPointF> polygonPointsFromConfig(const ReferencePositionCorrectionConfig &config)
+{
+    return polygonPointsFromJson(config.templatePolygonNormalized);
+}
+
+QJsonObject referencePoseJson(const QJsonObject &payload)
+{
+    return QJsonObject{
+        {QStringLiteral("x"), payload.value(QStringLiteral("x")).toDouble()},
+        {QStringLiteral("y"), payload.value(QStringLiteral("y")).toDouble()},
+        {QStringLiteral("angleDeg"), payload.value(QStringLiteral("angleDeg")).toDouble()},
+        {QStringLiteral("scale"), payload.value(QStringLiteral("scale")).toDouble(1.0)}
+    };
+}
+
+bool validPosePayload(const QJsonObject &payload)
+{
+    const double x = payload.value(QStringLiteral("x")).toDouble(qQNaN());
+    const double y = payload.value(QStringLiteral("y")).toDouble(qQNaN());
+    const double angle = payload.value(QStringLiteral("angleDeg")).toDouble(qQNaN());
+    const double scale = payload.value(QStringLiteral("scale")).toDouble(1.0);
+    return std::isfinite(x) && std::isfinite(y) && std::isfinite(angle)
+            && std::isfinite(scale) && scale > 0.0;
+}
+
 } // namespace
 
 ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
@@ -108,6 +144,7 @@ ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
             this,
             [this](const QImage &image) {
                 if (!m_liveCaptureMode && m_previewHelper) {
+                    clearReferencePositionMatchOverlays();
                     m_previewHelper->setImage(image);
                     ui->viewerTitleLabel->setText(image.isNull() ? tr("请先设置基准图") : tr("基准图"));
                     restoreReferencePositionRoi();
@@ -222,7 +259,7 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
     title->setProperty("role", QStringLiteral("cardTitle"));
     m_positionTestButton = new QPushButton(tr("测试运行"), m_positionSettingsFrame);
     m_positionTestButton->setObjectName(QStringLiteral("referencePositionTestButton"));
-    m_positionTestButton->setToolTip(tr("测试基准图位置修正；当前后端尚未实现"));
+    m_positionTestButton->setToolTip(tr("查看基准图位置修正私有模板模型的自匹配状态"));
     header->addWidget(title);
     header->addStretch(1);
     header->addWidget(m_positionTestButton);
@@ -246,6 +283,29 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
     tools->addWidget(m_positionPolygonButton);
     tools->addWidget(m_positionFinishButton);
     settingsLayout->addLayout(tools);
+
+    QHBoxLayout *originRow = new QHBoxLayout;
+    QLabel *originLabel = new QLabel(tr("定位点"), m_positionSettingsFrame);
+    originLabel->setProperty("role", QStringLiteral("rowField"));
+    m_positionOriginModeComboBox = new QComboBox(m_positionSettingsFrame);
+    m_positionOriginModeComboBox->setObjectName(
+                QStringLiteral("referencePositionOriginModeComboBox"));
+    m_positionOriginModeComboBox->addItem(tr("质心"), QStringLiteral("centroid"));
+    m_positionOriginModeComboBox->addItem(tr("自定义点"), QStringLiteral("custom"));
+    m_positionSelectOriginButton = new QPushButton(tr("选择点"), m_positionSettingsFrame);
+    m_positionSelectOriginButton->setObjectName(
+                QStringLiteral("referencePositionSelectOriginButton"));
+    m_positionSelectOriginButton->setCheckable(true);
+    m_positionOriginValueLabel = new QLabel(tr("使用模板质心"), m_positionSettingsFrame);
+    m_positionOriginValueLabel->setObjectName(
+                QStringLiteral("referencePositionOriginValueLabel"));
+    m_positionOriginValueLabel->setProperty("hint", true);
+    originRow->addWidget(originLabel);
+    originRow->addStretch(1);
+    originRow->addWidget(m_positionOriginModeComboBox);
+    originRow->addWidget(m_positionSelectOriginButton);
+    originRow->addWidget(m_positionOriginValueLabel);
+    settingsLayout->addLayout(originRow);
 
     m_positionStatusLabel = new QLabel(tr("配置已保存，尚未测试"), m_positionSettingsFrame);
     m_positionStatusLabel->setObjectName(QStringLiteral("referencePositionStatusLabel"));
@@ -273,6 +333,35 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
             this, &ReferenceImageDialog::startReferencePositionPolygonEditing);
     connect(m_positionFinishButton, &QPushButton::clicked,
             this, &ReferenceImageDialog::finishReferencePositionRoiEditing);
+    connect(m_positionOriginModeComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int index) {
+        stopReferencePositionOriginSelection();
+        m_referencePositionCorrection.originMode = index == 1
+                ? QStringLiteral("custom") : QStringLiteral("centroid");
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("editing_origin");
+        m_referencePositionCorrection.message.clear();
+        clearReferencePositionMatchOverlays();
+        updateReferencePositionOriginControls();
+        m_positionStatusLabel->setText(index == 1
+                ? tr("请点击“选择点”，然后在基准图任意位置选择定位点")
+                : tr("已切换为模板质心，请点击“完成”或“测试运行”重新创建基准"));
+    });
+    connect(m_positionSelectOriginButton, &QPushButton::clicked,
+            this, [this](bool checked) {
+        if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+            m_positionSelectOriginButton->setChecked(false);
+            m_positionStatusLabel->setText(tr("请先设置基准图"));
+            return;
+        }
+        stopReferencePositionRoiEditing(true);
+        m_positionSelectOriginButton->setChecked(checked);
+        m_previewHelper->setPointSelectionEnabled(checked);
+        ui->viewerTitleLabel->setText(checked
+                ? tr("点击基准图选择自定义定位点") : tr("基准图"));
+    });
     connect(m_positionTestButton, &QPushButton::clicked, this, [this]() {
         if (ReferenceImageProvider::instance().referenceImage().isNull()) {
             m_positionStatusLabel->setText(tr("请先设置基准图"));
@@ -286,7 +375,9 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
             m_positionStatusLabel->setText(tr("请先设置模板区域"));
             return;
         }
-        m_positionStatusLabel->setText(tr("位置修正后端尚未实现"));
+        stopReferencePositionOriginSelection();
+        if (buildAndValidateReferencePositionModel())
+            SchemeStore::instance().setReferencePositionCorrection(m_referencePositionCorrection);
     });
 
     if (m_previewHelper) {
@@ -294,6 +385,24 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
                 this, &ReferenceImageDialog::handleReferencePositionRectChanged);
         connect(m_previewHelper, &FrameViewHelper::polygonChanged,
                 this, &ReferenceImageDialog::handleReferencePositionPolygonChanged);
+        connect(m_previewHelper, &FrameViewHelper::pointSelected,
+                this, [this](const QPointF &point) {
+            if (m_referencePositionCorrection.originMode != QStringLiteral("custom")
+                    || !validNormalizedPoint(point)) {
+                return;
+            }
+            m_referencePositionCorrection.customOriginNormalized = point;
+            m_referencePositionCorrection.referenceCreated = false;
+            m_referencePositionCorrection.referencePose = QJsonObject();
+            m_referencePositionCorrection.status = QStringLiteral("editing_origin");
+            m_referencePositionCorrection.message.clear();
+            clearReferencePositionMatchOverlays();
+            updateReferencePositionOriginControls();
+            m_positionStatusLabel->setText(
+                        tr("自定义定位点 X=%1 Y=%2，可继续点击调整；完成后点击“测试运行”")
+                        .arg(point.x(), 0, 'f', 4)
+                        .arg(point.y(), 0, 'f', 4));
+        });
         connect(m_previewHelper, &FrameViewHelper::roiSelectionRejected,
                 this, [this](const QRectF &) {
                     if (m_positionRoiEditMode == PositionCorrectionRoiEditMode::Rectangle)
@@ -313,6 +422,12 @@ void ReferenceImageDialog::loadPositionCorrectionConfig()
 {
     m_referencePositionCorrection =
             SchemeStore::instance().currentScheme().referencePositionCorrection;
+    if (m_positionOriginModeComboBox) {
+        const QSignalBlocker blocker(m_positionOriginModeComboBox);
+        m_positionOriginModeComboBox->setCurrentIndex(
+                    m_referencePositionCorrection.originMode == QStringLiteral("custom") ? 1 : 0);
+    }
+    updateReferencePositionOriginControls();
     ui->positionCorrectionCheckBox->setChecked(m_referencePositionCorrection.enabled);
     updatePositionCorrectionUi(m_referencePositionCorrection.enabled);
 }
@@ -329,14 +444,18 @@ void ReferenceImageDialog::updatePositionCorrectionUi(bool enabled)
     if (m_positionPolygonButton)
         m_positionPolygonButton->setChecked(
                     m_referencePositionCorrection.templateRegionType == QStringLiteral("polygon"));
+    updateReferencePositionOriginControls();
     if (!enabled) {
+        stopReferencePositionOriginSelection();
         stopReferencePositionRoiEditing(false);
+        clearReferencePositionMatchOverlays();
         if (m_previewHelper) {
             m_previewHelper->clearRoi();
             m_previewHelper->clearPolygonRoi();
         }
     } else {
         restoreReferencePositionRoi();
+        renderReferencePositionOverlays();
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(referencePositionRoiStatusText());
     }
@@ -353,8 +472,13 @@ void ReferenceImageDialog::startReferencePositionRectEditing()
 
     const bool hadRectangle =
             m_referencePositionCorrection.templateRegionType != QStringLiteral("polygon");
-    showReferenceImageMode();
+    stopReferencePositionOriginSelection();
+    clearReferencePositionMatchOverlays();
     m_referencePositionCorrection.templateRegionType = QStringLiteral("rectangle");
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("editing");
+    showReferenceImageMode();
     m_positionRoiEditMode = PositionCorrectionRoiEditMode::Rectangle;
     m_positionRectButton->setChecked(true);
     m_positionPolygonButton->setChecked(false);
@@ -380,8 +504,13 @@ void ReferenceImageDialog::startReferencePositionPolygonEditing()
         return;
     }
 
-    showReferenceImageMode();
+    stopReferencePositionOriginSelection();
+    clearReferencePositionMatchOverlays();
     m_referencePositionCorrection.templateRegionType = QStringLiteral("polygon");
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("editing");
+    showReferenceImageMode();
     m_positionRoiEditMode = PositionCorrectionRoiEditMode::Polygon;
     m_positionRectButton->setChecked(false);
     m_positionPolygonButton->setChecked(true);
@@ -407,6 +536,7 @@ bool ReferenceImageDialog::finishReferencePositionRoiEditing()
             m_positionStatusLabel->setText(tr("请先设置基准图"));
         return false;
     }
+    stopReferencePositionOriginSelection();
 
     if (m_referencePositionCorrection.templateRegionType == QStringLiteral("polygon")) {
         if (m_previewHelper->isPolygonDrawingEnabled()
@@ -431,10 +561,17 @@ bool ReferenceImageDialog::finishReferencePositionRoiEditing()
         m_referencePositionCorrection.templatePolygonNormalized = QJsonArray();
     }
 
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("pending_validation");
+    m_referencePositionCorrection.message.clear();
     stopReferencePositionRoiEditing(true);
+    if (!buildAndValidateReferencePositionModel())
+        return false;
     SchemeStore::instance().setReferencePositionCorrection(m_referencePositionCorrection);
     m_positionStatusLabel->setText(
-                tr("%1；请点击方案保存按钮持久化配置").arg(referencePositionRoiStatusText()));
+                tr("%1；模型自匹配通过，请点击方案保存按钮持久化配置")
+                .arg(referencePositionRoiStatusText()));
     return true;
 }
 
@@ -449,6 +586,10 @@ void ReferenceImageDialog::handleReferencePositionRectChanged(const QRectF &roiN
     m_referencePositionCorrection.templateRegionType = QStringLiteral("rectangle");
     m_referencePositionCorrection.templateRoiNormalized = roiNormalized;
     m_referencePositionCorrection.templatePolygonNormalized = QJsonArray();
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("editing");
+    clearReferencePositionMatchOverlays();
     m_positionStatusLabel->setText(
                 tr("矩形 ROI x=%1 y=%2 w=%3 h=%4，点击“完成”确认")
                 .arg(roiNormalized.x(), 0, 'f', 3)
@@ -477,6 +618,10 @@ void ReferenceImageDialog::handleReferencePositionPolygonChanged(
             polygonPointsToJson(pointsNormalized);
     m_referencePositionCorrection.templateRoiNormalized =
             boundingRectForPoints(pointsNormalized);
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("editing");
+    clearReferencePositionMatchOverlays();
     m_positionStatusLabel->setText(drawingPolygon
             ? tr("多边形 ROI 已闭合，共 %1 个点，点击“完成”确认")
                   .arg(pointsNormalized.size())
@@ -565,6 +710,193 @@ QString ReferenceImageDialog::referencePositionRoiStatusText() const
             .arg(roi.height(), 0, 'f', 3);
 }
 
+bool ReferenceImageDialog::buildAndValidateReferencePositionModel()
+{
+    const ReferenceFrameSnapshot snapshot =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    if (snapshot.frame.empty()) {
+        clearReferencePositionMatchOverlays();
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("no_reference_image");
+        m_referencePositionCorrection.message = tr("请先设置基准图");
+        m_positionStatusLabel->setText(m_referencePositionCorrection.message);
+        return false;
+    }
+    if (!hasReferencePositionTemplateRoi()) {
+        clearReferencePositionMatchOverlays();
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("no_template_region");
+        m_referencePositionCorrection.message = tr("请先设置模板区域");
+        m_positionStatusLabel->setText(m_referencePositionCorrection.message);
+        return false;
+    }
+    if (m_referencePositionCorrection.originMode != QStringLiteral("centroid")
+            && m_referencePositionCorrection.originMode != QStringLiteral("custom")) {
+        clearReferencePositionMatchOverlays();
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("invalid_custom_origin");
+        m_referencePositionCorrection.message = tr("定位点模式无效");
+        m_positionStatusLabel->setText(m_referencePositionCorrection.message);
+        return false;
+    }
+    if (m_referencePositionCorrection.originMode == QStringLiteral("custom")
+            && !validNormalizedPoint(
+                m_referencePositionCorrection.customOriginNormalized)) {
+        clearReferencePositionMatchOverlays();
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("invalid_custom_origin");
+        m_referencePositionCorrection.message = tr("请先选择有效的自定义定位点");
+        m_positionStatusLabel->setText(m_referencePositionCorrection.message);
+        return false;
+    }
+    clearReferencePositionMatchOverlays();
+
+    TemplateLocationHalconConfig config;
+    config.toolId = PositionCorrection::defaultSourceId();
+    config.modelCacheKey = QStringLiteral("reference.positionCorrection.private_template");
+    config.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
+                QString(), &config.halconSoPathCandidates);
+    config.templateRegionType = m_referencePositionCorrection.templateRegionType;
+    config.templateRoiNormalized = m_referencePositionCorrection.templateRoiNormalized;
+    config.templatePolygonNormalized = polygonPointsFromConfig(m_referencePositionCorrection);
+    config.searchRegionType = QStringLiteral("full");
+    config.searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    config.minScore = 50;
+    config.angleStart = -45;
+    config.angleExtent = 90;
+    config.scaleMin = 100;
+    config.scaleMax = 100;
+    config.maxMatches = 1;
+    config.minMatchCount = 1;
+    config.maxMatchCount = 1;
+    config.maxOverlap = 0.5;
+    config.originMode = m_referencePositionCorrection.originMode;
+    config.customOriginNormalized =
+            m_referencePositionCorrection.customOriginNormalized;
+    config.timeoutMs = 2000;
+
+    const TemplateLocationHalconResult result =
+            m_referencePositionRunner.run(snapshot.frame, snapshot.frame, config);
+    m_referencePositionCorrection.modelCacheKey = config.modelCacheKey;
+    m_referencePositionCorrection.status = result.status;
+    m_referencePositionCorrection.message = result.message;
+    m_referencePositionCorrection.score = result.score;
+    m_referencePositionCorrection.elapsedMs = result.elapsedMs;
+    if (!result.success || !result.ok || !validPosePayload(result.payload)) {
+        clearReferencePositionMatchOverlays();
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_positionStatusLabel->setText(tr("基准图位置修正模型创建失败：%1")
+                                       .arg(result.message.trimmed().isEmpty()
+                                            ? result.status
+                                            : result.message));
+        return false;
+    }
+
+    m_referencePositionCorrection.referenceCreated = true;
+    m_referencePositionCorrection.referencePose = referencePoseJson(result.payload);
+    showReferencePositionMatchOverlays(result.overlays);
+    m_positionStatusLabel->setText(tr("基准图位置修正模型可用：X=%1，Y=%2，角度=%3°，分数=%4")
+                                   .arg(m_referencePositionCorrection.referencePose.value(QStringLiteral("x")).toDouble(), 0, 'f', 3)
+                                   .arg(m_referencePositionCorrection.referencePose.value(QStringLiteral("y")).toDouble(), 0, 'f', 3)
+                                   .arg(m_referencePositionCorrection.referencePose.value(QStringLiteral("angleDeg")).toDouble(), 0, 'f', 3)
+                                   .arg(result.score * 100.0, 0, 'f', 1));
+    return true;
+}
+
+void ReferenceImageDialog::showReferencePositionMatchOverlays(
+        const QVector<ToolOverlay> &overlays)
+{
+    m_referencePositionMatchOverlays.clear();
+    for (const ToolOverlay &overlay : overlays) {
+        if (overlay.extra.value(QStringLiteral("matchIndex")).toInt(-1) != 0)
+            continue;
+        if (overlay.label == QStringLiteral("match_result")
+                || overlay.label == QStringLiteral("match_center")) {
+            m_referencePositionMatchOverlays.append(overlay);
+        }
+    }
+
+    if (!m_previewHelper)
+        return;
+    renderReferencePositionOverlays();
+}
+
+void ReferenceImageDialog::clearReferencePositionMatchOverlays()
+{
+    m_referencePositionMatchOverlays.clear();
+    renderReferencePositionOverlays();
+}
+
+void ReferenceImageDialog::updateReferencePositionOriginControls()
+{
+    const bool custom =
+            m_referencePositionCorrection.originMode == QStringLiteral("custom");
+    if (m_positionSelectOriginButton)
+        m_positionSelectOriginButton->setVisible(custom);
+    if (m_positionOriginValueLabel) {
+        m_positionOriginValueLabel->setText(custom
+                ? tr("X %1  Y %2")
+                  .arg(m_referencePositionCorrection.customOriginNormalized.x(), 0, 'f', 4)
+                  .arg(m_referencePositionCorrection.customOriginNormalized.y(), 0, 'f', 4)
+                : tr("使用模板质心"));
+    }
+}
+
+void ReferenceImageDialog::stopReferencePositionOriginSelection()
+{
+    if (m_previewHelper)
+        m_previewHelper->setPointSelectionEnabled(false);
+    if (m_positionSelectOriginButton)
+        m_positionSelectOriginButton->setChecked(false);
+    if (!m_liveCaptureMode && ui && ui->viewerTitleLabel)
+        ui->viewerTitleLabel->setText(tr("基准图"));
+}
+
+void ReferenceImageDialog::renderReferencePositionOverlays()
+{
+    if (!m_previewHelper)
+        return;
+    if (!m_referencePositionCorrection.enabled || m_liveCaptureMode
+            || ReferenceImageProvider::instance().referenceImage().isNull()) {
+        m_previewHelper->clearToolOverlays();
+        return;
+    }
+
+    QVector<ToolOverlay> overlays;
+    if (m_referencePositionCorrection.originMode == QStringLiteral("custom")
+            && validNormalizedPoint(
+                m_referencePositionCorrection.customOriginNormalized)) {
+        const QImage image = ReferenceImageProvider::instance().referenceImage();
+        const QPointF point(
+                    m_referencePositionCorrection.customOriginNormalized.x() * image.width(),
+                    m_referencePositionCorrection.customOriginNormalized.y() * image.height());
+        const qreal radius = 12.0;
+        ToolOverlay horizontal;
+        horizontal.type = ToolOverlayType::Line;
+        horizontal.label = QStringLiteral("template_origin");
+        horizontal.p1 = QPointF(point.x() - radius, point.y());
+        horizontal.p2 = QPointF(point.x() + radius, point.y());
+        horizontal.extra.insert(QStringLiteral("displayRole"),
+                                QStringLiteral("template_location_origin"));
+        overlays.append(horizontal);
+        ToolOverlay vertical = horizontal;
+        vertical.p1 = QPointF(point.x(), point.y() - radius);
+        vertical.p2 = QPointF(point.x(), point.y() + radius);
+        overlays.append(vertical);
+    }
+    overlays += m_referencePositionMatchOverlays;
+
+    if (overlays.isEmpty())
+        m_previewHelper->clearToolOverlays();
+    else
+        m_previewHelper->setToolOverlays(overlays);
+}
+
 void ReferenceImageDialog::saveCurrentSchemeAs()
 {
     if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None
@@ -612,12 +944,14 @@ void ReferenceImageDialog::openOutputDialog()
 
 void ReferenceImageDialog::showCurrentImageMode()
 {
+    stopReferencePositionOriginSelection();
     stopReferencePositionRoiEditing(false);
+    m_liveCaptureMode = true;
+    clearReferencePositionMatchOverlays();
     if (m_previewHelper) {
         m_previewHelper->clearRoi();
         m_previewHelper->clearPolygonRoi();
     }
-    m_liveCaptureMode = true;
     updateReferenceImageControls();
     ui->viewerTitleLabel->setText(tr("当前图像"));
     ensureCameraRunning();
@@ -644,6 +978,14 @@ void ReferenceImageDialog::captureReferenceImage()
         QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
         return;
     }
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.customOriginNormalized = QPointF(0.5, 0.5);
+    m_referencePositionCorrection.status = QStringLiteral("reference_image_changed");
+    m_referencePositionCorrection.message = tr("基准图已更新，请重新确认模板区域和定位点");
+    updateReferencePositionOriginControls();
+    clearReferencePositionMatchOverlays();
+    SchemeStore::instance().setReferencePositionCorrection(m_referencePositionCorrection);
     showReferenceImageMode();
     qDebug() << QString("[ReferenceImageDialog] 已抓取静态基准图: %1x%2 type=%3")
                     .arg(frame.cols)
@@ -700,6 +1042,14 @@ void ReferenceImageDialog::importReferenceImageFromPc()
         QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
         return;
     }
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.customOriginNormalized = QPointF(0.5, 0.5);
+    m_referencePositionCorrection.status = QStringLiteral("reference_image_changed");
+    m_referencePositionCorrection.message = tr("基准图已更新，请重新确认模板区域和定位点");
+    updateReferencePositionOriginControls();
+    clearReferencePositionMatchOverlays();
+    SchemeStore::instance().setReferencePositionCorrection(m_referencePositionCorrection);
     showReferenceImageMode();
     qDebug() << QString("[ReferenceImageDialog] 已导入 PC 基准图: %1 size=%2x%3 type=%4")
                     .arg(fileName)
@@ -785,6 +1135,17 @@ void ReferenceImageDialog::refreshReferenceImage()
     }
 
     ui->viewerTitleLabel->setText(tr("基准图"));
+    m_previewHelper->clearToolOverlays();
     m_previewHelper->setImage(image);
     restoreReferencePositionRoi();
+    if (!m_referencePositionMatchOverlays.isEmpty()) {
+        renderReferencePositionOverlays();
+    } else if (m_referencePositionCorrection.enabled
+               && m_referencePositionCorrection.referenceCreated
+               && m_positionRoiEditMode == PositionCorrectionRoiEditMode::None
+               && hasReferencePositionTemplateRoi()) {
+        buildAndValidateReferencePositionModel();
+    } else {
+        renderReferencePositionOverlays();
+    }
 }

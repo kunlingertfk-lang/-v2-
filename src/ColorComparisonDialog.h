@@ -73,7 +73,8 @@ private:
     enum class LiveTestSource {
         None,
         Reference,
-        Camera
+        Camera,
+        Imported
     };
 
     void buildUi();
@@ -97,6 +98,7 @@ private:
     void stopContinuousRun();
     void runContinuousTick();
     void runSingleShotTest();
+    void importTestImageFromPc();
     void exitTestMode();
     void rerunLiveComparison();
     void updateBottomButtons();
@@ -167,7 +169,8 @@ private:
     CircleRoi m_detectCircle;
     QVector<QPointF> m_detectMask;
     bool m_positionCorrectionEnabled = false;
-    QString m_positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
+    bool m_showPositionCorrectionMatchContour = true;
+    QString m_positionCorrectionSource = QStringLiteral("reference.positionCorrection");
     EditState m_editState = EditState::None;
     bool m_previewUsesReferenceImage = true;
     QImage m_previewImage;
@@ -176,6 +179,7 @@ private:
     LiveTestSource m_liveTestSource = LiveTestSource::None;
     cv::Mat m_liveTestFrameSnapshot;
     FrameInputMetadata m_liveTestFrameMetadata;
+    QString m_liveTestImageTitle;
     QTimer *m_continuousTimer = nullptr;
     bool m_loadingConfig = false;
     bool m_invalidConfigReadOnly = false;
@@ -214,6 +218,7 @@ private:
     QLabel *m_viewerTitleLabel = nullptr;
     QLabel *m_viewerStatusLabel = nullptr;
     QGraphicsView *m_previewGraphicsView = nullptr;
+    QPushButton *m_pcImportButton = nullptr;
     QPushButton *m_basicButton = nullptr;
     QPushButton *m_allButton = nullptr;
     QComboBox *m_templateRegionModeComboBox = nullptr;
@@ -233,6 +238,8 @@ private:
     QCheckBox *m_positionCorrectionCheckBox = nullptr;
     QWidget *m_positionCorrectionSourceRow = nullptr;
     QComboBox *m_positionCorrectionComboBox = nullptr;
+    QWidget *m_positionCorrectionContourRow = nullptr;
+    QCheckBox *m_positionCorrectionContourCheckBox = nullptr;
     QPushButton *m_detectMaskEditButton = nullptr;
     QToolButton *m_detectMaskPolygonButton = nullptr;
     QPushButton *m_detectMaskRedrawButton = nullptr;

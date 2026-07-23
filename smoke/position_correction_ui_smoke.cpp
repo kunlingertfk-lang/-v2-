@@ -1,15 +1,20 @@
 #include "PositionCorrectionDialog.h"
 #include "ToolLibraryDialog.h"
 #include "PlanDialogUtils.h"
+#include "frame/ReferenceImageProvider.h"
 
 #include <QApplication>
 #include <QFrame>
+#include <QGraphicsSimpleTextItem>
 #include <QGraphicsView>
 #include <QJsonObject>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPushButton>
 #include <QToolButton>
 #include <iostream>
+
+#include <opencv2/imgproc.hpp>
 
 namespace PlanDialogUtils {
 void centerWindowOnScreen(QWidget *, QWidget *, int)
@@ -30,12 +35,25 @@ void check(bool condition, const char *message)
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
+    cv::Mat reference(240, 320, CV_8UC3, cv::Scalar(32, 32, 32));
+    cv::rectangle(reference, cv::Rect(90, 70, 80, 50),
+                  cv::Scalar(255, 255, 255), cv::FILLED);
+    ReferenceImageProvider::instance().setReferenceFrame(reference);
     PositionCorrectionDialog dialog;
 
     ToolConfig input;
     input.toolId = QStringLiteral("pc-stable-id");
     input.toolType = ToolType::PositionCorrection;
     input.category = ToolCategory::Location;
+    ToolConfig upstream;
+    upstream.toolId = QStringLiteral("upstream");
+    upstream.toolType = ToolType::TemplateLocation;
+    upstream.category = ToolCategory::Location;
+    upstream.enabled = true;
+    upstream.displayName = QStringLiteral("模板定位");
+    QVector<ToolConfig> tools;
+    tools.append(upstream);
+    tools.append(input);
     QJsonObject correction;
     correction.insert(QStringLiteral("version"), 1);
     correction.insert(QStringLiteral("runPointX"), QJsonObject{
@@ -54,6 +72,22 @@ int main(int argc, char **argv)
     input.params.insert(QStringLiteral("positionCorrection"), correction);
 
     dialog.loadFromConfig(input);
+    ReferencePositionCorrectionConfig referenceConfig;
+    referenceConfig.enabled = true;
+    referenceConfig.referenceCreated = true;
+    referenceConfig.referencePose = QJsonObject{
+        {QStringLiteral("x"), 160.25},
+        {QStringLiteral("y"), 92.5},
+        {QStringLiteral("angleDeg"), 7.25}
+    };
+    QVector<PositionReferencePoseProducer> referenceProducers{
+        PositionReferencePoseProducer{
+            PositionCorrection::defaultSourceId(),
+            QStringLiteral("1 基准图"),
+            referenceConfig.referencePose,
+            PositionCorrection::referenceToJson(referenceConfig)}
+    };
+    dialog.setAvailableProducers(tools, 1, referenceProducers);
     const ToolConfig output = dialog.toolConfig();
     const QJsonObject outputCorrection = output.params.value(
                 QStringLiteral("positionCorrection")).toObject();
@@ -66,6 +100,17 @@ int main(int argc, char **argv)
     check(outputCorrection.value(QStringLiteral("runPointX")).toObject()
                   .value(QStringLiteral("producerId")).toString() == QStringLiteral("upstream"),
           "dialog must round trip stable producer binding");
+    check(outputCorrection.value(QStringLiteral("version")).toInt() == 2,
+          "dialog must migrate position correction config to version 2");
+    check(outputCorrection.value(QStringLiteral("runPoseSource")).toObject()
+                  .value(QStringLiteral("producerId")).toString() == QStringLiteral("upstream"),
+          "dialog must write unified runPoseSource");
+    check(outputCorrection.value(QStringLiteral("runPoseSource")).toObject()
+                  .value(QStringLiteral("scaleKey")).toString() == QStringLiteral("scale"),
+          "dialog must pass template scale implicitly without adding another binding control");
+    check(outputCorrection.value(QStringLiteral("runPointX")).toObject()
+                  .value(QStringLiteral("displayPath")).toString().contains(QStringLiteral("运行点X")),
+          "dialog must display run pose semantics for X");
     check(outputCorrection.value(QStringLiteral("templateRegionType")).toString()
                   == QStringLiteral("polygon"),
           "dialog must round trip template region type");
@@ -82,6 +127,54 @@ int main(int argc, char **argv)
     check(previewView != nullptr, "dialog must expose preview graphics view");
     check(previewView && previewView->backgroundBrush().color() == QColor(0, 0, 0),
           "preview canvas must use a black background");
+
+    QPushButton *xLinkButton = dialog.findChild<QPushButton *>(
+                QStringLiteral("runPointXLinkButton"));
+    QAction *referenceNodeAction = nullptr;
+    if (xLinkButton && xLinkButton->menu()) {
+        for (QAction *action : xLinkButton->menu()->actions()) {
+            if (action->text() == QStringLiteral("1 基准图")) {
+                referenceNodeAction = action;
+                break;
+            }
+        }
+    }
+    check(referenceNodeAction && referenceNodeAction->menu(),
+          "enabled reference pose must appear as a linkable source node");
+    if (referenceNodeAction && referenceNodeAction->menu()
+            && !referenceNodeAction->menu()->actions().isEmpty()) {
+        referenceNodeAction->menu()->actions().first()->trigger();
+    }
+    QPushButton *createReferenceButton = dialog.findChild<QPushButton *>(
+                QStringLiteral("createReferenceButton"));
+    if (createReferenceButton)
+        createReferenceButton->click();
+    const QJsonObject importedCorrection = dialog.toolConfig().params
+            .value(QStringLiteral("positionCorrection")).toObject();
+    check(importedCorrection.value(QStringLiteral("runPoseSource")).toObject()
+                  .value(QStringLiteral("producerId")).toString()
+                  == PositionCorrection::defaultSourceId(),
+          "reference pose selection must persist its stable source id");
+    check(importedCorrection.value(QStringLiteral("referenceCreated")).toBool(false)
+          && qAbs(importedCorrection.value(QStringLiteral("referencePose")).toObject()
+                  .value(QStringLiteral("x")).toDouble() - 160.25) < 1e-9,
+          "creating a baseline from a reference source must import its pose values");
+    bool showsSource = false;
+    bool showsReferencePose = false;
+    if (previewView && previewView->scene()) {
+        for (QGraphicsItem *item : previewView->scene()->items()) {
+            QGraphicsSimpleTextItem *textItem =
+                    qgraphicsitem_cast<QGraphicsSimpleTextItem *>(item);
+            if (!textItem)
+                continue;
+            showsSource = showsSource
+                    || textItem->text().contains(QStringLiteral("订阅来源"));
+            showsReferencePose = showsReferencePose
+                    || textItem->text().contains(QStringLiteral("基准位姿"));
+        }
+    }
+    check(showsSource && showsReferencePose,
+          "preview must show source and reference pose information overlays");
 
     ToolLibraryDialog library;
     QToolButton *positionCorrectionButton = library.findChild<QToolButton *>(

@@ -10485,3 +10485,1173 @@
 2026-07-21T11:36:06.316 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
 2026-07-21T11:36:25.751 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x622c05304a00, name="MainWindow") reuseExisting= true
 2026-07-21T11:36:25.753 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-21T13:39:26.771 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-21T13:43:00.807 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T13:43:00.835 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T13:43:00.835 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T13:43:00.836 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T13:43:00.836 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T13:43:00.836 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T13:43:00.836 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:00.857 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:00.857 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T13:43:00.864 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T13:43:00.865 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T13:43:00.865 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:00.865 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:00.865 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-21T13:43:00.865 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T13:43:00.865 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T13:43:00.884 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T13:43:00.884 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T13:43:00.884 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T13:43:00.884 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T13:43:00.884 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T13:43:00.884 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:00.885 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:00.885 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T13:43:00.886 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T13:43:00.886 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T13:43:00.886 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:00.886 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:00.886 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-21T13:43:00.886 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T13:43:02.582 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5658d17890d0, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T13:43:02.642 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-21T13:43:02.680 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5658d17890d0, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T13:43:02.680 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T13:43:02.680 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T13:43:02.680 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T13:43:02.680 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T13:43:02.680 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T13:43:02.680 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:02.681 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:02.681 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T13:43:02.681 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T13:43:02.682 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T13:43:02.682 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:02.682 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:02.682 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:18.763 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x5658d17890d0, name="MainWindow") reuseExisting= true
+2026-07-21T13:43:18.765 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-21T13:43:37.240 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5658d17890d0, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T13:43:37.295 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-21T13:43:37.304 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5658d17890d0, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T13:43:37.304 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T13:43:37.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T13:43:37.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T13:43:37.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T13:43:37.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T13:43:37.305 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:37.305 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T13:43:37.305 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T13:43:37.306 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T13:43:37.306 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T13:43:37.306 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:37.306 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:43:37.306 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-21T13:48:03.865 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/Images/examples/images/rings/rings_01.png size=640x480 type=16"
+2026-07-21T13:48:20.993 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1118, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-21T13:48:20.994 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T13:48:20.994 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-21T13:48:20.994 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T13:48:20.994 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T13:48:20.994 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T13:48:20.994 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T13:54:10.395 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-21T13:55:00.550 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-21T13:55:02.839 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-21T13:55:03.681 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-21T14:45:12.530 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x5658d17890d0, name="MainWindow") reuseExisting= true
+2026-07-21T14:45:12.566 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-21T16:13:31.255 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-21T16:13:37.082 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:13:37.114 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T16:13:37.114 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T16:13:37.115 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T16:13:37.115 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T16:13:37.115 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T16:13:37.115 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T16:13:37.143 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T16:13:37.143 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T16:13:37.150 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T16:13:37.150 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T16:13:37.150 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:13:37.150 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:13:37.150 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-21T16:13:37.150 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:13:37.150 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:13:37.152 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T16:13:37.152 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T16:13:37.152 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T16:13:37.152 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T16:13:37.152 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T16:13:37.152 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T16:13:37.152 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T16:13:37.153 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T16:13:37.153 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T16:13:37.153 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T16:13:37.153 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:13:37.154 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:13:37.154 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-21T16:13:37.154 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:13:42.972 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x59786f01fc90, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T16:13:43.049 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-21T16:13:43.095 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x59786f01fc90, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T16:13:43.096 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T16:13:43.096 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T16:13:43.096 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T16:13:43.096 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T16:13:43.096 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T16:13:43.096 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T16:13:43.097 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T16:13:43.097 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T16:13:43.098 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T16:13:43.098 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T16:13:43.098 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:13:43.098 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:13:43.098 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:13:50.017 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-21T16:13:50.017 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:13:50.017 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-21T16:13:50.017 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:13:50.017 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:13:50.017 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:13:50.017 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:13:55.041 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "cd168269-ba25-4bdd-823c-a748e264e6a9" toolType= "TemplateLocation"
+2026-07-21T16:14:12.321 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "c69f55ec-04b7-4d9d-b87b-715865e261a8" toolType= "PositionCorrection"
+2026-07-21T16:14:14.110 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "c69f55ec-04b7-4d9d-b87b-715865e261a8" toolType= "PositionCorrection"
+2026-07-21T16:14:15.058 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "c69f55ec-04b7-4d9d-b87b-715865e261a8" toolType= "PositionCorrection"
+2026-07-21T16:14:44.918 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "c69f55ec-04b7-4d9d-b87b-715865e261a8" toolType= "PositionCorrection"
+2026-07-21T16:15:36.039 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "c69f55ec-04b7-4d9d-b87b-715865e261a8" toolType= "PositionCorrection"
+2026-07-21T16:18:08.350 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_6aaece36-acfc-48cf-b8a9-1fb134861fda" toolType= "ColorComparison"
+2026-07-21T16:18:23.175 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/双线.jpg size=2048x1536 type=16"
+2026-07-21T16:18:54.479 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "c69f55ec-04b7-4d9d-b87b-715865e261a8" toolType= "PositionCorrection"
+2026-07-21T16:26:10.192 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_6aaece36-acfc-48cf-b8a9-1fb134861fda" toolType= "ColorComparison"
+2026-07-21T16:27:49.077 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "cd168269-ba25-4bdd-823c-a748e264e6a9" toolType= "TemplateLocation"
+2026-07-21T16:27:57.921 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/ChatGPT Image 2026年7月17日 14_54_29.png size=1448x1086 type=16"
+2026-07-21T16:28:02.043 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/ChatGPT Image 2026年7月17日 15_09_40.png size=1448x1086 type=16"
+2026-07-21T16:29:18.831 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "cd168269-ba25-4bdd-823c-a748e264e6a9" toolType= "TemplateLocation"
+2026-07-21T16:44:36.499 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x59786f01fc90, name="MainWindow") reuseExisting= true
+2026-07-21T16:44:36.522 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-21T16:44:47.704 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-21T16:44:50.565 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:44:50.594 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T16:44:50.594 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T16:44:50.594 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T16:44:50.594 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T16:44:50.595 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T16:44:50.595 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T16:44:50.620 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T16:44:50.621 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T16:44:50.626 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T16:44:50.626 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T16:44:50.626 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:44:50.627 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:44:50.627 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-21T16:44:50.627 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:44:50.627 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:44:50.628 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T16:44:50.628 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T16:44:50.628 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T16:44:50.629 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T16:44:50.629 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T16:44:50.629 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T16:44:50.629 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T16:44:50.630 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T16:44:50.630 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T16:44:50.630 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T16:44:50.630 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:44:50.631 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:44:50.631 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-21T16:44:50.631 [DEBUG] [MainWindow] 当前无图像。
+2026-07-21T16:44:52.289 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x62ee8bd62c90, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T16:44:52.356 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-21T16:44:52.391 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x62ee8bd62c90, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T16:44:52.391 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T16:44:52.392 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T16:44:52.392 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T16:44:52.392 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T16:44:52.392 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T16:44:52.392 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T16:44:52.392 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T16:44:52.392 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T16:44:52.393 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T16:44:52.393 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T16:44:52.393 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:44:52.393 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:44:52.393 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:44:57.302 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x62ee8bd62c90, name="MainWindow") reuseExisting= true
+2026-07-21T16:44:57.303 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-21T16:45:06.768 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x62ee8bd62c90, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T16:45:06.811 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-21T16:45:06.816 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x62ee8bd62c90, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-21T16:45:06.816 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-21T16:45:06.816 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-21T16:45:06.816 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-21T16:45:06.817 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-21T16:45:06.817 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-21T16:45:06.817 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-21T16:45:06.817 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-21T16:45:06.817 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-21T16:45:06.818 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-21T16:45:06.818 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-21T16:45:06.818 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:45:06.818 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:45:06.818 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-21T16:45:34.107 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/Images/examples/images/color/color_pieces_00.png size=557x416 type=16"
+2026-07-21T16:45:55.641 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-21T16:45:55.641 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:45:55.641 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-21T16:45:55.642 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:45:55.642 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:45:55.642 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:45:55.642 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-21T16:47:10.277 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-21T16:47:25.760 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/Images/examples/images/color/citrus_fruits_02.png size=640x480 type=16"
+2026-07-21T16:47:30.104 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/Images/examples/images/color/color_pieces_01.png size=557x416 type=16"
+2026-07-21T16:49:31.201 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-21T16:50:06.234 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/Images/examples/images/color/pills_class_07.png size=648x432 type=16"
+2026-07-21T16:50:47.483 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-21T16:50:48.493 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-21T16:50:51.269 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-21T16:51:28.377 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T09:46:09.534 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x62ee8bd62c90, name="MainWindow") reuseExisting= true
+2026-07-22T09:46:09.561 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T09:46:14.188 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T09:46:17.267 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:46:17.303 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:46:17.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:46:17.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:46:17.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:46:17.304 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:46:17.304 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:17.331 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:17.331 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:46:17.337 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:46:17.337 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:46:17.337 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:17.337 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:17.338 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T09:46:17.338 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:46:17.338 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:46:17.339 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:46:17.340 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:46:17.340 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:46:17.340 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:46:17.340 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:46:17.340 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:17.340 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:17.340 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:46:17.341 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:46:17.341 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:46:17.341 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:17.341 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:17.341 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T09:46:17.341 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:46:25.365 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5f46df9a2e30, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:46:25.429 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T09:46:25.480 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5f46df9a2e30, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:46:25.480 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:46:25.480 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:46:25.480 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:46:25.480 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:46:25.480 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:46:25.480 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:25.481 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:25.481 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:46:25.482 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:46:25.482 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:46:25.482 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:25.482 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:25.482 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:30.362 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x5f46df9a2e30, name="MainWindow") reuseExisting= true
+2026-07-22T09:46:30.364 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T09:46:44.654 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5f46df9a2e30, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:46:44.718 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T09:46:44.723 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5f46df9a2e30, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:46:44.723 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:46:44.723 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:46:44.723 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:46:44.723 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:46:44.723 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:46:44.723 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:44.724 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:46:44.724 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:46:44.725 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:46:44.725 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:46:44.725 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:44.725 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:46:44.725 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:50:40.286 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-22T09:50:40.286 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:50:40.286 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T09:50:40.286 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:50:40.286 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:50:40.286 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:50:40.286 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:50:45.901 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T09:50:47.724 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-22T09:53:31.562 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-22T09:53:34.973 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T09:53:36.900 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:53:36.914 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:53:36.914 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:53:36.914 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:53:36.914 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:53:36.914 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:53:36.915 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:36.922 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:36.922 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:53:36.924 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:53:36.924 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:53:36.924 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:36.924 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:36.924 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T09:53:36.924 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:53:36.924 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:53:36.926 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:53:36.926 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:53:36.926 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:53:36.926 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:53:36.926 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:53:36.926 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:36.927 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:36.927 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:53:36.928 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:53:36.928 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:53:36.928 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:36.928 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:36.928 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T09:53:36.928 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T09:53:38.866 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x603455967d60, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:53:38.933 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T09:53:38.950 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x603455967d60, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:38.951 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:53:38.952 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:53:38.953 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:53:38.953 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:38.953 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:38.953 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:44.739 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x603455967d60, name="MainWindow") reuseExisting= true
+2026-07-22T09:53:44.741 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T09:53:57.029 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x603455967d60, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:53:57.092 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T09:53:57.098 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x603455967d60, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T09:53:57.099 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T09:53:57.100 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T09:53:57.101 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T09:53:57.101 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:57.101 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:53:57.101 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T09:54:00.314 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-22T09:54:00.315 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:54:00.315 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T09:54:00.315 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:54:00.315 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:54:00.315 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T09:54:00.315 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T15:49:38.655 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/01-base-object.png size=1254x1254 type=16"
+2026-07-22T15:51:27.854 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T15:51:28.584 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-22T15:51:29.880 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T15:52:12.412 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-22T15:52:13.688 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T15:52:34.902 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T16:31:33.576 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-22T16:31:34.860 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T16:31:39.199 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T18:50:36.202 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T18:51:10.718 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T19:01:57.500 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T19:02:51.660 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x603455967d60, name="MainWindow") reuseExisting= true
+2026-07-22T19:02:51.785 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T19:20:21.088 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T19:26:34.061 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:34.102 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:26:34.102 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:26:34.104 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:26:34.104 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:26:34.104 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:26:34.104 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.140 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.140 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.155 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.155 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:26:34.155 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.155 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.155 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:26:34.155 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:34.155 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.157 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.158 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.158 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:26:34.158 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.158 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.159 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:26:34.159 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:34.218 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:34.224 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:26:34.224 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:26:34.224 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:26:34.225 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:26:34.225 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:26:34.225 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.225 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.225 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.227 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.227 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:26:34.227 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.227 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.227 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.227 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:26:34.227 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:34.227 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:34.248 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:26:34.248 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:26:34.248 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:26:34.248 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:26:34.248 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:26:34.248 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.249 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:34.249 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.250 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:26:34.250 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:26:34.250 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.250 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.250 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:34.250 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:26:34.250 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:26:50.079 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5a57f2be3190, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:26:50.230 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T19:26:50.312 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5a57f2be3190, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:26:50.313 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:26:50.313 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:26:50.313 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:26:50.313 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:26:50.313 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:26:50.313 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:50.314 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:26:50.314 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:26:50.315 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:26:50.315 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:26:50.315 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:50.315 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:50.315 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:26:50.315 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:27:11.405 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1578) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1578) windowState= 2
+2026-07-22T19:27:11.405 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:27:11.405 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1452) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T19:27:11.405 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:27:11.405 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1356) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:27:11.405 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:27:11.405 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:28:28.883 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T19:34:32.237 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x5a57f2be3190, name="MainWindow") reuseExisting= true
+2026-07-22T19:34:32.261 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T19:34:53.794 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T19:34:56.680 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:34:56.710 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:34:56.710 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:34:56.711 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:34:56.711 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:34:56.711 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:34:56.711 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:34:56.743 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:34:56.743 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:34:56.750 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:34:56.750 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:34:56.751 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:34:56.751 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:34:56.752 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:34:56.752 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:34:56.753 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:34:56.755 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:34:56.755 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:34:56.755 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:34:56.755 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:34:56.755 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:34:56.755 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:34:56.756 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:34:56.756 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:34:56.757 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:34:56.757 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:34:56.757 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:34:56.757 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:34:56.757 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:34:56.758 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:34:58.326 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5f0ea371eb50, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:34:58.449 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T19:34:58.522 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5f0ea371eb50, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:34:58.522 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:34:58.523 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:34:58.523 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:34:58.523 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:34:58.523 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:34:58.523 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:34:58.524 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:34:58.524 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:34:58.525 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:34:58.526 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:34:58.526 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:34:58.526 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:34:58.526 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:35:00.400 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "CameraParamsDialog" mainWindow= MainWindow(0x5f0ea371eb50, name="MainWindow") reuseExisting= true
+2026-07-22T19:35:00.402 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T19:35:05.696 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5f0ea371eb50, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:35:05.884 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T19:35:05.892 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5f0ea371eb50, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:35:05.892 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:35:05.893 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:35:05.893 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:35:05.893 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:35:05.893 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:35:05.893 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:35:05.893 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:35:05.893 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:35:05.895 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:35:05.895 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:35:05.895 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:35:05.895 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:35:05.895 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:35:07.337 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1578) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1578) windowState= 2
+2026-07-22T19:35:07.338 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:35:07.338 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1452) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T19:35:07.338 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:35:07.338 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1356) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:35:07.338 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:35:07.338 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:43:00.240 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T19:43:23.319 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/02-captured-rotated-object.png size=1254x1254 type=16"
+2026-07-22T19:43:33.991 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T19:43:34.841 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T19:45:42.708 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T19:46:12.334 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x5f0ea371eb50, name="MainWindow") reuseExisting= true
+2026-07-22T19:46:12.336 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T19:51:50.631 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T19:51:52.892 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:51:52.932 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:51:52.932 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:51:52.933 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:51:52.934 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:51:52.934 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:51:52.934 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:51:52.963 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:51:52.964 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:51:52.971 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:51:52.971 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:51:52.971 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:51:52.971 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:51:52.971 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:51:52.972 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:51:52.972 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:51:52.974 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:51:52.974 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:51:52.974 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:51:52.974 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:51:52.974 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:51:52.974 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:51:52.975 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:51:52.975 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:51:52.976 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:51:52.976 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:51:52.976 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:51:52.976 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:51:52.977 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:51:52.977 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:52:00.782 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x60b9870c30a0, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:52:00.990 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T19:52:01.032 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x60b9870c30a0, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:52:01.032 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:52:01.032 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:52:01.033 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:52:01.033 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:52:01.033 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:52:01.033 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:52:01.033 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:52:01.033 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:52:01.035 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:52:01.035 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:52:01.035 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:52:01.035 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:52:01.035 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:52:12.954 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/01-base-object.png size=1254x1254 type=16"
+2026-07-22T19:52:27.881 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1578) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1578) windowState= 2
+2026-07-22T19:52:27.881 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:52:27.881 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1452) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T19:52:27.881 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:52:27.881 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1356) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:52:27.881 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:52:27.881 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:56:21.836 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x60b9870c30a0, name="MainWindow") reuseExisting= true
+2026-07-22T19:56:21.840 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T19:56:36.277 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T19:56:37.987 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:56:38.007 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:56:38.007 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:56:38.008 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:56:38.008 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:56:38.008 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:56:38.008 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:56:38.045 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:56:38.045 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:56:38.048 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:56:38.048 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:56:38.048 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:56:38.048 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:56:38.048 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:56:38.048 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:56:38.048 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:56:38.050 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:56:38.052 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:56:38.052 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:56:38.052 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:56:38.052 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:56:38.052 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:56:38.052 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:56:45.102 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x57999c0a5660, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:56:45.320 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T19:56:45.355 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x57999c0a5660, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:56:45.356 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:56:45.357 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:56:45.357 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:56:45.357 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:56:45.357 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:56:45.357 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:56:45.358 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:56:45.358 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:56:45.360 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:56:45.360 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:56:45.360 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:56:45.360 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:56:45.360 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:56:51.165 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1578) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1578) windowState= 2
+2026-07-22T19:56:51.165 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:56:51.165 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1452) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T19:56:51.165 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:56:51.165 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1356) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:56:51.165 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:56:51.165 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:57:05.452 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T19:58:53.312 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T19:58:54.811 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:58:54.827 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:58:54.827 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:58:54.827 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:58:54.828 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:58:54.828 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:58:54.828 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:58:54.836 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:58:54.836 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:58:54.839 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:58:54.839 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:58:54.839 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:58:54.839 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:58:54.839 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:58:54.839 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:58:54.839 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:58:54.840 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:58:54.841 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:58:54.841 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:58:54.841 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:58:54.841 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:58:54.841 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:58:54.841 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:58:54.841 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:58:54.842 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:58:54.842 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:58:54.843 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:58:54.843 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:58:54.843 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T19:58:54.843 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T19:59:01.226 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5f60eac01df0, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:59:01.444 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T19:59:01.475 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5f60eac01df0, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T19:59:01.476 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T19:59:01.476 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T19:59:01.476 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T19:59:01.476 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T19:59:01.477 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T19:59:01.477 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T19:59:01.477 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T19:59:01.478 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T19:59:01.479 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T19:59:01.479 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T19:59:01.479 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:59:01.479 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:59:01.480 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T19:59:10.595 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1578) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1578) windowState= 2
+2026-07-22T19:59:10.595 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:59:10.595 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1452) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T19:59:10.596 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:59:10.596 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1356) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:59:10.596 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T19:59:10.596 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T20:20:26.519 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T20:20:38.904 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:20:40.005 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T20:20:40.884 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:20:42.462 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T20:20:42.856 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:20:55.925 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:21:12.623 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:21:29.596 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-22T20:21:35.837 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:52:01.478 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x5f60eac01df0, name="MainWindow") reuseExisting= true
+2026-07-22T20:52:01.524 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-22T20:52:06.321 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-22T20:52:08.158 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T20:52:08.196 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T20:52:08.197 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T20:52:08.197 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T20:52:08.198 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T20:52:08.198 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T20:52:08.198 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T20:52:08.224 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T20:52:08.225 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T20:52:08.232 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T20:52:08.232 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T20:52:08.233 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T20:52:08.233 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T20:52:08.233 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T20:52:08.233 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T20:52:08.234 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T20:52:08.236 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T20:52:08.236 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T20:52:08.236 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T20:52:08.236 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T20:52:08.236 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T20:52:08.236 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T20:52:08.237 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T20:52:08.237 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T20:52:08.239 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T20:52:08.239 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T20:52:08.239 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T20:52:08.239 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T20:52:08.239 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-22T20:52:08.239 [DEBUG] [MainWindow] 当前无图像。
+2026-07-22T20:52:15.400 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5fdac2372760, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T20:52:15.621 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-22T20:52:15.693 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5fdac2372760, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-22T20:52:15.694 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-22T20:52:15.694 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-22T20:52:15.694 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-22T20:52:15.695 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-22T20:52:15.695 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-22T20:52:15.695 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-22T20:52:15.695 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-22T20:52:15.696 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-22T20:52:15.697 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-22T20:52:15.697 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-22T20:52:15.698 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-22T20:52:15.698 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-22T20:52:15.698 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-22T20:52:24.023 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1578) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1578) windowState= 2
+2026-07-22T20:52:24.023 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T20:52:24.023 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1452) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-22T20:52:24.023 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1452) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T20:52:24.023 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1356) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T20:52:24.024 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T20:52:24.024 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1271) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-22T20:52:25.466 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T20:52:28.406 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T20:52:37.159 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:52:51.286 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T20:56:24.574 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T20:59:41.656 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T20:59:55.527 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/02-captured-rotated-object.png size=1254x1254 type=16"
+2026-07-22T21:02:48.375 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-22T21:03:24.894 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T21:03:28.139 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-22T21:03:29.982 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T09:36:16.139 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T09:36:18.309 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T09:36:18.364 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T09:36:18.364 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T09:36:18.365 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T09:36:18.365 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T09:36:18.365 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T09:36:18.365 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T09:36:18.803 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T09:36:18.803 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T09:36:18.815 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T09:36:18.815 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T09:36:18.815 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T09:36:18.815 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T09:36:18.815 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T09:36:18.815 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T09:36:18.815 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T09:36:18.819 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T09:36:18.820 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T09:36:18.820 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T09:36:18.820 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T09:36:18.820 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T09:36:18.820 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T09:36:18.820 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T09:36:18.820 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T09:36:18.822 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T09:36:18.822 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T09:36:18.822 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T09:36:18.822 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T09:36:18.822 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T09:36:18.822 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T09:36:27.098 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5e340450da90, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T09:36:27.365 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T09:36:27.423 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5e340450da90, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T09:36:27.424 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T09:36:27.424 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T09:36:27.424 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T09:36:27.424 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T09:36:27.425 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T09:36:27.425 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T09:36:27.426 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T09:36:27.426 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T09:36:27.427 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T09:36:27.427 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T09:36:27.428 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T09:36:27.428 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T09:36:27.428 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T09:36:42.835 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/exec-0ed32766-b175-43a7-a1d2-e014ec38c4cf.png size=1254x1254 type=16"
+2026-07-23T09:36:50.269 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/exec-399f4e11-a7ea-454e-8019-c207fdf02530.png size=1254x1254 type=16"
+2026-07-23T09:36:53.881 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/exec-eb90dd06-6e6e-4a0f-a867-933fc89dd1a2.png size=1254x1254 type=16"
+2026-07-23T09:41:09.086 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T09:41:09.087 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T09:41:09.087 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T09:41:09.087 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T09:41:09.088 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T09:41:09.088 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T09:41:09.088 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T09:41:12.045 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T09:47:57.469 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T09:48:00.405 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T10:54:04.624 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x5e340450da90, name="MainWindow") reuseExisting= true
+2026-07-23T10:54:04.635 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T10:54:09.322 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T10:54:11.664 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T10:54:11.716 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T10:54:11.716 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T10:54:11.716 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T10:54:11.716 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T10:54:11.716 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T10:54:11.717 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:11.750 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:11.750 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T10:54:11.758 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T10:54:11.758 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T10:54:11.758 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:11.758 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:11.758 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T10:54:11.758 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T10:54:11.758 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T10:54:11.761 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T10:54:11.761 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T10:54:11.762 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T10:54:11.762 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T10:54:11.762 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T10:54:11.762 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:11.762 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:11.762 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T10:54:11.763 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T10:54:11.764 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T10:54:11.764 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:11.764 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:11.764 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T10:54:11.764 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T10:54:14.367 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5a7f9cb0c690, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T10:54:14.493 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T10:54:14.562 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5a7f9cb0c690, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T10:54:14.563 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T10:54:14.563 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T10:54:14.563 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T10:54:14.563 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T10:54:14.564 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T10:54:14.564 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:14.564 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:14.565 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T10:54:14.566 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T10:54:14.566 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T10:54:14.566 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:14.566 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:14.566 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:19.437 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x5a7f9cb0c690, name="MainWindow") reuseExisting= true
+2026-07-23T10:54:19.441 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T10:54:27.568 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x5a7f9cb0c690, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T10:54:27.796 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T10:54:27.807 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x5a7f9cb0c690, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T10:54:27.808 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T10:54:27.809 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T10:54:27.809 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T10:54:27.809 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T10:54:27.809 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T10:54:27.809 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:27.811 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T10:54:27.811 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T10:54:27.813 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T10:54:27.813 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T10:54:27.814 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:27.814 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:27.814 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T10:54:32.631 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T10:54:32.631 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T10:54:32.632 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T10:54:32.632 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T10:54:32.632 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T10:54:32.632 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T10:54:32.632 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T13:33:26.371 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T13:34:46.595 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T13:35:42.259 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T13:35:52.998 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T13:36:11.251 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T14:00:04.245 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x5a7f9cb0c690, name="MainWindow") reuseExisting= true
+2026-07-23T14:00:04.250 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T14:00:09.829 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T14:00:12.839 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:00:12.888 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:00:12.888 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:00:12.889 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:00:12.889 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:00:12.889 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:00:12.889 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:12.957 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:12.957 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:00:12.965 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:00:12.965 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:00:12.965 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:12.966 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:12.966 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T14:00:12.966 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:00:12.966 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:00:12.969 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:00:12.969 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:00:12.969 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:00:12.970 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:00:12.970 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:00:12.970 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:12.971 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:12.971 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:00:12.973 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:00:12.973 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:00:12.973 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:12.973 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:12.974 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T14:00:12.975 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:00:14.522 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x630d31ddbd30, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:00:14.638 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T14:00:14.683 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x630d31ddbd30, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:00:14.684 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:00:14.684 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:00:14.684 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:00:14.684 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:00:14.684 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:00:14.685 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:14.686 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:14.686 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:00:14.688 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:00:14.688 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:00:14.688 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:14.688 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:14.688 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:19.660 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x630d31ddbd30, name="MainWindow") reuseExisting= true
+2026-07-23T14:00:19.664 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T14:00:29.992 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x630d31ddbd30, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:00:30.200 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T14:00:30.212 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x630d31ddbd30, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:00:30.213 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:00:30.214 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:00:30.214 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:00:30.214 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:00:30.214 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:00:30.214 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:30.215 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:00:30.215 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:00:30.217 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:00:30.217 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:00:30.217 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:30.217 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:30.218 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:00:38.234 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T14:00:38.234 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:00:38.234 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T14:00:38.234 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:00:38.234 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:00:38.234 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:00:38.234 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:06:54.890 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T14:15:00.812 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ToolsDialog" mainWindow= MainWindow(0x630d31ddbd30, name="MainWindow") reuseExisting= true
+2026-07-23T14:15:00.817 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T14:15:04.312 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T14:15:05.597 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:15:05.620 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:15:05.620 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:15:05.620 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:15:05.620 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:15:05.620 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:15:05.620 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:15:05.633 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:15:05.633 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:15:05.639 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:15:05.639 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:15:05.639 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:15:05.639 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:15:05.639 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T14:15:05.639 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:15:05.640 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:15:05.641 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:15:05.642 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:15:05.642 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:15:05.642 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:15:05.642 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:15:05.643 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:15:05.643 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:15:05.644 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:15:05.646 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:15:05.646 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:15:05.646 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:15:05.646 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:15:05.646 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T14:15:05.646 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:15:15.324 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x623b33142130, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:15:15.578 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T14:15:15.621 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x623b33142130, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:15:15.623 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:15:15.623 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:15:15.623 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:15:15.623 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:15:15.623 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:15:15.624 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:15:15.625 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:15:15.625 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:15:15.628 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:15:15.628 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:15:15.628 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:15:15.628 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:15:15.629 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:15:28.539 [DEBUG] "[ReferenceImageDialog] 已导入 PC 基准图: /home/tt/tfk/WorkerSpace/project/V2_615_1628/qt_znxj_v2_work_1920_515/tests/Images/positionCorrection/01-base.png size=1254x1254 type=16"
+2026-07-23T14:15:35.366 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T14:15:35.366 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:15:35.366 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T14:15:35.366 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:15:35.367 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:15:35.367 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:15:35.367 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:15:48.902 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T14:16:03.671 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T14:17:48.929 [DEBUG] [ToolsDialog] 选中工具 index= 2 toolId= "color_comparison_b5362cfa-7eea-4ca7-b157-bbd080f868b3" toolType= "ColorComparison"
+2026-07-23T14:17:51.048 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T14:17:51.145 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:17:51.145 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:17:51.145 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:17:51.145 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:17:51.145 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:17:51.145 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:17:51.146 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:17:51.146 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:17:51.147 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:17:51.147 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:17:51.147 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:17:51.148 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:17:51.148 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:45:34.133 [INFO] HALCON license file: "/opt/halcon/license/license.txt"
+2026-07-23T14:46:34.703 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:46:34.769 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:46:34.769 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:46:34.771 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:46:34.771 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:46:34.771 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:46:34.771 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:34.834 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:34.835 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:46:34.849 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:46:34.849 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:46:34.850 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:34.850 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:34.850 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T14:46:34.850 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:46:34.850 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:46:34.853 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:46:34.853 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:46:34.853 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:46:34.853 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:46:34.853 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:46:34.853 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:34.854 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:34.854 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:46:34.856 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:46:34.856 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:46:34.856 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:34.856 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:34.856 [DEBUG] [MainWindow] 当前无图像：相机打开失败。
+2026-07-23T14:46:34.857 [DEBUG] [MainWindow] 当前无图像。
+2026-07-23T14:46:37.384 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x56bef75b3210, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:46:37.531 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T14:46:37.601 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x56bef75b3210, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:46:37.602 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:46:37.602 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:46:37.603 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:46:37.603 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:46:37.603 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:46:37.603 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:37.605 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:37.605 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:46:37.607 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:46:37.607 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:46:37.607 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:37.607 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:37.607 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:44.503 [DEBUG] [SCHEME-RETURN] returnToMainWindow source= "ReferenceImageDialog" mainWindow= MainWindow(0x56bef75b3210, name="MainWindow") reuseExisting= true
+2026-07-23T14:46:44.506 [DEBUG] [PlanDialogUtils] returnToMainWindow reused existing MainWindow
+2026-07-23T14:46:49.756 [DEBUG] [SCHEME-OPEN] openCameraParamsDialog enter mainWindow= MainWindow(0x56bef75b3210, name="MainWindow") visible= true cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:46:49.991 [DEBUG] "[CameraParamsDialog] preview area: 100x30"
+2026-07-23T14:46:50.000 [DEBUG] [SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive mainWindow= MainWindow(0x56bef75b3210, name="MainWindow") cameraOpened= false grabbing= false hasFrame= false frameIndex= 0
+2026-07-23T14:46:50.002 [DEBUG] [CameraFrameProvider] open camera: "/dev/video0"
+2026-07-23T14:46:50.002 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video00"
+2026-07-23T14:46:50.002 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video10"
+2026-07-23T14:46:50.002 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video20"
+2026-07-23T14:46:50.002 [DEBUG] [CameraFrameProvider] try V4L2 device: "/dev/video30"
+2026-07-23T14:46:50.002 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:50.003 [DEBUG] [CameraFrameProvider] GStreamer open failed: "1920x1080 MJPG->NV12"
+2026-07-23T14:46:50.003 [DEBUG] [CameraFrameProvider] try GStreamer pipeline: "640x480 MJPG->BGR"
+2026-07-23T14:46:50.006 [DEBUG] [CameraFrameProvider] GStreamer open failed: "640x480 MJPG->BGR"
+2026-07-23T14:46:50.006 [DEBUG] [CameraFrameProvider] try requested V4L2 device: "/dev/video0"
+2026-07-23T14:46:50.006 [WARN] [CameraFrameProvider] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:50.006 [WARN] [MainWindow] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:50.006 [WARN] [CameraParamsDialog] "无法初始化摄像头: /dev/video0"
+2026-07-23T14:46:58.896 [DEBUG] [ToolsDialogSize] window size= QSize(2626, 1575) min= QSize(1450, 739) max= QSize(16777215, 16777215) geometry= QRect(70,27 2626x1575) windowState= 2
+2026-07-23T14:46:58.896 [DEBUG] [ToolsDialogSize] setupBodyFrame size= QSize(2626, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:46:58.896 [DEBUG] [ToolsDialogSize] setupEditorPanel size= QSize(610, 1449) min= QSize(610, 0) max= QSize(610, 16777215)
+2026-07-23T14:46:58.896 [DEBUG] [ToolsDialogSize] setupViewerFrame size= QSize(1910, 1449) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:46:58.896 [DEBUG] [ToolsDialogSize] previewGraphicsView size= QSize(1910, 1353) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:46:58.897 [DEBUG] [ToolsDialogSize] scrollArea size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:46:58.897 [DEBUG] [ToolsDialogSize] contentWidget size= QSize(562, 1268) min= QSize(0, 0) max= QSize(16777215, 16777215)
+2026-07-23T14:47:06.177 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"
+2026-07-23T14:47:11.190 [DEBUG] [ToolsDialog] 选中工具 index= 0 toolId= "975800c2-539b-47c1-a019-f786ae4a4906" toolType= "TemplateLocation"
+2026-07-23T14:47:16.422 [DEBUG] [ToolsDialog] 选中工具 index= 1 toolId= "e2005316-93f0-4c14-8600-f463e3e1b4ac" toolType= "PositionCorrection"

@@ -70,6 +70,7 @@ SOURCES += \
     src/tooladapters/RegisteredClassificationAdapter.cpp \
     src/tooladapters/PatternPresenceAdapter.cpp \
     src/tooladapters/TemplateLocationAdapter.cpp \
+    src/tooladapters/PositionCorrectionAdapter.cpp \
     src/tooladapters/BlobPresenceAdapter.cpp \
     src/tooladapters/CirclePresenceAdapter.cpp \
     src/tooladapters/EdgePresenceAdapter.cpp \
@@ -94,6 +95,7 @@ SOURCES += \
     src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
     src/algorithms/presence/PatternPresenceHalconRunner.cpp \
     src/algorithms/location/TemplateLocationHalconRunner.cpp \
+    src/algorithms/location/PositionCorrectionHalconRunner.cpp \
     src/algorithms/presence/BlobPresenceHalconRunner.cpp \
     src/algorithms/presence/CirclePresenceHalconRunner.cpp \
     src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -151,6 +153,7 @@ HEADERS += \
     src/tooladapters/RegisteredClassificationAdapter.h \
     src/tooladapters/PatternPresenceAdapter.h \
     src/tooladapters/TemplateLocationAdapter.h \
+    src/tooladapters/PositionCorrectionAdapter.h \
     src/tooladapters/BlobPresenceAdapter.h \
     src/tooladapters/CirclePresenceAdapter.h \
     src/tooladapters/EdgePresenceAdapter.h \
@@ -175,6 +178,7 @@ HEADERS += \
     src/algorithms/presence/PatternPresenceAutoModelDomain.h \
     src/algorithms/presence/PatternPresenceHalconRunner.h \
     src/algorithms/location/TemplateLocationHalconRunner.h \
+    src/algorithms/location/PositionCorrectionHalconRunner.h \
     src/algorithms/presence/BlobPresenceHalconRunner.h \
     src/algorithms/presence/CirclePresenceHalconRunner.h \
     src/algorithms/presence/EdgePresenceHalconRunner.h \
