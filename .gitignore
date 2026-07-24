@@ -1,11 +1,8 @@
 # 不入库的开发资料
 .superpowers/
 backup/
-docs/
 projects/
 test/
-tests/
-smoke/
 AGENTS.*
 
 *.user
@@ -38,8 +35,7 @@ build/
 moc_predefs.h
 /qt_ui_test
 
-# smoke / tests 子工程整体不入库（源码与产物均不上传）
-smoke/
+# smoke / tests 子工程源码入库，构建产物继续按通用规则忽略
 *_smoke
 *_smoke.Makefile
 *.Makefile
@@ -62,17 +58,3 @@ local_paths.pri
 
 # AI 训练数据(纯开发资料，非构建/运行所需)，不入库
 rk_ai_materials/
-
-# TemplateLocation 功能文档与 smoke 源码属于交付内容；仅构建产物继续忽略。
-!docs/
-docs/*
-!docs/FID/
-docs/FID/*
-!docs/FID/TemplateLocation/
-!docs/FID/TemplateLocation/*.md
-!smoke/
-smoke/*
-!smoke/template_location_smoke.cpp
-!smoke/template_location_smoke.pro
-!smoke/template_location_ui_smoke.cpp
-!smoke/template_location_ui_smoke.pro
