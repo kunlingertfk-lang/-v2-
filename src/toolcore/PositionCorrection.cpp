@@ -68,13 +68,26 @@ QJsonObject legacyBinding(const QString &producerId,
 // 提供给界面及旧配置兼容字段使用的基准图来源显示文本。
 QString PositionCorrection::defaultSource()
 {
-    return QStringLiteral("1 基准图.位置修正信息");
+    return QStringLiteral("0 基准图.位置修正信息");
 }
 
 // 返回不会随界面序号变化的方案级基准图固定来源 ID。
 QString PositionCorrection::defaultSourceId()
 {
     return QStringLiteral("reference.positionCorrection");
+}
+
+// 显示编号从 1 统一为 0 后，历史方案仍应解析到同一个固定来源 ID。
+QString PositionCorrection::normalizedSourceId(const QString &sourceIdOrDisplayText)
+{
+    const QString source = sourceIdOrDisplayText.trimmed();
+    if (source.isEmpty()
+            || source == defaultSourceId()
+            || source == defaultSource()
+            || source == QStringLiteral("1 基准图.位置修正信息")) {
+        return defaultSourceId();
+    }
+    return source;
 }
 
 // 返回 UI 阶段统一的未实现原因，防止上层伪造位置修正成功状态。
@@ -93,12 +106,15 @@ PositionCorrectionConfig PositionCorrection::fromParams(
     config.enabled = boolParam(params,
                                QStringLiteral("enablePositionCorrection"),
                                defaultEnabled);
-    config.sourceId = stringParam(params,
-                                  QStringLiteral("positionCorrectionSourceId"),
-                                  defaultSourceId());
+    config.sourceId = normalizedSourceId(stringParam(
+                                             params,
+                                             QStringLiteral("positionCorrectionSourceId"),
+                                             defaultSourceId()));
     config.source = stringParam(params,
                                 QStringLiteral("positionCorrectionSource"),
                                 defaultSourceText);
+    if (config.sourceId == defaultSourceId())
+        config.source = defaultSource();
     return config;
 }
 
@@ -110,10 +126,12 @@ void PositionCorrection::writeParams(const PositionCorrectionConfig &config,
         return;
 
     params->insert(QStringLiteral("enablePositionCorrection"), config.enabled);
-    params->insert(QStringLiteral("positionCorrectionSourceId"),
-                   config.sourceId.trimmed().isEmpty() ? defaultSourceId() : config.sourceId);
+    const QString sourceId = normalizedSourceId(config.sourceId);
+    params->insert(QStringLiteral("positionCorrectionSourceId"), sourceId);
     params->insert(QStringLiteral("positionCorrectionSource"),
-                   config.source.trimmed().isEmpty() ? defaultSource() : config.source);
+                   sourceId == defaultSourceId()
+                   ? defaultSource()
+                   : config.source.trimmed().isEmpty() ? sourceId : config.source);
 }
 
 // 写入明确的“未应用”结果，供后端未接入期间的 UI 和日志展示。
@@ -323,6 +341,31 @@ ReferencePositionCorrectionConfig PositionCorrection::referenceFromJson(
                                           roi.value(QStringLiteral("height")).toDouble());
     config.templatePolygonNormalized =
             json.value(QStringLiteral("templatePolygonNormalized")).toArray();
+    config.templateMaskRegionType = stringParam(
+                json, QStringLiteral("templateMaskRegionType"),
+                json.value(QStringLiteral("templateMaskPolygonNormalized"))
+                    .toArray().isEmpty()
+                    ? QStringLiteral("none") : QStringLiteral("polygon"));
+    const QJsonObject maskRoi =
+            json.value(QStringLiteral("templateMaskRoiNormalized")).toObject();
+    config.templateMaskRoiNormalized = QRectF(
+                maskRoi.value(QStringLiteral("x")).toDouble(),
+                maskRoi.value(QStringLiteral("y")).toDouble(),
+                maskRoi.value(QStringLiteral("width")).toDouble(),
+                maskRoi.value(QStringLiteral("height")).toDouble());
+    config.templateMaskPolygonNormalized =
+            json.value(QStringLiteral("templateMaskPolygonNormalized")).toArray();
+    const QJsonObject maskCircleCenter = json.value(
+                QStringLiteral("templateMaskCircleCenterNormalized")).toObject();
+    config.templateMaskCircleCenterNormalized = QPointF(
+                maskCircleCenter.value(QStringLiteral("x")).toDouble(
+                    config.templateMaskRoiNormalized.center().x()),
+                maskCircleCenter.value(QStringLiteral("y")).toDouble(
+                    config.templateMaskRoiNormalized.center().y()));
+    config.templateMaskCircleRadiusNormalized = json.value(
+                QStringLiteral("templateMaskCircleRadiusNormalized")).toDouble(
+                qMin(config.templateMaskRoiNormalized.width(),
+                     config.templateMaskRoiNormalized.height()) / 2.0);
     config.originMode = stringParam(json,
                                     QStringLiteral("originMode"),
                                     QStringLiteral("centroid"));
@@ -364,6 +407,28 @@ QJsonObject PositionCorrection::referenceToJson(
     json.insert(QStringLiteral("templateRoiNormalized"), roi);
     json.insert(QStringLiteral("templatePolygonNormalized"),
                 config.templatePolygonNormalized);
+    json.insert(QStringLiteral("templateMaskRegionType"),
+                config.templateMaskRegionType.trimmed().isEmpty()
+                    ? QStringLiteral("none")
+                    : config.templateMaskRegionType.trimmed());
+    json.insert(QStringLiteral("templateMaskRoiNormalized"),
+                QJsonObject{
+                    {QStringLiteral("x"), config.templateMaskRoiNormalized.x()},
+                    {QStringLiteral("y"), config.templateMaskRoiNormalized.y()},
+                    {QStringLiteral("width"),
+                     config.templateMaskRoiNormalized.width()},
+                    {QStringLiteral("height"),
+                     config.templateMaskRoiNormalized.height()}});
+    json.insert(QStringLiteral("templateMaskPolygonNormalized"),
+                config.templateMaskPolygonNormalized);
+    json.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
+                QJsonObject{
+                    {QStringLiteral("x"),
+                     config.templateMaskCircleCenterNormalized.x()},
+                    {QStringLiteral("y"),
+                     config.templateMaskCircleCenterNormalized.y()}});
+    json.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
+                config.templateMaskCircleRadiusNormalized);
     json.insert(QStringLiteral("originMode"),
                 config.originMode.trimmed().isEmpty()
                     ? QStringLiteral("centroid")

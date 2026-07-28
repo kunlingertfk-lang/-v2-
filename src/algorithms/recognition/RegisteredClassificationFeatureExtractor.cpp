@@ -1,6 +1,7 @@
 #include "algorithms/recognition/RegisteredClassificationFeatureExtractor.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "algorithms/location/PositionCorrectionHalconTransform.h"
 #include "algorithms/recognition/RegisteredClassificationFeatureSpace.h"
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 
@@ -60,6 +61,8 @@ struct HalconFeatureApi
                                             const Htuple, const Htuple, const Htuple, Htuple *);
     using AffineTransImageFn = Herror (*)(const Hobject, Hobject *, const Htuple, const Htuple, const Htuple);
     using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple, const Htuple);
+    using ClipRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple, const Htuple,
+                                    const Htuple, const Htuple);
     using CropRectangle1Fn = Herror (*)(const Hobject, Hobject *, const Htuple, const Htuple,
                                         const Htuple, const Htuple);
     using MoveRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple, const Htuple);
@@ -109,6 +112,7 @@ struct HalconFeatureApi
     VectorAngleToRigidFn vectorAngleToRigid = nullptr;
     AffineTransImageFn affineTransImage = nullptr;
     AffineTransRegionFn affineTransRegion = nullptr;
+    ClipRegionFn clipRegion = nullptr;
     CropRectangle1Fn cropRectangle1 = nullptr;
     MoveRegionFn moveRegion = nullptr;
     ZoomImageSizeFn zoomImageSize = nullptr;
@@ -336,6 +340,7 @@ public:
             !resolveRequired(m_handle, api.vectorAngleToRigid, "T_vector_angle_to_rigid", errorMessage) ||
             !resolveRequired(m_handle, api.affineTransImage, "T_affine_trans_image", errorMessage) ||
             !resolveRequired(m_handle, api.affineTransRegion, "T_affine_trans_region", errorMessage) ||
+            !resolveRequired(m_handle, api.clipRegion, "T_clip_region", errorMessage) ||
             !resolveRequired(m_handle, api.cropRectangle1, "T_crop_rectangle1", errorMessage) ||
             !resolveRequired(m_handle, api.moveRegion, "T_move_region", errorMessage) ||
             !resolveRequired(m_handle, api.zoomImageSize, "T_zoom_image_size", errorMessage) ||
@@ -586,6 +591,21 @@ double boundedSigned(const double value)
     return 0.5 + 0.5 * value / (1.0 + std::abs(value));
 }
 
+PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
+        const HalconFeatureApi &api)
+{
+    PositionCorrectionHalconRegionApi transformApi;
+    transformApi.createTuple = api.createTuple;
+    transformApi.setDouble = api.setDouble;
+    transformApi.setString = api.setString;
+    transformApi.destroyTuple = api.destroyTuple;
+    transformApi.getDouble = api.getDouble;
+    transformApi.affineTransRegion = api.affineTransRegion;
+    transformApi.clipRegion = api.clipRegion;
+    transformApi.areaCenter = api.areaCenter;
+    return transformApi;
+}
+
 QVector<double> occupancyVector(HalconFeatureApi *api, const Hobject region)
 {
     QVector<double> occupancy;
@@ -774,7 +794,7 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
                            QStringLiteral("Feature region must be full, rectangle, or a polygon with at least three points."));
     }
 
-    const QRect roiPixels = normalizedRoiToPixels(normalizedBounds, halconFrame.cols, halconFrame.rows);
+    QRect roiPixels = normalizedRoiToPixels(normalizedBounds, halconFrame.cols, halconFrame.rows);
     if (roiPixels.width() < kMinRoiPixelSize || roiPixels.height() < kMinRoiPixelSize) {
         return errorResult(QStringLiteral("invalid_roi"),
                            QStringLiteral("Normalized ROI must resolve to at least 2x2 pixels."));
@@ -810,6 +830,8 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
     result.featureNames = registeredClassificationFeatureNamesV2();
     result.roiPixels = roiPixels;
     result.payload.insert(QStringLiteral("roiPixels"), rectToJson(roiPixels));
+    result.payload.insert(QStringLiteral("referenceRoiPixels"),
+                          rectToJson(roiPixels));
     result.payload.insert(QStringLiteral("halconSoPath"), halconLibPath);
     result.payload.insert(QStringLiteral("featureVersion"), registeredClassificationFeatureVersionV2());
     result.payload.insert(QStringLiteral("featureNames"), stringListToJson(result.featureNames));
@@ -817,6 +839,8 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
     HalconObjectGuard halconImage(api);
     HalconObjectGuard grayImage(api);
     HalconObjectGuard roiRegion(api);
+    HalconObjectGuard transformedRoiRegion(api);
+    HalconObjectGuard clippedRoiRegion(api);
     HalconObjectGuard roiGray(api);
     HalconObjectGuard smoothedGray(api);
     HalconObjectGuard innerRoi(api);
@@ -853,10 +877,85 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
                         QStringLiteral("gen_rectangle1(roi)"));
         }
 
+        Hobject effectiveRoiRegion = roiRegion.value();
+        if (!config.referenceToRunHomMat2D.isEmpty()) {
+            result.payload.insert(
+                        QStringLiteral("positionCorrectionOperation"),
+                        QStringLiteral("affine_trans_region+clip_region"));
+            const PositionCorrectionHalconTransformResult transformed =
+                    PositionCorrectionHalconTransform::transformAndClipRegion(
+                        positionCorrectionRegionApi(*api),
+                        roiRegion.value(),
+                        transformedRoiRegion.ptr(),
+                        clippedRoiRegion.ptr(),
+                        config.referenceToRunHomMat2D,
+                        halconFrame.cols,
+                        halconFrame.rows);
+            if (!transformed.success) {
+                if (transformed.halconStatus != H_MSG_OK) {
+                    checkStatus(api,
+                                transformed.halconStatus,
+                                QStringLiteral("position_correction.%1")
+                                .arg(transformed.operation));
+                }
+                throw std::pair<QString, QString>(
+                        transformed.status,
+                        QStringLiteral("Position-corrected classification ROI is invalid (%1).")
+                        .arg(transformed.operation));
+            }
+            if (transformed.area <= 0.0) {
+                throw std::pair<QString, QString>(
+                        QStringLiteral("corrected_roi_out_of_image"),
+                        QStringLiteral("Position-corrected classification ROI is outside the image."));
+            }
+            effectiveRoiRegion = clippedRoiRegion.value();
+
+            HalconTuple correctedRow1(api);
+            HalconTuple correctedColumn1(api);
+            HalconTuple correctedRow2(api);
+            HalconTuple correctedColumn2(api);
+            checkStatus(api,
+                        api->smallestRectangle1(
+                            effectiveRoiRegion,
+                            correctedRow1.ptr(),
+                            correctedColumn1.ptr(),
+                            correctedRow2.ptr(),
+                            correctedColumn2.ptr()),
+                        QStringLiteral("smallest_rectangle1(corrected_roi)"));
+            const int left = qBound(
+                        0,
+                        static_cast<int>(std::floor(requiredFiniteDouble(
+                                                       correctedColumn1,
+                                                       QStringLiteral("corrected ROI column1")))),
+                        halconFrame.cols - 1);
+            const int top = qBound(
+                        0,
+                        static_cast<int>(std::floor(requiredFiniteDouble(
+                                                       correctedRow1,
+                                                       QStringLiteral("corrected ROI row1")))),
+                        halconFrame.rows - 1);
+            const int right = qBound(
+                        left,
+                        static_cast<int>(std::ceil(requiredFiniteDouble(
+                                                      correctedColumn2,
+                                                      QStringLiteral("corrected ROI column2")))),
+                        halconFrame.cols - 1);
+            const int bottom = qBound(
+                        top,
+                        static_cast<int>(std::ceil(requiredFiniteDouble(
+                                                      correctedRow2,
+                                                      QStringLiteral("corrected ROI row2")))),
+                        halconFrame.rows - 1);
+            roiPixels = QRect(left, top, right - left + 1, bottom - top + 1);
+            result.roiPixels = roiPixels;
+            result.payload.insert(QStringLiteral("roiPixels"), rectToJson(roiPixels));
+            result.payload.insert(QStringLiteral("correctedRoiArea"), transformed.area);
+        }
+
         HalconTuple roiAreaTuple(api);
         HalconTuple roiCenterRowTuple(api);
         HalconTuple roiCenterColumnTuple(api);
-        checkStatus(api, api->areaCenter(roiRegion.value(), roiAreaTuple.ptr(),
+        checkStatus(api, api->areaCenter(effectiveRoiRegion, roiAreaTuple.ptr(),
                                          roiCenterRowTuple.ptr(), roiCenterColumnTuple.ptr()),
                     QStringLiteral("area_center(roi)"));
         const double roiArea = requiredFiniteDouble(roiAreaTuple, QStringLiteral("ROI area"));
@@ -867,7 +966,7 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
         if (roiArea <= 0.0)
             return errorResult(QStringLiteral("invalid_roi"), QStringLiteral("Feature ROI has no pixels."));
 
-        checkStatus(api, api->reduceDomain(grayImage.value(), roiRegion.value(), roiGray.ptr()),
+        checkStatus(api, api->reduceDomain(grayImage.value(), effectiveRoiRegion, roiGray.ptr()),
                     QStringLiteral("reduce_domain"));
         HalconTuple gaussSize = tupleInt(api, 3);
         checkStatus(api, api->gaussFilter(roiGray.value(), smoothedGray.ptr(), gaussSize.value()),
@@ -883,9 +982,9 @@ RegisteredClassificationFeatureResult RegisteredClassificationFeatureExtractor::
                     static_cast<double>(qRound(segmentation.value(QStringLiteral("borderBandRatio")).toDouble()
                                                * qMin(roiPixels.width(), roiPixels.height()))));
         HalconTuple borderRadius = tupleDouble(api, borderWidth);
-        checkStatus(api, api->erosionCircle(roiRegion.value(), innerRoi.ptr(), borderRadius.value()),
+        checkStatus(api, api->erosionCircle(effectiveRoiRegion, innerRoi.ptr(), borderRadius.value()),
                     QStringLiteral("erosion_circle(roi_border)"));
-        checkStatus(api, api->difference(roiRegion.value(), innerRoi.value(), borderBand.ptr()),
+        checkStatus(api, api->difference(effectiveRoiRegion, innerRoi.value(), borderBand.ptr()),
                     QStringLiteral("difference(roi_border)"));
 
         const QString thresholdMethod = segmentation.value(QStringLiteral("thresholdMethod")).toString();

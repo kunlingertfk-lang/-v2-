@@ -209,7 +209,7 @@ void configureProducerContext(PositionCorrectionDialog *dialog,
             && !reference.referencePose.isEmpty()) {
         referenceProducers.append(PositionReferencePoseProducer{
                                       PositionCorrection::defaultSourceId(),
-                                      QStringLiteral("1 基准图"),
+                                      QStringLiteral("0 基准图"),
                                       reference.referencePose,
                                       PositionCorrection::referenceToJson(reference)});
     }
@@ -237,6 +237,94 @@ void configureProducerContext(BlobPresenceDialog *dialog,
                 toolsDialog->toolEngineForTesting(),
                 SchemeStore::instance().currentScheme()
                 .referencePositionCorrection);
+}
+
+void configureProducerContext(CirclePresenceDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    int index = toolsDialog->toolConfigs().size();
+
+    if (initialConfig) {
+        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
+            if (toolsDialog->toolConfigs().at(i).toolId
+                    == initialConfig->toolId) {
+                index = i;
+                break;
+            }
+        }
+    }
+
+    dialog->setToolChainTestContext(
+                toolsDialog->toolConfigs(),
+                index,
+                toolsDialog->toolEngineForTesting(),
+                SchemeStore::instance().currentScheme()
+                .referencePositionCorrection);
+}
+
+template <typename Dialog>
+void configurePositionConsumerContext(Dialog *dialog,
+                                      ToolsDialog *toolsDialog,
+                                      const ToolConfig *initialConfig)
+{
+    int index = toolsDialog->toolConfigs().size();
+    if (initialConfig) {
+        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
+            if (toolsDialog->toolConfigs().at(i).toolId
+                    == initialConfig->toolId) {
+                index = i;
+                break;
+            }
+        }
+    }
+    dialog->setToolChainTestContext(
+                toolsDialog->toolConfigs(),
+                index,
+                SchemeStore::instance().currentScheme()
+                .referencePositionCorrection);
+}
+
+void configureProducerContext(PatternPresenceDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
+}
+
+void configureProducerContext(EdgePresenceDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
+}
+
+void configureProducerContext(LinePresenceDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
+}
+
+void configureProducerContext(ContourPresenceDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
+}
+
+void configureProducerContext(CharacterRecognitionDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
+}
+
+void configureProducerContext(RegisteredClassificationDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
 }
 
 template <typename Dialog>
@@ -457,6 +545,21 @@ bool ToolsDialog::commitToolStateToScheme(bool saveToDisk)
     return true;
 }
 
+void ToolsDialog::restoreToolState(
+        const QVector<ToolConfig> &configs,
+        const QMap<QString, ToolPreviewSnapshot> &snapshots,
+        int selectedIndex)
+{
+    m_toolConfigs = configs;
+    m_toolPreviewSnapshots = snapshots;
+    m_selectedToolIndex = selectedIndex;
+    refreshToolList();
+    if (m_selectedToolIndex >= 0 && m_selectedToolIndex < m_toolConfigs.size())
+        selectTool(m_selectedToolIndex);
+    else
+        refreshReferencePreview();
+}
+
 void ToolsDialog::editCurrentSchemeName()
 {
     SchemeStore &store = SchemeStore::instance();
@@ -487,7 +590,8 @@ void ToolsDialog::saveCurrentScheme()
 
 void ToolsDialog::saveCurrentSchemeAs()
 {
-    commitToolStateToScheme(false);
+    if (!commitToolStateToScheme(false))
+        return;
 
     bool ok = false;
     const QString name = QInputDialog::getText(this,
@@ -576,9 +680,9 @@ void ToolsDialog::openReferenceImageDialog()
 
 void ToolsDialog::openOutputDialog()
 {
-    m_openedOutputDialog = true;
     if (!commitToolStateToScheme(true))
         return;
+    m_openedOutputDialog = true;
 
     MainWindow *mainWindow = qobject_cast<MainWindow *>(parentWidget());
     OutputDialog *dialog = new OutputDialog(mainWindow);
@@ -660,9 +764,16 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     if (!accepted)
         return false;
 
+    const QVector<ToolConfig> configsBefore = m_toolConfigs;
+    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore =
+            m_toolPreviewSnapshots;
+    const int selectedIndexBefore = m_selectedToolIndex;
     m_toolConfigs.append(config);
     addConfiguredTool(config, snapshot);
-    commitToolStateToScheme(true);
+    if (!commitToolStateToScheme(true)) {
+        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
+        return false;
+    }
     raise();
     activateWindow();
     return true;
@@ -732,6 +843,10 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
     if (!accepted)
         return false;
 
+    const QVector<ToolConfig> configsBefore = m_toolConfigs;
+    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore =
+            m_toolPreviewSnapshots;
+    const int selectedIndexBefore = m_selectedToolIndex;
     editedConfig.toolId = originalConfig.toolId;
     editedConfig.toolType = originalConfig.toolType;
     editedConfig.category = originalConfig.category;
@@ -740,7 +855,10 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
     storePreviewSnapshot(editedConfig, snapshot, true);
     refreshToolList();
     selectTool(index);
-    commitToolStateToScheme(true);
+    if (!commitToolStateToScheme(true)) {
+        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
+        return false;
+    }
     raise();
     activateWindow();
     return true;

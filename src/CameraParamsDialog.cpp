@@ -175,15 +175,16 @@ void CameraParamsDialog::editCurrentSchemeName()
     saveCurrentScheme();
 }
 
-void CameraParamsDialog::saveCurrentScheme()
+bool CameraParamsDialog::saveCurrentScheme()
 {
     QString error;
     if (!SchemeStore::instance().saveCurrentScheme(&error)) {
         qWarning() << "[CameraParamsDialog] 方案保存失败:" << error;
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
-        return;
+        return false;
     }
     refreshSchemeHeader();
+    return true;
 }
 
 void CameraParamsDialog::saveCurrentSchemeAs()
@@ -209,18 +210,21 @@ void CameraParamsDialog::saveCurrentSchemeAs()
 
 void CameraParamsDialog::openReferenceImageDialog()
 {
-    saveCurrentScheme();
+    if (!saveCurrentScheme())
+        return;
     PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
 }
 
 void CameraParamsDialog::openToolsDialog()
 {
-    saveCurrentScheme();
+    if (!saveCurrentScheme())
+        return;
     PlanDialogUtils::replaceDialog(this, new ToolsDialog);
 }
 
 void CameraParamsDialog::openOutputDialog()
 {
-    saveCurrentScheme();
+    if (!saveCurrentScheme())
+        return;
     PlanDialogUtils::replaceDialog(this, new OutputDialog);
 }

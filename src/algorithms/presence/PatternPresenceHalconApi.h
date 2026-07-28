@@ -16,6 +16,7 @@ struct PatternPresenceHalconApi
     using CreateTupleDoubleFn = void (*)(Htuple *, double);
     using CreateTupleStringFn = void (*)(Htuple *, const char *);
     using SetDoubleFn = void (*)(Htuple *, double, Hlong);
+    using SetStringFn = void (*)(Htuple *, const char *, Hlong);
     using DestroyTupleFn = void (*)(Htuple *);
     using GetHandleFn = Hphandle (*)(const Htuple *, Hlong);
     using GetDoubleFn = double (*)(const Htuple *, Hlong);
@@ -24,6 +25,12 @@ struct PatternPresenceHalconApi
                                              const char *, Hlong, Hlong, Hlong, Hlong, Hlong, Hlong);
     using Rgb1ToGrayFn = Herror (*)(const Hobject, Hobject *);
     using GenRegionPolygonFn = Herror (*)(Hobject *, const Htuple, const Htuple);
+    using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
+    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *,
+                                           const Htuple, const Htuple);
+    using ClipRegionFn = Herror (*)(const Hobject, Hobject *,
+                                    const Htuple, const Htuple,
+                                    const Htuple, const Htuple);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using CountObjFn = Herror (*)(const Hobject, Hlong *);
     using SelectObjFn = Herror (*)(const Hobject, Hobject *, Hlong);
@@ -79,6 +86,7 @@ struct PatternPresenceHalconApi
     CreateTupleDoubleFn createTupleDouble = nullptr;
     CreateTupleStringFn createTupleString = nullptr;
     SetDoubleFn setDouble = nullptr;
+    SetStringFn setString = nullptr;
     DestroyTupleFn destroyTuple = nullptr;
     GetHandleFn getHandle = nullptr;
     GetDoubleFn getDouble = nullptr;
@@ -86,6 +94,9 @@ struct PatternPresenceHalconApi
     GenImageInterleavedFn genImageInterleaved = nullptr;
     Rgb1ToGrayFn rgb1ToGray = nullptr;
     GenRegionPolygonFn genRegionPolygon = nullptr;
+    GenRectangle1Fn genRectangle1 = nullptr;
+    AffineTransRegionFn affineTransRegion = nullptr;
+    ClipRegionFn clipRegion = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
     CountObjFn countObj = nullptr;
     SelectObjFn selectObj = nullptr;

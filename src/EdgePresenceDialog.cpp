@@ -2,15 +2,22 @@
 #include "ui_EdgePresenceDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "PositionCorrectionDialogTestHelper.h"
 
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDebug>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QEventLoop>
 #include <QFontMetrics>
 #include <QImage>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineF>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSize>
@@ -22,6 +29,7 @@
 #include <QtGlobal>
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 #include <cmath>
 
@@ -30,6 +38,7 @@
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
+#include "toolcore/PositionCorrection.h"
 
 namespace {
 
@@ -174,6 +183,8 @@ EdgePresenceDialog::EdgePresenceDialog(QWidget *parent)
     m_roiNormalized = QRectF(0.15, 0.46, 0.70, 0.08);
     m_toolId = QStringLiteral("edge_presence_%1")
             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_testToolEngine.registerAdapter(&m_testTemplateLocationAdapter);
+    m_testToolEngine.registerAdapter(&m_testPositionCorrectionAdapter);
     m_testToolEngine.registerAdapter(&m_testEdgePresenceAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     setupUiState();
@@ -202,6 +213,9 @@ EdgePresenceConfig EdgePresenceDialog::configuration() const
     config.positionCorrectionSource = basicMode
             ? ui->basicPositionCorrectionComboBox->currentText()
             : ui->positionCorrectionComboBox->currentText();
+    config.positionCorrectionSourceId = basicMode
+            ? ui->basicPositionCorrectionComboBox->currentData().toString().trimmed()
+            : ui->positionCorrectionComboBox->currentData().toString().trimmed();
     config.sensitivity = basicMode
             ? ui->edgeBasicSensitivitySpinBox->value()
             : ui->edgeSensitivitySpinBox->value();
@@ -223,8 +237,13 @@ ToolConfig EdgePresenceDialog::toToolConfig() const
     params.insert(QStringLiteral("searchLineP2"), pointToJson(edgeConfig.searchLineP2));
     params.insert(QStringLiteral("searchBandWidth"), edgeConfig.searchBandWidth);
     params.insert(QStringLiteral("lineBandWidthUnit"), QStringLiteral("normalized_max_dimension"));
-    params.insert(QStringLiteral("enablePositionCorrection"), edgeConfig.enablePositionCorrection);
-    params.insert(QStringLiteral("positionCorrectionSource"), edgeConfig.positionCorrectionSource);
+    PositionCorrectionConfig correction;
+    correction.enabled = edgeConfig.enablePositionCorrection;
+    correction.source = edgeConfig.positionCorrectionSource;
+    correction.sourceId = edgeConfig.positionCorrectionSourceId;
+    PositionCorrection::writeParams(correction, &params);
+    params.insert(QStringLiteral("showPositionCorrectionMatchContour"),
+                  edgeConfig.showPositionCorrectionMatchContour);
     params.insert(QStringLiteral("sensitivity"), edgeConfig.sensitivity);
     params.insert(QStringLiteral("edgePolarity"), edgeConfig.edgePolarity);
     params.insert(QStringLiteral("judgeBasis"), edgeConfig.judgeBasis);
@@ -260,6 +279,10 @@ ToolPreviewSnapshot EdgePresenceDialog::referencePreviewSnapshot() const
 
 void EdgePresenceDialog::loadFromConfig(const ToolConfig &config)
 {
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateBottomButtons();
     if (!config.toolId.trimmed().isEmpty())
         m_toolId = config.toolId;
     m_enabled = config.enabled;
@@ -273,11 +296,13 @@ void EdgePresenceDialog::loadFromConfig(const ToolConfig &config)
     ui->allSegmentButton->setChecked(allMode);
     ui->edgeParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
 
-    const bool positionCorrection = params.value(QStringLiteral("enablePositionCorrection")).toBool(ui->basicPositionCorrectionSwitch->isChecked());
+    const PositionCorrectionConfig correction = PositionCorrection::fromParams(
+                params, ui->basicPositionCorrectionSwitch->isChecked());
+    const bool positionCorrection = correction.enabled;
     ui->basicPositionCorrectionSwitch->setChecked(positionCorrection);
     ui->positionCorrectionSwitch->setChecked(positionCorrection);
-    setComboBoxValue(ui->basicPositionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
-    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    setComboBoxValue(ui->basicPositionCorrectionComboBox, correction.source);
+    setComboBoxValue(ui->positionCorrectionComboBox, correction.source);
     const int sensitivity = params.value(QStringLiteral("sensitivity")).toInt(ui->edgeBasicSensitivitySpinBox->value());
     ui->edgeBasicSensitivitySpinBox->setValue(sensitivity);
     ui->edgeSensitivitySpinBox->setValue(sensitivity);
@@ -299,6 +324,19 @@ void EdgePresenceDialog::loadFromConfig(const ToolConfig &config)
     }
     const QString roiText = detectRoiStatusText();
     setViewerStatusText(roiText, roiText);
+    updateBottomButtons();
+}
+
+void EdgePresenceDialog::setToolChainTestContext(
+        const QVector<ToolConfig> &toolConfigs,
+        int currentToolIndex,
+        const ReferencePositionCorrectionConfig &referencePositionCorrection)
+{
+    m_toolChainTestContext.toolConfigs = toolConfigs;
+    m_toolChainTestContext.currentToolIndex = currentToolIndex;
+    m_toolChainTestContext.referencePositionCorrection =
+            referencePositionCorrection;
+    m_toolChainTestContext.valid = true;
 }
 
 QString EdgePresenceDialog::summaryText() const
@@ -322,6 +360,15 @@ void EdgePresenceDialog::setupUiState()
     setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     applyAdaptiveWindowSize();
+    m_exitTestButton = new QPushButton(tr("退出测试"), this);
+    m_exitTestButton->setObjectName(QStringLiteral("exitTestButton"));
+    m_exitTestButton->setMinimumSize(120, 48);
+    m_exitTestButton->setProperty("actionRole", QStringLiteral("secondary"));
+    ui->horizontalLayout_actions->addWidget(m_exitTestButton);
+    m_pcImportButton = new QPushButton(tr("PC导入图片"), this);
+    m_pcImportButton->setObjectName(QStringLiteral("edgePcImportButton"));
+    m_pcImportButton->setMinimumHeight(38);
+    ui->horizontalLayout_editorHeader->insertWidget(2, m_pcImportButton);
 
     ui->basicSegmentButton->setChecked(true);
     ui->allSegmentButton->setChecked(false);
@@ -354,9 +401,36 @@ void EdgePresenceDialog::setupUiState()
 
 void EdgePresenceDialog::connectControls()
 {
+    connect(ui->basicPositionCorrectionSwitch, &QCheckBox::toggled,
+            ui->positionCorrectionSwitch, &QCheckBox::setChecked);
+    connect(ui->positionCorrectionSwitch, &QCheckBox::toggled,
+            ui->basicPositionCorrectionSwitch, &QCheckBox::setChecked);
+    const auto syncCorrectionSource = [](QComboBox *source, QComboBox *target, int index) {
+        if (!source || !target || index < 0)
+            return;
+        const int targetIndex = target->findData(source->itemData(index));
+        if (targetIndex >= 0 && targetIndex != target->currentIndex())
+            target->setCurrentIndex(targetIndex);
+    };
+    connect(ui->basicPositionCorrectionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this, syncCorrectionSource](int index) {
+        syncCorrectionSource(ui->basicPositionCorrectionComboBox,
+                             ui->positionCorrectionComboBox, index);
+    });
+    connect(ui->positionCorrectionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this, syncCorrectionSource](int index) {
+        syncCorrectionSource(ui->positionCorrectionComboBox,
+                             ui->basicPositionCorrectionComboBox, index);
+    });
     connect(ui->headerCloseButton, &QToolButton::clicked, this, &EdgePresenceDialog::reject);
     connect(ui->referenceTestButton, &QPushButton::clicked, this, &EdgePresenceDialog::runReferenceTest);
     connect(ui->testRunButton, &QPushButton::clicked, this, &EdgePresenceDialog::runCameraTest);
+    connect(m_pcImportButton, &QPushButton::clicked,
+            this, &EdgePresenceDialog::importTestImageFromPc);
+    connect(m_exitTestButton, &QPushButton::clicked,
+            this, &EdgePresenceDialog::exitTestMode);
     connect(ui->finishButton, &QPushButton::clicked, this, &EdgePresenceDialog::finishConfiguration);
 
     const auto applyParamMode = [this](bool allMode) {
@@ -426,6 +500,10 @@ void EdgePresenceDialog::connectControls()
 
 void EdgePresenceDialog::finishConfiguration()
 {
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     m_acceptedToolConfig = toToolConfig();
     m_hasAcceptedToolConfig = true;
     accept();
@@ -459,7 +537,10 @@ void EdgePresenceDialog::runReferenceTest()
 
 void EdgePresenceDialog::runCameraTest()
 {
-    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    const bool imported = m_importedTestActive && !m_importedTestFrame.empty();
+    const cv::Mat frame = imported
+            ? m_importedTestFrame.clone()
+            : CameraFrameProvider::instance().currentFrame();
     if (frame.empty()) {
         displayEdgePresenceError(QStringLiteral("image_empty"),
                                  tr("当前图像为空，无法测试"));
@@ -469,16 +550,71 @@ void EdgePresenceDialog::runCameraTest()
     const cv::Mat snapshot = frame.clone();
     const QImage image = imageFromFrame(snapshot);
     if (!image.isNull() && m_previewHelper) {
-        ui->viewerTitleLabel->setText(tr("测试图像"));
+        ui->viewerTitleLabel->setText(
+                    imported ? m_importedTestImageTitle : tr("测试图像"));
         m_previewHelper->setImage(image);
+        m_previewHelper->clearToolOverlays();
         m_previewHelper->clearRoi();
         m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
     }
 
     runEdgePresenceOnFrame(snapshot,
                            ReferenceImageProvider::instance().referenceFrame(),
-                           tr("测试图像"),
+                           imported ? m_importedTestImageTitle : tr("测试图像"),
                            tr("当前图像为空，无法测试"));
+}
+
+void EdgePresenceDialog::importTestImageFromPc()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this, tr("PC导入测试图片"), QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+    const cv::Mat frame = cv::imread(fileName.toLocal8Bit().constData(),
+                                     cv::IMREAD_UNCHANGED);
+    if (frame.empty()) {
+        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
+        return;
+    }
+    m_importedTestFrame = frame.clone();
+    m_importedTestImageTitle = QFileInfo(fileName).fileName();
+    m_importedTestActive = true;
+    updateBottomButtons();
+    rerunImportedTest();
+}
+
+void EdgePresenceDialog::exitTestMode()
+{
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateBottomButtons();
+    showReferenceImage();
+    setViewerStatusText(tr("已退出离线测试，可使用相机执行测试运行"));
+}
+
+void EdgePresenceDialog::updateBottomButtons()
+{
+    const bool imported = m_importedTestActive && !m_importedTestFrame.empty();
+    ui->referenceTestButton->setVisible(!imported);
+    ui->testRunButton->setText(
+                imported ? tr("测试运行（导入图）") : tr("测试运行"));
+    ui->finishButton->setText(imported ? tr("运行一次") : tr("完成"));
+    if (m_exitTestButton)
+        m_exitTestButton->setVisible(imported);
+}
+
+void EdgePresenceDialog::rerunImportedTest()
+{
+    if (!m_importedTestActive || m_importedTestFrame.empty()
+            || m_edgePresenceRunning) {
+        return;
+    }
+    showReferenceImage();
+    setViewerStatusText(tr("正在重新执行模板定位、位置修正和边缘检测…"));
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    runCameraTest();
 }
 
 void EdgePresenceDialog::applyAdaptiveWindowSize()
@@ -497,15 +633,19 @@ void EdgePresenceDialog::showReferenceImage()
     if (!m_previewHelper)
         return;
 
-    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    const QImage image = m_importedTestActive && !m_importedTestFrame.empty()
+            ? imageFromFrame(m_importedTestFrame)
+            : ReferenceImageProvider::instance().referenceImage();
     if (image.isNull()) {
         m_previewHelper->clear();
         ui->viewerTitleLabel->setText(tr("请先设置基准图"));
         return;
     }
 
-    ui->viewerTitleLabel->setText(tr("基准图"));
+    ui->viewerTitleLabel->setText(
+                m_importedTestActive ? m_importedTestImageTitle : tr("基准图"));
     m_previewHelper->setImage(image);
+    m_previewHelper->clearToolOverlays();
     m_previewHelper->clearRoi();
     m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
 }
@@ -515,8 +655,11 @@ void EdgePresenceDialog::showFrameForRoiEditing()
     if (!m_previewHelper)
         return;
 
-    QImage image = ReferenceImageProvider::instance().referenceImage();
-    QString title = tr("基准图");
+    QImage image = m_importedTestActive && !m_importedTestFrame.empty()
+            ? imageFromFrame(m_importedTestFrame)
+            : ReferenceImageProvider::instance().referenceImage();
+    QString title = m_importedTestActive
+            ? m_importedTestImageTitle : tr("基准图");
     if (image.isNull()) {
         image = CameraFrameProvider::instance().currentImage();
         title = tr("当前图像");
@@ -582,6 +725,7 @@ void EdgePresenceDialog::handleLineBandChanged(const LineBandRoi &roi)
              << "p2=" << m_lineBandRoi.p2Normalized
              << "width=" << m_lineBandRoi.widthNormalized
              << "bounding=" << m_roiNormalized;
+    rerunImportedTest();
 }
 
 void EdgePresenceDialog::handleLineBandSelectionRejected()
@@ -602,6 +746,7 @@ void EdgePresenceDialog::handleRoiChanged(const QRectF &roi)
     const QString roiText = detectRoiStatusText();
     setViewerStatusText(roiText, roiText);
     qDebug() << "[EdgePresenceDialog] ROI normalized:" << m_roiNormalized;
+    rerunImportedTest();
 }
 
 void EdgePresenceDialog::handleRoiSelectionRejected()
@@ -636,7 +781,12 @@ void EdgePresenceDialog::runEdgePresenceOnFrame(const cv::Mat &frame,
     request.image = frame.clone();
     request.referenceImage = referenceImage.empty() ? cv::Mat() : referenceImage.clone();
 
-    const ToolResult result = m_testToolEngine.runTool(request);
+    const ToolResult result = runPositionCorrectionAwareDialogTest(
+                m_testToolEngine,
+                request.config,
+                request.image,
+                request.referenceImage,
+                &m_toolChainTestContext);
     if (!imageTitle.isEmpty())
         ui->viewerTitleLabel->setText(imageTitle);
     displayEdgePresenceResult(result);
@@ -667,7 +817,18 @@ void EdgePresenceDialog::displayEdgePresenceResult(const ToolResult &result)
 
     if (m_previewHelper) {
         m_previewHelper->clearRoi();
-        m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
+        bool hasRuntimeDetectRoi = false;
+        for (const ToolOverlay &overlay : result.overlays) {
+            if (overlay.extra.value(QStringLiteral("role")).toString()
+                    == QStringLiteral("detect_roi")) {
+                hasRuntimeDetectRoi = true;
+                break;
+            }
+        }
+        if (hasRuntimeDetectRoi)
+            m_previewHelper->clearLineBandRoi();
+        else
+            m_previewHelper->setLineBandRoiNormalized(effectiveLineBandRoi());
         m_previewHelper->setToolOverlays(result.overlays);
     }
 }

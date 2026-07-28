@@ -609,3 +609,77 @@
   - 待手动 GUI 确认：完成/测试运行/基准图测试/退出测试四按钮的默认、hover、点击 flash、连续运行橙色态、disabled 灰化是否符合预期，且不影响基础/全部分段、ROI 绘制等回归。
 - 剩余事项：
   - 真实 GUI 手动确认上述视觉与回归项。
+
+### 2026-07-23 位置修正真实消费链路接入
+
+- 本节替代“2026-07-01 位置修正占位链路补齐”中的未实现结论；旧记录保留用于说明配置迁移历史。
+- 配置与 Dialog：
+  - 继续兼容 `enablePositionCorrection`、`positionCorrectionSource`。
+  - 正式保存和回显稳定的 `positionCorrectionSourceId`，Dialog 内测试直接读取来源下拉框 `currentData()`。
+  - `showPositionCorrectionMatchContour` 当前按简化 UI 默认保存为 `true`。
+  - 基准图默认来源使用稳定 ID `reference.positionCorrection` 和显示文本 `0 基准图.位置修正信息`。
+- Adapter：
+  - HSV Histogram 与 CIELAB GMM 共用 `PositionCorrectionConsumer::resolve()`。
+  - 来源缺失、来源失败、模板未匹配、矩阵或尺度非法时直接返回公共明确状态，不静默退回固定 ROI。
+- HALCON Runner：
+  - 两个颜色识别后端均在整张运行图绝对坐标中创建基准矩形/圆形 ROI，并先应用屏蔽区。
+  - 使用公共 `PositionCorrectionHalconTransform::transformAndClipRegion()` 调用 HALCON
+    `affine_trans_region`、`clip_region` 和 `area_center`。
+  - 分类只在修正并裁剪后的真实 HALCON Region 内执行；修正 ROI 完全出图时返回
+    `corrected_roi_out_of_image`。
+- Overlay 与 payload：
+  - 检测 ROI 与算法 Region 使用同一矩阵；矩形旋转后以 Polygon 输出。
+  - 输出标准角色 `detect_roi`、`position_correction_match_contour` 和
+    `position_correction_match_origin`。
+  - 运行态包含 `detect_roi` 时清除配置阶段的矩形、圆形和多边形 ROI，避免显示双 ROI。
+  - payload 输出 requested/applied/sourceId/reason、矩阵以及 reference/run/ratio 三个尺度字段。
+- Dialog 测试：
+  - “基准图测试”和“测试运行”均构造模板定位、位置修正、颜色识别的前置测试链，
+    通过 `ToolEngine::runTools()` 生成同帧 `positionCorrectionsById` 上下文。
+  - 方案级基准图位置修正配置通过 `referencePositionCorrection` 注入，不再孤立调用颜色识别 Adapter。
+- 自动验证：
+  - 主工程 qmake、颜色识别相关目标强制重编及完整链接通过。
+  - HSV smoke 覆盖平移后的真实 Region、Polygon `detect_roi` 和 applied payload，通过。
+  - GMM smoke 覆盖平移/裁剪后的真实 Region、`detect_roi` 和 applied payload，通过。
+- 待桌面人工复核：
+  - 使用真实模板定位与位置修正节点分别执行基准图测试、相机测试和连续运行。
+  - 验证平移、旋转、缩放、来源失效、模板未匹配、保存后重开回显，以及轮廓/原点显示。
+
+### 2026-07-24 PC 外部测试图导入
+
+- 在颜色识别标题与“基础/全部”切换区之间增加 `PC导入图片` 按钮，对象名为
+  `colorRecognitionPcImportButton`。
+- 支持 PNG、JPG/JPEG、BMP、TIF/TIFF，并使用 `IMREAD_UNCHANGED` 保留图片位深和通道；
+  同时通过 `FrameInputMetadata::fromMat(..., "file")` 建立输入合同。
+- 导入成功后立即显示该图，并执行模板定位、位置修正、颜色识别完整测试链。
+- 导入图仅缓存在当前 Dialog 会话中，不写入 `ToolConfig`，不替换方案基准图。
+- 导入后测试按钮显示为 `测试运行（导入图）`；再次点击“测试运行”或“运行一次”继续复用缓存图，
+  不会静默切换到相机帧。
+- `ColorRecognitionDialog.cpp` 中 `kShowPcImportButton` 是独立显隐开关；设为 `false`
+  即可隐藏入口，不影响导入测试实现和已有配置。
+
+### 2026-07-24 退出导入图片测试后运行轮廓遗留修复
+
+- 问题现象：
+  - PC 导入图片并完成测试后，点击“退出测试”虽然恢复了基准图，但上一轮测试的匹配轮廓仍显示在画布上。
+  - 同一运行结果层中的匹配原点、修正后检测 ROI 和结果文字也可能一并遗留。
+- 根因：
+  - `ColorRecognitionDialog::displayResult()` 使用 `FrameViewHelper::setToolOverlays()` 显示运行结果。
+  - 退出测试通过 `showPreviewImage()` 恢复编辑预览；该函数原先只调用 `setImage()` 替换底图并重画配置 ROI。
+  - `FrameViewHelper::setImage()` 按设计保留运行态 Overlay，因此仅替换底图不会删除上一轮结果。
+  - 异步检测不是本问题的根因：退出测试会递增 `m_testRunGeneration`，完成回调仅接收当前代次结果。
+- 修复：
+  - 在 `showPreviewImage()` 设置有效底图后调用 `clearToolOverlays()`，再执行
+    `refreshDisplayedRoiOverlay()`。
+  - 清理范围仅限运行态结果 Overlay；矩形/圆形检测 ROI 和样本 ROI 等配置态图形仍由现有刷新逻辑恢复。
+- 回归要求：
+  - 导入图片测试后退出，匹配轮廓、匹配原点、运行态检测 ROI 和结果文字应全部消失。
+  - 编辑态配置 ROI 应正常回显。
+  - 测试任务尚未完成时退出，旧代次结果不得重新写回画布。
+  - 基准图测试、相机连续测试退出时应具备相同清理行为。
+- 验证状态：
+  - 代码路径静态检查通过。
+  - 已执行 `/home/tt/Qt/5.15.2/gcc_64/bin/qmake qt_ui_test.pro`，配置通过并识别
+    HALCON 20.11 与系统 OpenCV。
+  - 已执行 `make -j$(nproc)`，`ColorRecognitionDialog.cpp` 重新编译及主工程链接通过。
+  - 待桌面人工复核导入图片测试、退出测试以及编辑态 ROI 回显。

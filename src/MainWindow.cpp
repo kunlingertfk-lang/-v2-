@@ -573,7 +573,8 @@ void MainWindow::openCameraParamsDialog()
              << "hasFrame=" << provider.hasFrame()
              << "frameIndex=" << provider.currentFrameIndex();
 
-    persistCurrentSchemeState(QStringLiteral("openCameraParamsDialog"));
+    if (!persistCurrentSchemeState(QStringLiteral("openCameraParamsDialog")))
+        return;
     CameraParamsDialog *dialog = new CameraParamsDialog(this);// 打开相机参数窗口
     PlanDialogUtils::setSessionInfo(dialog,
                                     ui->headerDeviceComboBox->currentText(),
@@ -1773,8 +1774,28 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         accepted = runToolConfigDialog<ColorComparisonDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::RegisteredClassification:
-        accepted = runToolConfigDialog<RegisteredClassificationDialog>(this, originalConfig, &editedConfig, &snapshot);
+    {
+        RegisteredClassificationDialog dialog(this);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+        dialog.loadFromConfig(originalConfig);
+        dialog.setToolChainTestContext(
+                    m_schemeToolConfigs,
+                    row,
+                    SchemeStore::instance().currentScheme()
+                    .referencePositionCorrection);
+        QTimer::singleShot(0, &dialog, [&dialog]() {
+            dialog.raise();
+            dialog.activateWindow();
+        });
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
         break;
+    }
     case ToolType::RegisteredClassificationDetection:
         accepted = runToolConfigDialog<RegisteredClassificationDetectionDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
@@ -1806,8 +1827,33 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         break;
     }
     case ToolType::CirclePresence:
-        accepted = runToolConfigDialog<CirclePresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
+    {
+        CirclePresenceDialog dialog(this);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+
+        dialog.loadFromConfig(originalConfig);
+        dialog.setToolChainTestContext(
+                m_schemeToolConfigs,
+                row,
+                &m_toolEngine,
+                SchemeStore::instance()
+                        .currentScheme()
+                        .referencePositionCorrection);
+
+        QTimer::singleShot(0, &dialog, [&dialog]() {
+            dialog.raise();
+            dialog.activateWindow();
+        });
+
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
         break;
+    }
     case ToolType::EdgePresence:
         accepted = runToolConfigDialog<EdgePresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;

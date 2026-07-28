@@ -48,8 +48,6 @@ private:
     void setRunPoseSource(const PositionRunPoseSource &source);
     /** 将当前 runPoseSource 显示到三个只读输入框。 */
     void updateRunPoseDisplay();
-    /** 根据配置中的模板区域类型同步矩形和多边形按钮选中态。 */
-    void updateTemplateButtons();
     /** 查找当前绑定的普通工具或基准图位姿来源。 */
     bool findToolProducer(const QString &producerId, ToolConfig *config) const;
     bool findReferenceProducer(const QString &producerId,
@@ -66,11 +64,9 @@ private:
                                const QJsonObject &referencePose,
                                const QJsonObject &runPose,
                                const QVector<ToolOverlay> &sourceOverlays = {});
-    /** 显示无基准图或位置修正后端尚未实现的明确提示。 */
-    void showNotImplemented();
     /** 在基准图上执行 runPoseSource 指向的同一上游模板定位实例，并冻结 referencePose。 */
     void createReferencePose();
-    /** 使用基准图作为测试帧，执行同一上游定位与位置修正后端。 */
+    /** 使用当前运行帧执行同一上游定位与位置修正后端。 */
     void runPositionCorrectionTest();
     /** 校验完成操作所需的运行姿态来源是否完整且来自合法前置生产者。 */
     bool validateForFinish();

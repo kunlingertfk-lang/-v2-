@@ -83,7 +83,7 @@ private:
     QString m_detectRegionType = QStringLiteral("full");
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     bool m_positionCorrectionEnabled = false;
-    QString m_positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
+    QString m_positionCorrectionSource = QStringLiteral("0 基准图.位置修正信息");
     ToolPreviewSnapshot m_referencePreviewSnapshot;
 
     QButtonGroup *m_segmentGroup = nullptr;

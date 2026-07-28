@@ -20,6 +20,7 @@
 #include <opencv2/core.hpp>
 
 class QButtonGroup;
+class QPushButton;
 class QResizeEvent;
 class FrameViewHelper;
 
@@ -77,6 +78,7 @@ private slots:
     void runReferenceTest();
     void runCameraTest();
     void importTestImageFromPc();
+    void exitTestMode();
 
 private:
     void setupUiState();
@@ -97,6 +99,8 @@ private:
     void handleCircleSelectionRejected();
     void handleRoiSelectionRejected();
     void refreshDisplayedRoiOverlay();
+    void updateBottomButtons();
+    void rerunImportedTest();
     void runBlobPresenceOnFrame(const cv::Mat &frame,
                                 const cv::Mat &referenceImage,
                                 const QString &imageTitle,
@@ -117,6 +121,7 @@ private:
     QButtonGroup *m_basicResultPresenceGroup;
     QButtonGroup *m_resultPresenceGroup;
     FrameViewHelper *m_previewHelper = nullptr;
+    QPushButton *m_exitTestButton = nullptr;
     TemplateLocationAdapter m_testTemplateLocationAdapter;
     PositionCorrectionAdapter m_testPositionCorrectionAdapter;
     BlobPresenceAdapter m_testBlobPresenceAdapter;
@@ -135,6 +140,7 @@ private:
     CircleRoi m_detectCircleNormalized;
     cv::Mat m_importedTestFrame;
     QString m_importedTestImageTitle;
+    bool m_importedTestActive = false;
     bool m_blobPresenceRunning = false;
 };
 

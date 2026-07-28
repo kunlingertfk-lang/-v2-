@@ -18,6 +18,8 @@ class QButtonGroup;
 class QFrame;
 class QPushButton;
 class QTableWidget;
+class QToolButton;
+class QWidget;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class TemplateLocationDialog; }
@@ -40,6 +42,9 @@ private:
         None,
         TemplateRect,
         TemplatePolygon,
+        TemplateMaskRect,
+        TemplateMaskCircle,
+        TemplateMaskPolygon,
         SearchRect,
         SearchCircle,
         SearchPolygon,
@@ -81,6 +86,10 @@ private:
     ToolPreviewSnapshot m_snapshot;
     QRectF m_templateRoi;
     QVector<QPointF> m_templatePolygon;
+    QString m_templateMaskRegionType = QStringLiteral("none");
+    QRectF m_templateMaskRoi;
+    QVector<QPointF> m_templateMaskPolygon;
+    CircleRoi m_templateMaskCircle;
     QRectF m_searchRoi = QRectF(0.0, 0.0, 1.0, 1.0);
     QVector<QPointF> m_searchPolygon;
     CircleRoi m_searchCircle;
@@ -98,6 +107,11 @@ private:
     QFrame *m_matchResultDrawer = nullptr;
     QPushButton *m_matchResultToggle = nullptr;
     QTableWidget *m_matchResultTable = nullptr;
+    QWidget *m_templateMaskRow = nullptr;
+    QToolButton *m_templateMaskRectButton = nullptr;
+    QToolButton *m_templateMaskCircleButton = nullptr;
+    QToolButton *m_templateMaskPolygonButton = nullptr;
+    QPushButton *m_templateMaskClearButton = nullptr;
     bool m_matchResultsExpanded = false;
     ToolResult m_lastDisplayResult;
 };

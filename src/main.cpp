@@ -76,8 +76,8 @@ int main(int argc, char *argv[])
 
     loadStyleSheet(app);
     QObject::connect(&app, &QApplication::aboutToQuit, []() {
-        CameraFrameProvider::instance().stopGrab();
-        CameraFrameProvider::instance().closeCamera(QStringLiteral("aboutToQuit"));
+    CameraFrameProvider::instance().closeCamera(
+                QStringLiteral("aboutToQuit"));
     });
 
     LoginWindow loginWindow;

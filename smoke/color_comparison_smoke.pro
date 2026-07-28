@@ -24,7 +24,9 @@ SOURCES += \
     color_comparison_smoke.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
     ../src/algorithms/recognition/ColorRecognitionHalconRunner.cpp \
-    ../src/algorithms/recognition/ColorComparisonHalconRunner.cpp
+    ../src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp
 
 LIBS += -L$$OPENCV_ROOT/lib
 LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib

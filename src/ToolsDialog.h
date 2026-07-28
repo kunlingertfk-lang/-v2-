@@ -56,6 +56,9 @@ private:
     void connectNavigation();
     void refreshSchemeHeader();
     bool commitToolStateToScheme(bool saveToDisk);
+    void restoreToolState(const QVector<ToolConfig> &configs,
+                          const QMap<QString, ToolPreviewSnapshot> &snapshots,
+                          int selectedIndex);
     void addConfiguredTool(const ToolConfig &config, const ToolPreviewSnapshot &snapshot);
     bool openToolConfigDialogForAdd(ToolType type);
     bool openToolConfigDialogForEdit(int index);

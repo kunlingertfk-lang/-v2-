@@ -364,8 +364,7 @@ ToolResult makeError(const ToolConfig &config,
             .toString().trimmed();
     if (!stablePositionSource.isEmpty())
         positionSource = stablePositionSource;
-    if (positionSource == PositionCorrection::defaultSource())
-        positionSource = PositionCorrection::defaultSourceId();
+    positionSource = PositionCorrection::normalizedSourceId(positionSource);
 
     QJsonArray warnings;
     QJsonObject detectionRoi{
@@ -869,10 +868,8 @@ ParseResult parseConfig(const ToolRequest &request,
                 .toString().trimmed();
         if (!stableSourceId.isEmpty())
             config.positionCorrection.sourceId = stableSourceId;
-        if (config.positionCorrection.sourceId == PositionCorrection::defaultSource())
-            config.positionCorrection.sourceId = PositionCorrection::defaultSourceId();
-        if (config.positionCorrection.sourceId.trimmed().isEmpty())
-            config.positionCorrection.sourceId = PositionCorrection::defaultSourceId();
+        config.positionCorrection.sourceId =
+                PositionCorrection::normalizedSourceId(config.positionCorrection.sourceId);
     }
 
     const QJsonObject judgeRule = request.config.judgeRule;

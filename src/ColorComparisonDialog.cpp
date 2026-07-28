@@ -2696,8 +2696,8 @@ void ColorComparisonDialog::loadFromConfig(const ToolConfig &config)
                       .toString(colorComparison.value(QStringLiteral("positionCorrectionSource"))
                                 .toString(PositionCorrection::defaultSourceId())))
             .trimmed();
-    if (m_positionCorrectionSource == PositionCorrection::defaultSource())
-        m_positionCorrectionSource = PositionCorrection::defaultSourceId();
+    m_positionCorrectionSource =
+            PositionCorrection::normalizedSourceId(m_positionCorrectionSource);
 
     const ReferenceFrameSnapshot reference =
             ReferenceImageProvider::instance().referenceFrameSnapshot();
@@ -2787,6 +2787,12 @@ void ColorComparisonDialog::runTest()
         return;
     }
 
+    if (m_liveTestSource == LiveTestSource::Imported
+            && !m_liveTestFrameSnapshot.empty()) {
+        runSingleShotTest();
+        return;
+    }
+
     startContinuousRun();
 }
 
@@ -2824,12 +2830,8 @@ void ColorComparisonDialog::startContinuousRun()
         return;
 
     invalidateAsyncWork();
-    const bool keepImportedSource =
-            m_liveTestSource == LiveTestSource::Imported
-            && !m_liveTestFrameSnapshot.empty();
     m_testUiMode = TestUiMode::Continuous;
-    if (!keepImportedSource)
-        m_liveTestSource = LiveTestSource::Camera;
+    m_liveTestSource = LiveTestSource::Camera;
     if (m_editState == EditState::TemplateRect
             || m_editState == EditState::TemplateMaskPolygon) {
         setEditState(EditState::None);
@@ -3048,11 +3050,22 @@ void ColorComparisonDialog::updateBottomButtons()
         return;
 
     const bool testMode = m_testUiMode != TestUiMode::Edit;
+    const bool imported = m_liveTestSource == LiveTestSource::Imported
+            && !m_liveTestFrameSnapshot.empty();
     m_referenceTestButton->setVisible(!testMode);
     m_exitTestButton->setVisible(testMode);
     m_finishButton->setText(testMode ? tr("运行一次") : tr("完成"));
-    m_testRunButton->setText(m_testUiMode == TestUiMode::Continuous ? tr("停止运行") :
-                             testMode ? tr("连续运行") : tr("测试运行"));
+    m_testRunButton->setText(
+                m_testUiMode == TestUiMode::Continuous
+                ? tr("停止运行")
+                : (imported ? tr("测试运行（导入图）")
+                            : (testMode ? tr("连续运行")
+                                        : tr("测试运行"))));
+    m_testRunButton->setToolTip(
+                imported
+                ? tr("重新填充并测试当前 PC 导入图片：%1")
+                  .arg(m_liveTestImageTitle)
+                : QString());
     m_testRunButton->setProperty("running", m_testUiMode == TestUiMode::Continuous);
     refreshButtonStyle(m_testRunButton);
 }

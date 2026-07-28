@@ -1,6 +1,8 @@
 #include "tooladapters/EdgePresenceAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonObject>
 #include <QJsonValue>
@@ -161,7 +163,21 @@ ToolResult EdgePresenceAdapter::run(const ToolRequest &request)
                                      QStringLiteral("EdgePresenceAdapter only supports ToolType::EdgePresence."));
     }
 
-    const EdgePresenceHalconConfig halconConfig = toHalconConfig(config);
+    EdgePresenceHalconConfig halconConfig = toHalconConfig(config);
+    const PositionCorrectionConfig savedCorrection =
+            PositionCorrection::fromParams(config.params);
+    PositionCorrectionConsumerOptions correctionOptions;
+    correctionOptions.requested = savedCorrection.enabled;
+    correctionOptions.sourceId = savedCorrection.sourceId;
+    correctionOptions.showMatchContour = boolParam(
+                config.params, QStringLiteral("showPositionCorrectionMatchContour"), true);
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, correctionOptions);
+    if (!correction.success)
+        return makeEdgePresenceError(config, correction.status, correction.message);
+    halconConfig.enablePositionCorrection = savedCorrection.enabled;
+    halconConfig.positionCorrectionSource = savedCorrection.source;
+    halconConfig.positionCorrection = correction.context;
     const EdgePresenceHalconResult runnerResult = m_runner.run(request.image, halconConfig);
 
     ToolResult result;

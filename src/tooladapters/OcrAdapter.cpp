@@ -1,6 +1,8 @@
 #include "tooladapters/OcrAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QDebug>
 #include <QJsonArray>
@@ -168,6 +170,14 @@ OcrHalconConfig toHalconConfig(const ToolConfig &config)
     halconConfig.roiNormalized = config.roiNormalized;
     if (halconConfig.roiNormalized.width() <= 0.0 || halconConfig.roiNormalized.height() <= 0.0)
         halconConfig.roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(
+                params,
+                params.value(QStringLiteral("independentPositionCorrection"))
+                .toBool(false),
+                params.value(QStringLiteral("positionCorrection")).toString());
+    halconConfig.enablePositionCorrection = correction.enabled;
+    halconConfig.positionCorrectionSource = correction.source;
 
     halconConfig.binaryThreshold = qBound(0,
                                           firstInt(params,
@@ -352,7 +362,7 @@ ToolResult OcrAdapter::run(const ToolRequest &request)
                             QStringLiteral("image_empty"),
                             QStringLiteral("OCR input image is empty."));
 
-    const OcrHalconConfig halconConfig = toHalconConfig(config);
+    OcrHalconConfig halconConfig = toHalconConfig(config);
     if (halconConfig.halconSoPath.isEmpty())
         return makePathError(config,
                              QStringLiteral("halcon_so_not_found"),
@@ -368,6 +378,24 @@ ToolResult OcrAdapter::run(const ToolRequest &request)
                              .arg(HalconRuntimePaths::formatTriedPaths(halconConfig.ocrModelPathCandidates)),
                              QStringLiteral("ocrModelPathCandidates"),
                              halconConfig.ocrModelPathCandidates);
+
+    const PositionCorrectionConfig savedCorrection =
+            PositionCorrection::fromParams(
+                config.params,
+                config.params.value(QStringLiteral("independentPositionCorrection"))
+                .toBool(false),
+                config.params.value(QStringLiteral("positionCorrection")).toString());
+    PositionCorrectionConsumerOptions correctionOptions;
+    correctionOptions.requested = savedCorrection.enabled;
+    correctionOptions.sourceId = savedCorrection.sourceId;
+    correctionOptions.showMatchContour = config.params
+            .value(QStringLiteral("showPositionCorrectionMatchContour"))
+            .toBool(true);
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, correctionOptions);
+    if (!correction.success)
+        return makeOcrError(config, correction.status, correction.message);
+    halconConfig.positionCorrection = correction.context;
 
     const OcrHalconResult ocrResult = m_runner.run(request.image, halconConfig);
 

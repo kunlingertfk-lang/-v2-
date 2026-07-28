@@ -80,6 +80,11 @@ int main(int argc, char **argv)
              QJsonObject{{QStringLiteral("x"), 0.2}, {QStringLiteral("y"), 0.2}},
              QJsonObject{{QStringLiteral("x"), 0.5}, {QStringLiteral("y"), 0.2}},
              QJsonObject{{QStringLiteral("x"), 0.4}, {QStringLiteral("y"), 0.6}}}},
+        {QStringLiteral("templateMaskPolygonNormalized"), QJsonArray{
+             QJsonObject{{QStringLiteral("x"), 0.25}, {QStringLiteral("y"), 0.25}},
+             QJsonObject{{QStringLiteral("x"), 0.35}, {QStringLiteral("y"), 0.25}},
+             QJsonObject{{QStringLiteral("x"), 0.35}, {QStringLiteral("y"), 0.35}},
+             QJsonObject{{QStringLiteral("x"), 0.25}, {QStringLiteral("y"), 0.35}}}},
         {QStringLiteral("searchRegionType"), QStringLiteral("rectangle")},
         {QStringLiteral("searchRoiNormalized"), rectJson(0.1, 0.1, 0.8, 0.8)},
         {QStringLiteral("minScore"), 63},
@@ -110,6 +115,12 @@ int main(int argc, char **argv)
     check(output.params.value(QStringLiteral("templateRegionType")).toString() ==
               QStringLiteral("polygon"),
           "template polygon mode round trips");
+    check(output.params.value(QStringLiteral("version")).toInt() == 4 &&
+          output.params.value(QStringLiteral("templateMaskRegionType")).toString() ==
+              QStringLiteral("polygon") &&
+          output.params.value(QStringLiteral("templateMaskPolygonNormalized"))
+              .toArray().size() == 4,
+          "legacy polygon mask round trips through the version 4 shape contract");
     check(output.params.value(QStringLiteral("minScore")).toInt() == 63 &&
               output.params.value(QStringLiteral("angleStart")).toInt() == -30 &&
               output.params.value(QStringLiteral("angleEnd")).toInt() == 35,
@@ -141,6 +152,47 @@ int main(int argc, char **argv)
               createTemplate && createTemplate->text() == QStringLiteral("创建模板"),
           "deleting the model clears its valid state and keeps recreation available");
 
+    dialog.loadFromConfig(input);
+    QPushButton *maskClearButton = dialog.findChild<QPushButton *>(
+                QStringLiteral("templateMaskClearButton"));
+    QToolButton *maskRectButton = dialog.findChild<QToolButton *>(
+                QStringLiteral("templateMaskRectButton"));
+    QToolButton *maskCircleButton = dialog.findChild<QToolButton *>(
+                QStringLiteral("templateMaskCircleButton"));
+    check(maskRectButton && maskCircleButton,
+          "rectangle and circle template mask actions are available");
+    if (maskClearButton)
+        maskClearButton->click();
+    check(maskClearButton &&
+          dialog.toolConfig().params.value(
+              QStringLiteral("templateMaskPolygonNormalized")).toArray().isEmpty() &&
+          !dialog.toolConfig().params.value(QStringLiteral("modelCreated")).toBool(),
+          "clearing the template mask invalidates the existing shape model");
+
+    ToolConfig circleMaskInput = input;
+    circleMaskInput.params.insert(QStringLiteral("templateMaskRegionType"),
+                                  QStringLiteral("circle"));
+    circleMaskInput.params.insert(QStringLiteral("templateMaskRoiNormalized"),
+                                  rectJson(0.30, 0.30, 0.20, 0.20));
+    circleMaskInput.params.insert(
+                QStringLiteral("templateMaskCircleCenterNormalized"),
+                QJsonObject{{QStringLiteral("x"), 0.40},
+                            {QStringLiteral("y"), 0.40}});
+    circleMaskInput.params.insert(
+                QStringLiteral("templateMaskCircleRadiusNormalized"), 0.10);
+    circleMaskInput.params.insert(
+                QStringLiteral("templateMaskPolygonNormalized"), QJsonArray());
+    circleMaskInput.params.insert(QStringLiteral("modelCreated"), false);
+    dialog.loadFromConfig(circleMaskInput);
+    const QJsonObject circleMaskOutput = dialog.toolConfig().params;
+    check(circleMaskOutput.value(
+              QStringLiteral("templateMaskRegionType")).toString() ==
+              QStringLiteral("circle") &&
+          std::abs(circleMaskOutput.value(
+              QStringLiteral("templateMaskCircleRadiusNormalized"))
+                   .toDouble() - 0.10) < 1e-9,
+          "circle template mask geometry round trips");
+
     ToolConfig creationInput = input;
     creationInput.params.insert(QStringLiteral("templateRegionType"),
                                 QStringLiteral("rectangle"));
@@ -148,6 +200,7 @@ int main(int argc, char **argv)
                                 rectJson(155.0 / 520.0, 90.0 / 360.0,
                                          160.0 / 520.0, 135.0 / 360.0));
     creationInput.params.insert(QStringLiteral("templatePolygonNormalized"), QJsonArray());
+    creationInput.params.insert(QStringLiteral("templateMaskPolygonNormalized"), QJsonArray());
     creationInput.params.insert(QStringLiteral("searchRegionType"), QStringLiteral("full"));
     creationInput.params.insert(QStringLiteral("searchRoiNormalized"),
                                 rectJson(0.0, 0.0, 1.0, 1.0));
@@ -173,6 +226,8 @@ int main(int argc, char **argv)
         deleteTemplate->click();
 
     QFrame *advancedCard = dialog.findChild<QFrame *>(QStringLiteral("advancedCard"));
+    QWidget *templateMaskRow = dialog.findChild<QWidget *>(
+                QStringLiteral("templateMaskRow"));
     QPushButton *allButton = dialog.findChild<QPushButton *>(QStringLiteral("allModeButton"));
     QComboBox *contrastMode = dialog.findChild<QComboBox *>(QStringLiteral("contrastModeComboBox"));
     QSpinBox *contrast = dialog.findChild<QSpinBox *>(QStringLiteral("contrastSpinBox"));
@@ -184,10 +239,14 @@ int main(int argc, char **argv)
     QLabel *contrastLabel = dialog.findChild<QLabel *>(QStringLiteral("contrastLabel"));
     QLabel *minContrastLabel = dialog.findChild<QLabel *>(QStringLiteral("minContrastLabel"));
     QLabel *autoValue = dialog.findChild<QLabel *>(QStringLiteral("autoContrastValueLabel"));
-    check(advancedCard && advancedCard->isHidden(), "basic page hides advanced parameters");
+    check(advancedCard && advancedCard->isHidden() &&
+          templateMaskRow && templateMaskRow->isHidden(),
+          "basic page hides advanced parameters and template mask controls");
     if (allButton)
         allButton->click();
-    check(advancedCard && !advancedCard->isHidden(), "all page shows advanced parameters");
+    check(advancedCard && !advancedCard->isHidden() &&
+          templateMaskRow && !templateMaskRow->isHidden(),
+          "all page shows advanced parameters and template mask controls");
     check(contrastMode && contrastMode->currentIndex() == 0,
           "automatic contrast is restored");
     check(contrast && minContrast && !contrast->isEnabled() && !minContrast->isEnabled(),

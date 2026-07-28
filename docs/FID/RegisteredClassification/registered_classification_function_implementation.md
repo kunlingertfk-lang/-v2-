@@ -2,7 +2,9 @@
 
 ## 文档用途
 
-本文档是当前注册分类功能的实现基线。当前基线以 `7728ac0` 及其之前的 Task 1-5 实现为准，后续 UI、Adapter、训练、模型管理和 Runner 变更必须同时更新本文档与同目录的当前实现说明、提示词规范。
+本文档是当前注册分类功能的实现基线。2026-07-25 已在 Feature V2 双 KNN
+主线上完成公共位置修正消费接入；后续 UI、Adapter、训练、模型管理和 Runner
+变更必须同时更新本文档与同目录的当前实现说明、提示词规范。
 
 ## 当前结论
 
@@ -24,7 +26,10 @@
   -> class_stats.json 类内半径
   -> schema 2 模型包
 
-输入图 + 检测 ROI
+输入图 + 基准检测 ROI
+  -> 可选公共位置修正上下文
+  -> HALCON affine_trans_region + clip_region
+  -> 当前帧真实检测 Region
   -> 同一 Feature V2 提取链
   -> 两个 HALCON KNN 分类
   -> 相似度融合
@@ -48,8 +53,10 @@
 | `params.registeredClassification.topK` | 仅控制候选 payload/UI 展示数量，默认 `1` |
 | `params.registeredClassification.minSimilarity` | 模型拒识阈值，固定默认 `80` |
 | `params.registeredClassification.minMargin` | Top1/Top2 类别差值阈值，固定默认 `8` |
-| `params.registeredClassification.enablePositionCorrection` | 可保存和回显，但当前不应用 |
-| `params.registeredClassification.positionCorrectionSource` | 位置修正来源文本，默认 `1 基准图.位置修正信息` |
+| `params.registeredClassification.enablePositionCorrection` | 开启后必须消费所选前置位置修正，不允许回退固定 ROI |
+| `params.registeredClassification.positionCorrectionSourceId` | 位置修正稳定来源 ID，基准图固定为 `reference.positionCorrection` |
+| `params.registeredClassification.positionCorrectionSource` | 位置修正显示文本，当前默认 `0 基准图.位置修正信息`；历史编号 `1` 仅作为迁移输入 |
+| `params.registeredClassification.showPositionCorrectionMatchContour` | 是否显示位置修正匹配轮廓，默认 `true`；不影响匹配原点和 ROI 修正 |
 
 `judgeRule.mode` 仍使用 `class_match` 或 `min_score`。`judgeRule.minScore` 是结果判断阈值，不替代模型拒识的 `minSimilarity` 和 `minMargin`。UNKNOWN 在两种判断模式下都为 NG。
 
@@ -140,7 +147,25 @@ score = 0.70 * sampleSimilarity + 0.30 * centerSimilarity
 
 HALCON 动态库、tuple、图像/区域对象和两个 KNN 句柄均使用作用域清理。每个已成功创建或读取的 KNN 句柄只清理一次；正常返回、拒识、异常和中途错误都不能泄漏句柄。当前不跨运行缓存 KNN 句柄。
 
-位置修正字段仍可保存、回显并写入 payload，但分类 Runner 不改变 ROI 坐标，不执行补偿；payload 固定表达 `positionCorrectionApplied=false` 和未实现原因。不得把位置修正字段存在误写成已应用。
+位置修正已按公共消费合同接入：
+
+1. Dialog 保存/回显开关、稳定来源 ID、显示文本和匹配轮廓开关；来源只允许
+   基准图或当前工具之前的合法位置修正节点。
+2. Dialog 的基准图、相机和 PC 导入图片测试在开启修正时通过
+   `ToolEngine::runTools()` 重跑完整前缀链，每轮生成新的 `frameId`。
+3. Adapter 使用 `PositionCorrectionConsumer::resolve()` 校验同帧来源、矩阵、
+   尺度和来源状态；失败时明确返回，不回退到固定 ROI。
+4. Runner 在全图绝对坐标中创建基准 Region，通过 HALCON
+   `affine_trans_region` 和 `clip_region` 得到当前帧 Region，Feature V2 的
+   `reduce_domain`、前景和 59D 特征均使用该 Region。
+5. `detect_roi` 使用同一矩阵，运行态同时按配置输出匹配轮廓和匹配原点。
+   新一轮测试、退出测试和恢复基准图会清除旧运行 Overlay 并恢复配置 ROI。
+
+结果 payload 包含 `positionCorrectionRequested`、`positionCorrectionApplied`、
+`positionCorrectionSourceId`、`positionCorrectionReason`、
+`referenceToRunHomMat2D`、三个尺度字段、`correctedRoiPixels`、
+`correctedRoiArea` 和 `positionCorrectionOperation`。来源缺失、来源失败、
+矩阵非法、尺度非法和修正 ROI 完全越界均返回明确错误。
 
 ## 旧模型与模型管理
 
@@ -153,6 +178,27 @@ MLP/DL 仅作为历史模型的识别标签和升级入口存在。不得新增 
 ## 关键错误状态
 
 当前链路至少应明确区分：`invalid_roi`、`foreground_not_found`、`invalid_feature_value`、`model_package_incomplete`、`legacy_model_requires_retraining`、`knn_read_failed`、`knn_model_mismatch`、`knn_classify_failed`、`halcon_symbol_missing`、`classification_rejected_low_similarity`、`classification_rejected_ambiguous` 和 `classification_rejected_out_of_radius`。错误 payload 应包含状态、消息、模型/ROI/耗时等定位信息。
+
+位置修正额外区分 `position_correction_source_missing`、
+`position_correction_match_not_found`、`position_correction_source_failed`、
+`position_correction_source_invalid`、`position_correction_frame_mismatch`、
+`invalid_position_correction_matrix`、`invalid_pose_scale` 和
+`corrected_roi_out_of_image`。
+
+## 2026-07-25 验证记录
+
+- 主工程 `qmake ../qt_ui_test.pro && make -j$(nproc)`：通过。
+- `registered_classification_dialog_smoke`：通过，覆盖位置修正开关可用、稳定来源
+  ID、轮廓开关保存和基础 UI 回归。
+- `registered_classification_adapter_smoke`、Feature V2 smoke、双 KNN backend
+  smoke：通过。
+- `registered_classification_position_correction_smoke`：通过；使用实际训练出的
+  schema 2 模型验证平移 Region 分类、同矩阵 `detect_roi`、轮廓显隐、匹配原点、
+  来源缺失、完全越界和 `ToolEngine` 前缀链。
+- 现有 Hikrobot 4 类数据集基线运行完成：12 个测试样本为
+  `0 正确 / 0 错分 / 12 ambiguous 拒识`。这说明链路能够稳定执行且未误报已知类，
+  但默认 `minMargin=8` 下类别区分度仍不足；该数据质量/特征区分问题不通过放宽
+  位置修正合同或篡改 smoke 断言掩盖。
 
 ## 历史记录（仅供追溯，不是当前实现）
 

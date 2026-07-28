@@ -183,8 +183,7 @@ ToolResult BlobPresenceAdapter::run(const ToolRequest &request)
             .toString().trimmed();
     if (stableSourceId.isEmpty())
         stableSourceId = halconConfig.positionCorrectionSource.trimmed();
-    if (stableSourceId == PositionCorrection::defaultSource())
-        stableSourceId = PositionCorrection::defaultSourceId();
+    stableSourceId = PositionCorrection::normalizedSourceId(stableSourceId);
 
     PositionCorrectionConsumerOptions correctionOptions;
     correctionOptions.requested = halconConfig.enablePositionCorrection;

@@ -76,11 +76,16 @@ struct PositionRunPoseSource
 
 struct ReferencePositionCorrectionConfig
 {
-    int version = 2;
+    int version = 3;
     bool enabled = false;
     QString templateRegionType = QStringLiteral("rectangle");
     QRectF templateRoiNormalized;
     QJsonArray templatePolygonNormalized;
+    QString templateMaskRegionType = QStringLiteral("none");
+    QRectF templateMaskRoiNormalized;
+    QJsonArray templateMaskPolygonNormalized;
+    QPointF templateMaskCircleCenterNormalized;
+    double templateMaskCircleRadiusNormalized = 0.0;
     QString originMode = QStringLiteral("centroid");
     QPointF customOriginNormalized = QPointF(0.5, 0.5);
     bool referenceCreated = false;
@@ -98,6 +103,8 @@ namespace PositionCorrection {
 QString defaultSource();
 /** 返回方案级基准图位置修正来源的固定稳定 ID。 */
 QString defaultSourceId();
+/** 将当前/历史基准图显示文本归一化为固定稳定 ID。 */
+QString normalizedSourceId(const QString &sourceIdOrDisplayText);
 /** 返回后端未接入阶段统一使用的英文原因码。 */
 QString notImplementedReason();
 

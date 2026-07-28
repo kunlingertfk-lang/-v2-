@@ -344,12 +344,68 @@ int main(int argc, char **argv)
     check(positionSwitch != nullptr, "position correction switch must exist");
     check(positionSwitch && !positionSwitch->isChecked(),
           "position correction switch must default to unchecked");
-    check(positionSwitch && !positionSwitch->isEnabled(),
-          "position correction switch must be disabled until implemented");
+    check(positionSwitch && positionSwitch->isEnabled(),
+          "position correction switch must be enabled");
     check(!dialog.toToolConfig()
            .params.value(QStringLiteral("registeredClassification")).toObject()
            .value(QStringLiteral("enablePositionCorrection")).toBool(true),
           "default config must save enablePositionCorrection=false");
+    QComboBox *positionSource = dialog.findChild<QComboBox *>(
+                QStringLiteral(
+                    "registeredClassificationPositionCorrectionSourceComboBox"));
+    check(positionSource != nullptr,
+          "position correction source combo must expose a stable object name");
+    check(positionSource
+          && positionSource->currentData().toString()
+             == QStringLiteral("reference.positionCorrection"),
+          "default position correction source must use the stable reference ID");
+    QCheckBox *positionContour = dialog.findChild<QCheckBox *>(
+                QStringLiteral(
+                    "registeredClassificationPositionCorrectionContourSwitch"));
+    check(positionContour && positionContour->isChecked(),
+          "match contour display must default to enabled");
+    if (positionSwitch)
+        positionSwitch->setChecked(true);
+    if (positionContour)
+        positionContour->setChecked(false);
+    const ToolConfig correctedConfig = dialog.toToolConfig();
+    const QJsonObject correctedParams = correctedConfig.params
+            .value(QStringLiteral("registeredClassification")).toObject();
+    check(correctedParams.value(
+              QStringLiteral("enablePositionCorrection")).toBool(false),
+          "enabled position correction must be saved");
+    check(correctedParams.value(
+              QStringLiteral("positionCorrectionSourceId")).toString()
+          == QStringLiteral("reference.positionCorrection"),
+          "position correction must save its stable source ID");
+    check(!correctedParams.value(
+              QStringLiteral("showPositionCorrectionMatchContour")).toBool(true),
+          "match contour visibility must be saved");
+    RegisteredClassificationDialog restoredPositionDialog;
+    restoredPositionDialog.loadFromConfig(correctedConfig);
+    QCheckBox *restoredPositionSwitch =
+            restoredPositionDialog.findChild<QCheckBox *>(
+                QStringLiteral("positionCorrectionSwitch"));
+    QCheckBox *restoredPositionContour =
+            restoredPositionDialog.findChild<QCheckBox *>(
+                QStringLiteral(
+                    "registeredClassificationPositionCorrectionContourSwitch"));
+    QComboBox *restoredPositionSource =
+            restoredPositionDialog.findChild<QComboBox *>(
+                QStringLiteral(
+                    "registeredClassificationPositionCorrectionSourceComboBox"));
+    check(restoredPositionSwitch && restoredPositionSwitch->isChecked(),
+          "position correction enabled state must round trip");
+    check(restoredPositionContour && !restoredPositionContour->isChecked(),
+          "match contour visibility must round trip");
+    check(restoredPositionSource
+          && restoredPositionSource->currentData().toString()
+             == QStringLiteral("reference.positionCorrection"),
+          "position correction stable source ID must round trip");
+    if (positionSwitch)
+        positionSwitch->setChecked(false);
+    if (positionContour)
+        positionContour->setChecked(true);
 
     QLabel *modelTitle = labelByText(dialog, QStringLiteral("模型训练"));
     QLabel *detectTitle = labelByText(dialog, QStringLiteral("检测区域"));

@@ -3,6 +3,7 @@
 #include "algorithms/halcon/HalconRuntimePaths.h"
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -73,7 +74,10 @@ RegisteredClassificationHalconConfig toRunnerConfig(const ToolConfig &config)
                 config.roiNormalized.width() > 0.0 && config.roiNormalized.height() > 0.0
                     ? config.roiNormalized
                     : runnerConfig.roiNormalized);
-    runnerConfig.positionCorrection = PositionCorrection::fromParams(params);
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(params);
+    runnerConfig.enablePositionCorrection = correction.enabled;
+    runnerConfig.positionCorrectionSource = correction.source;
     runnerConfig.topK = qMax(1, intParam(params,
                                          QStringLiteral("topK"),
                                          runnerConfig.topK));
@@ -127,8 +131,40 @@ ToolResult RegisteredClassificationAdapter::run(const ToolRequest &request)
                     QStringLiteral("RegisteredClassificationAdapter only supports ToolType::RegisteredClassification."));
     }
 
+    RegisteredClassificationHalconConfig runnerConfig =
+            toRunnerConfig(config);
+    const QJsonObject params = registeredClassificationParams(config);
+    const PositionCorrectionConfig savedCorrection =
+            PositionCorrection::fromParams(params);
+    PositionCorrectionConsumerOptions correctionOptions;
+    correctionOptions.requested = savedCorrection.enabled;
+    correctionOptions.sourceId = savedCorrection.sourceId;
+    correctionOptions.showMatchContour = params.value(
+                QStringLiteral("showPositionCorrectionMatchContour"))
+            .toBool(true);
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, correctionOptions);
+    if (!correction.success) {
+        ToolResult result = makeError(
+                    config, correction.status, correction.message);
+        result.payload.insert(QStringLiteral("positionCorrectionRequested"),
+                              correctionOptions.requested);
+        result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+        result.payload.insert(QStringLiteral("positionCorrectionSource"),
+                              savedCorrection.source);
+        result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
+                              PositionCorrection::normalizedSourceId(
+                                  correctionOptions.sourceId));
+        result.payload.insert(QStringLiteral("positionCorrectionReason"),
+                              correction.status);
+        result.payload.insert(QStringLiteral("errorCode"), correction.status);
+        result.payload.insert(QStringLiteral("errorMessage"), correction.message);
+        return result;
+    }
+    runnerConfig.positionCorrection = correction.context;
+
     const RegisteredClassificationHalconResult runnerResult =
-            m_runner.run(request.image, toRunnerConfig(config));
+            m_runner.run(request.image, runnerConfig);
 
     ToolResult result;
     result.toolId = config.toolId;

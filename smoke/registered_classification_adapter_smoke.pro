@@ -28,6 +28,9 @@ SOURCES += \
     registered_classification_adapter_smoke.cpp \
     ../src/tooladapters/RegisteredClassificationAdapter.cpp \
     ../src/toolcore/PositionCorrection.cpp \
+    ../src/toolcore/PositionCorrectionConsumer.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     ../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
@@ -51,6 +54,9 @@ HEADERS += \
     ../src/toolcore/ToolConfig.h \
     ../src/toolcore/ToolOverlay.h \
     ../src/toolcore/PositionCorrection.h \
+    ../src/toolcore/PositionCorrectionConsumer.h \
+    ../src/toolcore/PositionCorrectionTransform.h \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.h \
     ../src/toolcore/ToolRequest.h \
     ../src/toolcore/ToolResult.h \
     ../src/toolcore/ToolTypes.h

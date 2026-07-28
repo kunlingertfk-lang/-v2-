@@ -53,9 +53,11 @@ ToolConfig makeConfig(const QString &modelPath,
             {QStringLiteral("y"), roi.y()},
             {QStringLiteral("width"), roi.width()},
             {QStringLiteral("height"), roi.height()}});
-    nested.insert(QStringLiteral("enablePositionCorrection"), true);
+    nested.insert(QStringLiteral("enablePositionCorrection"), false);
     nested.insert(QStringLiteral("positionCorrectionSource"),
-                  QStringLiteral("1 基准图.位置修正信息"));
+                  QStringLiteral("0 基准图.位置修正信息"));
+    nested.insert(QStringLiteral("positionCorrectionSourceId"),
+                  QStringLiteral("reference.positionCorrection"));
     nested.insert(QStringLiteral("topK"), 1);
     nested.insert(QStringLiteral("minSimilarity"), minSimilarity);
     nested.insert(QStringLiteral("minMargin"), minMargin);
@@ -219,7 +221,7 @@ int main(int argc, char **argv)
               "invalid rectangle ROI must yield invalid_roi");
     }
 
-    // 6. 位置修正占位 payload 必须存在且未应用（用一个返回错误的场景验证 payload 字段）。
+    // 6. 未开启位置修正时仍须输出明确的未请求诊断。
     {
         ToolConfig config = makeConfig(QStringLiteral("/tmp/DemoModel.hdl"),
                                        QStringLiteral("DemoModel"),
@@ -228,13 +230,13 @@ int main(int argc, char **argv)
                                        QString(), QStringLiteral("class_match"),
                                        QStringLiteral("OK"), 80);
         const ToolResult result = adapter.run(requestWithImage(config, dummyImage));
-        check(result.payload.value(QStringLiteral("enablePositionCorrection")).toBool(false),
-              "payload must carry enablePositionCorrection");
+        check(!result.payload.value(QStringLiteral("enablePositionCorrection")).toBool(true),
+              "payload must carry disabled enablePositionCorrection");
         check(!result.payload.value(QStringLiteral("positionCorrectionApplied")).toBool(true),
               "position correction must not be applied");
         check(result.payload.value(QStringLiteral("positionCorrectionReason")).toString()
-                      == QStringLiteral("not implemented"),
-              "position correction reason must be not implemented");
+                      == QStringLiteral("not_requested"),
+              "disabled position correction reason must be not_requested");
         check(result.payload.value(QStringLiteral("errorCode")).toString() == result.status,
               "payload errorCode must match status");
     }

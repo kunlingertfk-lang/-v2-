@@ -4,12 +4,14 @@
 #include "algorithms/recognition/RegisteredClassificationFeatureSpace.h"
 #include "algorithms/recognition/RegisteredClassificationKnnRuntime.h"
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
+#include "toolcore/PositionCorrectionTransform.h"
 
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QMap>
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -33,6 +35,50 @@ QJsonArray topClassesToJson(const QVector<RegisteredClassificationClassScore> &c
     return values;
 }
 
+QJsonArray numbersToJson(const QVector<double> &numbers)
+{
+    QJsonArray array;
+    for (double number : numbers)
+        array.append(number);
+    return array;
+}
+
+void writePositionCorrectionPayload(
+        const RegisteredClassificationHalconConfig &config,
+        QJsonObject *payload)
+{
+    if (!payload)
+        return;
+    payload->insert(QStringLiteral("enablePositionCorrection"),
+                    config.enablePositionCorrection);
+    payload->insert(QStringLiteral("positionCorrectionRequested"),
+                    config.positionCorrection.requested);
+    payload->insert(QStringLiteral("positionCorrectionApplied"),
+                    config.positionCorrection.applied);
+    payload->insert(QStringLiteral("positionCorrectionSource"),
+                    config.positionCorrectionSource);
+    payload->insert(QStringLiteral("positionCorrectionSourceId"),
+                    config.positionCorrection.sourceId);
+    payload->insert(QStringLiteral("positionCorrectionReason"),
+                    config.positionCorrection.applied
+                    ? QStringLiteral("applied")
+                    : (config.positionCorrection.requested
+                       ? QStringLiteral("not_applied")
+                       : QStringLiteral("not_requested")));
+    payload->insert(QStringLiteral("referenceToRunHomMat2D"),
+                    numbersToJson(config.positionCorrection.referenceToRunHomMat2D));
+    payload->insert(QStringLiteral("referenceScale"),
+                    config.positionCorrection.referenceScale);
+    payload->insert(QStringLiteral("runScale"),
+                    config.positionCorrection.runScale);
+    payload->insert(QStringLiteral("scaleRatio"),
+                    config.positionCorrection.scaleRatio);
+    payload->insert(QStringLiteral("positionCorrectionMatchContourAvailable"),
+                    !config.positionCorrection.matchContours.isEmpty());
+    payload->insert(QStringLiteral("positionCorrectionMatchOriginAvailable"),
+                    !config.positionCorrection.matchOrigins.isEmpty());
+}
+
 RegisteredClassificationHalconResult makeError(const QString &status,
                                                 const QString &message,
                                                 const RegisteredClassificationHalconConfig &config,
@@ -49,7 +95,7 @@ RegisteredClassificationHalconResult makeError(const QString &status,
     result.payload.insert(QStringLiteral("modelType"), config.modelType);
     result.payload.insert(QStringLiteral("hasImage"), !image.empty());
     result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(elapsedMs));
-    PositionCorrection::writeNotAppliedPayload(config.positionCorrection, &result.payload);
+    writePositionCorrectionPayload(config, &result.payload);
     result.payload.insert(QStringLiteral("errorCode"), status);
     result.payload.insert(QStringLiteral("errorMessage"), message);
     return result;
@@ -73,6 +119,31 @@ ToolOverlay roiOverlay(const QRect &roi)
     overlay.type = ToolOverlayType::Rect;
     overlay.label = QStringLiteral("detect_roi");
     overlay.rect = QRectF(roi);
+    overlay.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
+    return overlay;
+}
+
+ToolOverlay configuredRoiOverlay(
+        const RegisteredClassificationHalconConfig &config,
+        const cv::Mat &image)
+{
+    const QRectF normalized = config.detectRegionType.trimmed().toLower()
+            == QStringLiteral("full")
+            ? QRectF(0.0, 0.0, 1.0, 1.0)
+            : config.roiNormalized.normalized();
+    ToolOverlay overlay = roiOverlay(QRect(
+        static_cast<int>(std::floor(normalized.x() * image.cols)),
+        static_cast<int>(std::floor(normalized.y() * image.rows)),
+        qMax(1, static_cast<int>(std::ceil(normalized.width() * image.cols))),
+        qMax(1, static_cast<int>(std::ceil(normalized.height() * image.rows)))));
+    if (config.positionCorrection.applied) {
+        overlay = PositionCorrectionTransform::transformOverlay(
+                    overlay,
+                    config.positionCorrection.referenceToRunHomMat2D);
+        overlay.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
+        overlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                             config.positionCorrection.sourceId);
+    }
     return overlay;
 }
 
@@ -138,10 +209,25 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
     RegisteredClassificationFeatureConfig featureConfig;
     featureConfig.halconSoPath = config.halconSoPath;
     featureConfig.halconSoPathCandidates = config.halconSoPathCandidates;
+    if (config.positionCorrection.applied) {
+        featureConfig.referenceToRunHomMat2D =
+                config.positionCorrection.referenceToRunHomMat2D;
+    }
     RegisteredClassificationFeatureExtractor extractor;
     const RegisteredClassificationFeatureResult feature = extractor.extract(image, featureRegion(config), featureConfig);
-    if (!feature.success)
-        return makeError(feature.status, feature.message, config, image, timer.elapsed());
+    if (!feature.success) {
+        RegisteredClassificationHalconResult error =
+                makeError(feature.status, feature.message,
+                          config, image, timer.elapsed());
+        for (const QString &key : {
+             QStringLiteral("referenceRoiPixels"),
+             QStringLiteral("correctedRoiArea"),
+             QStringLiteral("positionCorrectionOperation")}) {
+            if (feature.payload.contains(key))
+                error.payload.insert(key, feature.payload.value(key));
+        }
+        return error;
+    }
     if (feature.featureNames != metadata.featureNames || feature.feature.size() != metadata.featureLength)
         return makeError(QStringLiteral("feature_contract_mismatch"),
                          QStringLiteral("Extracted V2 feature does not match the package feature contract."),
@@ -261,11 +347,28 @@ RegisteredClassificationHalconResult RegisteredClassificationHalconRunner::run(
     result.payload.insert(QStringLiteral("minMargin"), minMargin);
     result.payload.insert(QStringLiteral("topClasses"), topClassesToJson(result.topClasses));
     result.payload.insert(QStringLiteral("roiNormalized"), rectToJson(config.roiNormalized));
+    result.payload.insert(QStringLiteral("correctedRoiPixels"),
+                          feature.payload.value(QStringLiteral("roiPixels")));
+    result.payload.insert(QStringLiteral("correctedRoiArea"),
+                          feature.payload.value(QStringLiteral("correctedRoiArea")));
+    result.payload.insert(QStringLiteral("positionCorrectionOperation"),
+                          feature.payload.value(QStringLiteral("positionCorrectionOperation")));
     result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
-    PositionCorrection::writeNotAppliedPayload(config.positionCorrection, &result.payload);
+    writePositionCorrectionPayload(config, &result.payload);
     result.payload.insert(QStringLiteral("errorCode"), result.status);
     result.payload.insert(QStringLiteral("errorMessage"), result.message);
-    result.overlays.append(roiOverlay(feature.roiPixels));
+    result.overlays.append(configuredRoiOverlay(config, image));
+    if (config.positionCorrection.applied
+            && config.positionCorrection.showMatchContour) {
+        result.overlays += PositionCorrectionTransform::matchContourOverlays(
+                    config.positionCorrection.matchContours,
+                    config.positionCorrection.sourceId);
+    }
+    if (config.positionCorrection.applied) {
+        result.overlays += PositionCorrectionTransform::matchOriginOverlays(
+                    config.positionCorrection.matchOrigins,
+                    config.positionCorrection.sourceId);
+    }
     result.overlays.append(resultOverlay(feature.roiPixels, result));
     return result;
 }

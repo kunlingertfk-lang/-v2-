@@ -29,6 +29,8 @@ SOURCES += \
     ../src/ToolLibraryDialog.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
     ../src/algorithms/location/TemplateLocationHalconRunner.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconRunner.cpp \
     ../src/algorithms/presence/PatternPresenceHalconApi.cpp \
     ../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
     ../src/algorithms/presence/PatternPresenceHalconRunner.cpp \
@@ -38,10 +40,14 @@ SOURCES += \
     ../src/frame/MatImageConverter.cpp \
     ../src/frame/ReferenceImageProvider.cpp \
     ../src/tooladapters/TemplateLocationAdapter.cpp \
+    ../src/toolcore/PositionCorrection.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp \
     ../src/toolcore/ToolEngine.cpp
 
 HEADERS += \
     ../src/TemplateLocationDialog.h \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.h \
+    ../src/algorithms/location/PositionCorrectionHalconRunner.h \
     ../src/ToolLibraryDialog.h \
     ../src/frame/CameraFrameProvider.h \
     ../src/frame/FrameViewHelper.h \
@@ -50,6 +56,8 @@ HEADERS += \
     ../src/toolcore/ToolConfig.h \
     ../src/toolcore/ToolEngine.h \
     ../src/toolcore/ToolPreviewSnapshot.h \
+    ../src/toolcore/PositionCorrection.h \
+    ../src/toolcore/PositionCorrectionTransform.h \
     ../src/toolcore/ToolTypes.h
 
 FORMS += \

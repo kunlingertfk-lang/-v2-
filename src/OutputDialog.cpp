@@ -234,7 +234,8 @@ void OutputDialog::saveCurrentScheme()
 
 void OutputDialog::saveCurrentSchemeAs()
 {
-    commitOutputStateToScheme(false);
+    if (!commitOutputStateToScheme(false))
+        return;
 
     bool ok = false;
     const QString name = QInputDialog::getText(this,
@@ -259,19 +260,22 @@ void OutputDialog::saveCurrentSchemeAs()
 
 void OutputDialog::openCameraParamsDialog()
 {
-    commitOutputStateToScheme(true);
+    if (!commitOutputStateToScheme(true))
+        return;
     PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
 }
 
 void OutputDialog::openReferenceImageDialog()
 {
-    commitOutputStateToScheme(true);
+    if (!commitOutputStateToScheme(true))
+        return;
     PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
 }
 
 void OutputDialog::openToolsDialog()
 {
-    commitOutputStateToScheme(true);
+    if (!commitOutputStateToScheme(true))
+        return;
     MainWindow *mainWindow = sourceMainWindow();
     ToolsDialog *dialog = new ToolsDialog(mainWindow);
     dialog->setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);

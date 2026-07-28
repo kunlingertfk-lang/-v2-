@@ -14,9 +14,12 @@
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QHeaderView>
+#include <QIcon>
+#include <QLabel>
 #include <QSignalBlocker>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QToolButton>
 #include <QUuid>
 #include <QVBoxLayout>
 
@@ -99,6 +102,45 @@ void clearButtonChecks(QButtonGroup *group)
     group->setExclusive(true);
 }
 
+void appendTemplateMaskOverlay(QVector<ToolOverlay> *overlays,
+                               const QString &type,
+                               const QRectF &rect,
+                               const QVector<QPointF> &points,
+                               const CircleRoi &circle,
+                               int imageWidth,
+                               int imageHeight)
+{
+    if (!overlays || type == QStringLiteral("none") ||
+            imageWidth <= 0 || imageHeight <= 0)
+        return;
+    ToolOverlay overlay;
+    if (type == QStringLiteral("circle") && circle.valid) {
+        overlay.type = ToolOverlayType::Circle;
+        overlay.center = QPointF(circle.centerNormalized.x() * imageWidth,
+                                 circle.centerNormalized.y() * imageHeight);
+        overlay.radius = circle.radiusNormalized *
+                qMax(imageWidth, imageHeight);
+    } else if (type == QStringLiteral("polygon") && points.size() >= 3) {
+        overlay.type = ToolOverlayType::Polygon;
+        for (const QPointF &point : points) {
+            overlay.points.append(QPointF(point.x() * imageWidth,
+                                          point.y() * imageHeight));
+        }
+    } else if (type == QStringLiteral("rectangle") && validRect(rect)) {
+        overlay.type = ToolOverlayType::Rect;
+        overlay.rect = QRectF(rect.x() * imageWidth,
+                              rect.y() * imageHeight,
+                              rect.width() * imageWidth,
+                              rect.height() * imageHeight);
+    } else {
+        return;
+    }
+    overlay.label = QStringLiteral("template_mask");
+    overlay.extra.insert(QStringLiteral("displayRole"),
+                         QStringLiteral("color_template_mask"));
+    overlays->append(overlay);
+}
+
 } // namespace
 
 TemplateLocationDialog::TemplateLocationDialog(QWidget *parent)
@@ -172,6 +214,59 @@ void TemplateLocationDialog::setupUiState()
     templateCommandLayout->addWidget(ui->createTemplateButton, 1);
     templateCommandLayout->addWidget(ui->deleteTemplateButton);
     ui->templateLayout->addLayout(templateCommandLayout, 2, 0, 1, 3);
+
+    m_templateMaskRow = new QWidget(ui->templateCard);
+    m_templateMaskRow->setObjectName(QStringLiteral("templateMaskRow"));
+    auto *templateMaskLayout = new QHBoxLayout(m_templateMaskRow);
+    templateMaskLayout->setContentsMargins(0, 0, 0, 0);
+    templateMaskLayout->setSpacing(4);
+    auto *templateMaskLabel = new QLabel(tr("屏蔽区域"), m_templateMaskRow);
+    templateMaskLabel->setProperty("role", QStringLiteral("rowField"));
+    templateMaskLayout->addWidget(templateMaskLabel);
+    templateMaskLayout->addStretch(1);
+    m_templateMaskRectButton = new QToolButton(m_templateMaskRow);
+    m_templateMaskRectButton->setObjectName(
+                QStringLiteral("templateMaskRectButton"));
+    m_templateMaskRectButton->setToolTip(tr("绘制矩形模板屏蔽区域"));
+    m_templateMaskRectButton->setIcon(
+                QIcon(QStringLiteral(":/icons/roi-rectangle.svg")));
+    m_templateMaskCircleButton = new QToolButton(m_templateMaskRow);
+    m_templateMaskCircleButton->setObjectName(
+                QStringLiteral("templateMaskCircleButton"));
+    m_templateMaskCircleButton->setToolTip(tr("绘制圆形模板屏蔽区域"));
+    m_templateMaskCircleButton->setIcon(
+                QIcon(QStringLiteral(":/icons/roi-circle.svg")));
+    m_templateMaskPolygonButton = new QToolButton(m_templateMaskRow);
+    m_templateMaskPolygonButton->setObjectName(
+                QStringLiteral("templateMaskPolygonButton"));
+    m_templateMaskPolygonButton->setToolTip(tr("绘制模板屏蔽区域"));
+    m_templateMaskPolygonButton->setIcon(
+                QIcon(QStringLiteral(":/icons/roi-polygon.svg")));
+    const QList<QToolButton *> templateMaskButtons{
+        m_templateMaskRectButton,
+        m_templateMaskCircleButton,
+        m_templateMaskPolygonButton
+    };
+    for (QToolButton *button : templateMaskButtons) {
+        button->setIconSize(QSize(24, 24));
+        button->setCheckable(true);
+        button->setFixedSize(42, 38);
+        button->setProperty("actionRole", QStringLiteral("toolbarIcon"));
+    }
+    m_templateMaskClearButton = new QPushButton(tr("清除"), m_templateMaskRow);
+    m_templateMaskClearButton->setObjectName(
+                QStringLiteral("templateMaskClearButton"));
+    m_templateMaskClearButton->setProperty(
+                "actionRole", QStringLiteral("secondary"));
+    m_templateMaskClearButton->setEnabled(false);
+    templateMaskLayout->addWidget(m_templateMaskRectButton);
+    templateMaskLayout->addWidget(m_templateMaskCircleButton);
+    templateMaskLayout->addWidget(m_templateMaskPolygonButton);
+    templateMaskLayout->addWidget(m_templateMaskClearButton);
+    ui->templateLayout->addWidget(m_templateMaskRow, 6, 0, 1, 3);
+    m_templateGroup->addButton(m_templateMaskRectButton, 2);
+    m_templateGroup->addButton(m_templateMaskCircleButton, 3);
+    m_templateGroup->addButton(m_templateMaskPolygonButton, 4);
 
     ui->searchLayout->removeWidget(ui->searchGlobalButton);
     ui->searchLayout->removeWidget(ui->searchRectButton);
@@ -312,6 +407,25 @@ void TemplateLocationDialog::connectControls()
             [this]() { startEditing(EditTarget::TemplateRect); });
     connect(ui->templatePolygonButton, &QToolButton::clicked, this,
             [this]() { startEditing(EditTarget::TemplatePolygon); });
+    connect(m_templateMaskRectButton, &QToolButton::clicked, this,
+            [this]() { startEditing(EditTarget::TemplateMaskRect); });
+    connect(m_templateMaskCircleButton, &QToolButton::clicked, this,
+            [this]() { startEditing(EditTarget::TemplateMaskCircle); });
+    connect(m_templateMaskPolygonButton, &QToolButton::clicked, this,
+            [this]() { startEditing(EditTarget::TemplateMaskPolygon); });
+    connect(m_templateMaskClearButton, &QPushButton::clicked, this, [this]() {
+        stopEditing();
+        if (m_templateMaskRegionType == QStringLiteral("none"))
+            return;
+        m_templateMaskRegionType = QStringLiteral("none");
+        m_templateMaskRoi = QRectF();
+        m_templateMaskPolygon.clear();
+        m_templateMaskCircle = CircleRoi();
+        m_templateMaskClearButton->setEnabled(false);
+        m_previewHelper->clearPolygonRoi();
+        markModelDirty();
+        ui->statusLabel->setText(tr("模板屏蔽区域已清除，请重新创建模板"));
+    });
     connect(ui->searchRectButton, &QToolButton::clicked, this,
             [this]() { startEditing(EditTarget::SearchRect); });
     connect(ui->searchCircleButton, &QToolButton::clicked, this,
@@ -327,6 +441,14 @@ void TemplateLocationDialog::connectControls()
             m_templatePolygon.clear();
             m_templateRegionType = QStringLiteral("rectangle");
             markModelDirty();
+        } else if (m_editTarget == EditTarget::TemplateMaskRect) {
+            m_templateMaskRegionType = QStringLiteral("rectangle");
+            m_templateMaskRoi = roi;
+            m_templateMaskPolygon.clear();
+            m_templateMaskCircle = CircleRoi();
+            m_templateMaskClearButton->setEnabled(true);
+            markModelDirty();
+            ui->statusLabel->setText(tr("矩形模板屏蔽区域已更新，请重新创建模板"));
         } else if (m_editTarget == EditTarget::SearchRect) {
             m_searchRoi = roi;
             m_searchPolygon.clear();
@@ -344,6 +466,14 @@ void TemplateLocationDialog::connectControls()
             m_templateRoi = boundingRect(points);
             m_templateRegionType = QStringLiteral("polygon");
             markModelDirty();
+        } else if (m_editTarget == EditTarget::TemplateMaskPolygon) {
+            m_templateMaskRegionType = QStringLiteral("polygon");
+            m_templateMaskRoi = boundingRect(points);
+            m_templateMaskPolygon = points;
+            m_templateMaskCircle = CircleRoi();
+            m_templateMaskClearButton->setEnabled(true);
+            markModelDirty();
+            ui->statusLabel->setText(tr("模板屏蔽区域已更新，请重新创建模板"));
         } else if (m_editTarget == EditTarget::SearchPolygon) {
             m_searchPolygon = points;
             m_searchRoi = boundingRect(points);
@@ -357,13 +487,23 @@ void TemplateLocationDialog::connectControls()
     });
     connect(m_previewHelper, &FrameViewHelper::circleChanged, this,
             [this](const CircleRoi &circle) {
-        if (m_editTarget != EditTarget::SearchCircle || !circle.valid)
+        if (!circle.valid)
             return;
-        m_searchCircle = circle;
-        m_searchRoi = circle.boundingRectNormalized;
-        m_searchPolygon.clear();
-        m_searchRegionType = QStringLiteral("circle");
-        ui->statusLabel->setText(tr("圆形搜索区域已更新"));
+        if (m_editTarget == EditTarget::TemplateMaskCircle) {
+            m_templateMaskRegionType = QStringLiteral("circle");
+            m_templateMaskCircle = circle;
+            m_templateMaskRoi = circle.boundingRectNormalized;
+            m_templateMaskPolygon.clear();
+            m_templateMaskClearButton->setEnabled(true);
+            markModelDirty();
+            ui->statusLabel->setText(tr("圆形模板屏蔽区域已更新，请重新创建模板"));
+        } else if (m_editTarget == EditTarget::SearchCircle) {
+            m_searchCircle = circle;
+            m_searchRoi = circle.boundingRectNormalized;
+            m_searchPolygon.clear();
+            m_searchRegionType = QStringLiteral("circle");
+            ui->statusLabel->setText(tr("圆形搜索区域已更新"));
+        }
     });
     connect(m_previewHelper, &FrameViewHelper::roiSelectionRejected, this,
             [this]() { ui->statusLabel->setText(tr("ROI 无效，请绘制宽高至少 2 像素的区域")); });
@@ -443,7 +583,13 @@ void TemplateLocationDialog::connectControls()
 
 void TemplateLocationDialog::setAdvancedVisible(bool visible)
 {
+    if (!visible && (m_editTarget == EditTarget::TemplateMaskRect ||
+                     m_editTarget == EditTarget::TemplateMaskCircle ||
+                     m_editTarget == EditTarget::TemplateMaskPolygon))
+        stopEditing();
     ui->advancedCard->setVisible(visible);
+    if (m_templateMaskRow)
+        m_templateMaskRow->setVisible(visible);
     ui->basicModeButton->setChecked(!visible);
     ui->allModeButton->setChecked(visible);
 }
@@ -482,41 +628,66 @@ void TemplateLocationDialog::startEditing(EditTarget target)
 
     m_editTarget = target;
     showReferenceImage();
-    if (target == EditTarget::TemplateRect || target == EditTarget::SearchRect) {
+    if (target == EditTarget::TemplateRect ||
+            target == EditTarget::TemplateMaskRect ||
+            target == EditTarget::SearchRect) {
         const bool isTemplate = target == EditTarget::TemplateRect;
-        (isTemplate ? ui->templateRectButton : ui->searchRectButton)->setChecked(true);
+        const bool isTemplateMask = target == EditTarget::TemplateMaskRect;
+        if (isTemplateMask)
+            m_templateMaskRectButton->setChecked(true);
+        else
+            (isTemplate ? ui->templateRectButton : ui->searchRectButton)->setChecked(true);
         m_previewHelper->clearPolygonRoi();
         m_previewHelper->clearCircleRoi();
-        const QRectF roi = isTemplate ? m_templateRoi : m_searchRoi;
+        const QRectF roi = isTemplateMask ? m_templateMaskRoi
+                                          : (isTemplate ? m_templateRoi : m_searchRoi);
         if (validRect(roi))
             m_previewHelper->setRoiRectNormalized(roi);
         else
             m_previewHelper->clearRoi();
         m_previewHelper->setRoiDrawingEnabled(true);
-        ui->viewerTitleLabel->setText(isTemplate ? tr("绘制模板矩形") : tr("绘制搜索矩形"));
-    } else if (target == EditTarget::TemplatePolygon || target == EditTarget::SearchPolygon) {
+        ui->viewerTitleLabel->setText(isTemplateMask
+                ? tr("绘制矩形模板屏蔽区域")
+                : (isTemplate ? tr("绘制模板矩形") : tr("绘制搜索矩形")));
+    } else if (target == EditTarget::TemplatePolygon ||
+               target == EditTarget::TemplateMaskPolygon ||
+               target == EditTarget::SearchPolygon) {
         const bool isTemplate = target == EditTarget::TemplatePolygon;
-        (isTemplate ? ui->templatePolygonButton : ui->searchPolygonButton)->setChecked(true);
+        const bool isTemplateMask = target == EditTarget::TemplateMaskPolygon;
+        if (isTemplateMask)
+            m_templateMaskPolygonButton->setChecked(true);
+        else
+            (isTemplate ? ui->templatePolygonButton
+                        : ui->searchPolygonButton)->setChecked(true);
         m_previewHelper->clearRoi();
         m_previewHelper->clearCircleRoi();
-        const QVector<QPointF> &polygon = isTemplate ? m_templatePolygon : m_searchPolygon;
+        const QVector<QPointF> &polygon = isTemplateMask
+                ? m_templateMaskPolygon
+                : (isTemplate ? m_templatePolygon : m_searchPolygon);
         if (polygon.size() >= 3)
             m_previewHelper->setPolygonRoiNormalized(polygon);
         else
             m_previewHelper->clearPolygonRoi();
         m_previewHelper->setPolygonDrawingEnabled(true);
-        ui->viewerTitleLabel->setText(isTemplate ? tr("绘制模板多边形")
-                                                  : tr("绘制多边形搜索区域"));
+        ui->viewerTitleLabel->setText(
+                    isTemplateMask ? tr("绘制模板屏蔽区域")
+                                   : (isTemplate ? tr("绘制模板多边形")
+                                                 : tr("绘制多边形搜索区域")));
     } else {
-        ui->searchCircleButton->setChecked(true);
+        const bool isTemplateMask = target == EditTarget::TemplateMaskCircle;
+        (isTemplateMask ? m_templateMaskCircleButton
+                        : ui->searchCircleButton)->setChecked(true);
         m_previewHelper->clearRoi();
         m_previewHelper->clearPolygonRoi();
-        if (m_searchCircle.valid)
-            m_previewHelper->setCircleRoiNormalized(m_searchCircle);
+        const CircleRoi &circle = isTemplateMask
+                ? m_templateMaskCircle : m_searchCircle;
+        if (circle.valid)
+            m_previewHelper->setCircleRoiNormalized(circle);
         else
             m_previewHelper->clearCircleRoi();
         m_previewHelper->setCircleDrawingEnabled(true);
-        ui->viewerTitleLabel->setText(tr("绘制圆形搜索区域"));
+        ui->viewerTitleLabel->setText(isTemplateMask
+                ? tr("绘制圆形模板屏蔽区域") : tr("绘制圆形搜索区域"));
     }
 }
 
@@ -550,6 +721,14 @@ void TemplateLocationDialog::showReferenceImage()
     QVector<ToolOverlay> overlays;
     if (m_modelCreated && !m_templateDisplayOverlays.isEmpty())
         overlays = m_templateDisplayOverlays;
+    if (m_editTarget != EditTarget::TemplateMaskRect &&
+            m_editTarget != EditTarget::TemplateMaskCircle &&
+            m_editTarget != EditTarget::TemplateMaskPolygon) {
+        appendTemplateMaskOverlay(&overlays, m_templateMaskRegionType,
+                                  m_templateMaskRoi, m_templateMaskPolygon,
+                                  m_templateMaskCircle,
+                                  image.width(), image.height());
+    }
     if (m_originMode == QStringLiteral("custom")) {
         const QPointF point(m_customOriginNormalized.x() * image.width(),
                             m_customOriginNormalized.y() * image.height());
@@ -623,6 +802,24 @@ bool TemplateLocationDialog::validateTemplate(QString *message) const
             : validRect(m_templateRoi);
     if (!valid && message)
         *message = tr("请先绘制有效模板区域");
+    if (valid && m_templateMaskRegionType == QStringLiteral("rectangle") &&
+            !validRect(m_templateMaskRoi)) {
+        if (message)
+            *message = tr("请先绘制有效的矩形模板屏蔽区域");
+        return false;
+    }
+    if (valid && m_templateMaskRegionType == QStringLiteral("circle") &&
+            !m_templateMaskCircle.valid) {
+        if (message)
+            *message = tr("请先绘制有效的圆形模板屏蔽区域");
+        return false;
+    }
+    if (valid && m_templateMaskRegionType == QStringLiteral("polygon") &&
+            m_templateMaskPolygon.size() < 3) {
+        if (message)
+            *message = tr("模板屏蔽多边形至少需要 3 个点");
+        return false;
+    }
     return valid;
 }
 
@@ -821,6 +1018,11 @@ void TemplateLocationDialog::displayResult(const ToolResult &result)
             templateOverlays.append(overlay);
         }
         m_templateDisplayOverlays = templateOverlays;
+        appendTemplateMaskOverlay(&templateOverlays, m_templateMaskRegionType,
+                                  m_templateMaskRoi, m_templateMaskPolygon,
+                                  m_templateMaskCircle,
+                                  ReferenceImageProvider::instance().referenceFrame().cols,
+                                  ReferenceImageProvider::instance().referenceFrame().rows);
         previewResult.overlays = templateOverlays;
     }
     m_previewHelper->setToolOverlays(previewResult.overlays);
@@ -931,10 +1133,24 @@ ToolConfig TemplateLocationDialog::toolConfig() const
     config.roiNormalized = m_searchRoi;
 
     QJsonObject params;
-    params.insert(QStringLiteral("version"), 2);
+    params.insert(QStringLiteral("version"), 4);
     params.insert(QStringLiteral("templateRegionType"), m_templateRegionType);
     params.insert(QStringLiteral("templateRoiNormalized"), rectToJson(m_templateRoi));
     params.insert(QStringLiteral("templatePolygonNormalized"), pointsToJson(m_templatePolygon));
+    params.insert(QStringLiteral("templateMaskRegionType"),
+                  m_templateMaskRegionType);
+    params.insert(QStringLiteral("templateMaskRoiNormalized"),
+                  rectToJson(m_templateMaskRoi));
+    params.insert(QStringLiteral("templateMaskPolygonNormalized"),
+                  pointsToJson(m_templateMaskPolygon));
+    params.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
+                  QJsonObject{
+                      {QStringLiteral("x"),
+                       m_templateMaskCircle.centerNormalized.x()},
+                      {QStringLiteral("y"),
+                       m_templateMaskCircle.centerNormalized.y()}});
+    params.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
+                  m_templateMaskCircle.radiusNormalized);
     params.insert(QStringLiteral("searchRegionType"), m_searchRegionType);
     params.insert(QStringLiteral("searchRoiNormalized"), rectToJson(m_searchRoi));
     params.insert(QStringLiteral("searchPolygonNormalized"), pointsToJson(m_searchPolygon));
@@ -986,6 +1202,38 @@ void TemplateLocationDialog::loadFromConfig(const ToolConfig &config)
     m_templateRegionType = params.value(QStringLiteral("templateRegionType")).toString(QStringLiteral("rectangle"));
     m_templateRoi = rectFromJson(params.value(QStringLiteral("templateRoiNormalized")).toObject(), QRectF());
     m_templatePolygon = pointsFromJson(params.value(QStringLiteral("templatePolygonNormalized")).toArray());
+    m_templateMaskRegionType = params.value(
+                QStringLiteral("templateMaskRegionType")).toString(
+                params.value(QStringLiteral("templateMaskPolygonNormalized"))
+                    .toArray().isEmpty()
+                    ? QStringLiteral("none") : QStringLiteral("polygon"));
+    m_templateMaskRoi = rectFromJson(
+                params.value(QStringLiteral("templateMaskRoiNormalized")).toObject(),
+                QRectF());
+    m_templateMaskPolygon = pointsFromJson(
+                params.value(QStringLiteral("templateMaskPolygonNormalized")).toArray());
+    const QJsonObject maskCircleCenter = params.value(
+                QStringLiteral("templateMaskCircleCenterNormalized")).toObject();
+    m_templateMaskCircle.centerNormalized = QPointF(
+                maskCircleCenter.value(QStringLiteral("x")).toDouble(
+                    m_templateMaskRoi.center().x()),
+                maskCircleCenter.value(QStringLiteral("y")).toDouble(
+                    m_templateMaskRoi.center().y()));
+    m_templateMaskCircle.radiusNormalized = params.value(
+                QStringLiteral("templateMaskCircleRadiusNormalized")).toDouble(
+                qMin(m_templateMaskRoi.width(),
+                     m_templateMaskRoi.height()) / 2.0);
+    m_templateMaskCircle.boundingRectNormalized = QRectF(
+                m_templateMaskCircle.centerNormalized.x() -
+                    m_templateMaskCircle.radiusNormalized,
+                m_templateMaskCircle.centerNormalized.y() -
+                    m_templateMaskCircle.radiusNormalized,
+                m_templateMaskCircle.radiusNormalized * 2.0,
+                m_templateMaskCircle.radiusNormalized * 2.0);
+    m_templateMaskCircle.valid =
+            m_templateMaskRegionType == QStringLiteral("circle") &&
+            m_templateMaskCircle.radiusNormalized > 0.0 &&
+            validRect(m_templateMaskCircle.boundingRectNormalized);
     m_searchRegionType = params.value(QStringLiteral("searchRegionType")).toString(QStringLiteral("full"));
     m_searchRoi = rectFromJson(params.value(QStringLiteral("searchRoiNormalized")).toObject(),
                                QRectF(0.0, 0.0, 1.0, 1.0));
@@ -1050,6 +1298,8 @@ void TemplateLocationDialog::loadFromConfig(const ToolConfig &config)
     ui->modelStatusLabel->setText(m_modelCreated ? tr("模板已创建") : tr("未创建模板"));
     ui->createTemplateButton->setText(m_modelCreated ? tr("重新创建模板") : tr("创建模板"));
     ui->deleteTemplateButton->setEnabled(m_modelCreated);
+    m_templateMaskClearButton->setEnabled(
+                m_templateMaskRegionType != QStringLiteral("none"));
     updateContrastControls();
     updateOriginControls();
     updateMatchResultTable(QJsonArray());

@@ -176,6 +176,10 @@ int main(int argc, char **argv)
     referenceConfig.enabled = true;
     referenceConfig.templateRegionType = QStringLiteral("rectangle");
     referenceConfig.templateRoiNormalized = QRectF(0.1, 0.2, 0.3, 0.4);
+    referenceConfig.templateMaskRegionType = QStringLiteral("circle");
+    referenceConfig.templateMaskRoiNormalized = QRectF(0.18, 0.28, 0.10, 0.10);
+    referenceConfig.templateMaskCircleCenterNormalized = QPointF(0.23, 0.33);
+    referenceConfig.templateMaskCircleRadiusNormalized = 0.05;
     referenceConfig.originMode = QStringLiteral("custom");
     referenceConfig.customOriginNormalized = QPointF(0.82, 0.16);
     referenceConfig.referenceCreated = true;
@@ -194,6 +198,13 @@ int main(int argc, char **argv)
             PositionCorrection::referenceFromJson(referenceJson);
     check(referenceRoundTrip.enabled
           && referenceRoundTrip.templateRoiNormalized == referenceConfig.templateRoiNormalized
+          && referenceRoundTrip.templateMaskRegionType == QStringLiteral("circle")
+          && referenceRoundTrip.templateMaskRoiNormalized ==
+             referenceConfig.templateMaskRoiNormalized
+          && referenceRoundTrip.templateMaskCircleCenterNormalized ==
+             QPointF(0.23, 0.33)
+          && std::abs(referenceRoundTrip.templateMaskCircleRadiusNormalized -
+                      0.05) < 1e-9
           && referenceRoundTrip.originMode == QStringLiteral("custom")
           && referenceRoundTrip.customOriginNormalized == QPointF(0.82, 0.16)
           && referenceRoundTrip.referenceCreated
@@ -201,7 +212,7 @@ int main(int argc, char **argv)
           && referenceRoundTrip.modelCacheKey == referenceConfig.modelCacheKey
           && referenceRoundTrip.status == QStringLiteral("found")
           && referenceRoundTrip.elapsedMs == 12,
-          "scheme reference correction must round trip template, custom origin and model state");
+          "scheme reference correction must round trip template, mask, custom origin and model state");
 
     ReferencePositionCorrectionConfig polygonConfig;
     polygonConfig.enabled = true;

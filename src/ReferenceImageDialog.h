@@ -4,6 +4,7 @@
 #include <QDialog>
 
 #include "algorithms/location/TemplateLocationHalconRunner.h"
+#include "frame/RoiGeometry.h"
 #include "toolcore/PositionCorrection.h"
 
 class FrameViewHelper;
@@ -35,7 +36,7 @@ private slots:
     void showReferenceImageMode();
     void importReferenceImageFromPc();
     void editCurrentSchemeName();
-    void saveCurrentScheme();
+    bool saveCurrentScheme();
     void saveCurrentSchemeAs();
     void updatePositionCorrectionUi(bool enabled);
 
@@ -43,7 +44,10 @@ private:
     enum class PositionCorrectionRoiEditMode {
         None,
         Rectangle,
-        Polygon
+        Polygon,
+        MaskRectangle,
+        MaskCircle,
+        MaskPolygon
     };
 
     void setupUiState();
@@ -60,12 +64,18 @@ private:
     void startReferencePositionRectEditing();
     /** 开始在基准图上逐点绘制多边形位置修正模板区域。 */
     void startReferencePositionPolygonEditing();
+    /** 开始绘制矩形、圆形或多边形模板屏蔽区。 */
+    void startReferencePositionMaskEditing(PositionCorrectionRoiEditMode mode);
     /** 校验当前模板区域并退出 ROI 编辑状态。 */
     bool finishReferencePositionRoiEditing();
+    /** 校验屏蔽区并退出屏蔽 ROI 编辑状态。 */
+    bool finishReferencePositionMaskEditing();
     /** 接收公共预览控件生成的归一化矩形 ROI。 */
     void handleReferencePositionRectChanged(const QRectF &roiNormalized);
     /** 接收公共预览控件生成的归一化多边形 ROI。 */
     void handleReferencePositionPolygonChanged(const QVector<QPointF> &pointsNormalized);
+    /** 接收公共预览控件生成的圆形模板屏蔽区。 */
+    void handleReferencePositionCircleChanged(const CircleRoi &circle);
     /** 根据当前配置在基准图预览上恢复矩形或多边形 ROI。 */
     void restoreReferencePositionRoi();
     /** 停止所有位置修正 ROI 绘制手势，并可选择恢复已确认区域。 */
@@ -96,6 +106,11 @@ private:
     QPushButton *m_positionRectButton = nullptr;
     QPushButton *m_positionPolygonButton = nullptr;
     QPushButton *m_positionFinishButton = nullptr;
+    QPushButton *m_positionMaskRectButton = nullptr;
+    QPushButton *m_positionMaskCircleButton = nullptr;
+    QPushButton *m_positionMaskPolygonButton = nullptr;
+    QPushButton *m_positionMaskClearButton = nullptr;
+    QPushButton *m_positionMaskFinishButton = nullptr;
     QPushButton *m_positionTestButton = nullptr;
     QComboBox *m_positionOriginModeComboBox = nullptr;
     QPushButton *m_positionSelectOriginButton = nullptr;

@@ -70,6 +70,16 @@ QByteArray modelSignature(const cv::Mat &referenceGray,
         {QStringLiteral("templateRegionType"), config.templateRegionType},
         {QStringLiteral("templateRoiNormalized"), rectToJson(config.templateRoiNormalized)},
         {QStringLiteral("templatePolygonNormalized"), pointsToJson(config.templatePolygonNormalized)},
+        {QStringLiteral("templateMaskRegionType"), config.templateMaskRegionType},
+        {QStringLiteral("templateMaskRoiNormalized"),
+         rectToJson(config.templateMaskRoiNormalized)},
+        {QStringLiteral("templateMaskPolygonNormalized"),
+         pointsToJson(config.templateMaskPolygonNormalized)},
+        {QStringLiteral("templateMaskCircleCenterNormalized"),
+         QJsonObject{{QStringLiteral("x"), config.templateMaskCircleCenterNormalized.x()},
+                     {QStringLiteral("y"), config.templateMaskCircleCenterNormalized.y()}}},
+        {QStringLiteral("templateMaskCircleRadiusNormalized"),
+         config.templateMaskCircleRadiusNormalized},
         {QStringLiteral("angleStart"), config.angleStart},
         {QStringLiteral("angleExtent"), config.angleExtent},
         {QStringLiteral("scaleMin"), config.scaleMin},
@@ -154,6 +164,45 @@ HTuple columnsTuple(const QVector<QPointF> &points, int imageWidth, const QRect 
         columns[i] = qBound(0.0, points.at(i).x() * imageWidth - crop.x(),
                             static_cast<double>(crop.width() - 1));
     return columns;
+}
+
+HTuple localRowsTuple(const QVector<QPointF> &points, int imageHeight, const QRect &crop)
+{
+    HTuple rows;
+    for (int i = 0; i < points.size(); ++i)
+        rows[i] = points.at(i).y() * imageHeight - crop.y();
+    return rows;
+}
+
+HTuple localColumnsTuple(const QVector<QPointF> &points, int imageWidth, const QRect &crop)
+{
+    HTuple columns;
+    for (int i = 0; i < points.size(); ++i)
+        columns[i] = points.at(i).x() * imageWidth - crop.x();
+    return columns;
+}
+
+bool validNormalizedPolygon(const QVector<QPointF> &points)
+{
+    if (points.size() < 3)
+        return false;
+    for (const QPointF &point : points) {
+        if (!std::isfinite(point.x()) || !std::isfinite(point.y()) ||
+                point.x() < 0.0 || point.x() > 1.0 ||
+                point.y() < 0.0 || point.y() > 1.0)
+            return false;
+    }
+    return true;
+}
+
+QString normalizedTemplateMaskType(const TemplateLocationHalconConfig &config)
+{
+    QString type = config.templateMaskRegionType.trimmed().toLower();
+    if ((type.isEmpty() || type == QStringLiteral("none")) &&
+            !config.templateMaskPolygonNormalized.isEmpty()) {
+        type = QStringLiteral("polygon");
+    }
+    return type.isEmpty() ? QStringLiteral("none") : type;
 }
 
 HObject croppedDomain(const HObject &image,
@@ -355,6 +404,36 @@ TemplateLocationHalconResult TemplateLocationHalconRunner::run(
         return errorResult(QStringLiteral("halcon_runtime_missing"), QStringLiteral("HALCON runtime is unavailable"), timer.elapsed());
     if (config.templateRegionType == QStringLiteral("polygon") && config.templatePolygonNormalized.size() < 3)
         return errorResult(QStringLiteral("invalid_template_region"), QStringLiteral("template polygon requires at least 3 points"), timer.elapsed());
+    const QString templateMaskType = normalizedTemplateMaskType(config);
+    if (templateMaskType != QStringLiteral("none") &&
+            templateMaskType != QStringLiteral("rectangle") &&
+            templateMaskType != QStringLiteral("circle") &&
+            templateMaskType != QStringLiteral("polygon")) {
+        return errorResult(QStringLiteral("invalid_template_mask"),
+                           QStringLiteral("template mask type is invalid"),
+                           timer.elapsed());
+    }
+    if (templateMaskType == QStringLiteral("rectangle") &&
+            !validNormalizedRect(config.templateMaskRoiNormalized)) {
+        return errorResult(QStringLiteral("invalid_template_mask"),
+                           QStringLiteral("template rectangle mask is invalid"),
+                           timer.elapsed());
+    }
+    if (templateMaskType == QStringLiteral("circle") &&
+            (!std::isfinite(config.templateMaskCircleCenterNormalized.x()) ||
+             !std::isfinite(config.templateMaskCircleCenterNormalized.y()) ||
+             !std::isfinite(config.templateMaskCircleRadiusNormalized) ||
+             config.templateMaskCircleRadiusNormalized <= 0.0)) {
+        return errorResult(QStringLiteral("invalid_template_mask"),
+                           QStringLiteral("template circle mask is invalid"),
+                           timer.elapsed());
+    }
+    if (templateMaskType == QStringLiteral("polygon") &&
+            !validNormalizedPolygon(config.templateMaskPolygonNormalized)) {
+        return errorResult(QStringLiteral("invalid_template_mask"),
+                           QStringLiteral("template mask polygon is invalid"),
+                           timer.elapsed());
+    }
     if (config.searchRegionType == QStringLiteral("polygon") && config.searchPolygonNormalized.size() < 3)
         return errorResult(QStringLiteral("invalid_search_region"), QStringLiteral("search polygon requires at least 3 points"), timer.elapsed());
     if (config.searchRegionType == QStringLiteral("circle") &&
@@ -396,13 +475,13 @@ TemplateLocationHalconResult TemplateLocationHalconRunner::run(
         const cv::Mat imageGray = grayImage(image);
         const HObject referenceHalcon = halconByteImage(referenceGray);
         const HObject imageHalcon = halconByteImage(imageGray);
-        const HObject templateDomain = croppedDomain(referenceHalcon,
-                                                      templateRect,
-                                                      config.templateRegionType,
-                                                      config.templatePolygonNormalized,
-                                                      QPointF(), 0.0,
-                                                      referenceImage.cols,
-                                                      referenceImage.rows);
+        const HObject templateBaseDomain = croppedDomain(referenceHalcon,
+                                                          templateRect,
+                                                          config.templateRegionType,
+                                                          config.templatePolygonNormalized,
+                                                          QPointF(), 0.0,
+                                                          referenceImage.cols,
+                                                          referenceImage.rows);
         const HObject searchDomain = croppedDomain(imageHalcon,
                                                     searchRect,
                                                     config.searchRegionType,
@@ -412,24 +491,104 @@ TemplateLocationHalconResult TemplateLocationHalconRunner::run(
                                                     image.cols,
                                                     image.rows);
 
-        HObject templateRegion;
-        HTuple templateArea;
+        HObject templateBaseRegion;
+        HTuple templateBaseArea;
         HTuple centroidRows;
         HTuple centroidColumns;
-        GetDomain(templateDomain, &templateRegion);
-        AreaCenter(templateRegion, &templateArea, &centroidRows, &centroidColumns);
+        GetDomain(templateBaseDomain, &templateBaseRegion);
+        AreaCenter(templateBaseRegion, &templateBaseArea,
+                   &centroidRows, &centroidColumns);
         if (centroidRows.Length() < 1 || centroidColumns.Length() < 1)
             return errorResult(QStringLiteral("invalid_template_region"),
                                QStringLiteral("template region has no centroid"), timer.elapsed());
+        const double templateBaseAreaValue = templateBaseArea.Length() > 0
+                ? templateBaseArea[0].D() : 0.0;
         const double centroidRow = centroidRows[0].D();
         const double centroidColumn = centroidColumns[0].D();
-        double originDeltaRow = 0.0;
-        double originDeltaColumn = 0.0;
+        double modelCentroidRow = centroidRow;
+        double modelCentroidColumn = centroidColumn;
+        HObject templateDomain = templateBaseDomain;
+        double templateEffectiveAreaValue = templateBaseAreaValue;
+        const bool templateMaskApplied =
+                templateMaskType != QStringLiteral("none");
+        if (templateMaskApplied) {
+            HObject templateMaskRegion;
+            if (templateMaskType == QStringLiteral("rectangle")) {
+                GenRectangle1(
+                            &templateMaskRegion,
+                            config.templateMaskRoiNormalized.top() *
+                                referenceImage.rows - templateRect.y(),
+                            config.templateMaskRoiNormalized.left() *
+                                referenceImage.cols - templateRect.x(),
+                            config.templateMaskRoiNormalized.bottom() *
+                                referenceImage.rows - templateRect.y(),
+                            config.templateMaskRoiNormalized.right() *
+                                referenceImage.cols - templateRect.x());
+            } else if (templateMaskType == QStringLiteral("circle")) {
+                GenCircle(
+                            &templateMaskRegion,
+                            config.templateMaskCircleCenterNormalized.y() *
+                                referenceImage.rows - templateRect.y(),
+                            config.templateMaskCircleCenterNormalized.x() *
+                                referenceImage.cols - templateRect.x(),
+                            config.templateMaskCircleRadiusNormalized *
+                                qMax(referenceImage.cols, referenceImage.rows));
+            } else {
+                GenRegionPolygonFilled(
+                            &templateMaskRegion,
+                            localRowsTuple(config.templateMaskPolygonNormalized,
+                                           referenceImage.rows, templateRect),
+                            localColumnsTuple(config.templateMaskPolygonNormalized,
+                                              referenceImage.cols, templateRect));
+            }
+            HObject clippedTemplateMask;
+            Intersection(templateBaseRegion, templateMaskRegion,
+                         &clippedTemplateMask);
+            HTuple clippedMaskArea;
+            HTuple clippedMaskRow;
+            HTuple clippedMaskColumn;
+            AreaCenter(clippedTemplateMask, &clippedMaskArea,
+                       &clippedMaskRow, &clippedMaskColumn);
+            if (clippedMaskArea.Length() < 1 || clippedMaskArea[0].D() < 1.0) {
+                return errorResult(QStringLiteral("invalid_template_mask"),
+                                   QStringLiteral("template mask does not overlap the template region"),
+                                   timer.elapsed());
+            }
+            if (clippedMaskArea[0].D() >= templateBaseAreaValue * 0.95) {
+                return errorResult(QStringLiteral("template_masked_empty"),
+                                   QStringLiteral("template mask leaves too little usable template area"),
+                                   timer.elapsed());
+            }
+
+            HObject effectiveTemplateRegion;
+            Difference(templateBaseRegion, clippedTemplateMask,
+                       &effectiveTemplateRegion);
+            HTuple effectiveArea;
+            HTuple effectiveRow;
+            HTuple effectiveColumn;
+            AreaCenter(effectiveTemplateRegion, &effectiveArea,
+                       &effectiveRow, &effectiveColumn);
+            const double minimumEffectiveArea =
+                    qMax(4.0, templateBaseAreaValue * 0.05);
+            if (effectiveArea.Length() < 1 ||
+                    effectiveArea[0].D() < minimumEffectiveArea) {
+                return errorResult(QStringLiteral("template_masked_empty"),
+                                   QStringLiteral("template mask leaves too little usable template area"),
+                                   timer.elapsed());
+            }
+            templateEffectiveAreaValue = effectiveArea[0].D();
+            modelCentroidRow = effectiveRow[0].D();
+            modelCentroidColumn = effectiveColumn[0].D();
+            ReduceDomain(templateBaseDomain, effectiveTemplateRegion,
+                         &templateDomain);
+        }
+        double originDeltaRow = centroidRow - modelCentroidRow;
+        double originDeltaColumn = centroidColumn - modelCentroidColumn;
         if (config.originMode == QStringLiteral("custom")) {
             originDeltaRow = config.customOriginNormalized.y() * referenceImage.rows -
-                    templateRect.y() - centroidRow;
+                    templateRect.y() - modelCentroidRow;
             originDeltaColumn = config.customOriginNormalized.x() * referenceImage.cols -
-                    templateRect.x() - centroidColumn;
+                    templateRect.x() - modelCentroidColumn;
         }
 
         const double angleStart = config.angleStart * kPi / 180.0;
@@ -624,6 +783,24 @@ TemplateLocationHalconResult TemplateLocationHalconRunner::run(
         result.payload.insert(QStringLiteral("modelCachePath"), modelPath);
         result.payload.insert(QStringLiteral("modelSignature"), QString::fromLatin1(signature));
         result.payload.insert(QStringLiteral("templateRoiNormalized"), rectToJson(config.templateRoiNormalized));
+        result.payload.insert(QStringLiteral("templateMaskApplied"), templateMaskApplied);
+        result.payload.insert(QStringLiteral("templateMaskRegionType"),
+                              templateMaskType);
+        result.payload.insert(QStringLiteral("templateMaskRoiNormalized"),
+                              rectToJson(config.templateMaskRoiNormalized));
+        result.payload.insert(QStringLiteral("templateMaskPolygonNormalized"),
+                              pointsToJson(config.templateMaskPolygonNormalized));
+        result.payload.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
+                              QJsonObject{
+                                  {QStringLiteral("x"),
+                                   config.templateMaskCircleCenterNormalized.x()},
+                                  {QStringLiteral("y"),
+                                   config.templateMaskCircleCenterNormalized.y()}});
+        result.payload.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
+                              config.templateMaskCircleRadiusNormalized);
+        result.payload.insert(QStringLiteral("templateBaseArea"), templateBaseAreaValue);
+        result.payload.insert(QStringLiteral("templateEffectiveArea"),
+                              templateEffectiveAreaValue);
         result.payload.insert(QStringLiteral("searchRoiNormalized"), rectToJson(config.searchRoiNormalized));
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
 

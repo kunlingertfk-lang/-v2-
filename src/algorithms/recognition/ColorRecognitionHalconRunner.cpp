@@ -1,4 +1,6 @@
 #include "algorithms/recognition/ColorRecognitionHalconRunner.h"
+#include "algorithms/location/PositionCorrectionHalconTransform.h"
+#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
@@ -10,6 +12,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPointF>
+#include <QPolygonF>
 #include <QRect>
 #include <QMutex>
 #include <QMutexLocker>
@@ -186,6 +189,36 @@ ToolOverlay circleOverlay(const QPointF &center,
     overlay.label = label;
     overlay.score = score;
     return overlay;
+}
+
+void writePositionCorrectionPayload(
+        const ColorRecognitionHalconConfig &config,
+        QJsonObject *payload)
+{
+    if (!payload)
+        return;
+    const PositionCorrectionContext &correction = config.positionCorrection;
+    QJsonArray matrix;
+    for (double value : correction.referenceToRunHomMat2D)
+        matrix.append(value);
+    payload->insert(QStringLiteral("enablePositionCorrection"),
+                    config.enablePositionCorrection);
+    payload->insert(QStringLiteral("positionCorrectionRequested"),
+                    correction.requested);
+    payload->insert(QStringLiteral("positionCorrectionApplied"),
+                    correction.applied);
+    payload->insert(QStringLiteral("positionCorrectionSource"),
+                    config.positionCorrectionSource);
+    payload->insert(QStringLiteral("positionCorrectionSourceId"),
+                    correction.sourceId.isEmpty()
+                    ? config.positionCorrectionSourceId : correction.sourceId);
+    payload->insert(QStringLiteral("positionCorrectionReason"),
+                    correction.applied ? QStringLiteral("applied")
+                                       : QStringLiteral("disabled"));
+    payload->insert(QStringLiteral("referenceToRunHomMat2D"), matrix);
+    payload->insert(QStringLiteral("referenceScale"), correction.referenceScale);
+    payload->insert(QStringLiteral("runScale"), correction.runScale);
+    payload->insert(QStringLiteral("scaleRatio"), correction.scaleRatio);
 }
 
 // 将矩形写入 overlay.extra 使用的 JSON 结构。
@@ -407,11 +440,7 @@ ColorRecognitionHalconFeatureResult featureError(const QString &status,
                           pointsToJson(config.detectMaskPolygonNormalized));
     result.payload.insert(QStringLiteral("detectMaskConfigured"),
                           config.detectMaskPolygonNormalized.size() >= 3);
-    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
-    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-    result.payload.insert(QStringLiteral("positionCorrectionSourceId"), config.positionCorrectionSourceId);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
+    writePositionCorrectionPayload(config, &result.payload);
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
     result.payload.insert(QStringLiteral("halconSoPathCandidates"),
                           config.halconSoPathCandidates.join(QStringLiteral("; ")));
@@ -458,11 +487,7 @@ ColorRecognitionHalconResult runError(const QString &status,
                           pointsToJson(config.detectMaskPolygonNormalized));
     result.payload.insert(QStringLiteral("detectMaskConfigured"),
                           config.detectMaskPolygonNormalized.size() >= 3);
-    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
-    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-    result.payload.insert(QStringLiteral("positionCorrectionSourceId"), config.positionCorrectionSourceId);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
+    writePositionCorrectionPayload(config, &result.payload);
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
     result.payload.insert(QStringLiteral("halconSoPathCandidates"),
                           config.halconSoPathCandidates.join(QStringLiteral("; ")));
@@ -528,11 +553,7 @@ ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig 
     result.payload.insert(QStringLiteral("detectCircleBoundingRectNormalized"),
                           rectToJson(config.detectCircleBoundingRectNormalized));
     result.payload.insert(QStringLiteral("roiPixelsRect"), rectToJson(QRectF(roiPixels)));
-    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
-    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-    result.payload.insert(QStringLiteral("positionCorrectionSourceId"), config.positionCorrectionSourceId);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
+    writePositionCorrectionPayload(config, &result.payload);
     result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(elapsedMs));
     return result;
 }
@@ -560,6 +581,11 @@ struct HalconCApi
     using GenCircleFn = Herror (*)(Hobject *, double, double, double);
     using GenRegionPolygonFilledFn = Herror (*)(Hobject *, const Htuple, const Htuple);
     using DifferenceFn = Herror (*)(const Hobject, const Hobject, Hobject *);
+    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *,
+                                           const Htuple, const Htuple);
+    using ClipRegionFn = Herror (*)(const Hobject, Hobject *,
+                                    const Htuple, const Htuple,
+                                    const Htuple, const Htuple);
     using AreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using Histo2DimFn = Herror (*)(const Hobject, const Hobject, const Hobject, Hobject *);
@@ -590,6 +616,8 @@ struct HalconCApi
     GenCircleFn genCircle = nullptr;
     GenRegionPolygonFilledFn genRegionPolygonFilled = nullptr;
     DifferenceFn difference = nullptr;
+    AffineTransRegionFn affineTransRegion = nullptr;
+    ClipRegionFn clipRegion = nullptr;
     AreaCenterFn areaCenter = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
     Histo2DimFn histo2Dim = nullptr;
@@ -672,6 +700,8 @@ public:
             !resolveRequired(m_handle, api.genCircle, "gen_circle", errorMessage) ||
             !resolveRequired(m_handle, api.genRegionPolygonFilled, "T_gen_region_polygon_filled", errorMessage) ||
             !resolveRequired(m_handle, api.difference, "difference", errorMessage) ||
+            !resolveRequired(m_handle, api.affineTransRegion, "T_affine_trans_region", errorMessage) ||
+            !resolveRequired(m_handle, api.clipRegion, "T_clip_region", errorMessage) ||
             !resolveRequired(m_handle, api.areaCenter, "T_area_center", errorMessage) ||
             !resolveRequired(m_handle, api.reduceDomain, "reduce_domain", errorMessage) ||
             !resolveRequired(m_handle, api.histo2Dim, "T_histo_2dim", errorMessage) ||
@@ -916,6 +946,21 @@ double regionArea(HalconCApi *api, const Hobject region, const QString &stage)
     checkStatus(api, api->areaCenter(region, area.ptr(), row.ptr(), column.ptr()),
                 stage + QStringLiteral(".area_center"));
     return area.size() > 0 ? area.doubleAt(0) : 0.0;
+}
+
+PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
+        const HalconCApi &api)
+{
+    PositionCorrectionHalconRegionApi transformApi;
+    transformApi.createTuple = api.createTuple;
+    transformApi.setDouble = api.setDouble;
+    transformApi.setString = api.setString;
+    transformApi.destroyTuple = api.destroyTuple;
+    transformApi.getDouble = api.getDouble;
+    transformApi.affineTransRegion = api.affineTransRegion;
+    transformApi.clipRegion = api.clipRegion;
+    transformApi.areaCenter = api.areaCenter;
+    return transformApi;
 }
 
 // 使用 HALCON tuple_min2 + tuple_sum 计算直方图交集相似度。
@@ -1454,10 +1499,13 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
     Hobject roiRegion = NO_OBJECTS;
     Hobject maskRegion = NO_OBJECTS;
     Hobject effectiveRegion = NO_OBJECTS;
+    Hobject transformedRegion = NO_OBJECTS;
+    Hobject clippedRegion = NO_OBJECTS;
 
     auto cleanup = [&]() {
         if (effectiveRegion != roiRegion)
             clearObject(api, effectiveRegion);
+        clearObject(api, transformedRegion);
         clearObject(api, maskRegion);
         clearObject(api, roiRegion);
         clearObject(api, value);
@@ -1579,6 +1627,36 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
                         api->difference(roiRegion, maskRegion, &effectiveRegion),
                         QStringLiteral("difference.detect_mask"));
             result.detectMaskApplied = true;
+        }
+
+        if (config.positionCorrection.applied) {
+            const PositionCorrectionHalconTransformResult transformed =
+                    PositionCorrectionHalconTransform::transformAndClipRegion(
+                        positionCorrectionRegionApi(*api),
+                        effectiveRegion,
+                        &transformedRegion,
+                        &clippedRegion,
+                        config.positionCorrection.referenceToRunHomMat2D,
+                        bgr.cols,
+                        bgr.rows);
+            if (!transformed.success) {
+                if (transformed.halconStatus != H_MSG_OK) {
+                    checkStatus(api,
+                                transformed.halconStatus,
+                                QStringLiteral("position_correction.%1")
+                                .arg(transformed.operation));
+                }
+                throw std::pair<QString, QString>(
+                        transformed.status,
+                        QStringLiteral("Position-corrected color ROI is invalid (%1).")
+                        .arg(transformed.operation));
+            }
+            effectiveRegion = clippedRegion;
+            if (transformed.area <= 0.0) {
+                throw std::pair<QString, QString>(
+                        QStringLiteral("corrected_roi_out_of_image"),
+                        QStringLiteral("Position-corrected color ROI is outside the image."));
+            }
         }
 
         result.effectiveRoiArea = regionArea(api, effectiveRegion, QStringLiteral("effective_roi"));
@@ -1919,14 +1997,6 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
     QElapsedTimer timer;
     timer.start();
 
-    if (config.enablePositionCorrection) {
-        return runError(QStringLiteral("unsupported_position_correction"),
-                        QStringLiteral("Position correction is not implemented for color recognition."),
-                        config,
-                        image,
-                        timer.elapsed());
-    }
-
     if (config.featureType.trimmed().toLower() == QStringLiteral("spectrum")) {
         return runError(QStringLiteral("unsupported_feature"),
                         QStringLiteral("Spectrum feature is reserved but not implemented."),
@@ -2074,20 +2144,55 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         const QRect roiPixels = normalizedRoiToPixels(config.roiNormalized,
                                                       image.empty() ? 0 : image.cols,
                                                       image.empty() ? 0 : image.rows);
+        ToolOverlay detectOverlay;
         if (isCircleRegionType(config.detectRegionType) &&
             config.detectCircleRadiusNormalized > 0.0 &&
             !image.empty()) {
             const double radiusPixels = config.detectCircleRadiusNormalized *
                     static_cast<double>(qMax(image.cols, image.rows));
-            result.overlays.append(circleOverlay(QPointF(config.detectCircleCenterNormalized.x() * image.cols,
-                                                         config.detectCircleCenterNormalized.y() * image.rows),
-                                                radiusPixels,
-                                                QStringLiteral("ROI"),
-                                                decision.score));
+            detectOverlay = circleOverlay(
+                        QPointF(config.detectCircleCenterNormalized.x() * image.cols,
+                                config.detectCircleCenterNormalized.y() * image.rows),
+                        radiusPixels,
+                        QStringLiteral("ROI"),
+                        decision.score);
         } else {
-            result.overlays.append(rectOverlay(QRectF(roiPixels), QStringLiteral("ROI"), decision.score));
+            detectOverlay = rectOverlay(
+                        QRectF(roiPixels), QStringLiteral("ROI"), decision.score);
         }
-        ToolOverlay statusText = textOverlay(QPointF(roiPixels.x(), roiPixels.y()),
+        if (config.positionCorrection.applied) {
+            detectOverlay = PositionCorrectionTransform::transformOverlay(
+                        detectOverlay,
+                        config.positionCorrection.referenceToRunHomMat2D);
+            detectOverlay.extra.insert(
+                        QStringLiteral("positionCorrectionSourceId"),
+                        config.positionCorrection.sourceId);
+        }
+        detectOverlay.extra.insert(QStringLiteral("role"),
+                                   QStringLiteral("detect_roi"));
+        detectOverlay.extra.insert(QStringLiteral("positionCorrectionApplied"),
+                                   config.positionCorrection.applied);
+        result.overlays.append(detectOverlay);
+        if (config.positionCorrection.applied
+                && config.positionCorrection.showMatchContour) {
+            result.overlays += PositionCorrectionTransform::matchContourOverlays(
+                        config.positionCorrection.matchContours,
+                        config.positionCorrection.sourceId);
+        }
+        if (config.positionCorrection.applied) {
+            result.overlays += PositionCorrectionTransform::matchOriginOverlays(
+                        config.positionCorrection.matchOrigins,
+                        config.positionCorrection.sourceId);
+        }
+        const QRectF anchorRect = detectOverlay.type == ToolOverlayType::Polygon
+                ? QPolygonF(detectOverlay.points).boundingRect()
+                : (detectOverlay.type == ToolOverlayType::Circle
+                   ? QRectF(detectOverlay.center.x() - detectOverlay.radius,
+                            detectOverlay.center.y() - detectOverlay.radius,
+                            detectOverlay.radius * 2.0,
+                            detectOverlay.radius * 2.0)
+                   : detectOverlay.rect);
+        ToolOverlay statusText = textOverlay(anchorRect.topLeft(),
                                              QStringLiteral("%1 %2 %3")
                                              .arg(result.ok ? QStringLiteral("OK") : QStringLiteral("NG"),
                                                   decision.predictedLabel,
@@ -2095,7 +2200,7 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                                              decision.score,
                                              QStringLiteral("color_result_text"));
         statusText.extra.insert(QStringLiteral("status"), result.ok ? QStringLiteral("OK") : QStringLiteral("NG"));
-        statusText.extra.insert(QStringLiteral("anchorRect"), rectToJsonObject(QRectF(roiPixels)));
+        statusText.extra.insert(QStringLiteral("anchorRect"), rectToJsonObject(anchorRect));
         result.overlays.append(statusText);
 
         result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_hsv_histogram_transition"));
@@ -2173,10 +2278,7 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         result.payload.insert(QStringLiteral("requestedBrightnessEnabled"), config.brightnessEnabled);
         result.payload.insert(QStringLiteral("lightingNormalizationMode"),
                               featureResult.payload.value(QStringLiteral("lightingNormalizationMode")).toString());
-        result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
-        result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-        result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
-        result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
+        writePositionCorrectionPayload(config, &result.payload);
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
 
         return result;

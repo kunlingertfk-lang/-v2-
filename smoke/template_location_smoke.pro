@@ -27,13 +27,16 @@ SOURCES += \
     template_location_smoke.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
     ../src/algorithms/location/TemplateLocationHalconRunner.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
     ../src/algorithms/presence/PatternPresenceHalconApi.cpp \
     ../src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
     ../src/algorithms/presence/PatternPresenceHalconRunner.cpp \
-    ../src/tooladapters/TemplateLocationAdapter.cpp
+    ../src/tooladapters/TemplateLocationAdapter.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp
 
 HEADERS += \
     ../src/algorithms/location/TemplateLocationHalconRunner.h \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.h \
     ../src/algorithms/presence/PatternPresenceHalconApi.h \
     ../src/algorithms/presence/PatternPresenceAutoModelDomain.h \
     ../src/algorithms/presence/PatternPresenceHalconRunner.h \
@@ -43,6 +46,7 @@ HEADERS += \
     ../src/toolcore/ToolOverlay.h \
     ../src/toolcore/ToolRequest.h \
     ../src/toolcore/ToolResult.h \
+    ../src/toolcore/PositionCorrectionTransform.h \
     ../src/toolcore/ToolTypes.h
 
 LIBS += -L$$OPENCV_ROOT/lib -Wl,-rpath,$$OPENCV_ROOT/lib

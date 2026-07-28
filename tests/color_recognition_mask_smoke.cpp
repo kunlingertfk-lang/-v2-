@@ -115,17 +115,7 @@ int main(int argc, char **argv)
         return fail("16-bit input without validBits/bitShift must be rejected");
     }
 
-    ColorRecognitionHalconConfig positionConfig = config;
-    positionConfig.enablePositionCorrection = true;
-    positionConfig.positionCorrectionSourceId = QStringLiteral("reference.positionCorrection");
-    positionConfig.positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
     const cv::Mat red8(24, 24, CV_8UC3, cv::Scalar(0, 0, 255));
-    const ColorRecognitionHalconResult positionResult = runner.run(red8, positionConfig);
-    if (positionResult.success ||
-        positionResult.status != QStringLiteral("unsupported_position_correction") ||
-        positionResult.payload.value(QStringLiteral("positionCorrectionApplied")).toBool(true)) {
-        return fail("Unimplemented position correction must return unsupported");
-    }
 
     const ColorRecognitionHalconFeatureResult redFeature = runner.extractFeature(red8, config);
     if (!redFeature.success || redFeature.feature.size() != 16 * 16) {
@@ -192,6 +182,36 @@ int main(int argc, char **argv)
         matched.payload.contains(QStringLiteral("dominantColorRatio")) ||
         matched.payload.contains(QStringLiteral("labelAreaRatios"))) {
         return fail("Strictly signed sample should classify without feature alignment");
+    }
+
+    ColorRecognitionHalconConfig positionConfig = runConfig;
+    positionConfig.roiNormalized = QRectF(0.0, 0.0, 0.5, 1.0);
+    positionConfig.enablePositionCorrection = true;
+    positionConfig.positionCorrectionSourceId =
+            QStringLiteral("reference.positionCorrection");
+    positionConfig.positionCorrectionSource =
+            QStringLiteral("0 基准图.位置修正信息");
+    positionConfig.positionCorrection.requested = true;
+    positionConfig.positionCorrection.applied = true;
+    positionConfig.positionCorrection.sourceId =
+            QStringLiteral("reference.positionCorrection");
+    positionConfig.positionCorrection.referenceToRunHomMat2D =
+            {1.0, 0.0, 0.0, 0.0, 1.0, 12.0};
+    ToolOverlay origin;
+    origin.type = ToolOverlayType::Circle;
+    origin.center = QPointF(12.0, 12.0);
+    origin.radius = 2.0;
+    positionConfig.positionCorrection.matchOrigins = {origin};
+    const ColorRecognitionHalconResult positionResult =
+            runner.run(red8, positionConfig);
+    if (!positionResult.success ||
+        !positionResult.payload.value(
+            QStringLiteral("positionCorrectionApplied")).toBool(false) ||
+        positionResult.overlays.isEmpty() ||
+        positionResult.overlays.first().extra.value(
+            QStringLiteral("role")).toString() != QStringLiteral("detect_roi") ||
+        positionResult.overlays.first().type != ToolOverlayType::Polygon) {
+        return fail("Position correction must transform the HSV HALCON ROI and overlay");
     }
     if (matched.payload.value(QStringLiteral("classifierVersion")).toString() !=
             colorRecognitionHsvCurrentClassifierVersion() ||

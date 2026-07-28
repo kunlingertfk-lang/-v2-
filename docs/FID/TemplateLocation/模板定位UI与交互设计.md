@@ -55,6 +55,7 @@
 
 ### 全部页
 
+- 模板卡片显示可选的“屏蔽区域”矩形、圆形、多边形和“清除”操作，三种绘制方式互斥且单次仅保存一个屏蔽区。屏蔽区仅从模板建模 Region 中扣除，修改或清除后已有模型变为“需要重新创建”；基础页隐藏该行但不清除已保存配置。
 - 自动对比度时向 HALCON 传入 `Contrast="auto"`、`MinContrast="auto"`；手动 `Contrast`、`MinContrast` 的标签和输入框同时禁用，并以深灰文字、中深灰底色和深灰边框突出自动接管状态。建模完成后只读显示“Contrast：自动”、实际 `MinContrast` 和实际金字塔层级。HALCON 20.11 不提供数值型自动 `Contrast` 回读。
 - 手动对比度时显示 `Contrast` 和 `MinContrast`；两者范围为 1–255，且必须满足 `MinContrast < Contrast`。
 - 金字塔层级为自动或 1–10；亚像素为 `least_squares` 或关闭；贪婪度为 0.0–1.0，默认 0.5；超时默认 2000 ms。
@@ -72,6 +73,8 @@
 | 无基准图 | `no_reference_image` / 请先设置基准图 |
 | 模板 ROI 缺失 | `no_template_region` / 请先绘制模板区域 |
 | ROI 无效 | `invalid_template_region` 或 `invalid_search_region` |
+| 屏蔽区无效或不与模板相交 | `invalid_template_mask` |
+| 屏蔽后有效模板面积不足 | `template_masked_empty` |
 | 参数范围错误 | `invalid_parameter`，定位到对应字段 |
 | 模板需要重建 | `model_dirty` / 参数已改变，请重新创建模板 |
 | 删除模板 | 模型状态和模型轮廓清空，保留模板 ROI，测试按钮等待重新建模 |

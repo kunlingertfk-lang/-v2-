@@ -92,7 +92,7 @@ PositionCorrectionResolveResult PositionCorrectionConsumer::resolve(
     PositionCorrectionContext context;
     context.requested = options.requested;
     context.showMatchContour = options.showMatchContour;
-    context.sourceId = options.sourceId.trimmed();
+    context.sourceId = PositionCorrection::normalizedSourceId(options.sourceId);
 
     if (!context.requested) {
         PositionCorrectionResolveResult result;
@@ -100,11 +100,6 @@ PositionCorrectionResolveResult PositionCorrectionConsumer::resolve(
         result.context = context;
         return result;
     }
-
-    if (context.sourceId == PositionCorrection::defaultSource())
-        context.sourceId = PositionCorrection::defaultSourceId();
-    if (context.sourceId.isEmpty())
-        context.sourceId = PositionCorrection::defaultSourceId();
 
     const QJsonValue correctionsValue = request.runtimeContext.value(
                 QStringLiteral("positionCorrectionsById"));
@@ -123,6 +118,28 @@ PositionCorrectionResolveResult PositionCorrectionConsumer::resolve(
 
     const QJsonObject sourceResult = sourceValue.toObject();
     const QJsonObject payload = sourceResult.value(QStringLiteral("payload")).toObject();
+    if (sourceResult.value(QStringLiteral("toolId")).toString().trimmed()
+            != context.sourceId
+            || toolTypeFromString(sourceResult.value(QStringLiteral("toolType"))
+                                  .toString()) != ToolType::PositionCorrection) {
+        return failure(context,
+                       QStringLiteral("position_correction_source_invalid"),
+                       QStringLiteral("Position correction result identity or type is invalid."));
+    }
+
+    const QString currentFrameId = request.frameId.trimmed().isEmpty()
+            ? request.runtimeContext.value(QStringLiteral("frameId"))
+              .toString().trimmed()
+            : request.frameId.trimmed();
+    const QString sourceFrameId = payload.value(QStringLiteral("frameId"))
+            .toString().trimmed();
+    if (!currentFrameId.isEmpty()
+            && (sourceFrameId.isEmpty() || sourceFrameId != currentFrameId)) {
+        return failure(context,
+                       QStringLiteral("position_correction_frame_mismatch"),
+                       QStringLiteral("Position correction result does not belong to the current frame."));
+    }
+
     context.sourceStatus = sourceResult.value(QStringLiteral("status"))
             .toString(payload.value(QStringLiteral("positionCorrectionReason"))
                       .toString()).trimmed();

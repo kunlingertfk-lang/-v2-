@@ -1,0 +1,17 @@
+{
+    "schemaVersion": 1,
+    "modelId": "industrial_embedding",
+    "modelVersion": "v1",
+    "featureModelFile": "feature_model.hdl",
+    "featureModelSha256": "sha256:<64位小写十六进制摘要>",
+    "preprocessFile": "preprocess_params.hdict",
+    "preprocessSha256": "sha256:<64位小写十六进制摘要>",
+    "embeddingLayer": "<经Phase 0验证的分类头前层名>",
+    "embeddingLength": 256,
+    "inputWidth": 224,
+    "inputHeight": 224,
+    "inputChannels": 3,
+    "resizeMode": "keep_aspect_pad",
+    "paddingValue": 0.0,
+    "runtimePreference": "auto"
+}

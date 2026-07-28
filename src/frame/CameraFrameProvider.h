@@ -30,7 +30,7 @@ public:
     bool openCamera(const QString &devicePath = QStringLiteral("/dev/video0"));
     void closeCamera(const QString &reason = QString());
     bool startGrab();
-    void stopGrab();
+    bool stopGrab(int timeoutMs = 3000);
     bool isOpened() const;
     bool isGrabbing() const;
 

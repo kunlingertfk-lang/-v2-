@@ -93,6 +93,62 @@ bool validNormalizedPoint(const QPointF &point)
             && point.y() >= 0.0 && point.y() <= 1.0;
 }
 
+CircleRoi referenceMaskCircle(
+        const ReferencePositionCorrectionConfig &config)
+{
+    CircleRoi circle;
+    circle.centerNormalized = config.templateMaskCircleCenterNormalized;
+    circle.radiusNormalized = config.templateMaskCircleRadiusNormalized;
+    circle.boundingRectNormalized = QRectF(
+                circle.centerNormalized.x() - circle.radiusNormalized,
+                circle.centerNormalized.y() - circle.radiusNormalized,
+                circle.radiusNormalized * 2.0,
+                circle.radiusNormalized * 2.0);
+    circle.valid = circle.radiusNormalized > 0.0 &&
+            validNormalizedPoint(circle.centerNormalized) &&
+            validNormalizedRect(circle.boundingRectNormalized);
+    return circle;
+}
+
+void appendReferenceRegionOverlay(
+        QVector<ToolOverlay> *overlays,
+        const QString &type,
+        const QRectF &rect,
+        const QVector<QPointF> &polygon,
+        const CircleRoi &circle,
+        const QSize &imageSize,
+        const QString &label,
+        const QString &displayRole)
+{
+    if (!overlays || imageSize.isEmpty())
+        return;
+    ToolOverlay overlay;
+    if (type == QStringLiteral("rectangle") && validNormalizedRect(rect)) {
+        overlay.type = ToolOverlayType::Rect;
+        overlay.rect = QRectF(rect.x() * imageSize.width(),
+                              rect.y() * imageSize.height(),
+                              rect.width() * imageSize.width(),
+                              rect.height() * imageSize.height());
+    } else if (type == QStringLiteral("circle") && circle.valid) {
+        overlay.type = ToolOverlayType::Circle;
+        overlay.center = QPointF(circle.centerNormalized.x() * imageSize.width(),
+                                 circle.centerNormalized.y() * imageSize.height());
+        overlay.radius = circle.radiusNormalized *
+                qMax(imageSize.width(), imageSize.height());
+    } else if (type == QStringLiteral("polygon") && polygon.size() >= 3) {
+        overlay.type = ToolOverlayType::Polygon;
+        for (const QPointF &point : polygon) {
+            overlay.points.append(QPointF(point.x() * imageSize.width(),
+                                          point.y() * imageSize.height()));
+        }
+    } else {
+        return;
+    }
+    overlay.label = label;
+    overlay.extra.insert(QStringLiteral("displayRole"), displayRole);
+    overlays->append(overlay);
+}
+
 QVector<QPointF> polygonPointsFromConfig(const ReferencePositionCorrectionConfig &config)
 {
     return polygonPointsFromJson(config.templatePolygonNormalized);
@@ -227,22 +283,28 @@ void ReferenceImageDialog::editCurrentSchemeName()
     saveCurrentScheme();
 }
 
-void ReferenceImageDialog::saveCurrentScheme()
+bool ReferenceImageDialog::saveCurrentScheme()
 {
-    if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None
-            && !finishReferencePositionRoiEditing()) {
-        return;
+    if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None) {
+        const bool maskEditing =
+                m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskRectangle ||
+                m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskCircle ||
+                m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskPolygon;
+        if (!(maskEditing ? finishReferencePositionMaskEditing()
+                          : finishReferencePositionRoiEditing()))
+            return false;
     }
     SchemeStore::instance().setReferencePositionCorrection(m_referencePositionCorrection);
     QString error;
     if (!SchemeStore::instance().saveCurrentScheme(&error)) {
         qWarning() << "[ReferenceImageDialog] 方案保存失败:" << error;
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
-        return;
+        return false;
     }
     refreshSchemeHeader();
     if (m_referencePositionCorrection.enabled && hasReferencePositionTemplateRoi())
         m_positionStatusLabel->setText(tr("配置已保存，尚未测试"));
+    return true;
 }
 
 void ReferenceImageDialog::setupPositionCorrectionControls()
@@ -283,6 +345,38 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
     tools->addWidget(m_positionPolygonButton);
     tools->addWidget(m_positionFinishButton);
     settingsLayout->addLayout(tools);
+
+    QHBoxLayout *maskTools = new QHBoxLayout;
+    QLabel *maskField = new QLabel(tr("屏蔽区域"), m_positionSettingsFrame);
+    maskField->setProperty("role", QStringLiteral("rowField"));
+    m_positionMaskRectButton = new QPushButton(tr("矩形"), m_positionSettingsFrame);
+    m_positionMaskRectButton->setObjectName(
+                QStringLiteral("referencePositionMaskRectButton"));
+    m_positionMaskRectButton->setCheckable(true);
+    m_positionMaskCircleButton = new QPushButton(tr("圆形"), m_positionSettingsFrame);
+    m_positionMaskCircleButton->setObjectName(
+                QStringLiteral("referencePositionMaskCircleButton"));
+    m_positionMaskCircleButton->setCheckable(true);
+    m_positionMaskPolygonButton = new QPushButton(tr("多边形"), m_positionSettingsFrame);
+    m_positionMaskPolygonButton->setObjectName(
+                QStringLiteral("referencePositionMaskPolygonButton"));
+    m_positionMaskPolygonButton->setCheckable(true);
+    m_positionMaskClearButton = new QPushButton(tr("清除"), m_positionSettingsFrame);
+    m_positionMaskClearButton->setObjectName(
+                QStringLiteral("referencePositionMaskClearButton"));
+    m_positionMaskFinishButton = new QPushButton(tr("完成"), m_positionSettingsFrame);
+    m_positionMaskFinishButton->setObjectName(
+                QStringLiteral("referencePositionMaskFinishButton"));
+    m_positionMaskFinishButton->setProperty(
+                "actionRole", QStringLiteral("primary"));
+    maskTools->addWidget(maskField);
+    maskTools->addStretch(1);
+    maskTools->addWidget(m_positionMaskRectButton);
+    maskTools->addWidget(m_positionMaskCircleButton);
+    maskTools->addWidget(m_positionMaskPolygonButton);
+    maskTools->addWidget(m_positionMaskClearButton);
+    maskTools->addWidget(m_positionMaskFinishButton);
+    settingsLayout->addLayout(maskTools);
 
     QHBoxLayout *originRow = new QHBoxLayout;
     QLabel *originLabel = new QLabel(tr("定位点"), m_positionSettingsFrame);
@@ -325,12 +419,53 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
     roiTypeGroup->addButton(m_positionRectButton);
     roiTypeGroup->addButton(m_positionPolygonButton);
 
+    QButtonGroup *maskTypeGroup = new QButtonGroup(this);
+    maskTypeGroup->setExclusive(true);
+    maskTypeGroup->addButton(m_positionMaskRectButton);
+    maskTypeGroup->addButton(m_positionMaskCircleButton);
+    maskTypeGroup->addButton(m_positionMaskPolygonButton);
+
     connect(ui->positionCorrectionCheckBox, &QCheckBox::toggled,
             this, &ReferenceImageDialog::updatePositionCorrectionUi);
     connect(m_positionRectButton, &QPushButton::clicked,
             this, &ReferenceImageDialog::startReferencePositionRectEditing);
     connect(m_positionPolygonButton, &QPushButton::clicked,
             this, &ReferenceImageDialog::startReferencePositionPolygonEditing);
+    connect(m_positionMaskRectButton, &QPushButton::clicked, this, [this]() {
+        startReferencePositionMaskEditing(
+                    PositionCorrectionRoiEditMode::MaskRectangle);
+    });
+    connect(m_positionMaskCircleButton, &QPushButton::clicked, this, [this]() {
+        startReferencePositionMaskEditing(
+                    PositionCorrectionRoiEditMode::MaskCircle);
+    });
+    connect(m_positionMaskPolygonButton, &QPushButton::clicked, this, [this]() {
+        startReferencePositionMaskEditing(
+                    PositionCorrectionRoiEditMode::MaskPolygon);
+    });
+    connect(m_positionMaskFinishButton, &QPushButton::clicked,
+            this, &ReferenceImageDialog::finishReferencePositionMaskEditing);
+    connect(m_positionMaskClearButton, &QPushButton::clicked, this, [this]() {
+        stopReferencePositionOriginSelection();
+        stopReferencePositionRoiEditing(true);
+        m_referencePositionCorrection.templateMaskRegionType =
+                QStringLiteral("none");
+        m_referencePositionCorrection.templateMaskRoiNormalized = QRectF();
+        m_referencePositionCorrection.templateMaskPolygonNormalized =
+                QJsonArray();
+        m_referencePositionCorrection.templateMaskCircleCenterNormalized =
+                QPointF();
+        m_referencePositionCorrection.templateMaskCircleRadiusNormalized = 0.0;
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("editing_mask");
+        m_referencePositionCorrection.message.clear();
+        clearReferencePositionMatchOverlays();
+        restoreReferencePositionRoi();
+        renderReferencePositionOverlays();
+        m_positionStatusLabel->setText(
+                    tr("模板屏蔽区域已清除，请点击“测试运行”重新创建基准"));
+    });
     connect(m_positionFinishButton, &QPushButton::clicked,
             this, &ReferenceImageDialog::finishReferencePositionRoiEditing);
     connect(m_positionOriginModeComboBox,
@@ -368,7 +503,7 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
             return;
         }
         if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None) {
-            m_positionStatusLabel->setText(tr("请先点击“完成”确认模板区域"));
+            m_positionStatusLabel->setText(tr("请先点击“完成”确认当前区域"));
             return;
         }
         if (!hasReferencePositionTemplateRoi()) {
@@ -385,6 +520,8 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
                 this, &ReferenceImageDialog::handleReferencePositionRectChanged);
         connect(m_previewHelper, &FrameViewHelper::polygonChanged,
                 this, &ReferenceImageDialog::handleReferencePositionPolygonChanged);
+        connect(m_previewHelper, &FrameViewHelper::circleChanged,
+                this, &ReferenceImageDialog::handleReferencePositionCircleChanged);
         connect(m_previewHelper, &FrameViewHelper::pointSelected,
                 this, [this](const QPointF &point) {
             if (m_referencePositionCorrection.originMode != QStringLiteral("custom")
@@ -410,9 +547,19 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
                 });
         connect(m_previewHelper, &FrameViewHelper::polygonSelectionRejected,
                 this, [this](int pointCount) {
-                    if (m_positionRoiEditMode == PositionCorrectionRoiEditMode::Polygon) {
+                    if (m_positionRoiEditMode == PositionCorrectionRoiEditMode::Polygon ||
+                            m_positionRoiEditMode ==
+                            PositionCorrectionRoiEditMode::MaskPolygon) {
                         m_positionStatusLabel->setText(
                                     tr("多边形至少需要 3 个点，当前为 %1 个点").arg(pointCount));
+                    }
+                });
+        connect(m_previewHelper, &FrameViewHelper::circleSelectionRejected,
+                this, [this]() {
+                    if (m_positionRoiEditMode ==
+                            PositionCorrectionRoiEditMode::MaskCircle) {
+                        m_positionStatusLabel->setText(
+                                    tr("圆形屏蔽区域半径至少需要 2 像素"));
                     }
                 });
     }
@@ -444,6 +591,22 @@ void ReferenceImageDialog::updatePositionCorrectionUi(bool enabled)
     if (m_positionPolygonButton)
         m_positionPolygonButton->setChecked(
                     m_referencePositionCorrection.templateRegionType == QStringLiteral("polygon"));
+    if (m_positionMaskRectButton)
+        m_positionMaskRectButton->setChecked(
+                    m_referencePositionCorrection.templateMaskRegionType ==
+                    QStringLiteral("rectangle"));
+    if (m_positionMaskCircleButton)
+        m_positionMaskCircleButton->setChecked(
+                    m_referencePositionCorrection.templateMaskRegionType ==
+                    QStringLiteral("circle"));
+    if (m_positionMaskPolygonButton)
+        m_positionMaskPolygonButton->setChecked(
+                    m_referencePositionCorrection.templateMaskRegionType ==
+                    QStringLiteral("polygon"));
+    if (m_positionMaskClearButton)
+        m_positionMaskClearButton->setEnabled(
+                    m_referencePositionCorrection.templateMaskRegionType !=
+                    QStringLiteral("none"));
     updateReferencePositionOriginControls();
     if (!enabled) {
         stopReferencePositionOriginSelection();
@@ -452,6 +615,7 @@ void ReferenceImageDialog::updatePositionCorrectionUi(bool enabled)
         if (m_previewHelper) {
             m_previewHelper->clearRoi();
             m_previewHelper->clearPolygonRoi();
+            m_previewHelper->clearCircleRoi();
         }
     } else {
         restoreReferencePositionRoi();
@@ -482,8 +646,13 @@ void ReferenceImageDialog::startReferencePositionRectEditing()
     m_positionRoiEditMode = PositionCorrectionRoiEditMode::Rectangle;
     m_positionRectButton->setChecked(true);
     m_positionPolygonButton->setChecked(false);
+    m_positionMaskRectButton->setChecked(false);
+    m_positionMaskCircleButton->setChecked(false);
+    m_positionMaskPolygonButton->setChecked(false);
     m_previewHelper->setPolygonDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
     m_previewHelper->clearPolygonRoi();
+    m_previewHelper->clearCircleRoi();
     if (hadRectangle
             && validNormalizedRect(m_referencePositionCorrection.templateRoiNormalized)) {
         m_previewHelper->setRoiRectNormalized(m_referencePositionCorrection.templateRoiNormalized);
@@ -514,8 +683,13 @@ void ReferenceImageDialog::startReferencePositionPolygonEditing()
     m_positionRoiEditMode = PositionCorrectionRoiEditMode::Polygon;
     m_positionRectButton->setChecked(false);
     m_positionPolygonButton->setChecked(true);
+    m_positionMaskRectButton->setChecked(false);
+    m_positionMaskCircleButton->setChecked(false);
+    m_positionMaskPolygonButton->setChecked(false);
     m_previewHelper->setRoiDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
     m_previewHelper->clearRoi();
+    m_previewHelper->clearCircleRoi();
     const QVector<QPointF> points = polygonPointsFromJson(
                 m_referencePositionCorrection.templatePolygonNormalized);
     if (points.size() >= 3)
@@ -528,6 +702,167 @@ void ReferenceImageDialog::startReferencePositionPolygonEditing()
                 tr("左键添加点，靠近首点或双击闭合，右键撤销，Esc 取消，完成后点击“完成”"));
 }
 
+void ReferenceImageDialog::startReferencePositionMaskEditing(
+        PositionCorrectionRoiEditMode mode)
+{
+    if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+        if (m_positionStatusLabel)
+            m_positionStatusLabel->setText(tr("请先设置基准图"));
+        return;
+    }
+    if (!hasReferencePositionTemplateRoi()) {
+        m_positionStatusLabel->setText(tr("请先设置并确认模板区域"));
+        return;
+    }
+    if (mode != PositionCorrectionRoiEditMode::MaskRectangle &&
+            mode != PositionCorrectionRoiEditMode::MaskCircle &&
+            mode != PositionCorrectionRoiEditMode::MaskPolygon) {
+        return;
+    }
+
+    stopReferencePositionOriginSelection();
+    clearReferencePositionMatchOverlays();
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("editing_mask");
+    m_referencePositionCorrection.message.clear();
+    showReferenceImageMode();
+    m_positionRoiEditMode = mode;
+
+    m_positionRectButton->setChecked(false);
+    m_positionPolygonButton->setChecked(false);
+    m_positionMaskRectButton->setChecked(
+                mode == PositionCorrectionRoiEditMode::MaskRectangle);
+    m_positionMaskCircleButton->setChecked(
+                mode == PositionCorrectionRoiEditMode::MaskCircle);
+    m_positionMaskPolygonButton->setChecked(
+                mode == PositionCorrectionRoiEditMode::MaskPolygon);
+
+    m_previewHelper->setRoiDrawingEnabled(false);
+    m_previewHelper->setPolygonDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
+    m_previewHelper->clearRoi();
+    m_previewHelper->clearPolygonRoi();
+    m_previewHelper->clearCircleRoi();
+    renderReferencePositionOverlays();
+
+    if (mode == PositionCorrectionRoiEditMode::MaskRectangle) {
+        if (m_referencePositionCorrection.templateMaskRegionType ==
+                QStringLiteral("rectangle") &&
+                validNormalizedRect(
+                    m_referencePositionCorrection.templateMaskRoiNormalized)) {
+            m_previewHelper->setRoiRectNormalized(
+                        m_referencePositionCorrection.templateMaskRoiNormalized);
+        }
+        m_previewHelper->setRoiDrawingEnabled(true);
+        ui->viewerTitleLabel->setText(tr("基准图 - 矩形模板屏蔽区域"));
+        m_positionStatusLabel->setText(
+                    tr("拖拽矩形屏蔽不稳定特征，完成后点击屏蔽区域一行的“完成”"));
+    } else if (mode == PositionCorrectionRoiEditMode::MaskCircle) {
+        const CircleRoi circle =
+                referenceMaskCircle(m_referencePositionCorrection);
+        if (m_referencePositionCorrection.templateMaskRegionType ==
+                QStringLiteral("circle") && circle.valid) {
+            m_previewHelper->setCircleRoiNormalized(circle);
+        }
+        m_previewHelper->setCircleDrawingEnabled(true);
+        ui->viewerTitleLabel->setText(tr("基准图 - 圆形模板屏蔽区域"));
+        m_positionStatusLabel->setText(
+                    tr("拖拽圆形屏蔽不稳定特征，完成后点击屏蔽区域一行的“完成”"));
+    } else {
+        const QVector<QPointF> points = polygonPointsFromJson(
+                    m_referencePositionCorrection.templateMaskPolygonNormalized);
+        if (m_referencePositionCorrection.templateMaskRegionType ==
+                QStringLiteral("polygon") && points.size() >= 3) {
+            m_previewHelper->setPolygonRoiNormalized(points);
+        }
+        m_previewHelper->setPolygonDrawingEnabled(true);
+        ui->viewerTitleLabel->setText(tr("基准图 - 多边形模板屏蔽区域"));
+        m_positionStatusLabel->setText(
+                    tr("逐点绘制屏蔽区域，闭合后点击屏蔽区域一行的“完成”"));
+    }
+}
+
+bool ReferenceImageDialog::finishReferencePositionMaskEditing()
+{
+    if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+        if (m_positionStatusLabel)
+            m_positionStatusLabel->setText(tr("请先设置基准图"));
+        return false;
+    }
+
+    if (m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskRectangle) {
+        const QRectF roi = m_previewHelper->roiRectNormalized();
+        if (!validNormalizedRect(roi)) {
+            m_positionStatusLabel->setText(tr("请先绘制有效矩形屏蔽区域"));
+            return false;
+        }
+        m_referencePositionCorrection.templateMaskRegionType =
+                QStringLiteral("rectangle");
+        m_referencePositionCorrection.templateMaskRoiNormalized = roi;
+        m_referencePositionCorrection.templateMaskPolygonNormalized = QJsonArray();
+        m_referencePositionCorrection.templateMaskCircleCenterNormalized =
+                QPointF();
+        m_referencePositionCorrection.templateMaskCircleRadiusNormalized = 0.0;
+    } else if (m_positionRoiEditMode ==
+               PositionCorrectionRoiEditMode::MaskCircle) {
+        const CircleRoi circle = m_previewHelper->circleRoiNormalized();
+        if (!circle.valid) {
+            m_positionStatusLabel->setText(tr("请先绘制有效圆形屏蔽区域"));
+            return false;
+        }
+        m_referencePositionCorrection.templateMaskRegionType =
+                QStringLiteral("circle");
+        m_referencePositionCorrection.templateMaskRoiNormalized =
+                circle.boundingRectNormalized;
+        m_referencePositionCorrection.templateMaskPolygonNormalized = QJsonArray();
+        m_referencePositionCorrection.templateMaskCircleCenterNormalized =
+                circle.centerNormalized;
+        m_referencePositionCorrection.templateMaskCircleRadiusNormalized =
+                circle.radiusNormalized;
+    } else if (m_positionRoiEditMode ==
+               PositionCorrectionRoiEditMode::MaskPolygon) {
+        if (m_previewHelper->isPolygonDrawingEnabled() &&
+                !m_previewHelper->finishPolygonDrawing()) {
+            m_positionStatusLabel->setText(tr("屏蔽多边形至少需要 3 个点"));
+            return false;
+        }
+        const QVector<QPointF> points =
+                m_previewHelper->polygonRoiNormalized();
+        if (points.size() < 3) {
+            m_positionStatusLabel->setText(tr("屏蔽多边形至少需要 3 个点"));
+            return false;
+        }
+        m_referencePositionCorrection.templateMaskRegionType =
+                QStringLiteral("polygon");
+        m_referencePositionCorrection.templateMaskRoiNormalized =
+                boundingRectForPoints(points);
+        m_referencePositionCorrection.templateMaskPolygonNormalized =
+                polygonPointsToJson(points);
+        m_referencePositionCorrection.templateMaskCircleCenterNormalized =
+                QPointF();
+        m_referencePositionCorrection.templateMaskCircleRadiusNormalized = 0.0;
+    } else {
+        m_positionStatusLabel->setText(tr("请先选择一种屏蔽区域形状"));
+        return false;
+    }
+
+    m_referencePositionCorrection.version = 3;
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("pending_validation");
+    m_referencePositionCorrection.message.clear();
+    stopReferencePositionRoiEditing(true);
+    if (!buildAndValidateReferencePositionModel())
+        return false;
+    SchemeStore::instance().setReferencePositionCorrection(
+                m_referencePositionCorrection);
+    m_positionMaskClearButton->setEnabled(true);
+    m_positionStatusLabel->setText(
+                tr("模板屏蔽区域已确认，模型自匹配通过，请保存方案"));
+    return true;
+}
+
 // 完成当前绘制并校验 ROI；只有有效矩形或至少三个点的多边形可以确认。
 bool ReferenceImageDialog::finishReferencePositionRoiEditing()
 {
@@ -537,6 +872,14 @@ bool ReferenceImageDialog::finishReferencePositionRoiEditing()
         return false;
     }
     stopReferencePositionOriginSelection();
+    if (m_positionRoiEditMode ==
+            PositionCorrectionRoiEditMode::MaskRectangle ||
+            m_positionRoiEditMode ==
+            PositionCorrectionRoiEditMode::MaskCircle ||
+            m_positionRoiEditMode ==
+            PositionCorrectionRoiEditMode::MaskPolygon) {
+        return finishReferencePositionMaskEditing();
+    }
 
     if (m_referencePositionCorrection.templateRegionType == QStringLiteral("polygon")) {
         if (m_previewHelper->isPolygonDrawingEnabled()
@@ -578,6 +921,27 @@ bool ReferenceImageDialog::finishReferencePositionRoiEditing()
 // 矩形拖拽完成后实时更新归一化配置，并清除不再适用的多边形数据。
 void ReferenceImageDialog::handleReferencePositionRectChanged(const QRectF &roiNormalized)
 {
+    if (m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskRectangle &&
+            validNormalizedRect(roiNormalized)) {
+        m_referencePositionCorrection.templateMaskRegionType =
+                QStringLiteral("rectangle");
+        m_referencePositionCorrection.templateMaskRoiNormalized = roiNormalized;
+        m_referencePositionCorrection.templateMaskPolygonNormalized = QJsonArray();
+        m_referencePositionCorrection.templateMaskCircleCenterNormalized =
+                QPointF();
+        m_referencePositionCorrection.templateMaskCircleRadiusNormalized = 0.0;
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("editing_mask");
+        clearReferencePositionMatchOverlays();
+        m_positionStatusLabel->setText(
+                    tr("矩形屏蔽区 x=%1 y=%2 w=%3 h=%4，点击屏蔽区域“完成”")
+                    .arg(roiNormalized.x(), 0, 'f', 3)
+                    .arg(roiNormalized.y(), 0, 'f', 3)
+                    .arg(roiNormalized.width(), 0, 'f', 3)
+                    .arg(roiNormalized.height(), 0, 'f', 3));
+        return;
+    }
     if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::Rectangle
             || !validNormalizedRect(roiNormalized)) {
         return;
@@ -602,6 +966,26 @@ void ReferenceImageDialog::handleReferencePositionRectChanged(const QRectF &roiN
 void ReferenceImageDialog::handleReferencePositionPolygonChanged(
         const QVector<QPointF> &pointsNormalized)
 {
+    if (m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskPolygon &&
+            pointsNormalized.size() >= 3) {
+        m_referencePositionCorrection.templateMaskRegionType =
+                QStringLiteral("polygon");
+        m_referencePositionCorrection.templateMaskPolygonNormalized =
+                polygonPointsToJson(pointsNormalized);
+        m_referencePositionCorrection.templateMaskRoiNormalized =
+                boundingRectForPoints(pointsNormalized);
+        m_referencePositionCorrection.templateMaskCircleCenterNormalized =
+                QPointF();
+        m_referencePositionCorrection.templateMaskCircleRadiusNormalized = 0.0;
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.status = QStringLiteral("editing_mask");
+        clearReferencePositionMatchOverlays();
+        m_positionStatusLabel->setText(
+                    tr("屏蔽多边形已闭合，共 %1 个点，点击屏蔽区域“完成”")
+                    .arg(pointsNormalized.size()));
+        return;
+    }
     const bool drawingPolygon =
             m_positionRoiEditMode == PositionCorrectionRoiEditMode::Polygon;
     const bool adjustingConfirmedPolygon =
@@ -629,6 +1013,33 @@ void ReferenceImageDialog::handleReferencePositionPolygonChanged(
                   .arg(pointsNormalized.size()));
 }
 
+void ReferenceImageDialog::handleReferencePositionCircleChanged(
+        const CircleRoi &circle)
+{
+    if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::MaskCircle ||
+            !circle.valid) {
+        return;
+    }
+    m_referencePositionCorrection.templateMaskRegionType =
+            QStringLiteral("circle");
+    m_referencePositionCorrection.templateMaskRoiNormalized =
+            circle.boundingRectNormalized;
+    m_referencePositionCorrection.templateMaskPolygonNormalized = QJsonArray();
+    m_referencePositionCorrection.templateMaskCircleCenterNormalized =
+            circle.centerNormalized;
+    m_referencePositionCorrection.templateMaskCircleRadiusNormalized =
+            circle.radiusNormalized;
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.status = QStringLiteral("editing_mask");
+    clearReferencePositionMatchOverlays();
+    m_positionStatusLabel->setText(
+                tr("圆形屏蔽区中心 X=%1 Y=%2 半径=%3，点击屏蔽区域“完成”")
+                .arg(circle.centerNormalized.x(), 0, 'f', 3)
+                .arg(circle.centerNormalized.y(), 0, 'f', 3)
+                .arg(circle.radiusNormalized, 0, 'f', 3));
+}
+
 // 在非编辑状态按配置类型恢复单一 ROI，避免矩形和多边形同时显示。
 void ReferenceImageDialog::restoreReferencePositionRoi()
 {
@@ -637,14 +1048,17 @@ void ReferenceImageDialog::restoreReferencePositionRoi()
 
     m_previewHelper->setRoiDrawingEnabled(false);
     m_previewHelper->setPolygonDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
     m_positionRoiEditMode = PositionCorrectionRoiEditMode::None;
 
     if (!m_referencePositionCorrection.enabled || m_liveCaptureMode
             || ReferenceImageProvider::instance().referenceImage().isNull()) {
         m_previewHelper->clearRoi();
         m_previewHelper->clearPolygonRoi();
+        m_previewHelper->clearCircleRoi();
         return;
     }
+    m_previewHelper->clearCircleRoi();
 
     if (m_referencePositionCorrection.templateRegionType == QStringLiteral("polygon")) {
         m_previewHelper->clearRoi();
@@ -671,9 +1085,25 @@ void ReferenceImageDialog::stopReferencePositionRoiEditing(bool restoreConfirmed
 
     m_previewHelper->setRoiDrawingEnabled(false);
     m_previewHelper->setPolygonDrawingEnabled(false);
+    m_previewHelper->setCircleDrawingEnabled(false);
+    m_previewHelper->clearCircleRoi();
     m_positionRoiEditMode = PositionCorrectionRoiEditMode::None;
-    if (restoreConfirmedRoi)
+    if (restoreConfirmedRoi) {
+        if (m_positionMaskRectButton)
+            m_positionMaskRectButton->setChecked(
+                        m_referencePositionCorrection.templateMaskRegionType ==
+                        QStringLiteral("rectangle"));
+        if (m_positionMaskCircleButton)
+            m_positionMaskCircleButton->setChecked(
+                        m_referencePositionCorrection.templateMaskRegionType ==
+                        QStringLiteral("circle"));
+        if (m_positionMaskPolygonButton)
+            m_positionMaskPolygonButton->setChecked(
+                        m_referencePositionCorrection.templateMaskRegionType ==
+                        QStringLiteral("polygon"));
         restoreReferencePositionRoi();
+        renderReferencePositionOverlays();
+    }
 }
 
 // 按当前模板类型检查矩形面积或多边形点数，防止测试空模板区域。
@@ -763,6 +1193,16 @@ bool ReferenceImageDialog::buildAndValidateReferencePositionModel()
     config.templateRegionType = m_referencePositionCorrection.templateRegionType;
     config.templateRoiNormalized = m_referencePositionCorrection.templateRoiNormalized;
     config.templatePolygonNormalized = polygonPointsFromConfig(m_referencePositionCorrection);
+    config.templateMaskRegionType =
+            m_referencePositionCorrection.templateMaskRegionType;
+    config.templateMaskRoiNormalized =
+            m_referencePositionCorrection.templateMaskRoiNormalized;
+    config.templateMaskPolygonNormalized = polygonPointsFromJson(
+                m_referencePositionCorrection.templateMaskPolygonNormalized);
+    config.templateMaskCircleCenterNormalized =
+            m_referencePositionCorrection.templateMaskCircleCenterNormalized;
+    config.templateMaskCircleRadiusNormalized =
+            m_referencePositionCorrection.templateMaskCircleRadiusNormalized;
     config.searchRegionType = QStringLiteral("full");
     config.searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     config.minScore = 50;
@@ -868,10 +1308,37 @@ void ReferenceImageDialog::renderReferencePositionOverlays()
     }
 
     QVector<ToolOverlay> overlays;
+    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    const bool editingMask =
+            m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskRectangle ||
+            m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskCircle ||
+            m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskPolygon;
+    if (editingMask) {
+        appendReferenceRegionOverlay(
+                    &overlays,
+                    m_referencePositionCorrection.templateRegionType,
+                    m_referencePositionCorrection.templateRoiNormalized,
+                    polygonPointsFromJson(
+                        m_referencePositionCorrection.templatePolygonNormalized),
+                    CircleRoi(),
+                    image.size(),
+                    QStringLiteral("template_roi"),
+                    QStringLiteral("color_template_roi"));
+    } else {
+        appendReferenceRegionOverlay(
+                    &overlays,
+                    m_referencePositionCorrection.templateMaskRegionType,
+                    m_referencePositionCorrection.templateMaskRoiNormalized,
+                    polygonPointsFromJson(
+                        m_referencePositionCorrection.templateMaskPolygonNormalized),
+                    referenceMaskCircle(m_referencePositionCorrection),
+                    image.size(),
+                    QStringLiteral("template_mask"),
+                    QStringLiteral("color_template_mask"));
+    }
     if (m_referencePositionCorrection.originMode == QStringLiteral("custom")
             && validNormalizedPoint(
                 m_referencePositionCorrection.customOriginNormalized)) {
-        const QImage image = ReferenceImageProvider::instance().referenceImage();
         const QPointF point(
                     m_referencePositionCorrection.customOriginNormalized.x() * image.width(),
                     m_referencePositionCorrection.customOriginNormalized.y() * image.height());
@@ -899,9 +1366,14 @@ void ReferenceImageDialog::renderReferencePositionOverlays()
 
 void ReferenceImageDialog::saveCurrentSchemeAs()
 {
-    if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None
-            && !finishReferencePositionRoiEditing()) {
-        return;
+    if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None) {
+        const bool maskEditing =
+                m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskRectangle ||
+                m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskCircle ||
+                m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskPolygon;
+        if (!(maskEditing ? finishReferencePositionMaskEditing()
+                          : finishReferencePositionRoiEditing()))
+            return;
     }
     SchemeStore::instance().setReferencePositionCorrection(m_referencePositionCorrection);
 
@@ -926,19 +1398,22 @@ void ReferenceImageDialog::saveCurrentSchemeAs()
 
 void ReferenceImageDialog::openCameraParamsDialog()
 {
-    saveCurrentScheme();
+    if (!saveCurrentScheme())
+        return;
     PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
 }
 
 void ReferenceImageDialog::openToolsDialog()
 {
-    saveCurrentScheme();
+    if (!saveCurrentScheme())
+        return;
     PlanDialogUtils::replaceDialog(this, new ToolsDialog);
 }
 
 void ReferenceImageDialog::openOutputDialog()
 {
-    saveCurrentScheme();
+    if (!saveCurrentScheme())
+        return;
     PlanDialogUtils::replaceDialog(this, new OutputDialog);
 }
 

@@ -2,7 +2,11 @@
 
 ## 文档用途
 
-本文档记录“注册目标检测”工具的阶段边界、实现状态、配置字段和验证要求。内部代码和配置命名暂沿用 `RegisteredClassificationDetection` / `registeredClassificationDetection`，用于保持既有配置兼容；用户可见文案统一为 `注册目标检测`。后续继续开发时，以根目录 `AGENTS.md` 为最高约束，以 `docs/FID/Function_Docs.md` 为 FID 公共规范，以 `docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md` 为提示词入口。
+本文档记录“注册目标检测”工具的阶段边界、实现状态、配置字段和验证要求。内部代码和配置命名暂沿用 `RegisteredClassificationDetection` / `registeredClassificationDetection`，用于保持既有配置兼容；用户可见文案统一为 `注册目标检测`。后续继续开发时，以根目录 `AGENTS.md` 为最高约束，以 `docs/FID/Function_Docs.md` 为 FID 公共规范，以 `docs/FID/RegisteredClassificationDetection/注册目标检测开发SOP.md` 为真实闭环开发流程和 HALCON 路线依据，以 `docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md` 为提示词入口。
+
+## 后续真实闭环入口
+
+第一阶段仍保持 UI 复刻边界。后续真实算法开发统一遵循 `注册目标检测开发SOP.md`，当前推荐首选后端为 HALCON 多模板 Shape Model 模型库；HALCON DL Object Detection 仅在数据、硬件、license、预训练 backbone 和泛化需求满足专项门禁后启用。现有 `halcon_dl_classification`、`TopK` 和分类判断字段属于第一阶段 UI 遗留语义，开发生产后端前必须先设计版本化的检测配置合同，不得直接作为目标检测生产合同。
 
 ## 第一阶段目标
 

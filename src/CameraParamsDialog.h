@@ -26,7 +26,7 @@ private slots:
     void openOutputDialog();
     void showLiveImage(const QImage &image);
     void editCurrentSchemeName();
-    void saveCurrentScheme();
+    bool saveCurrentScheme();
     void saveCurrentSchemeAs();
 
 private:

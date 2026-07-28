@@ -2,6 +2,7 @@
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
 #include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -357,9 +358,40 @@ ToolResult ColorRecognitionAdapter::run(const ToolRequest &request)
                 stringParam(config.params,
                             QStringLiteral("recognitionBackend"),
                             QStringLiteral("hsv_histogram")));
+
+    const PositionCorrectionConfig savedCorrection =
+            PositionCorrection::fromParams(config.params);
+    PositionCorrectionConsumerOptions correctionOptions;
+    correctionOptions.requested = savedCorrection.enabled;
+    correctionOptions.sourceId = savedCorrection.sourceId;
+    correctionOptions.showMatchContour = boolParam(
+                config.params,
+                QStringLiteral("showPositionCorrectionMatchContour"),
+                true);
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, correctionOptions);
+    if (!correction.success) {
+        ToolResult result = makeColorRecognitionError(
+                    config, correction.status, correction.message);
+        result.payload.insert(QStringLiteral("positionCorrectionRequested"),
+                              savedCorrection.enabled);
+        result.payload.insert(QStringLiteral("positionCorrectionApplied"),
+                              false);
+        result.payload.insert(QStringLiteral("positionCorrectionSource"),
+                              savedCorrection.source);
+        result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
+                              savedCorrection.sourceId);
+        result.payload.insert(QStringLiteral("positionCorrectionReason"),
+                              correction.status);
+        return result;
+    }
+
     if (recognitionBackend == QStringLiteral("cielab_gmm")) {
+        ColorRecognitionGmmRunConfig runnerConfig =
+                toGmmRunnerConfig(config, request.runtimeContext, colorTemplate);
+        runnerConfig.positionCorrection = correction.context;
         const ColorRecognitionGmmRunResult runnerResult = m_runner.runGmmModel(
-                    request.image, toGmmRunnerConfig(config, request.runtimeContext, colorTemplate));
+                    request.image, runnerConfig);
         ToolResult result;
         result.toolId = config.toolId;
         result.toolType = ToolType::ColorRecognition;
@@ -386,8 +418,11 @@ ToolResult ColorRecognitionAdapter::run(const ToolRequest &request)
         return result;
     }
 
+    ColorRecognitionHalconConfig runnerConfig =
+            toRunnerConfig(config, request.runtimeContext);
+    runnerConfig.positionCorrection = correction.context;
     const ColorRecognitionHalconResult runnerResult =
-            m_runner.run(request.image, toRunnerConfig(config, request.runtimeContext));
+            m_runner.run(request.image, runnerConfig);
 
     ToolResult result;
     result.toolId = config.toolId;

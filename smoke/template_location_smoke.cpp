@@ -33,6 +33,16 @@ QJsonObject rectJson(double x, double y, double width, double height)
                        {QStringLiteral("height"), height}};
 }
 
+QJsonArray polygonJson(const QVector<QPointF> &points)
+{
+    QJsonArray values;
+    for (const QPointF &point : points) {
+        values.append(QJsonObject{{QStringLiteral("x"), point.x()},
+                                  {QStringLiteral("y"), point.y()}});
+    }
+    return values;
+}
+
 cv::Mat referenceFixture()
 {
     cv::Mat image(360, 520, CV_8UC3, cv::Scalar(28, 28, 28));
@@ -92,6 +102,76 @@ int main(int argc, char *argv[])
     check(cachedBaseline.success && cachedBaseline.ok &&
           cachedBaseline.payload.value(QStringLiteral("modelCacheHit")).toBool(),
           QStringLiteral("second run restores the persisted HALCON shape model"));
+
+    TemplateLocationHalconConfig masked = automatic;
+    masked.templateMaskPolygonNormalized = {
+        QPointF(180.0 / 520.0, 114.0 / 360.0),
+        QPointF(232.0 / 520.0, 114.0 / 360.0),
+        QPointF(232.0 / 520.0, 154.0 / 360.0),
+        QPointF(180.0 / 520.0, 154.0 / 360.0)
+    };
+    const TemplateLocationHalconResult maskedResult =
+            runner.run(reference, reference, masked);
+    check(maskedResult.success && maskedResult.ok &&
+          maskedResult.payload.value(QStringLiteral("templateMaskApplied")).toBool() &&
+          maskedResult.payload.value(QStringLiteral("templateEffectiveArea")).toDouble() <
+              maskedResult.payload.value(QStringLiteral("templateBaseArea")).toDouble(),
+          QStringLiteral("template mask is subtracted from the HALCON model domain"));
+    check(!maskedResult.payload.value(QStringLiteral("modelCacheHit")).toBool() &&
+          maskedResult.payload.value(QStringLiteral("modelSignature")).toString() !=
+              baseline.payload.value(QStringLiteral("modelSignature")).toString(),
+          QStringLiteral("template mask participates in the persistent model signature"));
+    check(std::abs(maskedResult.payload.value(QStringLiteral("x")).toDouble() -
+                   baseline.payload.value(QStringLiteral("x")).toDouble()) <= 1.5 &&
+          std::abs(maskedResult.payload.value(QStringLiteral("y")).toDouble() -
+                   baseline.payload.value(QStringLiteral("y")).toDouble()) <= 1.5,
+          QStringLiteral("asymmetric masking does not move the template centroid output"));
+    const TemplateLocationHalconResult cachedMaskedResult =
+            runner.run(reference, reference, masked);
+    check(cachedMaskedResult.success && cachedMaskedResult.ok &&
+          cachedMaskedResult.payload.value(QStringLiteral("modelCacheHit")).toBool(),
+          QStringLiteral("unchanged template mask restores the matching cached model"));
+
+    TemplateLocationHalconConfig rectangleMasked = automatic;
+    rectangleMasked.modelCacheKey =
+            QStringLiteral("template-location-smoke-rectangle-mask-v1");
+    rectangleMasked.templateMaskRegionType = QStringLiteral("rectangle");
+    rectangleMasked.templateMaskRoiNormalized =
+            QRectF(180.0 / 520.0, 114.0 / 360.0,
+                   52.0 / 520.0, 40.0 / 360.0);
+    const TemplateLocationHalconResult rectangleMaskedResult =
+            runner.run(reference, reference, rectangleMasked);
+    check(rectangleMaskedResult.success && rectangleMaskedResult.ok &&
+          rectangleMaskedResult.payload.value(
+              QStringLiteral("templateMaskRegionType")).toString() ==
+              QStringLiteral("rectangle") &&
+          rectangleMaskedResult.payload.value(
+              QStringLiteral("templateEffectiveArea")).toDouble() <
+              rectangleMaskedResult.payload.value(
+                  QStringLiteral("templateBaseArea")).toDouble(),
+          QStringLiteral("rectangle template mask is applied as a filled HALCON region"));
+
+    TemplateLocationHalconConfig circleMasked = automatic;
+    circleMasked.modelCacheKey =
+            QStringLiteral("template-location-smoke-circle-mask-v1");
+    circleMasked.templateMaskRegionType = QStringLiteral("circle");
+    circleMasked.templateMaskCircleCenterNormalized =
+            QPointF(264.0 / 520.0, 174.0 / 360.0);
+    circleMasked.templateMaskCircleRadiusNormalized = 20.0 / 520.0;
+    circleMasked.templateMaskRoiNormalized =
+            QRectF((264.0 - 20.0) / 520.0, (174.0 - 20.0) / 360.0,
+                   40.0 / 520.0, 40.0 / 360.0);
+    const TemplateLocationHalconResult circleMaskedResult =
+            runner.run(reference, reference, circleMasked);
+    check(circleMaskedResult.success && circleMaskedResult.ok &&
+          circleMaskedResult.payload.value(
+              QStringLiteral("templateMaskRegionType")).toString() ==
+              QStringLiteral("circle") &&
+          circleMaskedResult.payload.value(
+              QStringLiteral("templateEffectiveArea")).toDouble() <
+              circleMaskedResult.payload.value(
+                  QStringLiteral("templateBaseArea")).toDouble(),
+          QStringLiteral("circle template mask is applied as a filled HALCON region"));
 
     TemplateLocationHalconConfig circleSearch = automatic;
     circleSearch.searchRegionType = QStringLiteral("circle");
@@ -248,6 +328,8 @@ int main(int argc, char *argv[])
         {QStringLiteral("templateRoiNormalized"), rectJson(155.0 / 520.0, 90.0 / 360.0,
                                                            160.0 / 520.0, 135.0 / 360.0)},
         {QStringLiteral("searchRoiNormalized"), rectJson(0.0, 0.0, 1.0, 1.0)},
+        {QStringLiteral("templateMaskPolygonNormalized"),
+         polygonJson(masked.templateMaskPolygonNormalized)},
         {QStringLiteral("contrastMode"), QStringLiteral("auto")},
         {QStringLiteral("minScore"), 45}
     };
@@ -259,6 +341,8 @@ int main(int argc, char *argv[])
           adapterFound.payload.contains(QStringLiteral("angleDeg")) &&
           adapterFound.payload.contains(QStringLiteral("scale")),
           QStringLiteral("result payload contains the public pose contract"));
+    check(adapterFound.payload.value(QStringLiteral("templateMaskApplied")).toBool(),
+          QStringLiteral("adapter parses and applies the saved template mask"));
 
     request.config.params.insert(QStringLiteral("contrastMode"), QStringLiteral("manual"));
     request.config.params.insert(QStringLiteral("contrast"), 20);
@@ -273,6 +357,40 @@ int main(int argc, char *argv[])
     check(!invalidRoiResult.success &&
           invalidRoiResult.status == QStringLiteral("invalid_template_region"),
           QStringLiteral("invalid template ROI returns the public error code"));
+
+    TemplateLocationHalconConfig invalidMask = automatic;
+    invalidMask.modelCacheKey = QStringLiteral("template-location-smoke-invalid-mask-v1");
+    invalidMask.templateMaskPolygonNormalized = {
+        QPointF(0.01, 0.01), QPointF(0.05, 0.01), QPointF(0.05, 0.05)
+    };
+    const TemplateLocationHalconResult invalidMaskResult =
+            runner.run(reference, reference, invalidMask);
+    check(!invalidMaskResult.success &&
+          invalidMaskResult.status == QStringLiteral("invalid_template_mask"),
+          QStringLiteral("template mask outside the template ROI is rejected"));
+
+    TemplateLocationHalconConfig fullyMasked = automatic;
+    fullyMasked.modelCacheKey = QStringLiteral("template-location-smoke-empty-mask-v1");
+    const QRectF fullMaskRect = automatic.templateRoiNormalized;
+    fullyMasked.templateMaskPolygonNormalized = {
+        fullMaskRect.topLeft(), fullMaskRect.topRight(),
+        fullMaskRect.bottomRight(), fullMaskRect.bottomLeft()
+    };
+    const TemplateLocationHalconResult fullyMaskedResult =
+            runner.run(reference, reference, fullyMasked);
+    if (fullyMaskedResult.success ||
+            fullyMaskedResult.status != QStringLiteral("template_masked_empty")) {
+        qCritical().noquote()
+                << QStringLiteral("complete-mask status=%1 message=%2 base=%3 effective=%4")
+                   .arg(fullyMaskedResult.status, fullyMaskedResult.message)
+                   .arg(fullyMaskedResult.payload.value(
+                            QStringLiteral("templateBaseArea")).toDouble())
+                   .arg(fullyMaskedResult.payload.value(
+                            QStringLiteral("templateEffectiveArea")).toDouble());
+    }
+    check(!fullyMaskedResult.success &&
+          fullyMaskedResult.status == QStringLiteral("template_masked_empty"),
+          QStringLiteral("masking the complete template returns template_masked_empty"));
 
     PatternPresenceHalconConfig legacyPattern;
     legacyPattern.toolId = QStringLiteral("pattern-presence-regression");

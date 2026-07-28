@@ -34,7 +34,9 @@ SOURCES += \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
     ../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
-    ../src/toolcore/PositionCorrection.cpp
+    ../src/toolcore/PositionCorrection.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp
 
 HEADERS += \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
@@ -45,4 +47,6 @@ HEADERS += \
     ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.h \
     ../src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
     ../src/algorithms/halcon/HalconRuntimePaths.h \
-    ../src/toolcore/PositionCorrection.h
+    ../src/toolcore/PositionCorrection.h \
+    ../src/toolcore/PositionCorrectionTransform.h \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.h

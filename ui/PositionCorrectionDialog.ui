@@ -248,69 +248,6 @@
          </widget>
         </item>
         <item>
-         <widget class="QFrame" name="templateCard">
-          <property name="panelRole" stdset="0">
-           <string>configCard</string>
-          </property>
-          <layout class="QVBoxLayout" name="templateLayout">
-           <item>
-            <widget class="QLabel" name="templateTitle">
-             <property name="text">
-              <string>模板区域设置</string>
-             </property>
-             <property name="role" stdset="0">
-              <string>cardTitle</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <layout class="QHBoxLayout" name="templateToolsLayout">
-             <item>
-              <widget class="QLabel" name="templateField">
-               <property name="text">
-                <string>模板区域</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="rectTemplateButton">
-               <property name="text">
-                <string>矩形</string>
-               </property>
-               <property name="checkable">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="polygonTemplateButton">
-               <property name="text">
-                <string>多边形</string>
-               </property>
-               <property name="checkable">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <spacer name="templateSpacer">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
          <spacer name="parameterSpacer">
           <property name="orientation">
            <enum>Qt::Vertical</enum>

@@ -72,6 +72,22 @@ TemplateLocationHalconConfig runnerConfig(const ToolConfig &config)
     output.templateRegionType = stringParam(params, QStringLiteral("templateRegionType"), output.templateRegionType);
     output.templateRoiNormalized = rectParam(params, QStringLiteral("templateRoiNormalized"), output.templateRoiNormalized);
     output.templatePolygonNormalized = pointsParam(params, QStringLiteral("templatePolygonNormalized"));
+    output.templateMaskRegionType = stringParam(
+                params, QStringLiteral("templateMaskRegionType"),
+                params.value(QStringLiteral("templateMaskPolygonNormalized")).toArray().isEmpty()
+                    ? QStringLiteral("none") : QStringLiteral("polygon"));
+    output.templateMaskRoiNormalized = rectParam(
+                params, QStringLiteral("templateMaskRoiNormalized"),
+                output.templateMaskRoiNormalized);
+    output.templateMaskPolygonNormalized = pointsParam(
+                params, QStringLiteral("templateMaskPolygonNormalized"));
+    output.templateMaskCircleCenterNormalized = pointParam(
+                params, QStringLiteral("templateMaskCircleCenterNormalized"),
+                output.templateMaskRoiNormalized.center());
+    output.templateMaskCircleRadiusNormalized = doubleParam(
+                params, QStringLiteral("templateMaskCircleRadiusNormalized"),
+                qMin(output.templateMaskRoiNormalized.width(),
+                     output.templateMaskRoiNormalized.height()) / 2.0);
     output.searchRegionType = stringParam(params, QStringLiteral("searchRegionType"), output.searchRegionType);
     output.searchRoiNormalized = rectParam(params, QStringLiteral("searchRoiNormalized"), output.searchRoiNormalized);
     output.searchPolygonNormalized = pointsParam(params, QStringLiteral("searchPolygonNormalized"));

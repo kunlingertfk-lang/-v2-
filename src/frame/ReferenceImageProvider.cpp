@@ -96,6 +96,11 @@ void ReferenceImageProvider::clearReferenceFrame()
     emit referenceFrameChanged(QImage());
 }
 
+cv::Mat ReferenceImageProvider::normalizeReferenceFrame(const cv::Mat &frame)
+{
+    return normalizeFrame(frame);
+}
+
 QImage ReferenceImageProvider::matToImage(const cv::Mat &frame)
 {
     return MatImageConverter::matToDisplayImage(frame, QStringLiteral("ReferenceImageProvider"));

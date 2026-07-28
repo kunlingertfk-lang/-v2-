@@ -21,6 +21,11 @@ struct TemplateLocationHalconConfig
     QString templateRegionType = QStringLiteral("rectangle");
     QRectF templateRoiNormalized;
     QVector<QPointF> templatePolygonNormalized;
+    QString templateMaskRegionType = QStringLiteral("none");
+    QRectF templateMaskRoiNormalized;
+    QVector<QPointF> templateMaskPolygonNormalized;
+    QPointF templateMaskCircleCenterNormalized;
+    double templateMaskCircleRadiusNormalized = 0.0;
     QString searchRegionType = QStringLiteral("full");
     QRectF searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QVector<QPointF> searchPolygonNormalized;

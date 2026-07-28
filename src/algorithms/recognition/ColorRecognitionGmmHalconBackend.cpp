@@ -1,4 +1,6 @@
 #include "algorithms/recognition/ColorRecognitionGmmHalconBackend.h"
+#include "algorithms/location/PositionCorrectionHalconTransform.h"
+#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
@@ -11,6 +13,7 @@
 #include <QJsonObject>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QPolygonF>
 #include <QSet>
 
 #include <algorithm>
@@ -70,6 +73,12 @@ struct GmmApi
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using GetDomainFn = Herror (*)(const Hobject, Hobject *);
     using AreaCenterFn = Herror (*)(const Hobject, Hlong *, double *, double *);
+    using TupleAreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
+    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *,
+                                           const Htuple, const Htuple);
+    using ClipRegionFn = Herror (*)(const Hobject, Hobject *,
+                                    const Htuple, const Htuple,
+                                    const Htuple, const Htuple);
     using MinMaxGrayFn = Herror (*)(const Hobject, const Hobject, double, double *, double *, double *);
     using ConvertImageTypeFn = Herror (*)(const Hobject, Hobject *, const char *);
     using ScaleImageFn = Herror (*)(const Hobject, Hobject *, double, double);
@@ -118,6 +127,9 @@ struct GmmApi
     ReduceDomainFn reduceDomain = nullptr;
     GetDomainFn getDomain = nullptr;
     AreaCenterFn areaCenter = nullptr;
+    TupleAreaCenterFn tupleAreaCenter = nullptr;
+    AffineTransRegionFn affineTransRegion = nullptr;
+    ClipRegionFn clipRegion = nullptr;
     MinMaxGrayFn minMaxGray = nullptr;
     ConvertImageTypeFn convertImageType = nullptr;
     ScaleImageFn scaleImage = nullptr;
@@ -196,6 +208,9 @@ public:
                 resolve(m_handle, api.reduceDomain, "reduce_domain", error) &&
                 resolve(m_handle, api.getDomain, "get_domain", error) &&
                 resolve(m_handle, api.areaCenter, "area_center", error) &&
+                resolve(m_handle, api.tupleAreaCenter, "T_area_center", error) &&
+                resolve(m_handle, api.affineTransRegion, "T_affine_trans_region", error) &&
+                resolve(m_handle, api.clipRegion, "T_clip_region", error) &&
                 resolve(m_handle, api.minMaxGray, "min_max_gray", error) &&
                 resolve(m_handle, api.convertImageType, "convert_image_type", error) &&
                 resolve(m_handle, api.scaleImage, "scale_image", error) &&
@@ -321,6 +336,21 @@ void clearObject(GmmApi *api, Hobject &object)
     if (objectAllocated(object))
         api->clearObj(object);
     object = NO_OBJECTS;
+}
+
+PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
+        const GmmApi &api)
+{
+    PositionCorrectionHalconRegionApi transformApi;
+    transformApi.createTuple = api.createTuple;
+    transformApi.setDouble = api.setDouble;
+    transformApi.setString = api.setString;
+    transformApi.destroyTuple = api.destroyTuple;
+    transformApi.getDouble = api.getDouble;
+    transformApi.affineTransRegion = api.affineTransRegion;
+    transformApi.clipRegion = api.clipRegion;
+    transformApi.areaCenter = api.tupleAreaCenter;
+    return transformApi;
 }
 
 QString sha256(const QByteArray &bytes)
@@ -1237,6 +1267,16 @@ ColorRecognitionGmmRunResult ColorRecognitionGmmHalconBackend::runModel(
         result.payload.insert(QStringLiteral("declaredPixelFormat"), config.pixelFormat);
         result.payload.insert(QStringLiteral("actualMatDepth"), image.empty() ? -1 : image.depth());
         result.payload.insert(QStringLiteral("actualChannelCount"), image.empty() ? 0 : image.channels());
+        result.payload.insert(QStringLiteral("enablePositionCorrection"),
+                              config.enablePositionCorrection);
+        result.payload.insert(QStringLiteral("positionCorrectionRequested"),
+                              config.positionCorrection.requested);
+        result.payload.insert(QStringLiteral("positionCorrectionApplied"),
+                              config.positionCorrection.applied);
+        result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
+                              config.positionCorrection.sourceId.isEmpty()
+                              ? config.positionCorrectionSourceId
+                              : config.positionCorrection.sourceId);
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
         return result;
     };
@@ -1272,9 +1312,6 @@ ColorRecognitionGmmRunResult ColorRecognitionGmmHalconBackend::runModel(
                           QStringLiteral("16-bit input requires a valid validBits/bitShift contract."),
                           QStringLiteral("gmm.run.input"), H_MSG_OK};
         }
-        if (config.enablePositionCorrection)
-            throw Failure{QStringLiteral("unsupported_position_correction"), QStringLiteral("GMM position correction is not implemented."), QStringLiteral("gmm.run.position_correction"), H_MSG_OK};
-
         const QRect roi = normalizedRoi(config.roiNormalized, image.cols, image.rows);
         if (roi.isEmpty())
             throw Failure{QStringLiteral("invalid_roi"), QStringLiteral("Detection ROI is invalid."), QStringLiteral("gmm.run.roi"), H_MSG_OK};
@@ -1357,6 +1394,7 @@ ColorRecognitionGmmRunResult ColorRecognitionGmmHalconBackend::runModel(
         GmmApi *api = &library->api;
         HalconLabImage lab = makeLabImage(api, input, QRect(0, 0, image.cols, image.rows), channels);
         Hobject roiRegion = NO_OBJECTS, maskRegion = NO_OBJECTS, effectiveRegion = NO_OBJECTS;
+        Hobject transformedRegion = NO_OBJECTS;
         Hobject reduced = NO_OBJECTS, classRegions = NO_OBJECTS;
         Tuple serializedPointer(api), serializedSize(api), copy(api), serializedHandle(api), gmmHandle(api);
         try {
@@ -1388,6 +1426,42 @@ ColorRecognitionGmmRunResult ColorRecognitionGmmHalconBackend::runModel(
                          QStringLiteral("gmm.run.gen_mask"));
                 checkRun(api, api->difference(roiRegion, maskRegion, &effectiveRegion),
                          QStringLiteral("gmm.run.difference_mask"));
+            }
+            if (config.positionCorrection.applied) {
+                Hobject clippedRegion = NO_OBJECTS;
+                const Hobject sourceRegion = effectiveRegion;
+                const PositionCorrectionHalconTransformResult transformed =
+                        PositionCorrectionHalconTransform::transformAndClipRegion(
+                            positionCorrectionRegionApi(*api),
+                            sourceRegion,
+                            &transformedRegion,
+                            &clippedRegion,
+                            config.positionCorrection.referenceToRunHomMat2D,
+                            image.cols,
+                            image.rows);
+                if (!transformed.success) {
+                    if (objectAllocated(clippedRegion))
+                        clearObject(api, clippedRegion);
+                    throw Failure{
+                        transformed.status,
+                        QStringLiteral("Position-corrected GMM ROI is invalid (%1).")
+                        .arg(transformed.operation),
+                        QStringLiteral("gmm.run.position_correction.%1")
+                        .arg(transformed.operation),
+                        transformed.halconStatus
+                    };
+                }
+                if (sourceRegion != roiRegion)
+                    clearObject(api, effectiveRegion);
+                effectiveRegion = clippedRegion;
+                if (transformed.area <= 0.0) {
+                    throw Failure{
+                        QStringLiteral("corrected_roi_out_of_image"),
+                        QStringLiteral("Position-corrected GMM ROI is outside the image."),
+                        QStringLiteral("gmm.run.position_correction.clip_region"),
+                        H_MSG_OK
+                    };
+                }
             }
             Hlong effectiveArea = 0; double centerRow = 0.0, centerColumn = 0.0;
             checkRun(api, api->areaCenter(effectiveRegion, &effectiveArea, &centerRow, &centerColumn),
@@ -1477,19 +1551,53 @@ ColorRecognitionGmmRunResult ColorRecognitionGmmHalconBackend::runModel(
                 roiOverlay.radius = config.detectCircleRadiusNormalized * qMax(image.cols, image.rows);
             } else { roiOverlay.type = ToolOverlayType::Rect; roiOverlay.rect = QRectF(roi); }
             roiOverlay.label = QStringLiteral("ROI"); roiOverlay.score = result.score;
+            if (config.positionCorrection.applied) {
+                roiOverlay = PositionCorrectionTransform::transformOverlay(
+                            roiOverlay,
+                            config.positionCorrection.referenceToRunHomMat2D);
+                roiOverlay.extra.insert(
+                            QStringLiteral("positionCorrectionSourceId"),
+                            config.positionCorrection.sourceId);
+            }
+            roiOverlay.extra.insert(QStringLiteral("role"),
+                                    QStringLiteral("detect_roi"));
+            roiOverlay.extra.insert(QStringLiteral("positionCorrectionApplied"),
+                                    config.positionCorrection.applied);
             result.overlays.append(roiOverlay);
+            if (config.positionCorrection.applied
+                    && config.positionCorrection.showMatchContour) {
+                result.overlays +=
+                        PositionCorrectionTransform::matchContourOverlays(
+                            config.positionCorrection.matchContours,
+                            config.positionCorrection.sourceId);
+            }
+            if (config.positionCorrection.applied) {
+                result.overlays +=
+                        PositionCorrectionTransform::matchOriginOverlays(
+                            config.positionCorrection.matchOrigins,
+                            config.positionCorrection.sourceId);
+            }
+            const QRectF overlayAnchor =
+                    roiOverlay.type == ToolOverlayType::Polygon
+                    ? QPolygonF(roiOverlay.points).boundingRect()
+                    : (roiOverlay.type == ToolOverlayType::Circle
+                       ? QRectF(roiOverlay.center.x() - roiOverlay.radius,
+                                roiOverlay.center.y() - roiOverlay.radius,
+                                roiOverlay.radius * 2.0,
+                                roiOverlay.radius * 2.0)
+                       : roiOverlay.rect);
             ToolOverlay textOverlay; textOverlay.type = ToolOverlayType::Text;
-            textOverlay.p1 = QPointF(roi.x(), roi.y()); textOverlay.score = result.score;
+            textOverlay.p1 = overlayAnchor.topLeft(); textOverlay.score = result.score;
             textOverlay.text = QStringLiteral("%1 %2 %3").arg(result.ok ? QStringLiteral("OK") : QStringLiteral("NG"),
                                                               result.predictedLabel.isEmpty() ? QStringLiteral("未分类") : result.predictedLabel,
                                                               QString::number(result.score, 'f', 1));
             textOverlay.label = QStringLiteral("color_result_text");
             textOverlay.extra.insert(QStringLiteral("status"), result.ok ? QStringLiteral("OK") : QStringLiteral("NG"));
             textOverlay.extra.insert(QStringLiteral("anchorRect"), QJsonObject{
-                                         {QStringLiteral("x"), roi.x()},
-                                         {QStringLiteral("y"), roi.y()},
-                                         {QStringLiteral("width"), roi.width()},
-                                         {QStringLiteral("height"), roi.height()}});
+                                         {QStringLiteral("x"), overlayAnchor.x()},
+                                         {QStringLiteral("y"), overlayAnchor.y()},
+                                         {QStringLiteral("width"), overlayAnchor.width()},
+                                         {QStringLiteral("height"), overlayAnchor.height()}});
             result.overlays.append(textOverlay);
 
             QJsonArray measurements;
@@ -1530,11 +1638,39 @@ ColorRecognitionGmmRunResult ColorRecognitionGmmHalconBackend::runModel(
             result.payload.insert(QStringLiteral("minScore"), config.minScore);
             result.payload.insert(QStringLiteral("minCategoryConfidence"), config.minCategoryConfidence);
             result.payload.insert(QStringLiteral("minClassifiedCoverage"), config.minClassifiedCoverage);
+            QJsonArray correctionMatrix;
+            for (double value : config.positionCorrection.referenceToRunHomMat2D)
+                correctionMatrix.append(value);
+            result.payload.insert(QStringLiteral("enablePositionCorrection"),
+                                  config.enablePositionCorrection);
+            result.payload.insert(QStringLiteral("positionCorrectionRequested"),
+                                  config.positionCorrection.requested);
+            result.payload.insert(QStringLiteral("positionCorrectionApplied"),
+                                  config.positionCorrection.applied);
+            result.payload.insert(QStringLiteral("positionCorrectionSource"),
+                                  config.positionCorrectionSource);
+            result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
+                                  config.positionCorrection.sourceId.isEmpty()
+                                  ? config.positionCorrectionSourceId
+                                  : config.positionCorrection.sourceId);
+            result.payload.insert(QStringLiteral("positionCorrectionReason"),
+                                  config.positionCorrection.applied
+                                  ? QStringLiteral("applied")
+                                  : QStringLiteral("disabled"));
+            result.payload.insert(QStringLiteral("referenceToRunHomMat2D"),
+                                  correctionMatrix);
+            result.payload.insert(QStringLiteral("referenceScale"),
+                                  config.positionCorrection.referenceScale);
+            result.payload.insert(QStringLiteral("runScale"),
+                                  config.positionCorrection.runScale);
+            result.payload.insert(QStringLiteral("scaleRatio"),
+                                  config.positionCorrection.scaleRatio);
         } catch (...) {
             if (gmmHandle.size() > 0) api->clearClassGmm(gmmHandle.value());
             if (serializedHandle.size() > 0) api->clearSerializedItem(serializedHandle.value());
             clearObject(api, classRegions); clearObject(api, reduced);
             if (effectiveRegion != roiRegion) clearObject(api, effectiveRegion);
+            clearObject(api, transformedRegion);
             clearObject(api, maskRegion); clearObject(api, roiRegion); clearLabImage(api, &lab);
             throw;
         }
@@ -1542,6 +1678,7 @@ ColorRecognitionGmmRunResult ColorRecognitionGmmHalconBackend::runModel(
         if (serializedHandle.size() > 0) api->clearSerializedItem(serializedHandle.value());
         clearObject(api, classRegions); clearObject(api, reduced);
         if (effectiveRegion != roiRegion) clearObject(api, effectiveRegion);
+        clearObject(api, transformedRegion);
         clearObject(api, maskRegion); clearObject(api, roiRegion); clearLabImage(api, &lab);
         result.elapsedMs = timer.elapsed();
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));

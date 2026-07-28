@@ -51,8 +51,11 @@ bool readScale(const QJsonObject &object,
 
 bool poseFromJson(const QJsonObject &object,
                   PositionPose *pose,
-                  bool *invalidScale = nullptr)
+                  bool *invalidScale = nullptr,
+                  bool *invalidPose = nullptr)
 {
+    if (invalidPose)
+        *invalidPose = false;
     if (!pose || object.isEmpty())
         return false;
     if (!object.contains(QStringLiteral("x")) ||
@@ -61,19 +64,27 @@ bool poseFromJson(const QJsonObject &object,
               object.contains(QStringLiteral("angle")))) {
         return false;
     }
-    pose->x = object.value(QStringLiteral("x")).toDouble();
-    pose->y = object.value(QStringLiteral("y")).toDouble();
-    pose->angleDeg = object.contains(QStringLiteral("angleDeg"))
-            ? object.value(QStringLiteral("angleDeg")).toDouble()
-            : object.value(QStringLiteral("angle")).toDouble();
+    const QJsonValue angleValue = object.contains(QStringLiteral("angleDeg"))
+            ? object.value(QStringLiteral("angleDeg"))
+            : object.value(QStringLiteral("angle"));
+    if (!finiteJsonNumber(object.value(QStringLiteral("x")), &pose->x)
+            || !finiteJsonNumber(object.value(QStringLiteral("y")), &pose->y)
+            || !finiteJsonNumber(angleValue, &pose->angleDeg)) {
+        if (invalidPose)
+            *invalidPose = true;
+        return false;
+    }
     return readScale(object, QStringLiteral("scale"), &pose->scale, invalidScale);
 }
 
 bool poseFromPayload(const QJsonObject &payload,
                      const PositionRunPoseSource &source,
                      PositionPose *pose,
-                     bool *invalidScale = nullptr)
+                     bool *invalidScale = nullptr,
+                     bool *invalidPose = nullptr)
 {
+    if (invalidPose)
+        *invalidPose = false;
     if (!pose)
         return false;
     if (!payload.contains(source.xKey) ||
@@ -81,9 +92,13 @@ bool poseFromPayload(const QJsonObject &payload,
             !payload.contains(source.angleKey)) {
         return false;
     }
-    pose->x = payload.value(source.xKey).toDouble();
-    pose->y = payload.value(source.yKey).toDouble();
-    pose->angleDeg = payload.value(source.angleKey).toDouble();
+    if (!finiteJsonNumber(payload.value(source.xKey), &pose->x)
+            || !finiteJsonNumber(payload.value(source.yKey), &pose->y)
+            || !finiteJsonNumber(payload.value(source.angleKey), &pose->angleDeg)) {
+        if (invalidPose)
+            *invalidPose = true;
+        return false;
+    }
     return readScale(payload, source.scaleKey, &pose->scale, invalidScale);
 }
 
@@ -139,12 +154,19 @@ ToolResult PositionCorrectionAdapter::run(const ToolRequest &request)
     }
     PositionPose referencePose;
     bool invalidReferenceScale = false;
+    bool invalidReferencePose = false;
     if (!poseFromJson(correction.value(QStringLiteral("referencePose")).toObject(),
                       &referencePose,
-                      &invalidReferenceScale)) {
+                      &invalidReferenceScale,
+                      &invalidReferencePose)) {
         if (invalidReferenceScale) {
             return errorResult(config, QStringLiteral("invalid_pose_scale"),
                                QStringLiteral("Position correction reference scale must be finite and greater than zero."),
+                               source);
+        }
+        if (invalidReferencePose) {
+            return errorResult(config, QStringLiteral("invalid_reference_pose"),
+                               QStringLiteral("Position correction reference x/y/angle must be finite numbers."),
                                source);
         }
         return errorResult(config, QStringLiteral("reference_pose_missing"),
@@ -158,6 +180,32 @@ ToolResult PositionCorrectionAdapter::run(const ToolRequest &request)
     if (producerResult.isEmpty()) {
         return errorResult(config, QStringLiteral("source_unavailable"),
                            QStringLiteral("Position correction pose source is unavailable."),
+                           source);
+    }
+    const ToolType producerType = toolTypeFromString(
+                producerResult.value(QStringLiteral("toolType")).toString());
+    const bool validProducerType = producerType == ToolType::TemplateLocation
+            || (source.producerId == PositionCorrection::defaultSourceId()
+                && producerType == ToolType::PositionCorrection);
+    if (producerResult.value(QStringLiteral("toolId")).toString().trimmed()
+            != source.producerId
+            || !validProducerType) {
+        return errorResult(config, QStringLiteral("source_invalid"),
+                           QStringLiteral("Position correction pose source identity or type is invalid."),
+                           source);
+    }
+    const QJsonObject producerPayload =
+            producerResult.value(QStringLiteral("payload")).toObject();
+    const QString currentFrameId = request.frameId.trimmed().isEmpty()
+            ? request.runtimeContext.value(QStringLiteral("frameId"))
+              .toString().trimmed()
+            : request.frameId.trimmed();
+    const QString producerFrameId = producerPayload.value(QStringLiteral("frameId"))
+            .toString().trimmed();
+    if (!currentFrameId.isEmpty()
+            && (producerFrameId.isEmpty() || producerFrameId != currentFrameId)) {
+        return errorResult(config, QStringLiteral("source_frame_mismatch"),
+                           QStringLiteral("Position correction pose source does not belong to the current frame."),
                            source);
     }
     if (!producerResult.value(QStringLiteral("success")).toBool(false) ||
@@ -188,13 +236,20 @@ ToolResult PositionCorrectionAdapter::run(const ToolRequest &request)
     }
     PositionPose runPose;
     bool invalidRunScale = false;
-    if (!poseFromPayload(producerResult.value(QStringLiteral("payload")).toObject(),
+    bool invalidRunPose = false;
+    if (!poseFromPayload(producerPayload,
                          source,
                          &runPose,
-                         &invalidRunScale)) {
+                         &invalidRunScale,
+                         &invalidRunPose)) {
         if (invalidRunScale) {
             return errorResult(config, QStringLiteral("invalid_pose_scale"),
                                QStringLiteral("Position correction run scale must be finite and greater than zero."),
+                               source);
+        }
+        if (invalidRunPose) {
+            return errorResult(config, QStringLiteral("invalid_run_pose"),
+                               QStringLiteral("Position correction run x/y/angle must be finite numbers."),
                                source);
         }
         return errorResult(config, QStringLiteral("input_binding_not_found"),

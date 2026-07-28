@@ -77,6 +77,8 @@ private slots:
     void runTest();
     // 退出测试态并恢复编辑态按钮和预览状态。
     void exitTestMode();
+    // 从 PC 导入单张图片，并立即执行完整颜色识别测试链。
+    void importTestImageFromPc();
 
 private:
     enum class EditState {
@@ -96,7 +98,8 @@ private:
     enum class LiveTestSource {
         None,       // 编辑态，不触发自动重测
         Reference,  // 基准图测试：始终在基准图上重测
-        Camera      // 相机测试：连续态用最新帧，单次态用进入时缓存的快照帧
+        Camera,     // 相机测试：连续态用最新帧，单次态用进入时缓存的快照帧
+        Imported    // PC 导入图片：始终复用当前 Dialog 会话缓存
     };
 
     void setupUiState();                         // 初始化控件状态、按钮组、预览 helper 和测试态辅助控件。
@@ -163,6 +166,8 @@ private:
     QButtonGroup *m_regionGroup;
     FrameViewHelper *m_previewHelper = nullptr;
     QString m_toolId;
+    QString m_loadedPositionCorrectionSourceId =
+            QStringLiteral("reference.positionCorrection");
     bool m_enabled = true;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QString m_detectRegionType = QStringLiteral("rectangle");
@@ -188,6 +193,7 @@ private:
     LiveTestSource m_liveTestSource = LiveTestSource::None;
     cv::Mat m_liveTestFrameSnapshot;       // 单次态锁定的相机帧快照
     FrameInputMetadata m_liveTestFrameMetadata; // 与单次快照成对锁定的原始输入格式元数据
+    QString m_liveTestImageTitle;
     bool m_liveTestRunning = false;
     QFutureWatcher<ToolResult> *m_testRunWatcher = nullptr;
     bool m_testRunBusy = false;

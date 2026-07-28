@@ -19,10 +19,14 @@ isEmpty(OPENCV_ROOT) {
 }
 INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
 include(../qmake/halcon_20_11.pri)
+INCLUDEPATH += $$HALCON_ROOT/include/halconcpp
 
 LIBS += -L$$OPENCV_ROOT/lib
 LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
-LIBS += -lopencv_core -lopencv_imgproc -lopencv_videoio -ldl
+LIBS += -lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_videoio -ldl
+LIBS += -L$$HALCON_ROOT/lib/x64-linux
+LIBS += -Wl,-rpath,$$HALCON_ROOT/lib/x64-linux
+LIBS += -lhalconcpp -lhalcon
 
 SOURCES += \
     registered_classification_dialog_smoke.cpp \
@@ -31,11 +35,20 @@ SOURCES += \
     ../src/RegisteredClassificationTrainingDialog.cpp \
     ../src/RegisteredClassificationModelManagementDialog.cpp \
     ../src/frame/CameraFrameProvider.cpp \
+    ../src/frame/FrameInputMetadata.cpp \
     ../src/frame/FrameViewHelper.cpp \
     ../src/frame/MatImageConverter.cpp \
     ../src/frame/ReferenceImageProvider.cpp \
     ../src/toolcore/PositionCorrection.cpp \
+    ../src/toolcore/PositionCorrectionConsumer.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp \
+    ../src/toolcore/ToolEngine.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
+    ../src/tooladapters/TemplateLocationAdapter.cpp \
+    ../src/tooladapters/PositionCorrectionAdapter.cpp \
     ../src/tooladapters/RegisteredClassificationAdapter.cpp \
+    ../src/algorithms/location/TemplateLocationHalconRunner.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconRunner.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     ../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
@@ -51,6 +64,7 @@ HEADERS += \
     ../src/RegisteredClassificationModelManagementDialog.h \
     ../src/PlanDialogUtils.h \
     ../src/frame/CameraFrameProvider.h \
+    ../src/frame/FrameInputMetadata.h \
     ../src/frame/FrameViewHelper.h \
     ../src/frame/MatImageConverter.h \
     ../src/frame/ReferenceImageProvider.h \
@@ -67,6 +81,14 @@ HEADERS += \
     ../src/toolcore/ToolConfig.h \
     ../src/toolcore/ToolOverlay.h \
     ../src/toolcore/PositionCorrection.h \
+    ../src/toolcore/PositionCorrectionConsumer.h \
+    ../src/toolcore/PositionCorrectionTransform.h \
+    ../src/toolcore/ToolEngine.h \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.h \
+    ../src/tooladapters/TemplateLocationAdapter.h \
+    ../src/tooladapters/PositionCorrectionAdapter.h \
+    ../src/algorithms/location/TemplateLocationHalconRunner.h \
+    ../src/algorithms/location/PositionCorrectionHalconRunner.h \
     ../src/toolcore/ToolPreviewSnapshot.h \
     ../src/toolcore/ToolRequest.h \
     ../src/toolcore/ToolResult.h \

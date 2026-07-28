@@ -2,16 +2,22 @@
 #include "ui_ContourPresenceDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "PositionCorrectionDialogTestHelper.h"
 
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDebug>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QEventLoop>
 #include <QFontMetrics>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSignalBlocker>
@@ -24,12 +30,14 @@
 #include <QtGlobal>
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
+#include "toolcore/PositionCorrection.h"
 
 namespace {
 
@@ -206,6 +214,8 @@ ContourPresenceDialog::ContourPresenceDialog(QWidget *parent)
     ui->setupUi(this);
     m_toolId = QStringLiteral("contour_presence_%1")
             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_testToolEngine.registerAdapter(&m_testTemplateLocationAdapter);
+    m_testToolEngine.registerAdapter(&m_testPositionCorrectionAdapter);
     m_testToolEngine.registerAdapter(&m_testContourPresenceAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     setupUiState();
@@ -240,6 +250,9 @@ ContourPresenceConfig ContourPresenceDialog::configuration() const
     config.positionCorrectionSource = basicMode
             ? ui->basicPositionCorrectionComboBox->currentText()
             : ui->positionCorrectionComboBox->currentText();
+    config.positionCorrectionSourceId = basicMode
+            ? ui->basicPositionCorrectionComboBox->currentData().toString().trimmed()
+            : ui->positionCorrectionComboBox->currentData().toString().trimmed();
     config.minScore = qBound(0.0, static_cast<double>(ui->minScoreSpinBox->value()) / 100.0, 1.0);
     config.polarity = ui->matchPolarityComboBox->currentText();
     config.thresholdType = ui->thresholdTypeComboBox->currentText();
@@ -287,8 +300,13 @@ ToolConfig ContourPresenceDialog::toToolConfig() const
     params.insert(QStringLiteral("detectPolygonNormalized"),
                   pointsToJson(contourConfig.detectPolygonNormalized));
     params.insert(QStringLiteral("templateShapeType"), contourConfig.templateShapeType);
-    params.insert(QStringLiteral("enablePositionCorrection"), contourConfig.enablePositionCorrection);
-    params.insert(QStringLiteral("positionCorrectionSource"), contourConfig.positionCorrectionSource);
+    PositionCorrectionConfig correction;
+    correction.enabled = contourConfig.enablePositionCorrection;
+    correction.source = contourConfig.positionCorrectionSource;
+    correction.sourceId = contourConfig.positionCorrectionSourceId;
+    PositionCorrection::writeParams(correction, &params);
+    params.insert(QStringLiteral("showPositionCorrectionMatchContour"),
+                  contourConfig.showPositionCorrectionMatchContour);
     params.insert(QStringLiteral("minScore"), contourConfig.minScore);
     params.insert(QStringLiteral("polarity"), contourConfig.polarity);
     params.insert(QStringLiteral("thresholdType"), contourConfig.thresholdType);
@@ -341,6 +359,10 @@ ToolPreviewSnapshot ContourPresenceDialog::referencePreviewSnapshot() const
 
 void ContourPresenceDialog::loadFromConfig(const ToolConfig &config)
 {
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateBottomButtons();
     if (!config.toolId.trimmed().isEmpty())
         m_toolId = config.toolId;
     m_enabled = config.enabled;
@@ -368,11 +390,13 @@ void ContourPresenceDialog::loadFromConfig(const ToolConfig &config)
     ui->allSegmentButton->setChecked(allMode);
     ui->contourParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
 
-    const bool positionCorrection = params.value(QStringLiteral("enablePositionCorrection")).toBool(ui->basicPositionCorrectionSwitch->isChecked());
+    const PositionCorrectionConfig correction = PositionCorrection::fromParams(
+                params, ui->basicPositionCorrectionSwitch->isChecked());
+    const bool positionCorrection = correction.enabled;
     ui->basicPositionCorrectionSwitch->setChecked(positionCorrection);
     ui->positionCorrectionSwitch->setChecked(positionCorrection);
-    setComboBoxValue(ui->basicPositionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
-    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    setComboBoxValue(ui->basicPositionCorrectionComboBox, correction.source);
+    setComboBoxValue(ui->positionCorrectionComboBox, correction.source);
     ui->minScoreSpinBox->setValue(qRound(params.value(QStringLiteral("minScore")).toDouble(ui->minScoreSpinBox->value() / 100.0) * 100.0));
     setComboBoxValue(ui->matchPolarityComboBox, params.value(QStringLiteral("polarity")).toString());
     setComboBoxValue(ui->thresholdTypeComboBox, params.value(QStringLiteral("thresholdType")).toString());
@@ -439,6 +463,18 @@ void ContourPresenceDialog::loadFromConfig(const ToolConfig &config)
     setViewerStatusText(roiText, roiText);
 }
 
+void ContourPresenceDialog::setToolChainTestContext(
+        const QVector<ToolConfig> &toolConfigs,
+        int currentToolIndex,
+        const ReferencePositionCorrectionConfig &referencePositionCorrection)
+{
+    m_toolChainTestContext.toolConfigs = toolConfigs;
+    m_toolChainTestContext.currentToolIndex = currentToolIndex;
+    m_toolChainTestContext.referencePositionCorrection =
+            referencePositionCorrection;
+    m_toolChainTestContext.valid = true;
+}
+
 QString ContourPresenceDialog::summaryText() const
 {
     const ContourPresenceConfig config = configuration();
@@ -474,6 +510,15 @@ void ContourPresenceDialog::setupUiState()
     setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     applyAdaptiveWindowSize();
+    m_exitTestButton = new QPushButton(tr("退出测试"), this);
+    m_exitTestButton->setObjectName(QStringLiteral("exitTestButton"));
+    m_exitTestButton->setMinimumSize(120, 48);
+    m_exitTestButton->setProperty("actionRole", QStringLiteral("secondary"));
+    ui->horizontalLayout_actions->addWidget(m_exitTestButton);
+    m_pcImportButton = new QPushButton(tr("PC导入图片"), this);
+    m_pcImportButton->setObjectName(QStringLiteral("contourPcImportButton"));
+    m_pcImportButton->setMinimumHeight(38);
+    ui->horizontalLayout_editorHeader->insertWidget(2, m_pcImportButton);
 
     ui->matchPolarityComboBox->setCurrentIndex(1);
     ui->thresholdTypeComboBox->setCurrentIndex(0);
@@ -525,13 +570,41 @@ void ContourPresenceDialog::setupUiState()
 
     const QString templateStatus = templateRoiStatusText();
     setViewerStatusText(templateStatus, templateStatus);
+    updateBottomButtons();
 }
 
 void ContourPresenceDialog::connectControls()
 {
+    connect(ui->basicPositionCorrectionSwitch, &QCheckBox::toggled,
+            ui->positionCorrectionSwitch, &QCheckBox::setChecked);
+    connect(ui->positionCorrectionSwitch, &QCheckBox::toggled,
+            ui->basicPositionCorrectionSwitch, &QCheckBox::setChecked);
+    const auto syncCorrectionSource = [](QComboBox *source, QComboBox *target, int index) {
+        if (!source || !target || index < 0)
+            return;
+        const int targetIndex = target->findData(source->itemData(index));
+        if (targetIndex >= 0 && targetIndex != target->currentIndex())
+            target->setCurrentIndex(targetIndex);
+    };
+    connect(ui->basicPositionCorrectionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this, syncCorrectionSource](int index) {
+        syncCorrectionSource(ui->basicPositionCorrectionComboBox,
+                             ui->positionCorrectionComboBox, index);
+    });
+    connect(ui->positionCorrectionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this, syncCorrectionSource](int index) {
+        syncCorrectionSource(ui->positionCorrectionComboBox,
+                             ui->basicPositionCorrectionComboBox, index);
+    });
     connect(ui->headerCloseButton, &QToolButton::clicked, this, &ContourPresenceDialog::reject);
     connect(ui->referenceTestButton, &QPushButton::clicked, this, &ContourPresenceDialog::runReferenceTest);
     connect(ui->testRunButton, &QPushButton::clicked, this, &ContourPresenceDialog::runCameraTest);
+    connect(m_pcImportButton, &QPushButton::clicked,
+            this, &ContourPresenceDialog::importTestImageFromPc);
+    connect(m_exitTestButton, &QPushButton::clicked,
+            this, &ContourPresenceDialog::exitTestMode);
     connect(ui->finishButton, &QPushButton::clicked, this, &ContourPresenceDialog::finishConfiguration);
 
     connect(ui->basicResultBasisComboBox,
@@ -755,6 +828,10 @@ void ContourPresenceDialog::finishConfiguration()
         return;
     }
 
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     m_acceptedToolConfig = toToolConfig();
     m_hasAcceptedToolConfig = true;
     accept();
@@ -787,7 +864,10 @@ void ContourPresenceDialog::runReferenceTest()
 
 void ContourPresenceDialog::runCameraTest()
 {
-    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    const bool imported = m_importedTestActive && !m_importedTestFrame.empty();
+    const cv::Mat frame = imported
+            ? m_importedTestFrame.clone()
+            : CameraFrameProvider::instance().currentFrame();
     if (frame.empty()) {
         displayContourPresenceError(QStringLiteral("image_empty"),
                                     tr("当前图像为空，无法测试"));
@@ -797,16 +877,71 @@ void ContourPresenceDialog::runCameraTest()
     const cv::Mat snapshot = frame.clone();
     const QImage image = imageFromFrame(snapshot);
     if (!image.isNull() && m_previewHelper) {
-        ui->viewerTitleLabel->setText(tr("测试图像"));
+        ui->viewerTitleLabel->setText(
+                    imported ? m_importedTestImageTitle : tr("测试图像"));
         m_previewHelper->setImage(image);
+        m_previewHelper->clearToolOverlays();
         refreshDisplayedRoiOverlay();
     }
 
     runContourPresenceOnFrame(snapshot,
                               ReferenceImageProvider::instance().referenceFrame(),
-                              tr("测试图像"),
+                              imported ? m_importedTestImageTitle : tr("测试图像"),
                               tr("当前图像为空，无法测试"),
                               false);
+}
+
+void ContourPresenceDialog::importTestImageFromPc()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this, tr("PC导入测试图片"), QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+    const cv::Mat frame = cv::imread(fileName.toLocal8Bit().constData(),
+                                     cv::IMREAD_UNCHANGED);
+    if (frame.empty()) {
+        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
+        return;
+    }
+    m_importedTestFrame = frame.clone();
+    m_importedTestImageTitle = QFileInfo(fileName).fileName();
+    m_importedTestActive = true;
+    updateBottomButtons();
+    rerunImportedTest();
+}
+
+void ContourPresenceDialog::exitTestMode()
+{
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateBottomButtons();
+    showReferenceImage();
+    setViewerStatusText(tr("已退出离线测试，可使用相机执行测试运行"));
+}
+
+void ContourPresenceDialog::updateBottomButtons()
+{
+    const bool imported = m_importedTestActive && !m_importedTestFrame.empty();
+    ui->referenceTestButton->setVisible(!imported);
+    ui->testRunButton->setText(
+                imported ? tr("测试运行（导入图）") : tr("测试运行"));
+    ui->finishButton->setText(imported ? tr("运行一次") : tr("完成"));
+    if (m_exitTestButton)
+        m_exitTestButton->setVisible(imported);
+}
+
+void ContourPresenceDialog::rerunImportedTest()
+{
+    if (!m_importedTestActive || m_importedTestFrame.empty()
+            || m_contourPresenceRunning) {
+        return;
+    }
+    showReferenceImage();
+    setViewerStatusText(tr("正在重新执行模板定位、位置修正和轮廓检测…"));
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    runCameraTest();
 }
 
 void ContourPresenceDialog::applyAdaptiveWindowSize()
@@ -825,7 +960,9 @@ void ContourPresenceDialog::showReferenceImage()
     if (!m_previewHelper)
         return;
 
-    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    const QImage image = m_importedTestActive && !m_importedTestFrame.empty()
+            ? imageFromFrame(m_importedTestFrame)
+            : ReferenceImageProvider::instance().referenceImage();
     if (image.isNull()) {
         m_previewHelper->setRoiDrawingEnabled(false);
         m_previewHelper->clear();
@@ -833,8 +970,10 @@ void ContourPresenceDialog::showReferenceImage()
         return;
     }
 
-    ui->viewerTitleLabel->setText(tr("基准图"));
+    ui->viewerTitleLabel->setText(
+                m_importedTestActive ? m_importedTestImageTitle : tr("基准图"));
     m_previewHelper->setImage(image);
+    m_previewHelper->clearToolOverlays();
     refreshDisplayedRoiOverlay();
 }
 
@@ -843,8 +982,11 @@ void ContourPresenceDialog::showFrameForRoiEditing()
     if (!m_previewHelper)
         return;
 
-    QImage image = ReferenceImageProvider::instance().referenceImage();
-    QString title = tr("基准图");
+    QImage image = m_importedTestActive && !m_importedTestFrame.empty()
+            ? imageFromFrame(m_importedTestFrame)
+            : ReferenceImageProvider::instance().referenceImage();
+    QString title = m_importedTestActive
+            ? m_importedTestImageTitle : tr("基准图");
     if (image.isNull()) {
         image = CameraFrameProvider::instance().currentImage();
         title = tr("当前图像");
@@ -1050,6 +1192,7 @@ void ContourPresenceDialog::handleRoiChanged(const QRectF &roi)
         const QString text = templateRoiStatusText();
         setViewerStatusText(text, text);
         qDebug() << "[ContourPresenceDialog] Template ROI normalized:" << m_templateRoiNormalized;
+        rerunImportedTest();
         return;
     }
 
@@ -1067,6 +1210,7 @@ void ContourPresenceDialog::handleRoiChanged(const QRectF &roi)
     const QString text = detectRoiStatusText();
     setViewerStatusText(text, text);
     qDebug() << "[ContourPresenceDialog] Detect ROI normalized:" << m_roiNormalized;
+    rerunImportedTest();
 }
 
 void ContourPresenceDialog::handlePolygonChanged(const QVector<QPointF> &points)
@@ -1090,6 +1234,7 @@ void ContourPresenceDialog::handlePolygonChanged(const QVector<QPointF> &points)
         setViewerStatusText(text, text);
         qDebug() << "[ContourPresenceDialog] Template polygon ROI points:" << m_templatePolygonNormalized.size()
                  << "bounding:" << m_templateRoiNormalized;
+        rerunImportedTest();
         return;
     }
 
@@ -1111,6 +1256,7 @@ void ContourPresenceDialog::handlePolygonChanged(const QVector<QPointF> &points)
     setViewerStatusText(text, text);
     qDebug() << "[ContourPresenceDialog] Detect polygon ROI points:" << m_detectPolygonNormalized.size()
              << "bounding:" << m_roiNormalized;
+    rerunImportedTest();
 }
 
 void ContourPresenceDialog::handlePolygonSelectionRejected(int pointCount)
@@ -1181,7 +1327,12 @@ void ContourPresenceDialog::runContourPresenceOnFrame(const cv::Mat &frame,
     request.referenceImage = referenceImage.empty() ? cv::Mat() : referenceImage.clone();
     request.runtimeContext.insert(QStringLiteral("referenceTest"), referenceTest);
 
-    const ToolResult result = m_testToolEngine.runTool(request);
+    const ToolResult result = runPositionCorrectionAwareDialogTest(
+                m_testToolEngine,
+                request.config,
+                request.image,
+                request.referenceImage,
+                &m_toolChainTestContext);
     if (!imageTitle.isEmpty())
         ui->viewerTitleLabel->setText(imageTitle);
     displayContourPresenceResult(result);
@@ -1211,7 +1362,21 @@ void ContourPresenceDialog::displayContourPresenceResult(const ToolResult &resul
     setViewerStatusText(displayText, makeContourPresenceStatusTooltipText(result));
 
     if (m_previewHelper) {
-        refreshDisplayedRoiOverlay();
+        bool hasRuntimeDetectRoi = false;
+        for (const ToolOverlay &overlay : result.overlays) {
+            if (overlay.extra.value(QStringLiteral("role")).toString()
+                    == QStringLiteral("detect_roi")) {
+                hasRuntimeDetectRoi = true;
+                break;
+            }
+        }
+        if (hasRuntimeDetectRoi) {
+            m_previewHelper->clearRoi();
+            m_previewHelper->clearPolygonRoi();
+            m_previewHelper->clearCircleRoi();
+        } else {
+            refreshDisplayedRoiOverlay();
+        }
         m_previewHelper->setToolOverlays(result.overlays);
     }
 }

@@ -2,8 +2,12 @@
 #include "ui_ColorRecognitionDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "SchemeStore.h"
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "tooladapters/PositionCorrectionAdapter.h"
+#include "tooladapters/TemplateLocationAdapter.h"
 #include "toolcore/PositionCorrection.h"
+#include "toolcore/ToolEngine.h"
 
 #include <QButtonGroup>
 #include <QBrush>
@@ -15,6 +19,7 @@
 #include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -43,6 +48,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <opencv2/imgcodecs.hpp>
 
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -51,6 +57,78 @@
 #include "toolcore/ToolRequest.h"
 
 namespace {
+
+// 改为 false 即可隐藏 PC 导入入口，不影响导入测试逻辑和已有配置。
+constexpr bool kShowPcImportButton = true;
+
+int toolIndexById(const QVector<ToolConfig> &tools,
+                  const QString &toolId,
+                  int beforeIndex)
+{
+    const int limit = qBound(0, beforeIndex, tools.size());
+    for (int index = 0; index < limit; ++index) {
+        if (tools.at(index).toolId.trimmed() == toolId.trimmed())
+            return index;
+    }
+    return -1;
+}
+
+void appendTestDependency(const ToolConfig &config,
+                          QVector<ToolConfig> *chain)
+{
+    if (!chain || config.toolId.trimmed().isEmpty())
+        return;
+    for (const ToolConfig &existing : *chain) {
+        if (existing.toolId.trimmed() == config.toolId.trimmed())
+            return;
+    }
+    chain->append(config);
+}
+
+QVector<ToolConfig> colorRecognitionTestChain(const ToolConfig &consumer)
+{
+    QVector<ToolConfig> chain;
+    const QVector<ToolConfig> tools =
+            SchemeStore::instance().currentScheme().toolConfigs;
+    int consumerIndex = tools.size();
+    for (int index = 0; index < tools.size(); ++index) {
+        if (tools.at(index).toolId.trimmed() == consumer.toolId.trimmed()) {
+            consumerIndex = index;
+            break;
+        }
+    }
+
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(consumer.params);
+    if (correction.enabled
+            && correction.sourceId != PositionCorrection::defaultSourceId()) {
+        const int correctionIndex = toolIndexById(
+                    tools, correction.sourceId, consumerIndex);
+        if (correctionIndex >= 0
+                && tools.at(correctionIndex).toolType
+                == ToolType::PositionCorrection) {
+            const ToolConfig &correctionTool = tools.at(correctionIndex);
+            const PositionRunPoseSource poseSource =
+                    PositionCorrection::runPoseSourceFromConfig(
+                        correctionTool.params.value(
+                            QStringLiteral("positionCorrection")).toObject());
+            if (poseSource.valid
+                    && poseSource.producerId
+                    != PositionCorrection::defaultSourceId()) {
+                const int producerIndex = toolIndexById(
+                            tools, poseSource.producerId, correctionIndex);
+                if (producerIndex >= 0
+                        && tools.at(producerIndex).toolType
+                        == ToolType::TemplateLocation) {
+                    appendTestDependency(tools.at(producerIndex), &chain);
+                }
+            }
+            appendTestDependency(correctionTool, &chain);
+        }
+    }
+    appendTestDependency(consumer, &chain);
+    return chain;
+}
 
 enum TemplateListRole {
     ItemKindRole = Qt::UserRole,
@@ -773,11 +851,16 @@ ToolConfig ColorRecognitionDialog::toToolConfig() const
                   m_maskPolygonNormalized.size() >= 3
                   ? QStringLiteral("UI configured; HALCON color runner applies mask during detection")
                   : QStringLiteral("not configured"));
+    QString positionSourceId = ui->positionCorrectionSourceComboBox
+            ->currentData().toString().trimmed();
+    if (positionSourceId.isEmpty())
+        positionSourceId = m_loadedPositionCorrectionSourceId;
     PositionCorrection::writeParams(PositionCorrectionConfig{
                                         ui->positionCorrectionSwitch->isChecked(),
                                         ui->positionCorrectionSourceComboBox->currentText(),
-                                        PositionCorrection::defaultSourceId()},
+                                        positionSourceId},
                                     &params);
+    params.insert(QStringLiteral("showPositionCorrectionMatchContour"), true);
     params.insert(QStringLiteral("colorDecisionMode"),
                   colorDecisionModeFromUi(ui->colorDecisionModeComboBox->currentText()));
     params.insert(QStringLiteral("colorModel"), colorModel);
@@ -849,11 +932,12 @@ void ColorRecognitionDialog::loadFromConfig(const ToolConfig &config)
     if (m_maskPolygonNormalized.size() < 3)
         m_maskPolygonNormalized.clear();
     m_maskEditing = false;
-    ui->positionCorrectionSwitch->setChecked(
-                params.value(QStringLiteral("enablePositionCorrection")).toBool(false));
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(params);
+    m_loadedPositionCorrectionSourceId = correction.sourceId;
+    ui->positionCorrectionSwitch->setChecked(correction.enabled);
     setComboBoxText(ui->positionCorrectionSourceComboBox,
-                    params.value(QStringLiteral("positionCorrectionSource"))
-                    .toString(QStringLiteral("1 基准图.位置修正信息")));
+                    correction.source);
 
     m_templates.clear();
     const QJsonArray templates = colorModel.value(QStringLiteral("templates")).toArray();
@@ -965,6 +1049,15 @@ void ColorRecognitionDialog::runTest()
         return;
     }
 
+    if (m_liveTestSource == LiveTestSource::Imported
+            && !m_liveTestFrameSnapshot.empty()) {
+        stopLiveTestRun();
+        m_testUiMode = TestUiMode::TestPaused;
+        updateBottomButtons();
+        rerunLiveTest();
+        return;
+    }
+
     m_testUiMode = TestUiMode::Continuous;
     m_liveTestSource = LiveTestSource::Camera;
     m_liveTestRunning = true;
@@ -1001,6 +1094,13 @@ void ColorRecognitionDialog::rerunLiveTest()
         referenceSource = true;
         if (frame.empty()) {
             displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
+            return;
+        }
+    } else if (m_liveTestSource == LiveTestSource::Imported) {
+        frame = m_liveTestFrameSnapshot;
+        metadata = m_liveTestFrameMetadata;
+        if (frame.empty()) {
+            displayError(QStringLiteral("image_empty"), tr("导入图片为空"));
             return;
         }
     } else {
@@ -1043,10 +1143,18 @@ void ColorRecognitionDialog::launchDetection(const cv::Mat &frame,
 
     const QImage image = MatImageConverter::matToDisplayImage(frame, QStringLiteral("ColorRecognitionDialog"));
     if (!image.isNull() && m_previewHelper) {
-        ui->viewerTitleLabel->setText(referenceSource ? tr("基准图") : tr("测试图像"));
+        const QString imageTitle = referenceSource
+                ? tr("基准图")
+                : (m_liveTestSource == LiveTestSource::Imported
+                   ? (m_liveTestImageTitle.trimmed().isEmpty()
+                      ? tr("PC导入图片") : m_liveTestImageTitle)
+                   : tr("测试图像"));
+        ui->viewerTitleLabel->setText(imageTitle);
         m_previewHelper->setImage(image);
+        m_previewHelper->clearToolOverlays();
         refreshDisplayedRoiOverlay();
     }
+    setViewerStatusText(tr("运行中…"));
 
     if (!referenceSource) {
         m_liveTestFrameSnapshot = frame;  // 缓存为停止态重测的快照帧
@@ -1054,14 +1162,55 @@ void ColorRecognitionDialog::launchDetection(const cv::Mat &frame,
     }
 
     ToolRequest request;
+    request.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    request.frameId = QStringLiteral("color-recognition-dialog-test-%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     request.config = toToolConfig();
     request.image = frame.clone();
+    request.runtimeContext.insert(QStringLiteral("frameId"), request.frameId);
     request.runtimeContext.insert(QStringLiteral("input"), metadata.toJson());
+    const ReferenceFrameSnapshot reference =
+            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    request.referenceImage = reference.frame.clone();
+    request.runtimeContext.insert(QStringLiteral("referenceInput"),
+                                  reference.metadata.toJson());
+    request.runtimeContext.insert(
+                QStringLiteral("referencePositionCorrection"),
+                PositionCorrection::referenceToJson(
+                    SchemeStore::instance().currentScheme()
+                    .referencePositionCorrection));
+    const QVector<ToolConfig> testChain =
+            colorRecognitionTestChain(request.config);
     const int generation = ++m_testRunGeneration;
     m_testRunBusy = true;
-    m_testRunWatcher->setFuture(QtConcurrent::run([request, referenceSource, generation]() mutable {
-        ColorRecognitionAdapter adapter;
-        ToolResult result = adapter.run(request);
+    m_testRunWatcher->setFuture(QtConcurrent::run(
+                                   [request, testChain, referenceSource, generation]() mutable {
+        TemplateLocationAdapter templateLocationAdapter;
+        PositionCorrectionAdapter positionCorrectionAdapter;
+        ColorRecognitionAdapter colorRecognitionAdapter;
+        ToolEngine engine;
+        engine.registerAdapter(&templateLocationAdapter);
+        engine.registerAdapter(&positionCorrectionAdapter);
+        engine.registerAdapter(&colorRecognitionAdapter);
+        const QVector<ToolResult> results = engine.runTools(
+                    testChain,
+                    request.image,
+                    request.referenceImage,
+                    request.runtimeContext);
+        ToolResult result;
+        for (auto it = results.crbegin(); it != results.crend(); ++it) {
+            if (it->toolId == request.config.toolId) {
+                result = *it;
+                break;
+            }
+        }
+        if (result.toolId.isEmpty()) {
+            result = ToolResult::error(
+                        request.config.toolId,
+                        request.config.toolType,
+                        QStringLiteral("颜色识别测试工具未执行"),
+                        QStringLiteral("test_tool_not_executed"));
+        }
         result.payload.insert(QStringLiteral("_referenceSource"), referenceSource);
         result.payload.insert(QStringLiteral("_testRunGeneration"), generation);
         return result;
@@ -1091,6 +1240,14 @@ void ColorRecognitionDialog::runOnceInTestMode()
 {
     stopLiveTestRun();
     m_testUiMode = TestUiMode::TestPaused;
+    if (m_liveTestSource == LiveTestSource::Imported
+            && !m_liveTestFrameSnapshot.empty()) {
+        updateBottomButtons();
+        rerunLiveTest();
+        setViewerStatusText(
+                    tr("已重新测试导入图片，可继续绘制检测区域即时重测"));
+        return;
+    }
     m_liveTestSource = LiveTestSource::Camera;
     const CameraFrameSnapshot snapshot =
             CameraFrameProvider::instance().currentFrameSnapshot();
@@ -1099,6 +1256,40 @@ void ColorRecognitionDialog::runOnceInTestMode()
     updateBottomButtons();
     rerunLiveTest();
     setViewerStatusText(tr("已运行一次，视图锁定当前帧，可继续绘制检测区域即时重测"));
+}
+
+void ColorRecognitionDialog::importTestImageFromPc()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this,
+                tr("PC导入测试图片"),
+                QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+
+    const cv::Mat frame = cv::imread(
+                fileName.toLocal8Bit().constData(),
+                cv::IMREAD_UNCHANGED);
+    if (frame.empty()) {
+        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
+        return;
+    }
+
+    stopLiveTestRun();
+    m_testUiMode = TestUiMode::TestPaused;
+    m_liveTestSource = LiveTestSource::Imported;
+    m_liveTestFrameSnapshot = frame.clone();
+    m_liveTestFrameMetadata = FrameInputMetadata::fromMat(
+                m_liveTestFrameSnapshot, QStringLiteral("file"));
+    m_liveTestImageTitle = QFileInfo(fileName).fileName();
+    m_displayedSampleIndex = -1;
+    setEditState(EditState::None);
+    updateBottomButtons();
+    rerunLiveTest();
+    setViewerStatusText(
+                tr("已导入 %1，并执行完整位置修正与颜色识别测试链")
+                .arg(m_liveTestImageTitle));
 }
 
 // 退出测试态，停止连续检测并恢复编辑态预览。
@@ -1132,8 +1323,19 @@ void ColorRecognitionDialog::updateBottomButtons()
     if (ui && ui->finishButton)
         ui->finishButton->setText(testMode ? tr("运行一次") : tr("完成"));
     if (ui && ui->testRunButton) {
-        ui->testRunButton->setText(m_testUiMode == TestUiMode::Continuous ? tr("停止运行") :
-                                   testMode ? tr("连续运行") : tr("测试运行"));
+        const bool imported = m_liveTestSource == LiveTestSource::Imported
+                && !m_liveTestFrameSnapshot.empty();
+        ui->testRunButton->setText(
+                    m_testUiMode == TestUiMode::Continuous
+                    ? tr("停止运行")
+                    : (imported ? tr("测试运行（导入图）")
+                                : (testMode ? tr("连续运行")
+                                            : tr("测试运行"))));
+        ui->testRunButton->setToolTip(
+                    imported
+                    ? tr("重新填充并测试当前 PC 导入图片：%1")
+                      .arg(m_liveTestImageTitle)
+                    : QString());
         ui->testRunButton->setProperty("running", m_testUiMode == TestUiMode::Continuous);
         refreshButtonStyle(ui->testRunButton);
     }
@@ -1146,6 +1348,7 @@ void ColorRecognitionDialog::setupUiState()
     setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     PlanDialogUtils::applyLargeWindow(this);
+    ui->colorRecognitionPcImportButton->setVisible(kShowPcImportButton);
     setStyleSheet(styleSheet() + QStringLiteral(
         "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;border-radius:4px;padding:0;font-size:15px;font-weight:600;min-width:120px;min-height:48px;}"
         "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000;border-color:#000;}"
@@ -1184,7 +1387,12 @@ void ColorRecognitionDialog::setupUiState()
     ui->positionCorrectionSwitch->setObjectName(QStringLiteral("positionCorrectionSwitch"));
     ui->positionCorrectionSwitch->setChecked(false);
     setComboBoxText(ui->positionCorrectionSourceComboBox,
-                    QStringLiteral("1 基准图.位置修正信息"));
+                    QStringLiteral("0 基准图.位置修正信息"));
+    if (ui->positionCorrectionSourceComboBox->currentIndex() >= 0) {
+        ui->positionCorrectionSourceComboBox->setItemData(
+                    ui->positionCorrectionSourceComboBox->currentIndex(),
+                    PositionCorrection::defaultSourceId());
+    }
     refreshPositionCorrectionControls();
     applyBottomActionButtonMetrics(ui->testRunButton);
     applyBottomActionButtonMetrics(ui->finishButton);
@@ -1284,6 +1492,10 @@ void ColorRecognitionDialog::connectControls()
     connect(ui->headerMaximizeButton, &QToolButton::clicked, this, &ColorRecognitionDialog::showMaximized);
     connect(ui->finishButton, &QPushButton::clicked, this, &ColorRecognitionDialog::finishConfiguration);
     connect(ui->testRunButton, &QPushButton::clicked, this, &ColorRecognitionDialog::runTest);
+    connect(ui->colorRecognitionPcImportButton,
+            &QPushButton::clicked,
+            this,
+            &ColorRecognitionDialog::importTestImageFromPc);
     if (m_referenceTestButton)
         connect(m_referenceTestButton, &QPushButton::clicked, this, &ColorRecognitionDialog::runReferenceTest);
     if (m_exitTestButton)
@@ -1948,6 +2160,7 @@ void ColorRecognitionDialog::showPreviewImage()
 
     ui->viewerTitleLabel->setText(title);
     m_previewHelper->setImage(image);
+    m_previewHelper->clearToolOverlays();
     refreshDisplayedRoiOverlay();
 }
 
@@ -2324,8 +2537,20 @@ void ColorRecognitionDialog::displayResult(const ToolResult &result, bool refere
         const bool keepDetectRoiEditable = m_editState == EditState::DetectRect ||
                 m_editState == EditState::DetectCircle;
         const bool keepCircleEditable = m_editState == EditState::DetectCircle;
+        const bool hasRuntimeDetectRoi = std::any_of(
+                    result.overlays.cbegin(),
+                    result.overlays.cend(),
+                    [](const ToolOverlay &overlay) {
+            return overlay.extra.value(QStringLiteral("role")).toString()
+                    == QStringLiteral("detect_roi");
+        });
         setEditState(m_editState);
         m_previewHelper->clearToolOverlays();
+        if (hasRuntimeDetectRoi && !keepDetectRoiEditable) {
+            m_previewHelper->clearRoi();
+            m_previewHelper->clearCircleRoi();
+            m_previewHelper->clearPolygonRoi();
+        }
         m_previewHelper->setToolOverlays(keepDetectRoiEditable
                                          ? colorRecognitionPreviewOverlaysWithoutRoi(result.overlays)
                                          : result.overlays);

@@ -94,11 +94,9 @@ PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
     m_config.enabled = true;
 
     m_correction.insert(QStringLiteral("version"), 2);
-    m_correction.insert(QStringLiteral("templateRegionType"), QStringLiteral("rectangle"));
     m_correction.insert(QStringLiteral("referenceCreated"), false);
 
     setupBindings();
-    updateTemplateButtons();
 
     const QImage reference = ReferenceImageProvider::instance().referenceImage();
     if (reference.isNull()) {
@@ -108,7 +106,7 @@ PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
         m_previewHelper->setImage(reference);
     }
 
-    // 基础与全部页签保持互斥；第一阶段两者共用已定义的核心参数。
+    // 基础与全部页签保持互斥；两者当前共用位置修正核心参数。
     connect(ui->basicModeButton, &QPushButton::clicked, this, [this]() {
         ui->basicModeButton->setChecked(true);
         ui->allModeButton->setChecked(false);
@@ -116,18 +114,7 @@ PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
     connect(ui->allModeButton, &QPushButton::clicked, this, [this]() {
         ui->allModeButton->setChecked(true);
         ui->basicModeButton->setChecked(false);
-        ui->statusLabel->setText(tr("全部参数将在 HALCON 算法阶段扩展"));
-    });
-    // 模板类型按钮只保存配置意图，真实 ROI 绘制由后续联调阶段接入。
-    connect(ui->rectTemplateButton, &QPushButton::clicked, this, [this]() {
-        m_correction.insert(QStringLiteral("templateRegionType"), QStringLiteral("rectangle"));
-        updateTemplateButtons();
-        ui->statusLabel->setText(tr("矩形模板区域绘制将在 ROI 联调阶段接入"));
-    });
-    connect(ui->polygonTemplateButton, &QPushButton::clicked, this, [this]() {
-        m_correction.insert(QStringLiteral("templateRegionType"), QStringLiteral("polygon"));
-        updateTemplateButtons();
-        ui->statusLabel->setText(tr("多边形模板区域绘制将在 ROI 联调阶段接入"));
+        ui->statusLabel->setText(tr("全部参数与基础参数保持同步"));
     });
     connect(ui->createReferenceButton, &QPushButton::clicked,
             this, &PositionCorrectionDialog::createReferencePose);
@@ -243,7 +230,6 @@ void PositionCorrectionDialog::loadFromConfig(const ToolConfig &config)
     if (source.valid)
         PositionCorrection::writeRunPoseSource(source, &m_correction);
     updateRunPoseDisplay();
-    updateTemplateButtons();
     const ReferenceFrameSnapshot snapshot =
             ReferenceImageProvider::instance().referenceFrameSnapshot();
     if (!snapshot.frame.empty()) {
@@ -253,7 +239,7 @@ void PositionCorrectionDialog::loadFromConfig(const ToolConfig &config)
     }
 }
 
-// 将当前 UI 状态写回 ToolConfig，并明确标记位置修正后端尚未实现。
+// 将当前 UI 状态写回 ToolConfig；旧版工具级模板 ROI 字段在保存时迁移移除。
 ToolConfig PositionCorrectionDialog::toolConfig() const
 {
     ToolConfig config = m_config;
@@ -264,23 +250,18 @@ ToolConfig PositionCorrectionDialog::toolConfig() const
     config.summary = m_correction.value(QStringLiteral("referenceCreated")).toBool(false)
             ? tr("已创建基准，运行时计算位置修正")
             : tr("未创建基准");
-    config.params.insert(QStringLiteral("positionCorrection"), m_correction);
+    QJsonObject correction = m_correction;
+    correction.remove(QStringLiteral("templateRegionType"));
+    correction.remove(QStringLiteral("templateRoiNormalized"));
+    correction.remove(QStringLiteral("templatePolygonNormalized"));
+    config.params.insert(QStringLiteral("positionCorrection"), correction);
     return config;
 }
 
-// UI 第一阶段不生成工具专属预览快照，返回空快照避免伪造结果。
+// 工具级位置修正不拥有模板 ROI，预览由基准姿态与运行姿态信息直接驱动。
 ToolPreviewSnapshot PositionCorrectionDialog::referencePreviewSnapshot() const
 {
     return ToolPreviewSnapshot();
-}
-
-// 根据 templateRegionType 同步两个互斥模板按钮的选中状态。
-void PositionCorrectionDialog::updateTemplateButtons()
-{
-    const QString type = m_correction.value(QStringLiteral("templateRegionType"))
-            .toString(QStringLiteral("rectangle"));
-    ui->rectTemplateButton->setChecked(type == QStringLiteral("rectangle"));
-    ui->polygonTemplateButton->setChecked(type == QStringLiteral("polygon"));
 }
 
 bool PositionCorrectionDialog::findToolProducer(const QString &producerId,
@@ -370,16 +351,6 @@ void PositionCorrectionDialog::showFrameWithPoseInfo(
     QVector<ToolOverlay> overlays = sourceOverlays;
     overlays += poseInfoOverlays(image.size(), source, referencePose, runPose);
     m_previewHelper->setToolOverlays(overlays);
-}
-
-// 测试或创建基准时优先检查基准图，再显示统一的未实现提示。
-void PositionCorrectionDialog::showNotImplemented()
-{
-    if (ReferenceImageProvider::instance().referenceImage().isNull()) {
-        ui->statusLabel->setText(tr("请先设置基准图"));
-        return;
-    }
-    ui->statusLabel->setText(tr("位置修正后端尚未实现"));
 }
 
 void PositionCorrectionDialog::createReferencePose()
@@ -616,6 +587,9 @@ void PositionCorrectionDialog::runPositionCorrectionTest()
         }
         runPose = poseJson(x, y, angle, scale);
         sourceOverlays = producerResult.overlays;
+        producerResult.payload.insert(
+                    QStringLiteral("frameId"),
+                    QStringLiteral("position-correction-test"));
 
         QJsonObject toolResults;
         toolResults.insert(producerResult.toolId, producerResult.toJson());

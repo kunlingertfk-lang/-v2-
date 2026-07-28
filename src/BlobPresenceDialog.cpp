@@ -6,7 +6,9 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDebug>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontMetrics>
@@ -29,6 +31,7 @@
 #include <opencv2/imgcodecs.hpp>
 
 #include "frame/CameraFrameProvider.h"
+#include "frame/FrameInputMetadata.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
@@ -358,6 +361,10 @@ ToolPreviewSnapshot BlobPresenceDialog::referencePreviewSnapshot() const
 
 void BlobPresenceDialog::loadFromConfig(const ToolConfig &config)
 {
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+
     if (!config.toolId.trimmed().isEmpty())
         m_toolId = config.toolId;
     m_enabled = config.enabled;
@@ -424,6 +431,7 @@ void BlobPresenceDialog::loadFromConfig(const ToolConfig &config)
     refreshDisplayedRoiOverlay();
     const QString roiText = detectRoiStatusText();
     setViewerStatusText(roiText, roiText);
+    updateBottomButtons();
 }
 
 QString BlobPresenceDialog::summaryText() const
@@ -449,6 +457,12 @@ void BlobPresenceDialog::setupUiState()
     setWindowModality(Qt::WindowModal);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     applyAdaptiveWindowSize();
+
+    m_exitTestButton = new QPushButton(tr("退出测试"), this);
+    m_exitTestButton->setObjectName(QStringLiteral("exitTestButton"));
+    m_exitTestButton->setMinimumSize(120, 48);
+    m_exitTestButton->setProperty("actionRole", QStringLiteral("secondary"));
+    ui->horizontalLayout_actions->addWidget(m_exitTestButton);
 
     ui->spotParamsStackedWidget->setCurrentWidget(ui->basicParamsPage);
     ui->basicSegmentButton->setChecked(true);
@@ -494,6 +508,7 @@ void BlobPresenceDialog::setupUiState()
     ui->horizontalLayout_viewerStatus->setStretch(2, 0);
     const QString roiText = detectRoiStatusText();
     setViewerStatusText(roiText, roiText);
+    updateBottomButtons();
 }
 
 void BlobPresenceDialog::connectControls()
@@ -503,6 +518,8 @@ void BlobPresenceDialog::connectControls()
     connect(ui->testRunButton, &QPushButton::clicked, this, &BlobPresenceDialog::runCameraTest);
     connect(ui->blobPcImportButton, &QPushButton::clicked,
             this, &BlobPresenceDialog::importTestImageFromPc);
+    connect(m_exitTestButton, &QPushButton::clicked,
+            this, &BlobPresenceDialog::exitTestMode);
     connect(ui->finishButton, &QPushButton::clicked, this, &BlobPresenceDialog::finishConfiguration);
 
     m_segmentGroup->setExclusive(true);
@@ -673,6 +690,11 @@ void BlobPresenceDialog::finishConfiguration()
         return;
     }
 
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
+
     accept();
 }
 
@@ -703,7 +725,8 @@ void BlobPresenceDialog::runReferenceTest()
 
 void BlobPresenceDialog::runCameraTest()
 {
-    const bool useImportedFrame = !m_importedTestFrame.empty();
+    const bool useImportedFrame =
+            m_importedTestActive && !m_importedTestFrame.empty();
     const cv::Mat frame = useImportedFrame
             ? m_importedTestFrame.clone()
             : CameraFrameProvider::instance().currentFrame();
@@ -750,10 +773,8 @@ void BlobPresenceDialog::importTestImageFromPc()
 
     m_importedTestFrame = frame.clone();
     m_importedTestImageTitle = QFileInfo(fileName).fileName();
-    ui->testRunButton->setText(tr("测试运行（导入图）"));
-    ui->testRunButton->setToolTip(
-                tr("重新填充并测试当前 PC 导入图片：%1")
-                .arg(m_importedTestImageTitle));
+    m_importedTestActive = true;
+    updateBottomButtons();
     const QImage image = imageFromFrame(m_importedTestFrame);
     if (!image.isNull() && m_previewHelper) {
         ui->viewerTitleLabel->setText(m_importedTestImageTitle);
@@ -766,6 +787,40 @@ void BlobPresenceDialog::importTestImageFromPc()
                 ReferenceImageProvider::instance().referenceFrame(),
                 m_importedTestImageTitle,
                 tr("导入图片为空，无法测试"));
+}
+
+void BlobPresenceDialog::exitTestMode()
+{
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateBottomButtons();
+    showReferenceImage();
+    setViewerStatusText(tr("已退出离线测试，可使用相机执行测试运行"));
+}
+
+void BlobPresenceDialog::updateBottomButtons()
+{
+    const bool imported =
+            m_importedTestActive && !m_importedTestFrame.empty();
+    ui->referenceTestButton->setVisible(!imported);
+    ui->finishButton->setText(imported ? tr("运行一次") : tr("完成"));
+    ui->testRunButton->setText(
+                imported ? tr("测试运行（导入图）") : tr("测试运行"));
+    ui->testRunButton->setToolTip(
+                imported
+                ? tr("重新填充并测试当前 PC 导入图片：%1")
+                  .arg(m_importedTestImageTitle)
+                : QString());
+    if (m_exitTestButton)
+        m_exitTestButton->setVisible(imported);
+}
+
+void BlobPresenceDialog::rerunImportedTest()
+{
+    if (!m_importedTestActive || m_importedTestFrame.empty())
+        return;
+    runCameraTest();
 }
 
 void BlobPresenceDialog::applyAdaptiveWindowSize()
@@ -781,7 +836,7 @@ void BlobPresenceDialog::fitPreview()
 
 void BlobPresenceDialog::showReferenceImage()
 {
-    if (!m_previewHelper)
+    if (!m_previewHelper || m_importedTestActive)
         return;
 
     const QImage image = ReferenceImageProvider::instance().referenceImage();
@@ -793,6 +848,9 @@ void BlobPresenceDialog::showReferenceImage()
 
     ui->viewerTitleLabel->setText(tr("基准图"));
     m_previewHelper->setImage(image);
+    // 与颜色识别退出测试的恢复顺序一致：先移除运行结果层，
+    // 再恢复配置阶段的基准 ROI，避免位置修正轮廓、原点和 Blob 框残留。
+    m_previewHelper->clearToolOverlays();
     refreshDisplayedRoiOverlay();
 }
 
@@ -833,9 +891,17 @@ void BlobPresenceDialog::showFrameForRoiEditing()
     if (!m_previewHelper)
         return;
 
-    QImage image = ReferenceImageProvider::instance().referenceImage();
-    QString title = tr("基准图");
-    if (image.isNull()) {
+    QImage image;
+    QString title;
+    if (m_importedTestActive && !m_importedTestFrame.empty()) {
+        image = imageFromFrame(m_importedTestFrame);
+        title = m_importedTestImageTitle.trimmed().isEmpty()
+                ? tr("PC导入图片") : m_importedTestImageTitle;
+    } else {
+        image = ReferenceImageProvider::instance().referenceImage();
+        title = tr("基准图");
+    }
+    if (image.isNull() && !m_importedTestActive) {
         image = CameraFrameProvider::instance().currentImage();
         title = tr("当前图像");
     }
@@ -979,6 +1045,7 @@ void BlobPresenceDialog::resetDetectRoi()
     }
     const QString text = detectRoiStatusText();
     setViewerStatusText(text, text);
+    rerunImportedTest();
 }
 
 void BlobPresenceDialog::handleRoiChanged(const QRectF &roi)
@@ -1001,6 +1068,7 @@ void BlobPresenceDialog::handleRoiChanged(const QRectF &roi)
     const QString roiText = detectRoiStatusText();
     setViewerStatusText(roiText, roiText);
     qDebug() << "[BlobPresenceDialog] ROI normalized:" << m_roiNormalized;
+    rerunImportedTest();
 }
 
 void BlobPresenceDialog::handlePolygonChanged(const QVector<QPointF> &points)
@@ -1028,6 +1096,7 @@ void BlobPresenceDialog::handlePolygonChanged(const QVector<QPointF> &points)
     setViewerStatusText(text, text);
     qDebug() << "[BlobPresenceDialog] Polygon ROI points:" << m_detectPolygonNormalized.size()
              << "bounding:" << m_roiNormalized;
+    rerunImportedTest();
 }
 
 void BlobPresenceDialog::handleCircleChanged(const CircleRoi &roi)
@@ -1056,6 +1125,7 @@ void BlobPresenceDialog::handleCircleChanged(const CircleRoi &roi)
     qDebug() << "[BlobPresenceDialog] Circle ROI center:" << m_detectCircleNormalized.centerNormalized
              << "radius:" << m_detectCircleNormalized.radiusNormalized
              << "bounding:" << m_roiNormalized;
+    rerunImportedTest();
 }
 
 void BlobPresenceDialog::handlePolygonSelectionRejected(int pointCount)
@@ -1125,6 +1195,32 @@ void BlobPresenceDialog::runBlobPresenceOnFrame(const cv::Mat &frame,
     ToolResult result;
     const PositionCorrectionConfig correctionConfig =
             PositionCorrection::fromParams(config.params);
+    const QString frameId = QStringLiteral("blob-dialog-test-%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    const QString inputSource = referenceTest
+            ? QStringLiteral("reference")
+            : (m_importedTestActive
+               ? QStringLiteral("file") : QStringLiteral("camera"));
+    const FrameInputMetadata inputMetadata =
+            FrameInputMetadata::fromMat(frame, inputSource);
+    QJsonObject runtimeContext;
+    runtimeContext.insert(QStringLiteral("frameId"), frameId);
+    runtimeContext.insert(QStringLiteral("input"), inputMetadata.toJson());
+    runtimeContext.insert(
+                QStringLiteral("referencePositionCorrection"),
+                PositionCorrection::referenceToJson(
+                    m_referencePositionCorrection));
+
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        refreshDisplayedRoiOverlay();
+    }
+    setViewerStatusText(
+                correctionConfig.enabled
+                ? tr("正在重新执行模板定位、位置修正和斑点检测…")
+                : tr("正在重新执行斑点检测…"));
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
     if (correctionConfig.enabled) {
         if (m_toolChainTestIndex < 0
                 || m_toolChainTestIndex > m_toolChainTestConfigs.size()) {
@@ -1141,11 +1237,6 @@ void BlobPresenceDialog::runBlobPresenceOnFrame(const cv::Mat &frame,
             testConfigs.append(m_toolChainTestConfigs.at(index));
         testConfigs.append(config);
 
-        QJsonObject runtimeContext;
-        runtimeContext.insert(
-                    QStringLiteral("referencePositionCorrection"),
-                    PositionCorrection::referenceToJson(
-                        m_referencePositionCorrection));
         ToolResult referenceCorrectionResult;
         ToolEngine *testEngine = m_sharedToolEngine
                 ? m_sharedToolEngine : &m_testToolEngine;
@@ -1171,10 +1262,13 @@ void BlobPresenceDialog::runBlobPresenceOnFrame(const cv::Mat &frame,
         }
     } else {
         ToolRequest request;
+        request.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        request.frameId = frameId;
         request.config = config;
         request.image = frame.clone();
         request.referenceImage =
                 referenceImage.empty() ? cv::Mat() : referenceImage.clone();
+        request.runtimeContext = runtimeContext;
         result = m_testToolEngine.runTool(request);
     }
     if (!imageTitle.isEmpty())

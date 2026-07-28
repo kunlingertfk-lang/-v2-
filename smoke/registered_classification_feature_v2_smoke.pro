@@ -29,10 +29,14 @@ SOURCES += \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp
 
 HEADERS += \
     ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
     ../src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \
+    ../src/toolcore/PositionCorrectionTransform.h \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.h \
     ../src/algorithms/halcon/HalconRuntimePaths.h

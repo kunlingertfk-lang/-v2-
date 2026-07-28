@@ -4,12 +4,23 @@
 
 ## 功能文档索引
 
+- 相机/坐标系标定：`docs/FID/Calibration/标定SOP.md`
 - 颜色识别：`docs/FID/ColorRecognition/颜色识别提示词规范.md`、`docs/FID/ColorRecognition/color_recognition_function_implementation.md`、`docs/FID/ColorRecognition/颜色识别算法V2整理设计.md`
 - 颜色比较：`docs/FID/ColorComparison/颜色比较V2设计说明.md`、`docs/FID/ColorComparison/颜色比较V2提示词规范.md`、`docs/FID/ColorComparison/color_comparison_function_implementation.md`（V1 历史提示词仅供追溯）
-- 注册分类：`docs/FID/RegisteredClassification/注册分类提示词规范.md`、`docs/FID/RegisteredClassification/registered_classification_function_implementation.md`、`docs/FID/RegisteredClassification/注册分类算法当前实现说明.md`
-- 注册目标检测：`docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md`、`docs/FID/RegisteredClassificationDetection/registered_classification_detection_function_implementation.md`
+- 注册分类：`docs/FID/RegisteredClassification/注册分类提示词规范.md`、`docs/FID/RegisteredClassification/registered_classification_function_implementation.md`、`docs/FID/RegisteredClassification/注册分类算法当前实现说明.md`、`docs/FID/RegisteredClassification/注册分类通用HALCON深度Embedding升级实施规划.md`、`docs/FID/RegisteredClassification/industrial_embedding_descriptor.example.json`
+- 注册目标检测：`docs/FID/RegisteredClassificationDetection/注册目标检测开发SOP.md`、`docs/FID/RegisteredClassificationDetection/注册分类检测提示词规范.md`、`docs/FID/RegisteredClassificationDetection/registered_classification_detection_function_implementation.md`
 - 位置修正：`docs/FID/PositionCorrection/位置修正UI设计规范.md`、`docs/FID/PositionCorrection/位置修正提示词规范.md`、`docs/FID/PositionCorrection/position_correction_function_implementation.md`
 - 模板定位：`docs/FID/TemplateLocation/模板定位UI与交互设计.md`、`docs/FID/TemplateLocation/template_location_function_implementation.md`、`docs/FID/TemplateLocation/模板定位与位置修正衔接.md`、`docs/FID/TemplateLocation/HANDOFF.md`
+- 图案有无：`docs/FID/PatternPresence/图案有无算法链解析.md`
+- 斑点有无：`docs/FID/BlobPresence/斑点有无算法链解析.md`
+- 圆有无：`docs/FID/CirclePresence/圆有无算法链解析.md`
+- 边缘有无：`docs/FID/EdgePresence/边缘有无算法链解析.md`
+- 直线有无：`docs/FID/LinePresence/直线有无算法链解析.md`
+- 轮廓有无：`docs/FID/ContourPresence/轮廓有无算法链解析.md`
+- 字符识别 OCR：`docs/FID/Ocr/OCR算法链解析.md`
+- AI 目标检测：`docs/FID/AiDetection/AI目标检测算法链解析.md`
+
+本轮“有无类”算法链文档覆盖当前实际具备 Dialog、Adapter、Runner 和主工程注册的六项功能。`ToolType::ColorPresence` 目前仅有枚举预留，没有对应配置 Dialog、Adapter 或 Runner，因此不作为可运行功能单列算法链文档。
 
 ## 约束优先级
 
@@ -281,7 +292,10 @@ ToolResult / overlays / payload
 
 ## 位置修正统一规范
 
-位置修正是多个 FID 算子的统一能力入口。正式名称统一为“位置修正”，代码和配置英文名使用 `PositionCorrection`。涉及位置修正 UI 时，应使用统一字段、稳定引用和占位语义。代码侧公共入口为 `src/toolcore/PositionCorrection.{h,cpp}`，当前只提供字段解析、写回和未应用 payload 占位，不代表真实位置补偿已经实现。
+位置修正是多个 FID 算子的统一能力入口。正式名称统一为“位置修正”，代码和配置英文名使用
+`PositionCorrection`。代码侧公共入口为 `src/toolcore/PositionCorrection.{h,cpp}`；
+运行时由 `ToolEngine`、位置修正 Adapter 和公共消费辅助层共同完成逐帧结果传递、变换计算和
+来源校验。当前完整消费者为颜色比较和 Blob 有无，其他工具链需分别完成接入后才能使用。
 
 专项 UI、配置和截图规范见 `docs/FID/PositionCorrection/位置修正UI设计规范.md`。
 
@@ -292,13 +306,14 @@ ToolResult / overlays / payload
 - 基准图位置修正：方案级固定节点，只允许一份，固定来源 ID 为 `reference.positionCorrection`，不占用工具序号。
 - 工具位置修正：属于 `Location` 分类，允许创建多个实例，每个实例使用独立且稳定的 `toolId`。
 
-基准图配置和工具实例配置不得相互覆盖。界面中的 `1 基准图`、`12 位置修正` 等序号是动态显示文本，不得作为唯一引用键。
+基准图配置和工具实例配置不得相互覆盖。当前基准图显示为 `0 基准图`；工具实例序号仍会随
+排序变化。显示文本不得作为唯一引用键。
 
 ### UI 字段
 
 - 开关文案：`独立位置修正使能 ⓘ`
 - 来源文案：`位置修正`
-- 默认来源：`1 基准图.位置修正信息`
+- 默认来源：`0 基准图.位置修正信息`
 - 开关关闭时隐藏来源行，开启时显示来源行。
 - 开关样式优先使用现有 `positionCorrectionSwitch` 样式。
 - 开启时，来源菜单只显示固定基准图节点以及当前消费工具之前、已启用且有效的位置修正工具实例。
@@ -318,12 +333,13 @@ positionCorrectionSource: string
 
 - `positionCorrectionSourceId` 是运行和引用校验使用的稳定键。
 - `positionCorrectionSource` 是显示文本和旧配置兼容字段。
-- 当前公共 helper 尚未读写 `positionCorrectionSourceId`；新增稳定 ID 必须在位置修正 UI/config 专项实施中统一补齐，不得由单个消费工具私自定义不同字段。
+- 公共 helper 统一读写 `positionCorrectionSourceId`，并将历史显示文本
+  `1 基准图.位置修正信息` 迁移到固定 ID `reference.positionCorrection`。
 
 旧配置缺少字段时：
 
 - `enablePositionCorrection` 默认 `false`，除非已有功能历史默认值不同。
-- `positionCorrectionSource` 默认 `1 基准图.位置修正信息` 或空字符串，按已有功能兼容策略确定。
+- `positionCorrectionSource` 当前默认 `0 基准图.位置修正信息`；历史编号 1 只作为迁移输入。
 - 只有旧文本能唯一映射到合法节点时才补齐 `positionCorrectionSourceId`；无法匹配或匹配不唯一时必须显示来源失效，不得自动回退到基准图。
 
 ### 来源生命周期
@@ -346,7 +362,7 @@ positionCorrectionSourceId
 positionCorrectionSource
 ```
 
-在稳定 ID 尚未完成公共 helper 接入前，已有 Adapter/Runner 可以继续只透传旧字段，但必须保持 `positionCorrectionApplied=false` 和明确的未实现原因；不得假报稳定引用已经生效。
+Adapter 必须使用稳定来源 ID，并校验来源结果身份和当前帧；不得仅依赖显示文本或复用历史结果。
 
 新增或改造工具时优先使用公共结构和方法：
 
@@ -367,7 +383,7 @@ positionCorrectionApplied
 positionCorrectionReason
 ```
 
-若当前 runner 尚未实现实际位置补偿，必须明确：
+尚未接入位置修正的其他 runner 必须明确：
 
 ```text
 positionCorrectionApplied = false

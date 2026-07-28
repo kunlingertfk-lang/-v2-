@@ -43,13 +43,47 @@ void registerResultInContext(const ToolResult &result, QJsonObject *context)
     }
 }
 
-double finiteDouble(const QJsonObject &object, const QString &key, double fallback = 0.0)
+bool finiteJsonNumber(const QJsonValue &value, double *number)
 {
-    const QJsonValue value = object.value(key);
-    const double number = value.isString()
-            ? value.toString().toDouble()
-            : value.toDouble(fallback);
-    return std::isfinite(number) ? number : fallback;
+    if (!number)
+        return false;
+    bool ok = true;
+    const double parsed = value.isString()
+            ? value.toString().toDouble(&ok)
+            : value.isDouble() ? value.toDouble() : qQNaN();
+    if (!ok || !std::isfinite(parsed))
+        return false;
+    *number = parsed;
+    return true;
+}
+
+bool poseFromJson(const QJsonObject &object,
+                  PositionPose *pose,
+                  bool *invalidScale = nullptr)
+{
+    if (invalidScale)
+        *invalidScale = false;
+    if (!pose || object.isEmpty())
+        return false;
+
+    const QJsonValue angleValue = object.contains(QStringLiteral("angleDeg"))
+            ? object.value(QStringLiteral("angleDeg"))
+            : object.value(QStringLiteral("angle"));
+    if (!finiteJsonNumber(object.value(QStringLiteral("x")), &pose->x)
+            || !finiteJsonNumber(object.value(QStringLiteral("y")), &pose->y)
+            || !finiteJsonNumber(angleValue, &pose->angleDeg)) {
+        return false;
+    }
+
+    pose->scale = 1.0;
+    if (object.contains(QStringLiteral("scale"))
+            && (!finiteJsonNumber(object.value(QStringLiteral("scale")), &pose->scale)
+                || pose->scale <= 0.0)) {
+        if (invalidScale)
+            *invalidScale = true;
+        return false;
+    }
+    return true;
 }
 
 bool validNormalizedPoint(const QPointF &point)
@@ -132,6 +166,16 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
     locatorConfig.templateRoiNormalized = referenceConfig.templateRoiNormalized;
     locatorConfig.templatePolygonNormalized =
             polygonPoints(referenceConfig.templatePolygonNormalized);
+    locatorConfig.templateMaskRegionType =
+            referenceConfig.templateMaskRegionType;
+    locatorConfig.templateMaskRoiNormalized =
+            referenceConfig.templateMaskRoiNormalized;
+    locatorConfig.templateMaskPolygonNormalized =
+            polygonPoints(referenceConfig.templateMaskPolygonNormalized);
+    locatorConfig.templateMaskCircleCenterNormalized =
+            referenceConfig.templateMaskCircleCenterNormalized;
+    locatorConfig.templateMaskCircleRadiusNormalized =
+            referenceConfig.templateMaskCircleRadiusNormalized;
     locatorConfig.searchRegionType = QStringLiteral("full");
     locatorConfig.searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     locatorConfig.minScore = 50;
@@ -161,19 +205,35 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
         return result;
     }
 
+    PositionPose referencePose;
+    bool invalidReferenceScale = false;
+    if (!poseFromJson(referenceConfig.referencePose,
+                      &referencePose,
+                      &invalidReferenceScale)) {
+        return referencePositionCorrectionError(
+                    invalidReferenceScale
+                    ? QStringLiteral("invalid_pose_scale")
+                    : QStringLiteral("invalid_reference_pose"),
+                    invalidReferenceScale
+                    ? QStringLiteral("Reference pose scale must be finite and greater than zero.")
+                    : QStringLiteral("Reference pose x/y/angle must be finite numbers."));
+    }
+    PositionPose runPose;
+    bool invalidRunScale = false;
+    if (!poseFromJson(located.payload, &runPose, &invalidRunScale)) {
+        ToolResult result = referencePositionCorrectionError(
+                    invalidRunScale
+                    ? QStringLiteral("invalid_pose_scale")
+                    : QStringLiteral("invalid_run_pose"),
+                    invalidRunScale
+                    ? QStringLiteral("Run pose scale must be finite and greater than zero.")
+                    : QStringLiteral("Run pose x/y/angle must be finite numbers."));
+        result.elapsedMs = located.elapsedMs;
+        result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
+        return result;
+    }
+
     PositionCorrectionHalconRunner correctionRunner;
-    const PositionPose referencePose{
-        finiteDouble(referenceConfig.referencePose, QStringLiteral("x")),
-        finiteDouble(referenceConfig.referencePose, QStringLiteral("y")),
-        finiteDouble(referenceConfig.referencePose, QStringLiteral("angleDeg")),
-        finiteDouble(referenceConfig.referencePose, QStringLiteral("scale"), 1.0)
-    };
-    const PositionPose runPose{
-        finiteDouble(located.payload, QStringLiteral("x")),
-        finiteDouble(located.payload, QStringLiteral("y")),
-        finiteDouble(located.payload, QStringLiteral("angleDeg")),
-        finiteDouble(located.payload, QStringLiteral("scale"), 1.0)
-    };
     const PositionCorrectionHalconResult corrected =
             correctionRunner.run(referencePose, runPose);
     ToolResult result;
@@ -261,6 +321,8 @@ ToolResult ToolEngine::runTool(const ToolRequest &request) const
         result.toolType = config.toolType;
     if (result.elapsedMs <= 0)
         result.elapsedMs = timer.elapsed();
+    if (!request.frameId.trimmed().isEmpty())
+        result.payload.insert(QStringLiteral("frameId"), request.frameId.trimmed());
     return result;
 }
 
@@ -273,13 +335,17 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
     QVector<ToolResult> results;
     results.reserve(configs.size());
     QJsonObject frameContext = runtimeContext;
-    if (!frameContext.contains(QStringLiteral("toolResultsById")))
-        frameContext.insert(QStringLiteral("toolResultsById"), QJsonObject());
-    if (!frameContext.contains(QStringLiteral("positionCorrectionsById")))
-        frameContext.insert(QStringLiteral("positionCorrectionsById"), QJsonObject());
+    // Dynamic results belong to this invocation only. Never accept caller-provided
+    // result maps, otherwise a failed frame could reuse a previous frame's matrix.
+    frameContext.insert(QStringLiteral("toolResultsById"), QJsonObject());
+    frameContext.insert(QStringLiteral("positionCorrectionsById"), QJsonObject());
+    const QString frameId = frameContext.value(QStringLiteral("frameId"))
+            .toString().trimmed();
 
-    const ToolResult referenceCorrection =
+    ToolResult referenceCorrection =
             runReferencePositionCorrection(image, referenceImage, frameContext);
+    if (!frameId.isEmpty())
+        referenceCorrection.payload.insert(QStringLiteral("frameId"), frameId);
     if (referenceCorrectionResult)
         *referenceCorrectionResult = referenceCorrection;
     if (!referenceCorrection.toolId.trimmed().isEmpty())
@@ -293,6 +359,7 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
         request.config = config;
         request.image = image;
         request.referenceImage = referenceImage;
+        request.frameId = frameId;
         request.runtimeContext = frameContext;
         ToolResult result = runTool(request);
         registerResultInContext(result, &frameContext);

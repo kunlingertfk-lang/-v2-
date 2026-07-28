@@ -1,6 +1,7 @@
 #ifndef ALGORITHMS_PRESENCE_PATTERNPRESENCEHALCONRUNNER_H
 #define ALGORITHMS_PRESENCE_PATTERNPRESENCEHALCONRUNNER_H
 
+#include "toolcore/PositionCorrectionConsumer.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -32,6 +33,7 @@ struct PatternPresenceHalconConfig
     QVector<QPointF> detectPolygonNormalized;
     bool enablePositionCorrection = true;
     QString positionCorrectionSource;
+    PositionCorrectionContext positionCorrection;
     int minScore = 50;
     QString polarity = QStringLiteral("consider");
     int scaleMin = 100;

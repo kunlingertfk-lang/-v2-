@@ -568,7 +568,7 @@ void RegisteredClassificationDetectionDialog::buildUi()
     positionLabel->setProperty("role", QStringLiteral("rowField"));
     positionLabel->setMinimumWidth(118);
     m_positionSourceComboBox = new QComboBox(m_positionSourceRow);
-    m_positionSourceComboBox->addItem(QStringLiteral("1 基准图.位置修正信息"));
+    m_positionSourceComboBox->addItem(QStringLiteral("0 基准图.位置修正信息"));
     positionSourceLayout->addWidget(positionLabel);
     positionSourceLayout->addWidget(m_positionSourceComboBox, 1);
     detectLayout->addWidget(m_positionSourceRow);

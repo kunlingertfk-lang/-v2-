@@ -19,7 +19,31 @@ CameraFrameProvider::CameraFrameProvider(QObject *parent)
 
 CameraFrameProvider::~CameraFrameProvider()
 {
-    closeCamera(QStringLiteral("provider destructor"));
+    m_grabRunning.storeRelease(0);
+
+    if (m_workerThread) {
+        m_workerThread->requestInterruption();
+
+        if (!m_workerThread->wait(5000)) {
+            qCritical()
+                    << "[CameraFrameProvider] worker did not exit in 5 seconds;"
+                    << "waiting indefinitely to avoid use-after-free";
+
+            // 当前结构下只能继续等待。
+            // 不能 terminate、delete、release m_capture。
+            m_workerThread->wait();
+        }
+
+        // 只有确认线程结束后才能删除。
+        Q_ASSERT(m_workerThread->isFinished());
+        delete m_workerThread;
+        m_workerThread = nullptr;
+    }
+
+    // worker 已结束，不可能再访问 m_capture。
+    QMutexLocker locker(&m_cameraMutex);
+    if (m_capture.isOpened())
+        m_capture.release();
 }
 
 CameraFrameProvider &CameraFrameProvider::instance()
@@ -34,12 +58,14 @@ bool CameraFrameProvider::openCamera(const QString &devicePath)
         return true;
     }
 
-    stopGrab();
+    if(!stopGrab()){
+        qCritical() << "[CameraFrameProvider] open aborted because worker is still running";   
+        return false;
+    };
 
     const QString path = devicePath.isEmpty()
             ? QStringLiteral("/dev/video0")
             : devicePath;
-
     {
         QMutexLocker locker(&m_cameraMutex);
         m_devicePath = path;
@@ -80,7 +106,10 @@ bool CameraFrameProvider::openCamera(const QString &devicePath)
 
 void CameraFrameProvider::closeCamera(const QString &reason)
 {
-    stopGrab();
+    if(!stopGrab()){
+        qCritical() << "[CameraFrameProvider] close aborted beacuse worker is still running";
+        return;
+    }
 
     {
         QMutexLocker locker(&m_cameraMutex);
@@ -98,6 +127,16 @@ void CameraFrameProvider::closeCamera(const QString &reason)
 
 bool CameraFrameProvider::startGrab()
 {
+    if (m_workerThread){
+        if(m_workerThread->isRunning()){
+            qWarning() << "[CameraFrameProvider] previous grab thread is still running";
+            emit cameraError(tr("上一次采集线程尚未退出"));
+            return false;
+        }
+        delete m_workerThread;
+        m_workerThread = nullptr;
+    }
+
     if (isGrabbing()) {
         return true;
     }
@@ -118,25 +157,52 @@ bool CameraFrameProvider::startGrab()
     return true;
 }
 
-void CameraFrameProvider::stopGrab()
-{
-    if (!m_grabRunning.loadAcquire() && !m_workerThread) {
-        return;
-    }
+/*===============没有返回值。使用terminate()存在资源未完全释放的风险===================*/
+// void CameraFrameProvider::stopGrab(int timeoutMs)
+// {
+//     if (!m_grabRunning.loadAcquire() && !m_workerThread) {
+//         return;
+//     }
+//     m_grabRunning.storeRelease(0);
+//     if (m_workerThread) {
+//         if (!m_workerThread->wait(3000)) {
+//             qWarning() << "[CameraFrameProvider] grab thread did not stop in time, terminating";
+//             m_workerThread->terminate();
+//             m_workerThread->wait();
+//         }
+//         delete m_workerThread;
+//         m_workerThread = nullptr;
+//     }
+//     qDebug() << "[CameraFrameProvider] grab thread stopped";
+// }
 
+//===============有返回值。使用requestInterruption()等待线程退出，避免资源未释放的风险===================*/
+bool CameraFrameProvider::stopGrab(int timeoutMs)
+{
     m_grabRunning.storeRelease(0);
 
-    if (m_workerThread) {
-        if (!m_workerThread->wait(3000)) {
-            qWarning() << "[CameraFrameProvider] grab thread did not stop in time, terminating";
-            m_workerThread->terminate();
-            m_workerThread->wait();
-        }
-        delete m_workerThread;
-        m_workerThread = nullptr;
+    QThread *thread = m_workerThread;
+    if(!thread) 
+        return true;
+
+    thread->requestInterruption();
+
+    if(!thread->wait(timeoutMs)){
+        const QString message = tr("相机采集线程停止超时，暂不释放相机资源");
+        qCritical() << "[CameraFrameProvider]" << message;
+        emit cameraError(message);
+
+        //不能terminate线程，可能导致资源未释放，后续无法重新打开相机
+        //不能delete，因为线程还在运行，delete会导致崩溃
+        //也不能继续release m_capture，因为线程还在运行，release会导致崩溃
+        return false;
     }
 
+    delete thread;
+    m_workerThread = nullptr;
+
     qDebug() << "[CameraFrameProvider] grab thread stopped";
+    return true;
 }
 
 bool CameraFrameProvider::isOpened() const
@@ -298,6 +364,9 @@ bool CameraFrameProvider::initCameraWithGStreamer(const QString &devicePath)
             return false;
         }
 
+        const bool timeoutSupported = m_capture.set(cv::CAP_PROP_READ_TIMEOUT_MSEC, 500);
+        qDebug() << "[CameraFrameProvider] CAP_PROP_READ_TIMEOUT_MSEC supported:" << timeoutSupported ;
+
         if (!testCameraRead()) {
             qDebug() << "[CameraFrameProvider] GStreamer opened but no frame:" << tag;
             m_capture.release();
@@ -418,28 +487,46 @@ cv::Mat CameraFrameProvider::decodeCapturedFrame(const cv::Mat &frame) const
 
 void CameraFrameProvider::workerLoop()
 {
+
+    QThread *currentThread = QThread::currentThread();
+
     qDebug() << "[CameraFrameProvider] worker loop started";
 
     QElapsedTimer frameTimer;
     int failureCount = 0;
     int frameCount = 0;
 
-    while (m_grabRunning.loadAcquire()) {
+    while (m_grabRunning.loadAcquire() 
+            && !currentThread->isInterruptionRequested()) {
         frameTimer.restart();
 
         cv::Mat capturedFrame;
         bool grabSuccess = false;
+        
         {
             QMutexLocker locker(&m_cameraMutex);
+
+            if(!m_grabRunning.loadAcquire() 
+                    || currentThread->isInterruptionRequested()) {
+                break;
+            }
+
             if (m_capture.isOpened()) {
                 try {
                     const bool grabbed = m_capture.grab();
-                    grabSuccess = grabbed && m_capture.retrieve(capturedFrame) && !capturedFrame.empty();
-                } catch (const cv::Exception &e) {
-                    qWarning() << "[CameraFrameProvider] OpenCV exception in worker:" << e.what();
-                    grabSuccess = false;
+                    grabSuccess = grabbed
+                            && m_capture.retrieve(capturedFrame)
+                            && !capturedFrame.empty();
+                } catch (const cv::Exception &exception) {
+                    qWarning() << "[CameraFrameProvider] OpenCV exception in worker:"
+                                << exception.what();
                 }
             }
+        }
+
+        if(!m_grabRunning.loadAcquire()
+                ||currentThread->isInterruptionRequested()){
+            break;
         }
 
         if (!grabSuccess) {

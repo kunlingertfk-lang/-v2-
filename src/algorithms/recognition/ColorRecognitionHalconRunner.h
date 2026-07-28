@@ -2,6 +2,7 @@
 #define ALGORITHMS_RECOGNITION_COLORRECOGNITIONHALCONRUNNER_H
 
 #include "toolcore/ToolOverlay.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QByteArray>
 #include <QJsonObject>
@@ -54,6 +55,7 @@ struct ColorRecognitionHalconConfig
     bool enablePositionCorrection = false;
     QString positionCorrectionSourceId;
     QString positionCorrectionSource;
+    PositionCorrectionContext positionCorrection;
     QString pixelFormat;
     int validBits = -1;
     int bitShift = -1;
@@ -179,6 +181,7 @@ struct ColorRecognitionGmmRunConfig
     bool enablePositionCorrection = false;
     QString positionCorrectionSourceId;
     QString positionCorrectionSource;
+    PositionCorrectionContext positionCorrection;
     QString pixelFormat;
     int validBits = -1;
     int bitShift = -1;

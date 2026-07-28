@@ -122,6 +122,15 @@ int main(int argc, char **argv)
           "width/height filters apply",
           &failures);
 
+    AiDetectionConfig sortConfig;
+    sortConfig.sortMode = QStringLiteral("按X坐标从小到大排序");
+    const AiDetectionFilterResult sorted =
+            AiDetectionRunner::applyFilters(multi, sortConfig);
+    check(sorted.detections.size() == 2
+          && sorted.detections.first().className == QStringLiteral("black"),
+          "supported sort mode is applied",
+          &failures);
+
     AiDetectionConfig judgeConfig;
     judgeConfig.judgeMode = QStringLiteral("count");
     judgeConfig.minCount = 1;
@@ -140,6 +149,22 @@ int main(int argc, char **argv)
     sshFailureConfig.localTempRoot = QStringLiteral("/tmp/v2_ai_bridge_smoke");
     cv::Mat tinyImage(8, 8, CV_8UC3, cv::Scalar(0, 0, 0));
     AiDetectionRunner runner;
+    AiDetectionConfig angleConfig;
+    angleConfig.angleFilterEnabled = true;
+    const AiDetectionRunnerResult angleResult =
+            runner.run(tinyImage, angleConfig);
+    check(angleResult.status == QStringLiteral("unsupported_angle_filter"),
+          "unsupported angle filter fails explicitly",
+          &failures);
+
+    AiDetectionConfig regionConfig;
+    regionConfig.detectRegionType = QStringLiteral("freehand");
+    const AiDetectionRunnerResult regionResult =
+            runner.run(tinyImage, regionConfig);
+    check(regionResult.status == QStringLiteral("unsupported_detect_roi"),
+          "unsupported detect ROI fails explicitly",
+          &failures);
+
     const AiDetectionRunnerResult sshFailureResult = runner.run(tinyImage, sshFailureConfig);
     check(!sshFailureResult.success && !sshFailureResult.message.trimmed().isEmpty(),
           "SSH failure returns error without crashing",
@@ -148,6 +173,25 @@ int main(int argc, char **argv)
     AiDetectionAdapter adapter;
     check(adapter.supports(ToolType::AiDetection), "ToolType::AiDetection adapter support", &failures);
     check(!adapter.supports(ToolType::Ocr), "AiDetectionAdapter rejects Ocr", &failures);
+    ToolRequest unsupportedModelRequest;
+    unsupportedModelRequest.image = tinyImage;
+    unsupportedModelRequest.config.toolType = ToolType::AiDetection;
+    unsupportedModelRequest.config.params.insert(
+                QStringLiteral("modelName"), QStringLiteral("not-supported"));
+    check(adapter.run(unsupportedModelRequest).status
+          == QStringLiteral("unsupported_model"),
+          "unsupported model is not silently replaced",
+          &failures);
+
+    ToolRequest unsupportedNmsRequest;
+    unsupportedNmsRequest.image = tinyImage;
+    unsupportedNmsRequest.config.toolType = ToolType::AiDetection;
+    unsupportedNmsRequest.config.params.insert(
+                QStringLiteral("nmsIouThreshold"), 0.2);
+    check(adapter.run(unsupportedNmsRequest).status
+          == QStringLiteral("unsupported_nms_threshold"),
+          "unsupported NMS threshold is not silently ignored",
+          &failures);
 
     check(QFileInfo::exists(QStringLiteral("ui/ObjectDetectionDialog.ui")),
           "ObjectDetectionDialog.ui still exists",

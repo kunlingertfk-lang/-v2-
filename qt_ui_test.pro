@@ -35,6 +35,7 @@ SOURCES += \
     src/CameraParamsDialog.cpp \
     src/ReferenceImageDialog.cpp \
     src/PositionCorrectionDialog.cpp \
+    src/PositionCorrectionDialogTestHelper.cpp \
     src/TemplateLocationDialog.cpp \
     src/ToolLibraryDialog.cpp \
     src/CharacterRecognitionDialog.cpp \
@@ -86,6 +87,8 @@ SOURCES += \
     src/algorithms/recognition/ColorComparisonModel.cpp \
     src/algorithms/recognition/ColorComparisonHalconRunner.cpp \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
+    src/algorithms/recognition/RegisteredClassificationEmbeddingModelProvider.cpp \
+    src/algorithms/recognition/RegisteredClassificationDlCapability.cpp \
     src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
     src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
@@ -114,6 +117,7 @@ HEADERS += \
     src/CameraParamsDialog.h \
     src/ReferenceImageDialog.h \
     src/PositionCorrectionDialog.h \
+    src/PositionCorrectionDialogTestHelper.h \
     src/TemplateLocationDialog.h \
     src/ToolLibraryDialog.h \
     src/CharacterRecognitionDialog.h \
@@ -172,6 +176,8 @@ HEADERS += \
     src/algorithms/recognition/ColorComparisonModel.h \
     src/algorithms/recognition/ColorComparisonHalconRunner.h \
     src/algorithms/recognition/RegisteredClassificationFeatureSpace.h \
+    src/algorithms/recognition/RegisteredClassificationEmbeddingModelProvider.h \
+    src/algorithms/recognition/RegisteredClassificationDlCapability.h \
     src/algorithms/recognition/RegisteredClassificationModelPackage.h \
     src/algorithms/recognition/RegisteredClassificationTrainingSession.h \
     src/algorithms/recognition/RegisteredClassificationFeatureExtractor.h \

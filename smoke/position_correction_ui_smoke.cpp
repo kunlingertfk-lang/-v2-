@@ -83,7 +83,7 @@ int main(int argc, char **argv)
     QVector<PositionReferencePoseProducer> referenceProducers{
         PositionReferencePoseProducer{
             PositionCorrection::defaultSourceId(),
-            QStringLiteral("1 基准图"),
+            QStringLiteral("0 基准图"),
             referenceConfig.referencePose,
             PositionCorrection::referenceToJson(referenceConfig)}
     };
@@ -111,9 +111,14 @@ int main(int argc, char **argv)
     check(outputCorrection.value(QStringLiteral("runPointX")).toObject()
                   .value(QStringLiteral("displayPath")).toString().contains(QStringLiteral("运行点X")),
           "dialog must display run pose semantics for X");
-    check(outputCorrection.value(QStringLiteral("templateRegionType")).toString()
-                  == QStringLiteral("polygon"),
-          "dialog must round trip template region type");
+    check(!outputCorrection.contains(QStringLiteral("templateRegionType"))
+          && !outputCorrection.contains(QStringLiteral("templateRoiNormalized"))
+          && !outputCorrection.contains(QStringLiteral("templatePolygonNormalized")),
+          "tool position correction must migrate away legacy template ROI fields");
+    check(dialog.findChild<QFrame *>(QStringLiteral("templateCard")) == nullptr
+          && dialog.findChild<QPushButton *>(QStringLiteral("rectTemplateButton")) == nullptr
+          && dialog.findChild<QPushButton *>(QStringLiteral("polygonTemplateButton")) == nullptr,
+          "tool position correction must not expose a private template ROI card");
     check(dialog.findChild<QLineEdit *>(QStringLiteral("runPointXEdit")) != nullptr,
           "dialog must expose run X field");
     check(dialog.findChild<QPushButton *>(QStringLiteral("testRunButton")) != nullptr,
@@ -133,7 +138,7 @@ int main(int argc, char **argv)
     QAction *referenceNodeAction = nullptr;
     if (xLinkButton && xLinkButton->menu()) {
         for (QAction *action : xLinkButton->menu()->actions()) {
-            if (action->text() == QStringLiteral("1 基准图")) {
+            if (action->text() == QStringLiteral("0 基准图")) {
                 referenceNodeAction = action;
                 break;
             }
