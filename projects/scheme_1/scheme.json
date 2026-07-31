@@ -93546,7 +93546,7 @@
         "originalChannels": 3,
         "originalDepth": 8,
         "pixelFormat": "BGR8",
-        "source": "file",
+        "source": "reference",
         "validBits": 8
     },
     "referencePositionCorrection": {
@@ -93554,16 +93554,13 @@
             "x": 0.5,
             "y": 0.5
         },
-        "elapsedMs": 351,
-        "enabled": true,
-        "message": "基准图已更新，请重新确认模板区域和定位点",
-        "modelCacheKey": "reference.positionCorrection.private_template",
-        "originMode": "custom",
+        "elapsedMs": 0,
+        "enabled": false,
+        "originMode": "centroid",
         "referenceCreated": false,
         "referencePose": {
         },
-        "score": 0.9995255621212777,
-        "status": "reference_image_changed",
+        "score": 0,
         "templateMaskCircleCenterNormalized": {
             "x": 0,
             "y": 0
@@ -93582,10 +93579,10 @@
         ],
         "templateRegionType": "rectangle",
         "templateRoiNormalized": {
-            "height": 0.08079268292682928,
-            "width": 0.30640243902439024,
-            "x": 0.22789634146341467,
-            "y": 0.2682926829268293
+            "height": 0,
+            "width": 0,
+            "x": 0,
+            "y": 0
         },
         "version": 1
     },
@@ -93855,46 +93852,6 @@
             "toolType": "ColorRecognition"
         },
         {
-            "category": "Location",
-            "displayName": "位置修正",
-            "enabled": true,
-            "judgeRule": {
-            },
-            "params": {
-                "positionCorrection": {
-                    "referenceCreated": false,
-                    "runAngle": {
-                        "displayPath": "1 基准图.基准角度",
-                        "outputKey": "angle",
-                        "producerId": "reference.positionCorrection"
-                    },
-                    "runPointX": {
-                        "displayPath": "1 基准图.匹配点X",
-                        "outputKey": "x",
-                        "producerId": "reference.positionCorrection"
-                    },
-                    "runPointY": {
-                        "displayPath": "1 基准图.基准点坐标Y",
-                        "outputKey": "y",
-                        "producerId": "reference.positionCorrection"
-                    },
-                    "templateRegionType": "rectangle",
-                    "version": 1
-                }
-            },
-            "roiNormalized": {
-                "height": 0,
-                "width": 0,
-                "x": 0,
-                "y": 0
-            },
-            "schemaVersion": 1,
-            "summary": "位置修正后端尚未实现",
-            "toolId": "1b143a5c-3d0d-41c0-8e2c-5fcdf4eb2995",
-            "toolName": "位置修正",
-            "toolType": "PositionCorrection"
-        },
-        {
             "category": "Presence",
             "displayName": "直线有无",
             "enabled": true,
@@ -93938,5 +93895,5 @@
             "toolType": "LinePresence"
         }
     ],
-    "updatedAt": "2026-07-28T10:58:30"
+    "updatedAt": "2026-07-31T14:38:46"
 }
