@@ -48,6 +48,8 @@ public:
     void setSessionInfo(const QString &deviceName, const QString &userName);
     void setSchemeTools(const QVector<ToolConfig> &configs,
                         const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
+    void applySavedSchemeTools(const QVector<ToolConfig> &configs,
+                               const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
     void updateSchemeToolsFromToolsDialog(const QVector<ToolConfig> &configs,
                                           const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
 

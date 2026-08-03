@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QMap>
+#include <QStringList>
 #include <QVector>
 
 #include "toolcore/ToolConfig.h"
@@ -50,6 +51,9 @@ private slots:
     void editCurrentSchemeName();
     void saveCurrentScheme();
     void saveCurrentSchemeAs();
+    void copySelectedTool();
+    void deleteSelectedTool();
+    void deleteAllTools();
 
 private:
     void setupUiState();
@@ -67,6 +71,8 @@ private:
                               bool keepExistingWhenInvalid);
     void refreshToolList();
     void clearToolList();
+    void updateToolbarActionState();
+    QStringList dependentToolsFor(int producerIndex) const;
     QFrame *createToolCard(const ToolConfig &config, int index);
     void selectTool(int index);
     void updateToolCardSelection();

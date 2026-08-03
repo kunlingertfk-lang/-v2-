@@ -200,6 +200,12 @@ bool OutputDialog::commitOutputStateToScheme(bool saveToDisk)
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
         return false;
     }
+    if (saveToDisk) {
+        if (MainWindow *mainWindow = sourceMainWindow()) {
+            mainWindow->applySavedSchemeTools(m_schemeToolConfigs,
+                                              m_referencePreviewSnapshots);
+        }
+    }
 
     refreshSchemeHeader();
     return true;
@@ -321,7 +327,8 @@ void OutputDialog::returnToSourceMainWindow()
              << "mainWindow=" << mainWindow
              << "sourceMainWindowValid=" << !m_sourceMainWindow.isNull();
 
-    mainWindow->setSchemeTools(m_schemeToolConfigs, m_referencePreviewSnapshots);
+    mainWindow->applySavedSchemeTools(m_schemeToolConfigs,
+                                      m_referencePreviewSnapshots);
     PlanDialogUtils::showWindowFromWidget(this, mainWindow);
     close();
 }

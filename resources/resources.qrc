@@ -10,6 +10,7 @@
         <file alias="icons/compare.svg">icons/compare.svg</file>
         <file alias="icons/device.svg">icons/device.svg</file>
         <file alias="icons/delete-outline.svg">icons/delete-outline.svg</file>
+        <file alias="icons/delete-all-tools.svg">icons/delete-all-tools.svg</file>
         <file alias="icons/eye.svg">icons/eye.svg</file>
         <file alias="icons/external-link.svg">icons/external-link.svg</file>
         <file alias="icons/export-output.svg">icons/export-output.svg</file>

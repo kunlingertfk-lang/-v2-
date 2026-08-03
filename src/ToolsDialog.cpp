@@ -1,5 +1,7 @@
 #include "ToolsDialog.h"
 
+#include <algorithm>
+
 #include <QDebug>
 #include <QColor>
 #include <QComboBox>
@@ -9,6 +11,7 @@
 #include <QIcon>
 #include <QImage>
 #include <QInputDialog>
+#include <QJsonArray>
 #include <QLabel>
 #include <QLayoutItem>
 #include <QLineEdit>
@@ -21,6 +24,7 @@
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
+#include <QUuid>
 #include <QVariant>
 #include <QVBoxLayout>
 
@@ -108,6 +112,39 @@ QJsonObject writeSourceId(QJsonObject object,
             it.value() = writeSourceId(it.value().toObject(), sourceId, sourceText);
     }
     return object;
+}
+
+bool containsToolReference(const QJsonValue &value, const QString &toolId)
+{
+    if (value.isArray()) {
+        const QJsonArray array = value.toArray();
+        for (const QJsonValue &entry : array) {
+            if (containsToolReference(entry, toolId))
+                return true;
+        }
+        return false;
+    }
+
+    if (!value.isObject())
+        return false;
+
+    const QJsonObject object = value.toObject();
+    static const QStringList referenceKeys = {
+        QStringLiteral("positionCorrectionSourceId"),
+        QStringLiteral("producerId"),
+        QStringLiteral("referencePoseSourceId")
+    };
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        if (referenceKeys.contains(it.key())
+                && it.value().toString().trimmed() == toolId) {
+            return true;
+        }
+        if ((it.value().isObject() || it.value().isArray())
+                && containsToolReference(it.value(), toolId)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void configurePositionSourceCombos(QWidget *dialog,
@@ -511,6 +548,9 @@ void ToolsDialog::setupUiState()
 void ToolsDialog::connectNavigation()
 {
     connect(ui->addToolButton, &QToolButton::clicked, this, &ToolsDialog::openToolLibrary);
+    connect(ui->copyToolButton, &QToolButton::clicked, this, &ToolsDialog::copySelectedTool);
+    connect(ui->deleteToolButton, &QToolButton::clicked, this, &ToolsDialog::deleteSelectedTool);
+    connect(ui->deleteAllToolsButton, &QToolButton::clicked, this, &ToolsDialog::deleteAllTools);
     connect(ui->cameraStepButton, &QToolButton::clicked, this, &ToolsDialog::openCameraParamsDialog);
     connect(ui->referenceStepButton, &QToolButton::clicked, this, &ToolsDialog::openReferenceImageDialog);
     connect(ui->outputStepButton, &QToolButton::clicked, this, &ToolsDialog::openOutputDialog);
@@ -541,6 +581,12 @@ bool ToolsDialog::commitToolStateToScheme(bool saveToDisk)
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
         return false;
     }
+    if (saveToDisk) {
+        if (MainWindow *mainWindow = qobject_cast<MainWindow *>(parentWidget())) {
+            mainWindow->applySavedSchemeTools(m_toolConfigs,
+                                              m_toolPreviewSnapshots);
+        }
+    }
 
     refreshSchemeHeader();
     return true;
@@ -554,11 +600,122 @@ void ToolsDialog::restoreToolState(
     m_toolConfigs = configs;
     m_toolPreviewSnapshots = snapshots;
     m_selectedToolIndex = selectedIndex;
+    SchemeStore::instance().setToolConfigs(m_toolConfigs, m_toolPreviewSnapshots);
     refreshToolList();
     if (m_selectedToolIndex >= 0 && m_selectedToolIndex < m_toolConfigs.size())
         selectTool(m_selectedToolIndex);
     else
         refreshReferencePreview();
+}
+
+void ToolsDialog::copySelectedTool()
+{
+    if (m_selectedToolIndex < 0 || m_selectedToolIndex >= m_toolConfigs.size())
+        return;
+
+    const QVector<ToolConfig> configsBefore = m_toolConfigs;
+    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore = m_toolPreviewSnapshots;
+    const int selectedIndexBefore = m_selectedToolIndex;
+    const ToolConfig &sourceConfig = m_toolConfigs.at(m_selectedToolIndex);
+
+    ToolConfig copiedConfig = sourceConfig;
+    do {
+        copiedConfig.toolId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    } while (std::any_of(m_toolConfigs.cbegin(), m_toolConfigs.cend(),
+                         [&copiedConfig](const ToolConfig &config) {
+        return config.toolId == copiedConfig.toolId;
+    }));
+
+    const int copiedIndex = m_selectedToolIndex + 1;
+    m_toolConfigs.insert(copiedIndex, copiedConfig);
+    const ToolPreviewSnapshot sourceSnapshot =
+            m_toolPreviewSnapshots.value(sourceConfig.toolId);
+    if (sourceSnapshot.valid) {
+        ToolPreviewSnapshot copiedSnapshot = sourceSnapshot;
+        copiedSnapshot.toolId = copiedConfig.toolId;
+        copiedSnapshot.toolType = copiedConfig.toolType;
+        copiedSnapshot.result.toolId = copiedConfig.toolId;
+        m_toolPreviewSnapshots.insert(copiedConfig.toolId, copiedSnapshot);
+    }
+
+    m_selectedToolIndex = copiedIndex;
+    refreshToolList();
+    selectTool(copiedIndex);
+    if (!commitToolStateToScheme(true))
+        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
+}
+
+void ToolsDialog::deleteSelectedTool()
+{
+    if (m_selectedToolIndex < 0 || m_selectedToolIndex >= m_toolConfigs.size())
+        return;
+
+    const QStringList dependents = dependentToolsFor(m_selectedToolIndex);
+    if (!dependents.isEmpty()) {
+        QMessageBox::warning(this,
+                             tr("无法删除工具"),
+                             tr("当前工具正被以下后续工具引用：\n%1\n\n"
+                                "请先修改这些工具的位置修正或输入绑定。")
+                             .arg(dependents.join(QLatin1Char('\n'))));
+        return;
+    }
+
+    const ToolConfig selectedConfig = m_toolConfigs.at(m_selectedToolIndex);
+    const QString selectedName = toolDisplayName(selectedConfig).trimmed().isEmpty()
+            ? tr("未命名工具") : toolDisplayName(selectedConfig);
+    const QMessageBox::StandardButton answer = QMessageBox::question(
+                this,
+                tr("删除工具"),
+                tr("确认删除选中的“%1”工具？\n删除后将立即保存到当前方案。")
+                .arg(selectedName),
+                QMessageBox::Yes | QMessageBox::No,
+                QMessageBox::No);
+    if (answer != QMessageBox::Yes)
+        return;
+
+    const QVector<ToolConfig> configsBefore = m_toolConfigs;
+    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore = m_toolPreviewSnapshots;
+    const int selectedIndexBefore = m_selectedToolIndex;
+    const int removedIndex = m_selectedToolIndex;
+    m_toolConfigs.removeAt(removedIndex);
+    m_toolPreviewSnapshots.remove(selectedConfig.toolId);
+    m_selectedToolIndex = m_toolConfigs.isEmpty()
+            ? -1 : qMin(removedIndex, m_toolConfigs.size() - 1);
+    refreshToolList();
+    if (m_selectedToolIndex >= 0)
+        selectTool(m_selectedToolIndex);
+    else
+        refreshReferencePreview();
+    if (!commitToolStateToScheme(true))
+        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
+}
+
+void ToolsDialog::deleteAllTools()
+{
+    if (m_toolConfigs.isEmpty())
+        return;
+
+    const QMessageBox::StandardButton answer = QMessageBox::question(
+                this,
+                tr("删除所有工具"),
+                tr("确认删除当前方案中的全部 %1 个工具？\n"
+                   "删除后将立即保存且无法撤销。")
+                .arg(m_toolConfigs.size()),
+                QMessageBox::Yes | QMessageBox::No,
+                QMessageBox::No);
+    if (answer != QMessageBox::Yes)
+        return;
+
+    const QVector<ToolConfig> configsBefore = m_toolConfigs;
+    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore = m_toolPreviewSnapshots;
+    const int selectedIndexBefore = m_selectedToolIndex;
+    m_toolConfigs.clear();
+    m_toolPreviewSnapshots.clear();
+    m_selectedToolIndex = -1;
+    refreshToolList();
+    refreshReferencePreview();
+    if (!commitToolStateToScheme(true))
+        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
 }
 
 void ToolsDialog::editCurrentSchemeName()
@@ -904,6 +1061,7 @@ void ToolsDialog::refreshToolList()
     ui->verticalLayout_toolsList->addStretch(1);
     updateToolCardSelection();
     m_toolSerial = m_toolConfigs.size();
+    updateToolbarActionState();
 }
 
 void ToolsDialog::clearToolList()
@@ -914,6 +1072,36 @@ void ToolsDialog::clearToolList()
         delete item;
     }
     m_toolCards.clear();
+}
+
+void ToolsDialog::updateToolbarActionState()
+{
+    const bool hasSelection = m_selectedToolIndex >= 0
+            && m_selectedToolIndex < m_toolConfigs.size();
+    ui->copyToolButton->setEnabled(hasSelection);
+    ui->deleteToolButton->setEnabled(hasSelection);
+    ui->deleteAllToolsButton->setEnabled(!m_toolConfigs.isEmpty());
+}
+
+QStringList ToolsDialog::dependentToolsFor(int producerIndex) const
+{
+    QStringList dependents;
+    if (producerIndex < 0 || producerIndex >= m_toolConfigs.size())
+        return dependents;
+
+    const QString producerId = m_toolConfigs.at(producerIndex).toolId.trimmed();
+    if (producerId.isEmpty())
+        return dependents;
+
+    for (int index = producerIndex + 1; index < m_toolConfigs.size(); ++index) {
+        const ToolConfig &candidate = m_toolConfigs.at(index);
+        if (!containsToolReference(candidate.params, producerId))
+            continue;
+        const QString name = toolDisplayName(candidate).trimmed().isEmpty()
+                ? tr("未命名工具") : toolDisplayName(candidate);
+        dependents.append(tr("#%1 %2").arg(index + 1).arg(name));
+    }
+    return dependents;
 }
 
 QFrame *ToolsDialog::createToolCard(const ToolConfig &config, int index)

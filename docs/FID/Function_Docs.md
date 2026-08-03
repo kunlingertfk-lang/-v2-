@@ -4,6 +4,7 @@
 
 ## 功能文档索引
 
+- 工具列表管理：`docs/FID/ToolManagement/工具列表操作实施规划.md`
 - 相机/坐标系标定：`docs/FID/Calibration/标定SOP.md`
 - 颜色识别：`docs/FID/ColorRecognition/颜色识别提示词规范.md`、`docs/FID/ColorRecognition/color_recognition_function_implementation.md`、`docs/FID/ColorRecognition/颜色识别算法V2整理设计.md`
 - 颜色比较：`docs/FID/ColorComparison/颜色比较V2设计说明.md`、`docs/FID/ColorComparison/颜色比较V2提示词规范.md`、`docs/FID/ColorComparison/color_comparison_function_implementation.md`（V1 历史提示词仅供追溯）

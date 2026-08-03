@@ -472,6 +472,14 @@ void MainWindow::setSessionInfo(const QString &deviceName, const QString &userNa
 void MainWindow::setSchemeTools(const QVector<ToolConfig> &configs,
                                 const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots)
 {
+    applySavedSchemeTools(configs, referenceSnapshots);
+    persistCurrentSchemeState(QStringLiteral("setSchemeTools"));
+}
+
+void MainWindow::applySavedSchemeTools(
+        const QVector<ToolConfig> &configs,
+        const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots)
+{
     m_schemeToolConfigs = configs;
     m_referencePreviewSnapshots.clear();
 
@@ -494,8 +502,7 @@ void MainWindow::setSchemeTools(const QVector<ToolConfig> &configs,
     else
         refreshLivePreview();
 
-    persistCurrentSchemeState(QStringLiteral("setSchemeTools"));
-    qDebug() << "[MainWindow] 当前方案工具链数量:" << m_schemeToolConfigs.size();
+    qDebug() << "[MainWindow] 已应用方案工具链，数量:" << m_schemeToolConfigs.size();
 }
 
 void MainWindow::updateSchemeToolsFromToolsDialog(const QVector<ToolConfig> &configs,

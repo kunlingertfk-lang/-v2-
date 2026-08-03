@@ -500,6 +500,9 @@
            </item>
            <item>
             <widget class="QToolButton" name="copyToolButton">
+             <property name="toolTip">
+              <string>复制工具</string>
+             </property>
              <property name="icon">
               <iconset resource="../resources/resources.qrc">
                <normaloff>:/icons/copy.svg</normaloff>:/icons/copy.svg</iconset>
@@ -517,6 +520,9 @@
            </item>
            <item>
             <widget class="QToolButton" name="deleteToolButton">
+             <property name="toolTip">
+              <string>删除选中工具</string>
+             </property>
              <property name="icon">
               <iconset resource="../resources/resources.qrc">
                <normaloff>:/icons/delete-outline.svg</normaloff>:/icons/delete-outline.svg</iconset>
@@ -533,10 +539,13 @@
             </widget>
            </item>
            <item>
-            <widget class="QToolButton" name="settingsToolButton">
+            <widget class="QToolButton" name="deleteAllToolsButton">
+             <property name="toolTip">
+              <string>删除所有工具</string>
+             </property>
              <property name="icon">
               <iconset resource="../resources/resources.qrc">
-               <normaloff>:/icons/tool-step.svg</normaloff>:/icons/tool-step.svg</iconset>
+               <normaloff>:/icons/delete-all-tools.svg</normaloff>:/icons/delete-all-tools.svg</iconset>
              </property>
              <property name="iconSize">
               <size>
