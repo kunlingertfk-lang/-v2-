@@ -21,6 +21,7 @@ SOURCES += \
     ../src/ColorTemplateDialog.cpp \
     ../src/frame/CameraFrameProvider.cpp \
     ../src/frame/FrameInputMetadata.cpp \
+    ../src/frame/FramePixelProbe.cpp \
     ../src/frame/FrameViewHelper.cpp \
     ../src/frame/MatImageConverter.cpp \
     ../src/frame/ReferenceImageProvider.cpp \
@@ -35,6 +36,7 @@ SOURCES += \
 HEADERS += \
     ../src/ColorTemplateDialog.h \
     ../src/frame/CameraFrameProvider.h \
+    ../src/frame/FramePixelProbe.h \
     ../src/frame/FrameViewHelper.h \
     ../src/frame/ReferenceImageProvider.h
 

@@ -15,8 +15,10 @@ system(mkdir -p $$DESTDIR $$OBJECTS_DIR $$MOC_DIR $$RCC_DIR $$UI_DIR)
 INCLUDEPATH += ../src
 SOURCES += \
     frame_view_helper_roi_edit_smoke.cpp \
+    ../src/frame/FramePixelProbe.cpp \
     ../src/frame/FrameViewHelper.cpp
 HEADERS += \
+    ../src/frame/FramePixelProbe.h \
     ../src/frame/FrameViewHelper.h \
     ../src/frame/RoiGeometry.h \
     ../src/frame/RoiEditorController.h \

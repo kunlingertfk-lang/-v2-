@@ -727,12 +727,18 @@ void ColorTemplateDialog::buildUi()
     m_statusLabel->setMinimumHeight(28);
     m_statusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     m_statusLabel->setWordWrap(false);
+    QLabel *viewerCursorLabel = new QLabel;
+    viewerCursorLabel->setObjectName(QStringLiteral("viewerCursorLabel"));
+    viewerCursorLabel->setMinimumHeight(28);
+    viewerCursorLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     previewLayout->addWidget(m_viewerTitleLabel);
     previewLayout->addWidget(m_previewGraphicsView, 1);
     previewLayout->addWidget(m_statusLabel);
+    previewLayout->addWidget(viewerCursorLabel);
     content->addWidget(previewPanel, 1);
 
     m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(viewerCursorLabel);
     m_previewHelper->setNavigationEnabled(true);
     m_previewGraphicsView->setBackgroundBrush(QBrush(QColor(255, 255, 255)));
 }

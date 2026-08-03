@@ -557,12 +557,17 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QAbstractItemView::item{min-height:34px;padding:6px 10px;background:#2d333f;color:#ffffff;}"
         "QAbstractItemView::item:hover,QAbstractItemView::item:selected{background:#0ea5e9;color:#ffffff;}"));
     QLabel *imageStatusLabel = new QLabel(tr("图像 0 / 标注 0 / 类别 1"), statusBar);
+    QLabel *pixelLabel = new QLabel(statusBar);
+    pixelLabel->setObjectName(QStringLiteral("registeredTrainingPixelLabel"));
     statusLayout->addWidget(filterCombo);
     statusLayout->addSpacing(18);
     statusLayout->addWidget(imageStatusLabel);
     statusLayout->addStretch(1);
+    statusLayout->addWidget(pixelLabel);
+    statusLayout->addSpacing(18);
     QLabel *editStatusLabel = new QLabel(tr("请添加注册图并标注至少两个类别样本"), statusBar);
     statusLayout->addWidget(editStatusLabel);
+    previewHelper->bindPixelStatusLabel(pixelLabel);
     previewLayout->addWidget(statusBar);
 
     QListWidget *thumbnailList = new QListWidget(previewPanel);

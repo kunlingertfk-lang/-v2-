@@ -13,6 +13,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsSimpleTextItem>
 #include <QGraphicsView>
+#include <QLabel>
 #include <QLineF>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -25,6 +26,7 @@
 #include <QResizeEvent>
 #include <QSizePolicy>
 #include <QtGlobal>
+#include <QtMath>
 #include <QWidget>
 #include <QFont>
 #include <QWheelEvent>
@@ -353,6 +355,7 @@ void FrameViewHelper::clear()
 {
     endPan();
     m_lastImage = QImage();
+    publishCursorPixel(FramePixelSample());
     clearToolOverlays();
     clearDraftRoiItem();
     clearRoiHandleItems();
@@ -480,6 +483,18 @@ QRectF FrameViewHelper::normalizedToImageRect(const QRectF &normalized) const
 QSize FrameViewHelper::imageSize() const
 {
     return m_lastImage.size();
+}
+
+void FrameViewHelper::bindPixelStatusLabel(QLabel *label)
+{
+    if (!label)
+        return;
+
+    label->setText(FramePixelProbe::displayText(m_lastPixelSample));
+    connect(this, &FrameViewHelper::cursorPixelChanged,
+            label, [label](const FramePixelSample &sample) {
+        label->setText(FramePixelProbe::displayText(sample));
+    });
 }
 
 void FrameViewHelper::setRoiDrawingEnabled(bool enabled)
@@ -1089,6 +1104,15 @@ void FrameViewHelper::endPan()
 
 bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
 {
+    if (m_view && obj == m_view->viewport()) {
+        if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            updateCursorPixel(mouseEvent->pos());
+        } else if (event->type() == QEvent::Leave) {
+            publishCursorPixel(FramePixelSample());
+        }
+    }
+
     if (m_view && obj == m_view->viewport() && event->type() == QEvent::Resize) {
         if (m_isFitToView) {
             fitToView();
@@ -1707,6 +1731,35 @@ bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
     }
 
     return QObject::eventFilter(obj, event);
+}
+
+void FrameViewHelper::updateCursorPixel(const QPoint &viewPosition)
+{
+    if (!m_view || m_lastImage.isNull()) {
+        publishCursorPixel(FramePixelSample());
+        return;
+    }
+
+    const QPointF scenePoint = m_view->mapToScene(viewPosition);
+    if (!finitePoint(scenePoint)
+            || scenePoint.x() < 0.0 || scenePoint.x() >= m_lastImage.width()
+            || scenePoint.y() < 0.0 || scenePoint.y() >= m_lastImage.height()) {
+        publishCursorPixel(FramePixelSample());
+        return;
+    }
+
+    publishCursorPixel(FramePixelProbe::sample(
+                           m_lastImage,
+                           QPoint(qFloor(scenePoint.x()), qFloor(scenePoint.y()))));
+}
+
+void FrameViewHelper::publishCursorPixel(const FramePixelSample &sample)
+{
+    if (FramePixelProbe::equal(m_lastPixelSample, sample))
+        return;
+
+    m_lastPixelSample = sample;
+    emit cursorPixelChanged(m_lastPixelSample);
 }
 
 bool FrameViewHelper::viewPosToImagePoint(const QPoint &viewPos, QPointF *imagePoint) const

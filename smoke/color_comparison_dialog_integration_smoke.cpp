@@ -152,6 +152,12 @@ int main(int argc, char **argv)
           "dialog must construct its FrameViewHelper");
     check(dialog.m_previewHelper && dialog.m_previewHelper->navigationEnabled(),
           "ColorComparisonDialog must explicitly opt in to image navigation");
+    QLabel *cursorLabel = dialog.findChild<QLabel *>(QStringLiteral("viewerCursorLabel"));
+    check(cursorLabel != nullptr,
+          "ColorComparisonDialog must expose the shared cursor pixel label");
+    check(cursorLabel
+          && cursorLabel->palette().color(QPalette::WindowText) == QColor(QStringLiteral("#f8fafc")),
+          "cursor pixel label must remain visible on the dark viewer status area");
     check(dialog.m_pcImportButton != nullptr
           && dialog.m_pcImportButton->objectName()
                  == QStringLiteral("colorComparisonPcImportButton")

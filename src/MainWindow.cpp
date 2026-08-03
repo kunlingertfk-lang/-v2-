@@ -407,6 +407,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolEngine.registerAdapter(&m_templateLocationAdapter);
     m_toolEngine.registerAdapter(&m_positionCorrectionAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->cursorLabel);
     m_toolChainWatcher = new QFutureWatcher<ToolChainRunOutput>(this);
     setupUiState();
     setupSchemeSelector();

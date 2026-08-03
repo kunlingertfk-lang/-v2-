@@ -55,6 +55,7 @@ void CameraParamsDialog::setupCameraUI()
 {
     if (!m_previewHelper) {
         m_previewHelper = new FrameViewHelper(ui->camera_1, this);
+        m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     }
 
     ui->viewerTitleLabel->setText(tr("相机图像"));
@@ -67,6 +68,7 @@ void CameraParamsDialog::setupCameraErrorUI()
 {
     if (!m_previewHelper) {
         m_previewHelper = new FrameViewHelper(ui->camera_1, this);
+        m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     }
 
     m_previewHelper->clear();

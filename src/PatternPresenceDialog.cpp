@@ -237,6 +237,7 @@ PatternPresenceDialog::PatternPresenceDialog(QWidget *parent)
     m_continuousTimer->setInterval(500);
     connect(m_continuousTimer, &QTimer::timeout, this, &PatternPresenceDialog::runContinuousTick);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     connectControls();
     setUiMode(PresenceUiMode::Edit);

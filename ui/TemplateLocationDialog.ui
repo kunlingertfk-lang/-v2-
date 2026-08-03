@@ -968,7 +968,7 @@
             </widget>
            </item>
            <item>
-            <spacer name="resultSpacer">
+           <spacer name="resultSpacer">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>
              </property>
@@ -979,6 +979,13 @@
               </size>
              </property>
             </spacer>
+           </item>
+           <item>
+            <widget class="QLabel" name="viewerCursorLabel">
+             <property name="text">
+              <string>X: --  Y: --  |  R: --  G: --  B: --</string>
+             </property>
+            </widget>
            </item>
            <item>
             <widget class="QLabel" name="elapsedLabel">

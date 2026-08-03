@@ -1049,12 +1049,19 @@ void RegisteredClassificationDialog::buildUi()
     m_viewerStatusLabel = new QLabel(rightPanel);
     m_viewerStatusLabel->setMinimumHeight(42);
     m_viewerStatusLabel->setContentsMargins(18, 0, 0, 0);
+    QLabel *viewerCursorLabel = new QLabel(rightPanel);
+    viewerCursorLabel->setObjectName(QStringLiteral("viewerCursorLabel"));
+    viewerCursorLabel->setMinimumHeight(32);
+    viewerCursorLabel->setContentsMargins(18, 0, 18, 0);
+    viewerCursorLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     rightLayout->addWidget(m_viewerTitleLabel);
     rightLayout->addWidget(m_previewGraphicsView, 1);
     rightLayout->addWidget(m_viewerStatusLabel);
+    rightLayout->addWidget(viewerCursorLabel);
     content->addWidget(rightPanel, 1);
 
     m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(viewerCursorLabel);
 
     setStyleSheet(styleSheet() + QStringLiteral(
         "QPushButton,QToolButton,QComboBox,QSpinBox,QLineEdit{background:#ffffff;color:#111827;border:1px solid #cfd6df;border-radius:4px;padding:6px;}"

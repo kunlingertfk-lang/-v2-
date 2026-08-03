@@ -166,6 +166,7 @@ CharacterRecognitionDialog::CharacterRecognitionDialog(QWidget *parent)
     m_continuousTimer->setInterval(500);
     connect(m_continuousTimer, &QTimer::timeout, this, &CharacterRecognitionDialog::runContinuousTick);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     connectControls();
     setUiMode(OcrUiMode::Edit);

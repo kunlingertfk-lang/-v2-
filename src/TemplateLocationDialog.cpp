@@ -161,6 +161,7 @@ TemplateLocationDialog::TemplateLocationDialog(QWidget *parent)
     m_config.enabled = true;
 
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     m_previewHelper->setNavigationEnabled(true);
     m_testEngine.registerAdapter(&m_testAdapter);
     setupUiState();

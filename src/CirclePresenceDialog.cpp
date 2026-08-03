@@ -292,6 +292,7 @@ CirclePresenceDialog::CirclePresenceDialog(QWidget *parent)
     m_testToolEngine.registerAdapter(&m_testPositionCorrectionAdapter);
     m_testToolEngine.registerAdapter(&m_testCirclePresenceAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     connectControls();
     showReferenceImage();

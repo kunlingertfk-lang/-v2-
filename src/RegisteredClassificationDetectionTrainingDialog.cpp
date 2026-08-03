@@ -356,6 +356,7 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
     QLabel *currentLabel = new QLabel(tr("当前：0/0"), statusBar);
     QLabel *markCountLabel = new QLabel(tr("已标注：0"), statusBar);
     QLabel *pixelLabel = new QLabel(tr("X: --  Y: --  |  R: --  G: --  B: --"), statusBar);
+    pixelLabel->setObjectName(QStringLiteral("registeredDetectionTrainingPixelLabel"));
     statusLayout->addWidget(filterCombo);
     statusLayout->addSpacing(18);
     statusLayout->addWidget(currentLabel);
@@ -363,6 +364,7 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
     statusLayout->addWidget(pixelLabel);
     statusLayout->addSpacing(18);
     statusLayout->addWidget(markCountLabel);
+    previewHelper->bindPixelStatusLabel(pixelLabel);
     previewLayout->addWidget(statusBar);
 
     QListWidget *thumbnailList = new QListWidget(previewPanel);

@@ -758,6 +758,7 @@ ColorRecognitionDialog::ColorRecognitionDialog(QWidget *parent)
 {
     ui->setupUi(this);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     m_previewHelper->setNavigationEnabled(true);
     m_testRunTimer = new QTimer(this);
     m_testRunTimer->setInterval(kLiveTestIntervalMs);

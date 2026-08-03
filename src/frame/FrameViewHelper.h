@@ -11,6 +11,7 @@
 
 #include "frame/RoiEditorController.h"
 #include "frame/RoiGeometry.h"
+#include "frame/FramePixelProbe.h"
 #include "toolcore/ToolOverlay.h"
 
 class QEvent;
@@ -22,6 +23,7 @@ class QGraphicsPolygonItem;
 class QGraphicsRectItem;
 class QGraphicsScene;
 class QGraphicsView;
+class QLabel;
 
 class FrameViewHelper : public QObject
 {
@@ -45,6 +47,7 @@ public:
     QRectF imageRectToNormalized(const QRectF &imageRect) const;
     QRectF normalizedToImageRect(const QRectF &normalized) const;
     QSize imageSize() const;
+    void bindPixelStatusLabel(QLabel *label);
 
     void setRoiDrawingEnabled(bool enabled);
     bool isRoiDrawingEnabled() const;
@@ -81,6 +84,7 @@ public:
 
 signals:
     void viewTransformChanged(qreal scale, bool fitToView);
+    void cursorPixelChanged(const FramePixelSample &sample);
     void roiChanged(const QRectF &roiNormalized);
     void roiSelectionRejected(const QRectF &imageRect);
     void polygonChanged(const QVector<QPointF> &pointsNormalized);
@@ -161,6 +165,8 @@ private:
     void addLineBandItems(const LineBandRoi &roi, QVector<QGraphicsItem *> *items, qreal zValue);
     void addOverlayItem(QGraphicsItem *item, qreal zValue = 110.0);
     void restoreImageSceneRect();
+    void updateCursorPixel(const QPoint &viewPosition);
+    void publishCursorPixel(const FramePixelSample &sample);
 
     QGraphicsView *m_view;
     QGraphicsScene *m_scene;
@@ -221,6 +227,7 @@ private:
     QVector<QGraphicsItem *> m_lineBandItems;
     QVector<QGraphicsItem *> m_lineBandDraftItems;
     QGraphicsItem *m_lineBandWidthHandleItem = nullptr;
+    FramePixelSample m_lastPixelSample;
 };
 
 #endif // FRAME_FRAMEVIEWHELPER_H

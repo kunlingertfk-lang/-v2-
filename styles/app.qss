@@ -1810,7 +1810,8 @@ QFrame#colorComparisonRightPanel QGraphicsView {
 }
 
 QDialog#ColorComparisonDialog QLabel#colorComparisonViewerTitleLabel,
-QDialog#ColorComparisonDialog QLabel#colorComparisonStatusLabel {
+QDialog#ColorComparisonDialog QLabel#colorComparisonStatusLabel,
+QDialog#ColorComparisonDialog QLabel#viewerCursorLabel {
     background: #111418;
     color: #f8fafc;
     font-size: 18px;

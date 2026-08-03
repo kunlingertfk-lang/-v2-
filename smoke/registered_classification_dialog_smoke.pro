@@ -36,6 +36,7 @@ SOURCES += \
     ../src/RegisteredClassificationModelManagementDialog.cpp \
     ../src/frame/CameraFrameProvider.cpp \
     ../src/frame/FrameInputMetadata.cpp \
+    ../src/frame/FramePixelProbe.cpp \
     ../src/frame/FrameViewHelper.cpp \
     ../src/frame/MatImageConverter.cpp \
     ../src/frame/ReferenceImageProvider.cpp \
@@ -65,6 +66,7 @@ HEADERS += \
     ../src/PlanDialogUtils.h \
     ../src/frame/CameraFrameProvider.h \
     ../src/frame/FrameInputMetadata.h \
+    ../src/frame/FramePixelProbe.h \
     ../src/frame/FrameViewHelper.h \
     ../src/frame/MatImageConverter.h \
     ../src/frame/ReferenceImageProvider.h \

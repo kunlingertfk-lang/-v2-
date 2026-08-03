@@ -85,6 +85,7 @@ PositionCorrectionDialog::PositionCorrectionDialog(QWidget *parent)
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     connect(ui->closeButton, &QToolButton::clicked, this, &QDialog::reject);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
 
     m_config.toolId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_config.toolType = ToolType::PositionCorrection;

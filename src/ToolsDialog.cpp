@@ -376,6 +376,7 @@ ToolsDialog::ToolsDialog(QWidget *parent)
 {
     ui->setupUi(this);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     connectNavigation();
     connect(&ReferenceImageProvider::instance(),
