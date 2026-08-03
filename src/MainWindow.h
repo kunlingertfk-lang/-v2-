@@ -7,6 +7,7 @@
 #include <QImage>
 #include <QMap>
 #include <QMetaObject>
+#include <QPointer>
 #include <QVector>
 
 #include "toolcore/ToolConfig.h"
@@ -52,6 +53,8 @@ public:
                                const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
     void updateSchemeToolsFromToolsDialog(const QVector<ToolConfig> &configs,
                                           const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
+    void registerActiveSetupWindow(QWidget *window);
+    bool activateActiveSetupWindow();
 
 protected:
     void showEvent(QShowEvent *event) override;
@@ -113,6 +116,7 @@ private:
 
     bool m_isContinuousRunning = false;
     bool m_isToolChainRunning = false;
+    QPointer<QWidget> m_activeSetupWindow;
     QVector<ToolConfig> m_schemeToolConfigs;
     QMap<QString, ToolPreviewSnapshot> m_referencePreviewSnapshots;
     QMap<QString, ToolPreviewSnapshot> m_lastRunSnapshots;

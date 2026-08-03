@@ -562,12 +562,40 @@ void MainWindow::clearSummary()
     ui->runtimeValueLabel->setText(QStringLiteral("0s"));
 }
 
+void MainWindow::registerActiveSetupWindow(QWidget *window)
+{
+    m_activeSetupWindow = window;
+}
+
+bool MainWindow::activateActiveSetupWindow()
+{
+    if (!m_activeSetupWindow)
+        return false;
+
+    QWidget *window = m_activeSetupWindow.data();
+    if (!window->isVisible()) {
+        m_activeSetupWindow.clear();
+        return false;
+    }
+
+    if (window->isMinimized())
+        window->showNormal();
+    else
+        window->show();
+    window->raise();
+    window->activateWindow();
+    return true;
+}
+
 void MainWindow::openCameraParamsDialog()
 {
     if (m_isToolChainRunning) {
         showStatusText(tr("工具链运行中，暂不能进入方案设置"));
         return;
     }
+
+    if (activateActiveSetupWindow())
+        return;
 
     if (m_isContinuousRunning)
         stopContinuousRun();
@@ -604,6 +632,9 @@ void MainWindow::openToolsDialog()
         return;
     }
 
+    if (activateActiveSetupWindow())
+        return;
+
     if (m_isContinuousRunning)
         stopContinuousRun();
 
@@ -615,6 +646,7 @@ void MainWindow::openToolsDialog()
     PlanDialogUtils::setSessionInfo(&dialog,
                                     ui->headerDeviceComboBox->currentText(),
                                     ui->headerUserButton->text());
+    registerActiveSetupWindow(&dialog);
 
     dialog.exec();
 

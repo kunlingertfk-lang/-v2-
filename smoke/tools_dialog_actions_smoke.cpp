@@ -1,10 +1,12 @@
 #include "SchemeStore.h"
 #include "MainWindow.h"
+#include "PlanDialogUtils.h"
 #include "ToolsDialog.h"
 
 #include <QAbstractButton>
 #include <QApplication>
 #include <QDir>
+#include <QDialog>
 #include <QFile>
 #include <QFrame>
 #include <QJsonDocument>
@@ -169,6 +171,39 @@ int main(int argc, char **argv)
         return fail(QStringLiteral("scheme initialization failed: %1").arg(error));
 
     MainWindow mainWindow;
+    QDialog cameraPage(&mainWindow);
+    cameraPage.setObjectName(QStringLiteral("CameraParamsDialog"));
+    PlanDialogUtils::showDialogFromWidget(&mainWindow, &cameraPage);
+    if (!mainWindow.activateActiveSetupWindow())
+        return fail(QStringLiteral("active setup page was not registered"));
+    if (!QMetaObject::invokeMethod(&mainWindow,
+                                   "openCameraParamsDialog",
+                                   Qt::DirectConnection)) {
+        return fail(QStringLiteral("could not invoke scheme setup entry"));
+    }
+    int visibleSetupPages = 0;
+    for (QDialog *child : mainWindow.findChildren<QDialog *>(
+             QString(), Qt::FindDirectChildrenOnly)) {
+        if (child->isVisible()
+                && (child->objectName() == QStringLiteral("CameraParamsDialog")
+                    || child->objectName() == QStringLiteral("ReferenceImageDialog")
+                    || child->objectName() == QStringLiteral("ToolsDialog")
+                    || child->objectName() == QStringLiteral("OutputDialog"))) {
+            ++visibleSetupPages;
+        }
+    }
+    if (visibleSetupPages != 1)
+        return fail(QStringLiteral("repeated setup entry created another page"));
+
+    QDialog toolsPage(&mainWindow);
+    toolsPage.setObjectName(QStringLiteral("ToolsDialog"));
+    PlanDialogUtils::replaceDialog(&cameraPage, &toolsPage);
+    if (!mainWindow.activateActiveSetupWindow() || !toolsPage.isVisible())
+        return fail(QStringLiteral("setup navigation did not track the new page"));
+    toolsPage.hide();
+    if (mainWindow.activateActiveSetupWindow())
+        return fail(QStringLiteral("hidden setup page remained active"));
+
     ToolsDialog dialog(&mainWindow);
     QToolButton *copyButton = button(dialog, "copyToolButton");
     QToolButton *deleteButton = button(dialog, "deleteToolButton");

@@ -450,6 +450,11 @@ void PlanDialogUtils::showWindowFromWidget(QWidget *source, QWidget *target)
     copySessionInfo(source, target);
     PlanDialogUtils::fitWindowToScreen(target, 0);
 
+    if (isSetupWindow(target)) {
+        if (MainWindow *mainWindow = findParentMainWindow(target))
+            mainWindow->registerActiveSetupWindow(target);
+    }
+
     if (PlanDialogUtils::isLargeWindow(target)
             || target->windowState().testFlag(Qt::WindowMaximized)) {
         target->showMaximized();
