@@ -4,6 +4,7 @@
 #include <QByteArray>
 #include <QDebug>
 #include <QDialog>
+#include <QGraphicsView>
 #include <QLayout>
 #include <QList>
 #include <QMainWindow>
@@ -13,6 +14,7 @@
 #include <QScreen>
 #include <QSize>
 #include <QSizePolicy>
+#include <QStyle>
 #include <QTimer>
 #include <QToolButton>
 #include <QVariant>
@@ -123,6 +125,76 @@ void applyStandardSetupPageLayout(QWidget *window)
     setToolButtonMinimum(window, "referenceStepButton", stepMinimum, stepIcon);
     setToolButtonMinimum(window, "toolsStepButton", stepMinimum, stepIcon);
     setToolButtonMinimum(window, "outputStepButton", stepMinimum, stepIcon);
+}
+
+void applyStandardToolPageLayout(QWidget *window)
+{
+    if (!window || !window->property("toolLevelStyle").toBool())
+        return;
+
+    const QRect available = safeAvailableGeometry(window, window->parentWidget(), 0);
+    const int parameterPanelWidth = qBound(
+                520,
+                qRound(static_cast<qreal>(available.width()) * 0.32),
+                610);
+
+    static const char *const parameterPanels[] = {
+        "setupEditorPanel",
+        "leftPanel",
+        "parameterPanel",
+        "colorComparisonLeftPanel",
+        "calibrationTransformConfigScroll",
+        "configScrollArea",
+        "colorTemplateLeftScrollArea"
+    };
+    for (const char *name : parameterPanels)
+        setWidgetWidth(window, name, parameterPanelWidth, parameterPanelWidth);
+
+    static const char *const viewerPanels[] = {
+        "setupViewerFrame",
+        "previewPanel",
+        "colorComparisonRightPanel",
+        "resultFrame"
+    };
+    for (const char *name : viewerPanels) {
+        QWidget *viewer = window->findChild<QWidget *>(QLatin1String(name));
+        if (!viewer)
+            continue;
+        viewer->setMinimumWidth(0);
+        viewer->setMaximumWidth(QWIDGETSIZE_MAX);
+        viewer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    }
+
+    const QList<QGraphicsView *> graphicsViews = window->findChildren<QGraphicsView *>();
+    for (QGraphicsView *view : graphicsViews) {
+        view->setMinimumSize(0, 0);
+        view->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+        view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    }
+
+    static const char *const titleBars[] = {
+        "setupTopBar",
+        "titleBar",
+        "headerFrame",
+        "colorComparisonHeader",
+        "calibrationTransformHeader"
+    };
+    for (const char *name : titleBars) {
+        QWidget *titleBar = window->findChild<QWidget *>(QLatin1String(name));
+        if (!titleBar)
+            continue;
+        titleBar->setMinimumHeight(54);
+        titleBar->setMaximumHeight(54);
+    }
+}
+
+void refreshWidgetStyle(QWidget *widget)
+{
+    if (!widget)
+        return;
+    widget->style()->unpolish(widget);
+    widget->style()->polish(widget);
+    widget->update();
 }
 
 void copySessionInfo(QWidget *source, QWidget *target)
@@ -258,6 +330,19 @@ void PlanDialogUtils::applyLargeWindow(QWidget *window)
     window->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
     window->setGeometry(safe);
     window->setWindowState((window->windowState() & ~Qt::WindowMinimized) | Qt::WindowMaximized);
+}
+
+void PlanDialogUtils::applyToolLevelStyle(QWidget *window)
+{
+    if (!window)
+        return;
+
+    window->setProperty("toolLevelStyle", true);
+    applyStandardToolPageLayout(window);
+    refreshWidgetStyle(window);
+    const QList<QWidget *> children = window->findChildren<QWidget *>();
+    for (QWidget *child : children)
+        refreshWidgetStyle(child);
 }
 
 bool PlanDialogUtils::isLargeWindow(QWidget *window)
@@ -412,7 +497,11 @@ void PlanDialogUtils::configureDialogWindow(QDialog *dialog, const QString &titl
     }
 
     dialog->setWindowTitle(title);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    // Ownership is decided by the caller. Modal configuration dialogs are
+    // commonly stack allocated and opened with exec(); enabling
+    // WA_DeleteOnClose here would delete a stack object when accept()/reject()
+    // closes it. Heap-allocated setup pages opt in from showDialogFromWidget().
+    dialog->setAttribute(Qt::WA_DeleteOnClose, false);
     dialog->setWindowFlag(Qt::Window, true);
     PlanDialogUtils::applyLargeWindow(dialog);
     scheduleSetupDialogSizeLog(dialog);
@@ -470,6 +559,8 @@ void PlanDialogUtils::showWindowFromWidget(QWidget *source, QWidget *target)
 
 void PlanDialogUtils::showDialogFromWidget(QWidget *source, QDialog *dialog)
 {
+    if (dialog)
+        dialog->setAttribute(Qt::WA_DeleteOnClose, true);
     showWindowFromWidget(source, dialog);
 }
 

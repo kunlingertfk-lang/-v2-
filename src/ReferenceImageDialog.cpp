@@ -181,6 +181,8 @@ ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
     , ui(new Ui::ReferenceImageDialog)
 {
     ui->setupUi(this);
+    ui->setupQuickCalibrateButton->setEnabled(false);
+    ui->setupQuickCalibrateButton->setProperty("quickCalibrationState", QStringLiteral("locked"));
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();

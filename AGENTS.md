@@ -97,6 +97,15 @@
 - 控件文案、颜色、间距和显隐关系优先与已有同类对话框一致；若用户提供专项截图，以对应功能文档中的截图要求为准。
 - 按钮连接必须稳定，普通操作不得误触发 `accept`、`reject` 或程序退出。
 
+### QSS 作用域红线
+
+- `styles/app.qss` 由 `QApplication` 全局加载；新增或修改样式时，禁止仅使用 `QFrame[panelRole="configCard"]`、`QLabel[role="cardTitle"]`、`QPushButton#basicSegmentButton` 等无页面作用域的选择器覆盖新视觉规范，否则任何复用同名对象或语义属性的新功能都会被自动命中。
+- 新视觉规范必须以顶层页面 `objectName` 或显式动态属性作为第一层作用域。当前工具级统一样式只允许使用 `QDialog[toolLevelStyle="true"] ...`；该属性只由工具配置打开链路设置，方案流程页、相机参数、基准图、工具页、添加工具页、输出页及其他非工具级窗口不得设置。
+- 所有工具配置对话框（包括纯代码构建的对话框）必须通过 `PlanDialogUtils::applyToolLevelStyle()` 进入工具级公共样式；不得在新增/编辑的不同入口分别手工设置动态属性，避免同一工具从不同入口打开时样式不一致。
+- 公共语义属性（`panelRole`、`role`、`actionRole` 等）只表达控件职责，不等于授权全局换肤；需要跨页面共享时，必须先列出允许命中的页面范围，并为选择器增加共同的显式作用域。
+- 新建 UI 或引入新 `objectName` / 动态属性前，必须用 `rg` 检查 `styles/app.qss` 中是否已有同名选择器，并检查四层样式来源：`QApplication` 全局 QSS、对话框 `.ui` 根样式、子控件局部样式、运行时 `setStyleSheet`。不得在未完成影响面检查时调用 `setStyleSheet(QString())` 清空 Designer 样式。
+- QSS 变更验收除目标工具外，至少回归相机参数、基准图、工具流程页、添加工具页和输出页，确认非目标页面保持原样；发现误命中时应收紧选择器作用域，不得通过继续叠加更高优先级的无作用域选择器补丁解决。
+
 ## 配置与结果约束
 
 - 工具配置应通过现有 `ToolConfig.params`、`judgeRule` 等结构保存，字段命名保持清晰、稳定、可回显。

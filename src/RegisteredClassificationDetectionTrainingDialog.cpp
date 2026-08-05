@@ -1,4 +1,5 @@
 #include "RegisteredClassificationDetectionTrainingDialog.h"
+#include "ui_RegisteredClassificationDetectionTrainingDialog.h"
 
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -87,38 +88,6 @@ QSize initialDialogSize(QWidget *parent, const QSize &fallback)
                  qMax(620, qRound(parentSize.height() * 0.76)));
 }
 
-QFrame *card(QWidget *parent, const QString &title)
-{
-    QFrame *frame = new QFrame(parent);
-    frame->setProperty("panelRole", QStringLiteral("trainingCard"));
-    QVBoxLayout *layout = new QVBoxLayout(frame);
-    layout->setContentsMargins(14, 10, 14, 10);
-    layout->setSpacing(6);
-    if (!title.trimmed().isEmpty()) {
-        QLabel *titleLabel = new QLabel(title, frame);
-        titleLabel->setProperty("role", QStringLiteral("cardTitle"));
-        layout->addWidget(titleLabel);
-    }
-    return frame;
-}
-
-QPushButton *plainButton(QWidget *parent, const QString &text)
-{
-    QPushButton *button = new QPushButton(text, parent);
-    button->setMinimumHeight(42);
-    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    return button;
-}
-
-QToolButton *toolIconButton(QWidget *parent, const QString &text, const QString &tooltip)
-{
-    QToolButton *button = new QToolButton(parent);
-    button->setText(text);
-    button->setToolTip(tooltip);
-    button->setMinimumSize(40, 40);
-    return button;
-}
-
 QIcon roiIcon(const QString &kind)
 {
     QPixmap pixmap(34, 34);
@@ -136,32 +105,6 @@ QIcon roiIcon(const QString &kind)
         painter.drawRoundedRect(QRectF(7, 9, 21, 17), 2, 2);
     }
     return QIcon(pixmap);
-}
-
-QToolButton *roiButton(QWidget *parent, const QString &objectName, const QString &text, const QIcon &icon)
-{
-    QToolButton *button = new QToolButton(parent);
-    button->setObjectName(objectName);
-    button->setText(text);
-    button->setToolTip(text);
-    button->setIcon(icon);
-    button->setIconSize(QSize(26, 26));
-    button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    button->setCheckable(true);
-    button->setMinimumHeight(46);
-    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    return button;
-}
-
-QToolButton *rowButton(QWidget *parent, const QString &objectName, const QIcon &icon, const QString &tooltip)
-{
-    QToolButton *button = new QToolButton(parent);
-    button->setObjectName(objectName);
-    button->setIcon(icon);
-    button->setIconSize(QSize(24, 24));
-    button->setToolTip(tooltip);
-    button->setMinimumSize(38, 38);
-    return button;
 }
 
 QRectF markBoundingRect(const DetectionMark &mark)
@@ -256,8 +199,10 @@ protected:
 } // namespace
 
 RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetectionTrainingDialog(QWidget *parent)
-    : QDialog(parent)
+    : QDialog(parent),
+      ui(new Ui::RegisteredClassificationDetectionTrainingDialog)
 {
+#if 0
     setWindowTitle(tr("注册目标检测"));
     resize(initialDialogSize(parent, QSize(1280, 760)));
     setMinimumSize(900, 620);
@@ -509,6 +454,63 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
     bottomRow->addWidget(trainButton);
     rightLayout->addLayout(bottomRow);
     root->addWidget(rightPanel);
+#endif
+
+    ui->setupUi(this);
+    resize(initialDialogSize(parent, QSize(1280, 760)));
+    QSharedPointer<DetectionTrainingState> state(new DetectionTrainingState);
+
+    QToolButton *previousButton = ui->registeredDetectionTrainingPreviousButton;
+    QToolButton *nextButton = ui->registeredDetectionTrainingNextButton;
+    QStackedWidget *previewStack = ui->registeredDetectionTrainingPreviewStack;
+    QWidget *imagePage = ui->registeredDetectionTrainingImagePage;
+    QGraphicsView *view = ui->registeredDetectionTrainingPreviewView;
+    FrameViewHelper *previewHelper = new FrameViewHelper(view, this);
+    previewHelper->setObjectName(QStringLiteral("registeredDetectionTrainingPreviewHelper"));
+    QWidget *previewPage = ui->registeredDetectionTrainingPreviewPage;
+    QLabel *previewPageTitle = ui->registeredDetectionTrainingPreviewPageTitle;
+    QToolButton *closePreviewButton = ui->registeredDetectionTrainingClosePreviewButton;
+    QLabel *previewEmptyLabel = ui->registeredDetectionTrainingPreviewEmptyLabel;
+    QScrollArea *roiPreviewScroll = ui->registeredDetectionTrainingRoiPreviewScroll;
+    QWidget *roiPreviewList = ui->registeredDetectionTrainingRoiPreviewList;
+    QVBoxLayout *roiPreviewListLayout = ui->registeredDetectionTrainingRoiPreviewListLayout;
+    QComboBox *filterCombo = ui->registeredDetectionTrainingFilterCombo;
+    filterCombo->clear();
+    filterCombo->addItem(tr("全部"), QStringLiteral("all"));
+    filterCombo->addItem(tr("标注"), QStringLiteral("marked"));
+    filterCombo->addItem(tr("未标注"), QStringLiteral("unmarked"));
+    QLabel *currentLabel = ui->registeredDetectionTrainingCurrentLabel;
+    QLabel *markCountLabel = ui->registeredDetectionTrainingMarkCountLabel;
+    QLabel *pixelLabel = ui->registeredDetectionTrainingPixelLabel;
+    QListWidget *thumbnailList = ui->registeredDetectionTrainingThumbnailList;
+    QToolButton *deleteAllImagesButton = ui->registeredDetectionTrainingDeleteAllImagesButton;
+    QPushButton *cameraButton = ui->registeredDetectionTrainingCameraButton;
+    QPushButton *storedButton = ui->registeredDetectionTrainingStoredButton;
+    QPushButton *externalButton = ui->registeredDetectionTrainingExternalButton;
+    QToolButton *rectButton = ui->registeredDetectionTrainingRectButton;
+    QToolButton *polygonButton = ui->registeredDetectionTrainingPolygonButton;
+    QLabel *targetNameLabel = ui->registeredDetectionTrainingTargetNameLabel;
+    QLabel *targetCountValueLabel = ui->registeredDetectionTrainingTargetCountValueLabel;
+    QToolButton *renameTargetButton = ui->registeredDetectionTrainingRenameTargetButton_0;
+    QToolButton *previewTargetButton = ui->registeredDetectionTrainingPreviewTargetButton_0;
+    QCheckBox *angleCheckBox = ui->registeredDetectionTrainingAngleCheckBox;
+    QCheckBox *resolutionCheckBox = ui->registeredDetectionTrainingResolutionCheckBox;
+    QLabel *trainingStatusLabel = ui->registeredDetectionTrainingStateLabel;
+    QPushButton *trainButton = ui->registeredDetectionTrainingStartButton;
+
+    Q_UNUSED(roiPreviewScroll)
+    Q_UNUSED(roiPreviewList)
+    previewStack->setCurrentWidget(imagePage);
+    previewHelper->bindPixelStatusLabel(pixelLabel);
+    deleteAllImagesButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_TrashIcon));
+    rectButton->setIcon(roiIcon(QStringLiteral("rect")));
+    polygonButton->setIcon(roiIcon(QStringLiteral("polygon")));
+    for (QToolButton *button : {rectButton, polygonButton}) {
+        button->setIconSize(QSize(26, 26));
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    }
+    renameTargetButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_FileDialogDetailedView));
+    previewTargetButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_FileDialogContentsView));
 
     auto currentImage = [state]() -> DetectionImageState * {
         if (state->currentImage < 0 || state->currentImage >= state->images.size())
@@ -1144,4 +1146,9 @@ RegisteredClassificationDetectionTrainingDialog::RegisteredClassificationDetecti
         "QCheckBox{font-size:18px;font-weight:700;color:#0f172a;}"
         "QCheckBox::indicator{width:36px;height:24px;border:2px solid #94a3b8;border-radius:4px;background:#ffffff;}"
         "QCheckBox::indicator:checked{background:#22c55e;border-color:#16a34a;}"));
+}
+
+RegisteredClassificationDetectionTrainingDialog::~RegisteredClassificationDetectionTrainingDialog()
+{
+    delete ui;
 }

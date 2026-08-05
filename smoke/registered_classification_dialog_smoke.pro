@@ -95,3 +95,9 @@ HEADERS += \
     ../src/toolcore/ToolRequest.h \
     ../src/toolcore/ToolResult.h \
     ../src/toolcore/ToolTypes.h
+
+FORMS += \
+    ../ui/RegisteredClassificationDialog.ui \
+    ../ui/RegisteredClassificationTrainingDialog.ui \
+    ../ui/RegisteredClassificationModelManagementDialog.ui
+FORMS += ../ui/CreateDatasetDialog.ui

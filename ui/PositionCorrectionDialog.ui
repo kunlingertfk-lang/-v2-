@@ -83,13 +83,13 @@
       <widget class="QFrame" name="parameterPanel">
        <property name="minimumSize">
         <size>
-         <width>430</width>
+         <width>610</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>520</width>
+         <width>610</width>
          <height>16777215</height>
         </size>
        </property>

@@ -8,6 +8,8 @@
         <file alias="icons/close.svg">icons/close.svg</file>
         <file alias="icons/comm.svg">icons/comm.svg</file>
         <file alias="icons/compare.svg">icons/compare.svg</file>
+        <file alias="icons/circle-spin-plus.svg">icons/circle-spin-plus.svg</file>
+        <file alias="icons/circle-spin-minus.svg">icons/circle-spin-minus.svg</file>
         <file alias="icons/device.svg">icons/device.svg</file>
         <file alias="icons/delete-outline.svg">icons/delete-outline.svg</file>
         <file alias="icons/delete-all-tools.svg">icons/delete-all-tools.svg</file>
@@ -33,11 +35,14 @@
         <file alias="icons/save-as.svg">icons/save-as.svg</file>
         <file alias="icons/save.svg">icons/save.svg</file>
         <file alias="icons/settings.svg">icons/settings.svg</file>
+        <file alias="icons/settings-dark.svg">icons/settings-dark.svg</file>
         <file alias="icons/sliders-active.svg">icons/sliders-active.svg</file>
         <file alias="icons/sliders.svg">icons/sliders.svg</file>
         <file alias="icons/stop.svg">icons/stop.svg</file>
         <file alias="icons/tool.svg">icons/tool.svg</file>
         <file alias="icons/tool-step.svg">icons/tool-step.svg</file>
+        <file alias="icons/toggle-off.svg">icons/toggle-off.svg</file>
+        <file alias="icons/toggle-on.svg">icons/toggle-on.svg</file>
         <file alias="icons/trash.svg">icons/trash.svg</file>
         <file alias="icons/user.svg">icons/user.svg</file>
         <file alias="icons/output-active.svg">icons/output-active.svg</file>

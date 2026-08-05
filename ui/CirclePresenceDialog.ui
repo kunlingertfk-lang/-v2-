@@ -319,37 +319,37 @@
              </property>
             </spacer>
            </item>
-              <item>
-                <widget class="QPushButton" name="circlePcImportButton">
-                  <property name="minimumSize">
-                  <size>
-                    <width>118</width>
-                    <height>42</height>
-                  </size>
-                  </property>
-                  <property name="text">
-                  <string>PC导入图片</string>
-                  </property>
-                  <property name="actionRole" stdset="0">
-                  <string>secondary</string>
-                  </property>
-                  <property name="optionalEntry" stdset="0">
-                  <bool>true</bool>
-                  </property>
-                </widget>
-              </item>
+           <item>
+            <widget class="QPushButton" name="circlePcImportButton">
+             <property name="minimumSize">
+              <size>
+               <width>118</width>
+               <height>42</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>PC导入图片</string>
+             </property>
+             <property name="actionRole" stdset="0">
+              <string>secondary</string>
+             </property>
+             <property name="optionalEntry" stdset="0">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
            <item>
             <widget class="QFrame" name="segmentFrame">
              <property name="minimumSize">
               <size>
-               <width>170</width>
-               <height>42</height>
+               <width>184</width>
+               <height>46</height>
               </size>
              </property>
              <property name="maximumSize">
               <size>
-               <width>170</width>
-               <height>42</height>
+               <width>184</width>
+               <height>46</height>
               </size>
              </property>
              <property name="frameShape">
@@ -357,19 +357,19 @@
              </property>
              <layout class="QHBoxLayout" name="horizontalLayout_segment">
               <property name="spacing">
-               <number>0</number>
+               <number>10</number>
               </property>
               <property name="leftMargin">
-               <number>2</number>
+               <number>0</number>
               </property>
               <property name="topMargin">
-               <number>2</number>
+               <number>0</number>
               </property>
               <property name="rightMargin">
-               <number>2</number>
+               <number>0</number>
               </property>
               <property name="bottomMargin">
-               <number>2</number>
+               <number>0</number>
               </property>
               <item>
                <widget class="QPushButton" name="basicSegmentButton">
@@ -455,7 +455,7 @@
                   <number>0</number>
                  </property>
                  <property name="rightMargin">
-                  <number>0</number>
+                  <number>18</number>
                  </property>
                  <property name="bottomMargin">
                   <number>0</number>
@@ -659,15 +659,12 @@
                        </widget>
                       </item>
                       <item row="0" column="1">
-                       <widget class="QPushButton" name="basicPositionCorrectionSwitch">
+                       <widget class="QCheckBox" name="basicPositionCorrectionSwitch">
                         <property name="text">
-                         <string>启用</string>
+                         <string/>
                         </property>
                         <property name="checkable">
                          <bool>true</bool>
-                        </property>
-                        <property name="actionRole" stdset="0">
-                         <string>secondary</string>
                         </property>
                        </widget>
                       </item>
@@ -884,8 +881,8 @@
                  <rect>
                   <x>0</x>
                   <y>0</y>
-                  <width>554</width>
-                  <height>786</height>
+                  <width>297</width>
+                  <height>633</height>
                  </rect>
                 </property>
                 <layout class="QVBoxLayout" name="verticalLayout_allConfigCards">
@@ -899,7 +896,7 @@
                   <number>0</number>
                  </property>
                  <property name="rightMargin">
-                  <number>0</number>
+                  <number>18</number>
                  </property>
                  <property name="bottomMargin">
                   <number>0</number>
@@ -1076,15 +1073,12 @@
                        </widget>
                       </item>
                       <item row="0" column="1">
-                       <widget class="QPushButton" name="positionCorrectionSwitch">
+                       <widget class="QCheckBox" name="positionCorrectionSwitch">
                         <property name="text">
-                         <string>启用</string>
+                         <string/>
                         </property>
                         <property name="checkable">
                          <bool>true</bool>
-                        </property>
-                        <property name="actionRole" stdset="0">
-                         <string>secondary</string>
                         </property>
                        </widget>
                       </item>
@@ -1493,7 +1487,7 @@
                <size>
                 <width>24</width>
                 <height>24</height>
-              </size>
+               </size>
               </property>
               <property name="autoRaise">
                <bool>true</bool>
@@ -1510,7 +1504,7 @@
                <size>
                 <width>24</width>
                 <height>24</height>
-              </size>
+               </size>
               </property>
               <property name="autoRaise">
                <bool>true</bool>
@@ -1544,7 +1538,7 @@
                <size>
                 <width>24</width>
                 <height>24</height>
-              </size>
+               </size>
               </property>
               <property name="autoRaise">
                <bool>true</bool>
@@ -1561,7 +1555,7 @@
                <size>
                 <width>24</width>
                 <height>24</height>
-              </size>
+               </size>
               </property>
               <property name="autoRaise">
                <bool>true</bool>
@@ -1650,6 +1644,7 @@
   </layout>
  </widget>
  <resources>
+  <include location="../resources/resources.qrc"/>
   <include location="../resources/resources.qrc"/>
  </resources>
  <connections/>

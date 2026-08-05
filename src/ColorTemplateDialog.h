@@ -24,6 +24,7 @@ class QResizeEvent;
 class QMouseEvent;
 class QToolButton;
 class QWidget;
+namespace Ui { class ColorTemplateDialog; }
 
 struct ColorRecognitionLabelData
 {
@@ -104,6 +105,7 @@ class ColorTemplateDialog : public QDialog
 
 public:
     explicit ColorTemplateDialog(QWidget *parent = nullptr);
+    ~ColorTemplateDialog() override;
 
     // 返回模板编辑器当前编辑完成的数据。
     ColorRecognitionTemplateData templateData() const;
@@ -224,6 +226,7 @@ private:
     bool m_hsvRebuildInProgress = false;
     bool m_gmmBuildInProgress = false;
     EditState m_editState = EditState::None;
+    Ui::ColorTemplateDialog *ui = nullptr;
 };
 
 #endif // COLORTEMPLATEDIALOG_H

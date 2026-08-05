@@ -18,6 +18,7 @@ enum class Page {
 };
 
 void applyLargeWindow(QWidget *window);
+void applyToolLevelStyle(QWidget *window);
 bool isLargeWindow(QWidget *window);
 void fitDialogToScreen(QWidget *dialog, QWidget *parent = nullptr, int margin = 40);
 void fitWindowToScreen(QWidget *window, int margin = 40);

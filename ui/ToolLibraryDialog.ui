@@ -1887,6 +1887,18 @@
                   </property>
                  </widget>
                 </item>
+                <item row="2" column="0">
+                 <widget class="QToolButton" name="calibrationTransformToolButton">
+                  <property name="minimumSize"><size><width>132</width><height>118</height></size></property>
+                  <property name="text"><string>标定转换</string></property>
+                  <property name="toolTip"><string>加载标定文件转换图像坐标与物理坐标</string></property>
+                  <property name="icon"><iconset resource="../resources/resources.qrc"><normaloff>:/icons/fit.svg</normaloff>:/icons/fit.svg</iconset></property>
+                  <property name="iconSize"><size><width>46</width><height>46</height></size></property>
+                  <property name="checkable"><bool>true</bool></property>
+                  <property name="toolButtonStyle"><enum>Qt::ToolButtonTextUnderIcon</enum></property>
+                  <property name="toolCard" stdset="0"><bool>true</bool></property>
+                 </widget>
+                </item>
                </layout>
               </widget>
              </item>

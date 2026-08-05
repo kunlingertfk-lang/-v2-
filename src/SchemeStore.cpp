@@ -46,6 +46,59 @@ QVector<ToolConfig> toolConfigsFromJson(const QJsonArray &array)
     return configs;
 }
 
+bool copyCalibrationAssetsForScheme(const QString &sourceSchemeDir,
+                                    SchemeState *targetScheme,
+                                    QString *errorMessage)
+{
+    if (!targetScheme)
+        return false;
+    const QString sourceRoot = QDir(sourceSchemeDir).absolutePath() + QDir::separator();
+    QDir targetAssetDir(QDir(targetScheme->schemeDir).filePath(QStringLiteral("calibrations")));
+    QMap<QString, QString> copiedPaths;
+    for (ToolConfig &tool : targetScheme->toolConfigs) {
+        if (tool.toolType != ToolType::CalibrationTransform)
+            continue;
+        QJsonObject transform = tool.params.value(QStringLiteral("calibrationTransform")).toObject();
+        QJsonArray rewrittenFiles;
+        const QJsonArray files = transform.value(QStringLiteral("calibrationFiles")).toArray();
+        for (const QJsonValue &value : files) {
+            const QString sourceValue = value.toString().trimmed();
+            if (sourceValue.isEmpty())
+                continue;
+            const QString sourcePath = QFileInfo(sourceValue).absoluteFilePath();
+            QString targetPath = sourcePath;
+            if (sourcePath.startsWith(sourceRoot)) {
+                if (!targetAssetDir.exists() && !targetAssetDir.mkpath(QStringLiteral("."))) {
+                    if (errorMessage)
+                        *errorMessage = QStringLiteral("无法创建方案副本的标定资产目录");
+                    return false;
+                }
+                targetPath = copiedPaths.value(sourcePath);
+                if (targetPath.isEmpty()) {
+                    targetPath = targetAssetDir.filePath(QFileInfo(sourcePath).fileName());
+                    if (!QFile::copy(sourcePath, targetPath)) {
+                        if (errorMessage)
+                            *errorMessage = QStringLiteral("无法复制标定资产: %1").arg(sourcePath);
+                        return false;
+                    }
+                    copiedPaths.insert(sourcePath, targetPath);
+                }
+            }
+            rewrittenFiles.append(targetPath);
+        }
+        const QString activeValue = transform.value(
+                    QStringLiteral("activeCalibrationFile")).toString().trimmed();
+        const QString activeSource = activeValue.isEmpty()
+                ? QString() : QFileInfo(activeValue).absoluteFilePath();
+        transform.insert(QStringLiteral("calibrationFiles"), rewrittenFiles);
+        transform.insert(QStringLiteral("activeCalibrationFile"),
+                         activeSource.isEmpty() ? QString()
+                                                : copiedPaths.value(activeSource, activeSource));
+        tool.params.insert(QStringLiteral("calibrationTransform"), transform);
+    }
+    return true;
+}
+
 QJsonObject previewSnapshotsToJson(const QMap<QString, ToolPreviewSnapshot> &snapshots)
 {
     QJsonObject object;
@@ -353,6 +406,8 @@ bool SchemeStore::saveCurrentSchemeAs(const QString &schemeName, QString *errorM
         }
         copy.referenceImagePath = QString::fromLatin1(kReferenceImageSlotA);
     }
+    if (!copyCalibrationAssetsForScheme(m_currentScheme.schemeDir, &copy, errorMessage))
+        return false;
 
     SchemeState savedCopy;
     const cv::Mat *referenceFramePtr = referenceFrame.empty() ? nullptr : &referenceFrame;

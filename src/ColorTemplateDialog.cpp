@@ -1,4 +1,5 @@
 #include "ColorTemplateDialog.h"
+#include "ui_ColorTemplateDialog.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
 #include "frame/CameraFrameProvider.h"
@@ -6,6 +7,7 @@
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "UiStyleRoles.h"
+#include "PlanDialogUtils.h"
 
 #include <QButtonGroup>
 #include <QBuffer>
@@ -200,61 +202,6 @@ void setComboBoxText(QComboBox *comboBox, const QString &text)
         comboBox->setCurrentIndex(index);
 }
 
-QLabel *rowLabel(const QString &text)
-{
-    QLabel *label = new QLabel(text);
-    label->setMinimumWidth(118);
-    label->setProperty("role", QStringLiteral("rowField"));
-    return label;
-}
-
-QFrame *makeCard(const QString &title, QVBoxLayout **contentLayout)
-{
-    QFrame *card = new QFrame;
-    card->setFrameShape(QFrame::NoFrame);
-    card->setProperty("panelRole", QStringLiteral("configCard"));
-
-    QVBoxLayout *layout = new QVBoxLayout(card);
-    layout->setContentsMargins(20, 18, 20, 18);
-    layout->setSpacing(14);
-
-    QHBoxLayout *header = new QHBoxLayout;
-    QLabel *titleLabel = new QLabel(title);
-    titleLabel->setProperty("role", QStringLiteral("cardTitle"));
-    QToolButton *collapseButton = new QToolButton;
-    collapseButton->setText(QStringLiteral("⌄"));
-    collapseButton->setCheckable(true);
-    collapseButton->setProperty("role", QStringLiteral("collapseCard"));
-    header->addWidget(titleLabel);
-    header->addStretch(1);
-    header->addWidget(collapseButton);
-    layout->addLayout(header);
-
-    QWidget *contentWidget = new QWidget(card);
-    QVBoxLayout *content = new QVBoxLayout(contentWidget);
-    content->setContentsMargins(0, 0, 0, 0);
-    content->setSpacing(14);
-    layout->addWidget(contentWidget);
-    QObject::connect(collapseButton, &QToolButton::clicked, card, [collapseButton, contentWidget](bool collapsed) {
-        contentWidget->setVisible(!collapsed);
-        collapseButton->setText(collapsed ? QStringLiteral("›") : QStringLiteral("⌄"));
-    });
-
-    *contentLayout = content;
-    return card;
-}
-
-QToolButton *roiButton(const QString &text, const QString &tooltip)
-{
-    QToolButton *button = new QToolButton;
-    button->setText(text);
-    button->setToolTip(tooltip);
-    button->setCheckable(true);
-    button->setMinimumSize(74, 36);
-    button->setProperty("actionRole", QStringLiteral("toolbarIcon"));
-    return button;
-}
-
 } // namespace
 
 QString colorRecognitionGmmTrainingDataHash(const ColorRecognitionTemplateData &colorTemplate)
@@ -298,13 +245,20 @@ QString colorRecognitionGmmTrainingDataHash(const ColorRecognitionTemplateData &
 }
 
 ColorTemplateDialog::ColorTemplateDialog(QWidget *parent)
-    : QDialog(parent)
+    : QDialog(parent),
+      ui(new Ui::ColorTemplateDialog)
 {
     buildUi();
+    PlanDialogUtils::applyToolLevelStyle(this);
     adjustInitialGeometry();
     setupUiState();
     connectControls();
     showPreviewImage();
+}
+
+ColorTemplateDialog::~ColorTemplateDialog()
+{
+    delete ui;
 }
 
 ColorRecognitionTemplateData ColorTemplateDialog::templateData() const
@@ -465,7 +419,8 @@ void ColorTemplateDialog::adjustInitialGeometry()
     move(available.center() - QPoint(width / 2, height / 2));
 }
 
-void ColorTemplateDialog::buildUi()
+#if 0
+void ColorTemplateDialog::buildLegacyUi()
 {
     setWindowTitle(tr("创建颜色模板"));
     setMinimumSize(720, 520);
@@ -740,7 +695,68 @@ void ColorTemplateDialog::buildUi()
     m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
     m_previewHelper->bindPixelStatusLabel(viewerCursorLabel);
     m_previewHelper->setNavigationEnabled(true);
-    m_previewGraphicsView->setBackgroundBrush(QBrush(QColor(255, 255, 255)));
+    m_previewGraphicsView->setBackgroundBrush(QBrush(QColor(0, 0, 0)));
+}
+#endif
+
+void ColorTemplateDialog::buildUi()
+{
+    ui->setupUi(this);
+    setWindowModality(Qt::WindowModal);
+
+    m_templateNameLineEdit = ui->templateNameLineEdit;
+    m_recognitionBackendComboBox = ui->recognitionBackendComboBox;
+    m_featureTypeRowWidget = ui->featureTypeRowWidget;
+    m_featureTypeComboBox = ui->featureTypeComboBox;
+    m_labelListWidget = ui->labelListWidget;
+    m_addLabelButton = ui->addLabelButton;
+    m_renameLabelButton = ui->renameLabelButton;
+    m_deleteLabelButton = ui->deleteLabelButton;
+    m_roiSampleListWidget = ui->roiSampleListWidget;
+    m_sampleCountLabel = ui->sampleCountLabel;
+    m_sensitivityComboBox = ui->sensitivityComboBox;
+    m_brightnessCheckBox = ui->brightnessEnabledCheckBox;
+    m_gmmModelStateLabel = ui->gmmModelStateLabel;
+    m_gmmDiagnosticsLabel = ui->gmmDiagnosticsLabel;
+    m_buildGmmButton = ui->buildGmmModelButton;
+    m_gmmBuildFeedbackLabel = ui->gmmBuildFeedbackLabel;
+    m_hsvModelStateLabel = ui->hsvModelStateLabel;
+    m_rebuildHsvButton = ui->rebuildHsvFeaturesButton;
+    m_hsvBuildFeedbackLabel = ui->hsvBuildFeedbackLabel;
+    m_regionRectButton = ui->sampleRectRoiButton;
+    m_addCurrentImageButton = ui->addCurrentSampleImageButton;
+    m_addImageButton = ui->addExternalSampleImageButton;
+    m_deleteCurrentRoiButton = ui->deleteCurrentRoiSampleButton;
+    m_addSampleButton = ui->addSampleButton;
+    m_cancelButton = ui->cancelButton;
+    m_saveButton = ui->saveTemplateButton;
+    m_viewerTitleLabel = ui->viewerTitleLabel;
+    m_previewGraphicsView = ui->previewGraphicsView;
+    m_statusLabel = ui->statusLabel;
+
+    ui->headerFrame->setProperty("colorTemplateDragHandle", true);
+    ui->headerTitleLabel->setProperty("colorTemplateDragHandle", true);
+    ui->headerFrame->installEventFilter(this);
+    ui->headerTitleLabel->installEventFilter(this);
+    connect(ui->closeButton, &QToolButton::clicked, this, &ColorTemplateDialog::reject);
+
+    const auto bindCollapse = [](QToolButton *button, QWidget *content) {
+        QObject::connect(button, &QToolButton::clicked, content,
+                         [button, content](bool collapsed) {
+            content->setVisible(!collapsed);
+            button->setText(collapsed ? QStringLiteral("›") : QStringLiteral("⌄"));
+        });
+    };
+    bindCollapse(ui->modelCollapseButton, ui->modelContentWidget);
+    bindCollapse(ui->sampleCollapseButton, ui->sampleContentWidget);
+    bindCollapse(ui->advancedCollapseButton, ui->advancedContentWidget);
+
+    m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
+    m_previewHelper->setNavigationEnabled(true);
+    m_previewGraphicsView->setBackgroundBrush(QBrush(QColor(0, 0, 0)));
+    UiStyleRoles::applyStatusTone(m_hsvBuildFeedbackLabel, QStringLiteral("neutral"));
+    UiStyleRoles::applyStatusTone(m_gmmBuildFeedbackLabel, QStringLiteral("neutral"));
 }
 
 void ColorTemplateDialog::setupUiState()

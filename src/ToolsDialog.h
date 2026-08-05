@@ -54,6 +54,7 @@ private slots:
     void copySelectedTool();
     void deleteSelectedTool();
     void deleteAllTools();
+    void openQuickCalibration();
 
 private:
     void setupUiState();

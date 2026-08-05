@@ -22,6 +22,8 @@ CameraParamsDialog::CameraParamsDialog(QWidget *parent)
     , ui(new Ui::CameraParamsDialog)
 {
     ui->setupUi(this);
+    ui->setupQuickCalibrateButton->setEnabled(false);
+    ui->setupQuickCalibrateButton->setProperty("quickCalibrationState", QStringLiteral("locked"));
     setupUiState();
     connectNavigation();
     setupCameraUI();

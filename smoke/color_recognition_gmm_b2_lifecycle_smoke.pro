@@ -26,6 +26,7 @@ SOURCES += \
     ../src/frame/MatImageConverter.cpp \
     ../src/frame/ReferenceImageProvider.cpp \
     ../src/toolcore/PositionCorrection.cpp \
+    ../src/toolcore/PositionCorrectionConsumer.cpp \
     ../src/tooladapters/ColorRecognitionAdapter.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp \
     ../src/algorithms/recognition/ColorRecognitionGmmHalconBackend.cpp \
@@ -39,5 +40,7 @@ HEADERS += \
     ../src/frame/FramePixelProbe.h \
     ../src/frame/FrameViewHelper.h \
     ../src/frame/ReferenceImageProvider.h
+
+FORMS += ../ui/ColorTemplateDialog.ui
 
 LIBS += -ldl

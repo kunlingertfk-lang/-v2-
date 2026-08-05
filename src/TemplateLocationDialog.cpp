@@ -196,17 +196,6 @@ void TemplateLocationDialog::setupUiState()
     m_searchGroup->addButton(ui->searchGlobalButton, 3);
     ui->searchGlobalButton->setChecked(true);
 
-    // ROI 操作使用独立的右对齐行，避免搜索参数受图标列宽影响。
-    ui->templateLayout->removeWidget(ui->templateRectButton);
-    ui->templateLayout->removeWidget(ui->templatePolygonButton);
-    auto *templateRoiLayout = new QHBoxLayout;
-    templateRoiLayout->setContentsMargins(0, 0, 0, 0);
-    templateRoiLayout->setSpacing(4);
-    templateRoiLayout->addStretch();
-    templateRoiLayout->addWidget(ui->templateRectButton);
-    templateRoiLayout->addWidget(ui->templatePolygonButton);
-    ui->templateLayout->addLayout(templateRoiLayout, 1, 1, 1, 2);
-
     ui->templateLayout->removeWidget(ui->createTemplateButton);
     ui->templateLayout->removeWidget(ui->deleteTemplateButton);
     auto *templateCommandLayout = new QHBoxLayout;

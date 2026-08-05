@@ -83,13 +83,13 @@
       <widget class="QFrame" name="parameterPanel">
        <property name="minimumSize">
         <size>
-         <width>450</width>
+         <width>610</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>540</width>
+         <width>610</width>
          <height>16777215</height>
         </size>
        </property>
@@ -142,12 +142,21 @@
             </rect>
            </property>
            <layout class="QVBoxLayout" name="parameterLayout">
+            <property name="spacing">
+             <number>12</number>
+            </property>
             <item>
              <widget class="QFrame" name="templateCard">
               <property name="panelRole" stdset="0">
                <string>configCard</string>
               </property>
               <layout class="QGridLayout" name="templateLayout">
+               <property name="horizontalSpacing">
+                <number>8</number>
+               </property>
+               <property name="verticalSpacing">
+                <number>12</number>
+               </property>
                <item row="1" column="1">
                 <widget class="QToolButton" name="templateRectButton">
                  <property name="toolTip">
@@ -893,6 +902,18 @@
            </size>
           </property>
           <layout class="QHBoxLayout" name="viewerHeaderLayout">
+           <property name="leftMargin">
+            <number>9</number>
+           </property>
+           <property name="topMargin">
+            <number>3</number>
+           </property>
+           <property name="rightMargin">
+            <number>9</number>
+           </property>
+           <property name="bottomMargin">
+            <number>3</number>
+           </property>
            <item>
             <widget class="QLabel" name="viewerTitleLabel">
              <property name="text">

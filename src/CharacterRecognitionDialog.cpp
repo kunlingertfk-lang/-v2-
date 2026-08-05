@@ -380,6 +380,8 @@ void CharacterRecognitionDialog::setupUiState()
     ui->horizontalLayout_actions->addWidget(m_exitTestButton);
     m_pcImportButton = new QPushButton(tr("PC导入图片"), this);
     m_pcImportButton->setObjectName(QStringLiteral("ocrPcImportButton"));
+    m_pcImportButton->setProperty("actionRole", QStringLiteral("secondary"));
+    m_pcImportButton->setMinimumWidth(130);
     m_pcImportButton->setMinimumHeight(38);
     ui->horizontalLayout_editorHeader->insertWidget(2, m_pcImportButton);
 

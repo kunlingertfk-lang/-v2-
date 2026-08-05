@@ -1,6 +1,7 @@
 #include "ColorComparisonDialog.h"
 
 #include "ColorComparisonFeatureView.h"
+#include "ui_ColorComparisonDialog.h"
 #include "PlanDialogUtils.h"
 #include "SchemeStore.h"
 #include "UiStyleRoles.h"
@@ -790,33 +791,6 @@ QImage imageFromFrame(const cv::Mat &frame)
     return MatImageConverter::matToDisplayImage(frame, QStringLiteral("ColorComparisonDialog"));
 }
 
-QFrame *card(QWidget *parent, const QString &title)
-{
-    QFrame *frame = new QFrame(parent);
-    frame->setFrameShape(QFrame::NoFrame);
-    frame->setProperty("panelRole", QStringLiteral("configCard"));
-    QVBoxLayout *layout = new QVBoxLayout(frame);
-    layout->setContentsMargins(20, 18, 20, 18);
-    layout->setSpacing(12);
-    QLabel *titleLabel = new QLabel(title, frame);
-    titleLabel->setProperty("role", QStringLiteral("cardTitle"));
-    layout->addWidget(titleLabel);
-    return frame;
-}
-
-QHBoxLayout *row(const QString &labelText, QWidget *field)
-{
-    QHBoxLayout *layout = new QHBoxLayout;
-    QLabel *label = new QLabel(labelText);
-    label->setMinimumWidth(118);
-    label->setProperty("role", QStringLiteral("rowField"));
-    layout->addWidget(label);
-    layout->addStretch(1);
-    if (field)
-        layout->addWidget(field);
-    return layout;
-}
-
 void applyBottomActionButtonMetrics(QPushButton *button)
 {
     if (!button)
@@ -860,6 +834,7 @@ ColorComparisonDialog::ColorComparisonDialog(QWidget *parent)
     : QDialog(parent)
     , m_toolId(QStringLiteral("color_comparison_%1")
                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)))
+    , ui(new Ui::ColorComparisonDialog)
 {
     buildUi();
 
@@ -898,6 +873,7 @@ ColorComparisonDialog::~ColorComparisonDialog()
         disconnect(m_testWatcher, nullptr, this, nullptr);
     if (m_modelBuildWatcher)
         disconnect(m_modelBuildWatcher, nullptr, this, nullptr);
+    delete ui;
 }
 
 void ColorComparisonDialog::connectAsyncWorkers()
@@ -912,7 +888,8 @@ void ColorComparisonDialog::connectAsyncWorkers()
             &ColorComparisonDialog::handleModelBuildFinished);
 }
 
-void ColorComparisonDialog::buildUi()
+#if 0
+void ColorComparisonDialog::buildLegacyUi()
 {
     setObjectName(QStringLiteral("ColorComparisonDialog"));
     setWindowTitle(tr("方案编辑 - 颜色比较"));
@@ -935,6 +912,7 @@ void ColorComparisonDialog::buildUi()
     headerTitle->setObjectName(QStringLiteral("colorComparisonHeaderTitle"));
     QToolButton *closeButton = new QToolButton(header);
     closeButton->setObjectName(QStringLiteral("colorComparisonHeaderClose"));
+    closeButton->setProperty("actionRole", QStringLiteral("windowClose"));
     closeButton->setText(QStringLiteral("×"));
     headerLayout->addWidget(headerTitle);
     headerLayout->addStretch(1);
@@ -948,8 +926,8 @@ void ColorComparisonDialog::buildUi()
 
     QFrame *leftPanel = new QFrame(this);
     leftPanel->setObjectName(QStringLiteral("colorComparisonLeftPanel"));
-    leftPanel->setMinimumWidth(420);
-    leftPanel->setMaximumWidth(480);
+    leftPanel->setMinimumWidth(610);
+    leftPanel->setMaximumWidth(610);
     QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->setContentsMargins(24, 18, 24, 18);
     leftLayout->setSpacing(14);
@@ -957,15 +935,16 @@ void ColorComparisonDialog::buildUi()
 
     QHBoxLayout *titleLayout = new QHBoxLayout;
     QLabel *dialogTitle = new QLabel(tr("颜色比较"), leftPanel);
-    dialogTitle->setProperty("role", QStringLiteral("cardTitle"));
+    dialogTitle->setObjectName(QStringLiteral("editorTitleLabel"));
     m_pcImportButton = new QPushButton(tr("PC导入图片"), leftPanel);
     m_basicButton = new QPushButton(tr("基础"), leftPanel);
     m_allButton = new QPushButton(tr("全部"), leftPanel);
     m_pcImportButton->setObjectName(
                 QStringLiteral("colorComparisonPcImportButton"));
     m_pcImportButton->setVisible(kShowPcImportButton);
-    m_basicButton->setObjectName(QStringLiteral("colorComparisonBasicButton"));
-    m_allButton->setObjectName(QStringLiteral("colorComparisonAllButton"));
+    m_pcImportButton->setProperty("actionRole", QStringLiteral("secondary"));
+    m_basicButton->setObjectName(QStringLiteral("basicSegmentButton"));
+    m_allButton->setObjectName(QStringLiteral("allSegmentButton"));
     m_basicButton->setCheckable(true);
     m_allButton->setCheckable(true);
     m_segmentGroup->addButton(m_basicButton, 0);
@@ -1383,6 +1362,113 @@ void ColorComparisonDialog::buildUi()
 
     connect(closeButton, &QToolButton::clicked, this, &ColorComparisonDialog::reject);
     connect(m_finishButton, &QPushButton::clicked, this, &ColorComparisonDialog::finishConfiguration);
+}
+#endif
+
+void ColorComparisonDialog::buildUi()
+{
+    ui->setupUi(this);
+    setWindowModality(Qt::WindowModal);
+    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+    PlanDialogUtils::applyLargeWindow(this);
+
+    m_segmentGroup = new QButtonGroup(this);
+    m_segmentGroup->addButton(ui->basicSegmentButton, 0);
+    m_segmentGroup->addButton(ui->allSegmentButton, 1);
+    m_detectRegionGroup = new QButtonGroup(this);
+    m_detectRegionGroup->addButton(ui->colorComparisonDetectGlobalButton, 0);
+    m_detectRegionGroup->addButton(ui->colorComparisonDetectRectButton, 1);
+    m_detectRegionGroup->addButton(ui->colorComparisonDetectCircleButton, 2);
+
+    m_pcImportButton = ui->colorComparisonPcImportButton;
+    m_pcImportButton->setVisible(kShowPcImportButton);
+    m_basicButton = ui->basicSegmentButton;
+    m_allButton = ui->allSegmentButton;
+    m_paramsStack = ui->colorComparisonParamsStack;
+    m_templateRegionModeComboBox = ui->colorComparisonTemplateRegionModeCombo;
+    m_templateSyncHintLabel = ui->colorComparisonTemplateSyncHint;
+    m_templateEditButton = ui->colorComparisonTemplateEditButton;
+    m_templateRectButton = ui->colorComparisonTemplateRectButton;
+    m_templateFinishButton = ui->colorComparisonTemplateFinishButton;
+    m_templateMaskEditButton = ui->colorComparisonTemplateMaskEditButton;
+    m_templateMaskPolygonButton = ui->colorComparisonTemplateMaskPolygonButton;
+    m_templateMaskRedrawButton = ui->colorComparisonTemplateMaskRedrawButton;
+    m_templateMaskClearButton = ui->colorComparisonTemplateMaskClearButton;
+    m_templateMaskFinishButton = ui->colorComparisonTemplateMaskFinishButton;
+    m_templatePreviewLabel = ui->colorComparisonTemplatePreview;
+    m_rebuildModelButton = ui->colorComparisonRebuildModelButton;
+    m_modelStateLabel = ui->colorComparisonModelStateLabel;
+    m_featureCard = ui->featureCard;
+    m_featureTypeComboBox = ui->colorComparisonFeatureTypeCombo;
+    m_brightnessCheckBox = ui->colorComparisonBrightnessCompensation;
+    m_detectGlobalButton = ui->colorComparisonDetectGlobalButton;
+    m_detectRectButton = ui->colorComparisonDetectRectButton;
+    m_detectCircleButton = ui->colorComparisonDetectCircleButton;
+    m_positionCorrectionPanel = ui->colorComparisonPositionCorrectionPanel;
+    m_positionCorrectionCheckBox = ui->positionCorrectionSwitch;
+    m_positionCorrectionSourceRow = ui->positionCorrectionSourceRow;
+    m_positionCorrectionComboBox = ui->colorComparisonPositionCorrectionCombo;
+    m_positionCorrectionContourRow = ui->positionCorrectionContourRow;
+    m_positionCorrectionContourCheckBox = ui->positionCorrectionContourSwitch;
+    m_detectMaskRow = ui->detectMaskRow;
+    m_detectMaskEditButton = ui->colorComparisonDetectMaskEditButton;
+    m_detectMaskPolygonButton = ui->colorComparisonDetectMaskPolygonButton;
+    m_detectMaskRedrawButton = ui->colorComparisonDetectMaskRedrawButton;
+    m_detectMaskClearButton = ui->colorComparisonDetectMaskClearButton;
+    m_detectMaskFinishButton = ui->colorComparisonDetectMaskFinishButton;
+    m_sensitivityComboBox = ui->colorComparisonSensitivityCombo;
+    m_minScoreSpinBox = ui->colorComparisonMinScore;
+    m_referenceTestButton = ui->colorComparisonReferenceTestButton;
+    m_testRunButton = ui->colorComparisonTestRunButton;
+    m_finishButton = ui->colorComparisonFinishButton;
+    m_exitTestButton = ui->exitTestButton;
+    m_viewerTitleLabel = ui->colorComparisonViewerTitleLabel;
+    m_previewGraphicsView = ui->previewGraphicsView;
+    m_viewerStatusLabel = ui->colorComparisonStatusLabel;
+
+    m_templateRegionModeComboBox->clear();
+    m_templateRegionModeComboBox->addItem(tr("与检测区域同步"), QStringLiteral("sync"));
+    m_templateRegionModeComboBox->addItem(tr("自定义"), QStringLiteral("custom"));
+    m_templateRegionModeComboBox->setCurrentIndex(1);
+    m_featureTypeComboBox->clear();
+    m_featureTypeComboBox->addItem(tr("直方图特征"), QStringLiteral("histogram_hs_2d"));
+    m_featureTypeComboBox->addItem(tr("色谱特征（待实现）"), QStringLiteral("spectrum"));
+    if (QStandardItemModel *model = qobject_cast<QStandardItemModel *>(m_featureTypeComboBox->model()))
+        if (QStandardItem *item = model->item(1)) item->setEnabled(false);
+    m_sensitivityComboBox->clear();
+    m_sensitivityComboBox->addItem(tr("高（严格）"), QStringLiteral("high"));
+    m_sensitivityComboBox->addItem(tr("中（标准）"), QStringLiteral("medium"));
+    m_sensitivityComboBox->addItem(tr("低（宽松）"), QStringLiteral("low"));
+    m_sensitivityComboBox->setCurrentIndex(1);
+    m_positionCorrectionComboBox->clear();
+    m_positionCorrectionComboBox->addItem(PositionCorrection::defaultSource(),
+                                           PositionCorrection::defaultSourceId());
+    for (QComboBox *combo : {m_templateRegionModeComboBox, m_featureTypeComboBox,
+                             m_sensitivityComboBox, m_positionCorrectionComboBox})
+        UiStyleRoles::applyLightComboBox(combo);
+
+    QVBoxLayout *featureHostLayout = new QVBoxLayout(ui->featureViewHost);
+    featureHostLayout->setContentsMargins(0, 0, 0, 0);
+    m_featureView = new ColorComparisonFeatureView(ui->featureViewHost);
+    featureHostLayout->addWidget(m_featureView);
+
+    for (QPushButton *button : {m_referenceTestButton, m_testRunButton,
+                                m_finishButton, m_exitTestButton}) {
+        applyBottomActionButtonMetrics(button);
+        installActionButtonFlash(button);
+    }
+    m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
+    m_previewHelper->setNavigationEnabled(true);
+
+    setAllParamsMode(false);
+    refreshEditControls();
+    refreshTemplateRegionControls();
+    refreshPositionCorrectionControls();
+    connect(ui->colorComparisonHeaderClose, &QToolButton::clicked,
+            this, &ColorComparisonDialog::reject);
+    connect(m_finishButton, &QPushButton::clicked,
+            this, &ColorComparisonDialog::finishConfiguration);
 }
 
 void ColorComparisonDialog::connectControls()

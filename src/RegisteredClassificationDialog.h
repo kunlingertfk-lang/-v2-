@@ -25,6 +25,7 @@ class QResizeEvent;
 class QSpinBox;
 class QToolButton;
 class QWidget;
+namespace Ui { class RegisteredClassificationDialog; }
 
 class RegisteredClassificationDialog : public QDialog
 {
@@ -90,6 +91,7 @@ private:
     QString resultBasisText() const;
     QString roiStatusText() const;
 
+    Ui::RegisteredClassificationDialog *ui = nullptr;
     QString m_toolId;
     bool m_enabled = true;
     bool m_allParamsMode = false;

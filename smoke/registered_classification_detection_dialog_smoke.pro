@@ -22,7 +22,7 @@ include(../qmake/halcon_20_11.pri)
 
 LIBS += -L$$OPENCV_ROOT/lib
 LIBS += -Wl,-rpath,$$OPENCV_ROOT/lib
-LIBS += -lopencv_core -lopencv_imgproc -lopencv_videoio -ldl
+LIBS += -lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_videoio -ldl
 
 SOURCES += \
     registered_classification_detection_dialog_smoke.cpp \
@@ -33,11 +33,20 @@ SOURCES += \
     ../src/RegisteredClassificationModelManagementDialog.cpp \
     ../src/ToolLibraryDialog.cpp \
     ../src/frame/CameraFrameProvider.cpp \
+    ../src/frame/FrameInputMetadata.cpp \
     ../src/frame/FramePixelProbe.cpp \
     ../src/frame/FrameViewHelper.cpp \
     ../src/frame/MatImageConverter.cpp \
     ../src/frame/ReferenceImageProvider.cpp \
     ../src/toolcore/PositionCorrection.cpp \
+    ../src/toolcore/PositionCorrectionTransform.cpp \
+    ../src/algorithms/location/PositionCorrectionHalconTransform.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationFeatureSpace.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationKnnRuntime.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationModelPackage.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationTrainingSession.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationFeatureExtractor.cpp \
+    ../src/algorithms/recognition/RegisteredClassificationTrainingRunner.cpp \
     ../src/algorithms/halcon/HalconRuntimePaths.cpp
 
 HEADERS += \
@@ -61,7 +70,13 @@ HEADERS += \
     ../src/toolcore/ToolTypes.h
 
 FORMS += \
-    ../ui/ToolLibraryDialog.ui
+    ../ui/ToolLibraryDialog.ui \
+    ../ui/RegisteredClassificationDialog.ui \
+    ../ui/RegisteredClassificationTrainingDialog.ui \
+    ../ui/RegisteredClassificationDetectionDialog.ui \
+    ../ui/RegisteredClassificationDetectionTrainingDialog.ui \
+    ../ui/RegisteredClassificationModelManagementDialog.ui
+FORMS += ../ui/CreateDatasetDialog.ui
 
 RESOURCES += \
     ../resources/resources.qrc

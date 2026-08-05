@@ -41,6 +41,7 @@
 
 #include "BlobPresenceDialog.h"
 #include "CameraParamsDialog.h"
+#include "CalibrationTransformDialog.h"
 #include "CharacterRecognitionDialog.h"
 #include "ClassificationDialog.h"
 #include "CirclePresenceDialog.h"
@@ -366,6 +367,7 @@ bool runToolConfigDialog(QWidget *parent,
                          ToolPreviewSnapshot *snapshot)
 {
     Dialog configDialog(parent);
+    PlanDialogUtils::applyToolLevelStyle(&configDialog);
     configDialog.setWindowModality(Qt::WindowModal);
     configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     PlanDialogUtils::applyLargeWindow(&configDialog);
@@ -406,6 +408,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolEngine.registerAdapter(&m_registeredClassificationAdapter);
     m_toolEngine.registerAdapter(&m_templateLocationAdapter);
     m_toolEngine.registerAdapter(&m_positionCorrectionAdapter);
+    m_toolEngine.registerAdapter(&m_calibrationTransformAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     m_previewHelper->bindPixelStatusLabel(ui->cursorLabel);
     m_toolChainWatcher = new QFutureWatcher<ToolChainRunOutput>(this);
@@ -1734,6 +1737,8 @@ QString MainWindow::toolDisplayName(const ToolConfig &config) const
         return tr("分类");
     case ToolType::TemplateLocation:
         return tr("模板定位");
+    case ToolType::CalibrationTransform:
+        return tr("标定转换");
     default:
         return toolTypeToString(config.toolType);
     }
@@ -1816,6 +1821,7 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
     case ToolType::RegisteredClassification:
     {
         RegisteredClassificationDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
         dialog.setWindowModality(Qt::WindowModal);
         dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
         PlanDialogUtils::applyLargeWindow(&dialog);
@@ -1845,6 +1851,7 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
     case ToolType::BlobPresence:
     {
         BlobPresenceDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
         dialog.setWindowModality(Qt::WindowModal);
         dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
         PlanDialogUtils::applyLargeWindow(&dialog);
@@ -1869,6 +1876,7 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
     case ToolType::CirclePresence:
     {
         CirclePresenceDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
         dialog.setWindowModality(Qt::WindowModal);
         dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
         PlanDialogUtils::applyLargeWindow(&dialog);
@@ -1912,6 +1920,22 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
     case ToolType::TemplateLocation:
         accepted = runToolConfigDialog<TemplateLocationDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
+    case ToolType::CalibrationTransform:
+    {
+        CalibrationTransformDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+        dialog.setProducerTools(m_schemeToolConfigs, row, m_referencePreviewSnapshots);
+        dialog.loadFromConfig(originalConfig);
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
+        break;
+    }
     default:
         qDebug() << "[MainWindow] Unsupported tool edit type:" << toolTypeToString(originalConfig.toolType);
         break;

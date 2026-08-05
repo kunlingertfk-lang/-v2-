@@ -10,10 +10,9 @@
 #include "toolcore/ToolEngine.h"
 
 #include <QButtonGroup>
-#include <QBrush>
+#include <QAbstractItemView>
 #include <QByteArray>
 #include <QCheckBox>
-#include <QColor>
 #include <QComboBox>
 #include <QDebug>
 #include <QDoubleSpinBox>
@@ -60,6 +59,8 @@ namespace {
 
 // 改为 false 即可隐藏 PC 导入入口，不影响导入测试逻辑和已有配置。
 constexpr bool kShowPcImportButton = true;
+constexpr int kTemplateListMinimumHeight = 118;
+constexpr int kTemplateListMaximumHeight = 560;
 
 int toolIndexById(const QVector<ToolConfig> &tools,
                   const QString &toolId,
@@ -1372,7 +1373,6 @@ void ColorRecognitionDialog::setupUiState()
     ui->minCategoryConfidenceSpinBox->setRange(0, 100);
     ui->minClassifiedCoverageSpinBox->setRange(0, 100);
     ui->viewerTitleLabel->setText(tr("基准图"));
-    ui->previewGraphicsView->setBackgroundBrush(QBrush(QColor(255, 255, 255)));
     ui->viewerStatusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     ui->viewerStatusLabel->setMinimumWidth(0);
     ui->viewerStatusLabel->setWordWrap(false);
@@ -1836,6 +1836,7 @@ QWidget *makeTemplateRoiSampleCard(const QImage &sourceImage,
 {
     QFrame *card = new QFrame(parent);
     card->setFrameShape(QFrame::NoFrame);
+    card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     card->setToolTip(toolTip);
     card->setStyleSheet(QStringLiteral(
         "QFrame { background:#ffffff; border:1px solid #cfd6df; border-radius:4px; }"
@@ -1869,6 +1870,31 @@ QWidget *makeTemplateRoiSampleCard(const QImage &sourceImage,
     layout->addWidget(imageLabel, 0, Qt::AlignHCenter);
     layout->addWidget(textLabel);
     return card;
+}
+
+// 让常用数量的模板 ROI 完整展开；内容过多时才由列表自身滚动。
+void adjustTemplateListHeight(QListWidget *listWidget)
+{
+    if (!listWidget)
+        return;
+
+    int contentHeight = listWidget->frameWidth() * 2 + 2;
+    for (int row = 0; row < listWidget->count(); ++row) {
+        const QListWidgetItem *item = listWidget->item(row);
+        int rowHeight = listWidget->sizeHintForRow(row);
+        if (rowHeight <= 0 && item)
+            rowHeight = item->sizeHint().height();
+        contentHeight += qMax(1, rowHeight);
+    }
+
+    const int targetHeight = qBound(kTemplateListMinimumHeight,
+                                    contentHeight,
+                                    kTemplateListMaximumHeight);
+    listWidget->setFixedHeight(targetHeight);
+    listWidget->setVerticalScrollBarPolicy(
+                contentHeight > kTemplateListMaximumHeight
+                ? Qt::ScrollBarAsNeeded
+                : Qt::ScrollBarAlwaysOff);
 }
 
 // 重建模板树形列表，按模板、标签、样本三级展示。
@@ -1931,7 +1957,7 @@ void ColorRecognitionDialog::updateTemplateList()
                     sampleImage.loadFromData(QByteArray::fromBase64(sample.roiImagePngBase64.toLatin1()),
                                              "PNG");
                 }
-                sampleItem->setSizeHint(QSize(260, 104));
+                sampleItem->setSizeHint(QSize(0, 104));
                 sampleItem->setData(ItemKindRole, kSampleItem);
                 sampleItem->setData(TemplateIdRole, colorTemplate.templateId);
                 sampleItem->setData(ClassIdRole, sample.classId);
@@ -1946,6 +1972,8 @@ void ColorRecognitionDialog::updateTemplateList()
             }
         }
     }
+
+    adjustTemplateListHeight(ui->templateListWidget);
 
     if (selectedRow < 0 && !m_templates.isEmpty())
         selectedRow = 0;

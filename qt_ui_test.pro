@@ -33,6 +33,8 @@ SOURCES += \
     src/SchemeStore.cpp \
     src/PlanDialogUtils.cpp \
     src/CameraParamsDialog.cpp \
+    src/CalibrationTransformDialog.cpp \
+    src/QuickCalibrationWizard.cpp \
     src/ReferenceImageDialog.cpp \
     src/PositionCorrectionDialog.cpp \
     src/PositionCorrectionDialogTestHelper.cpp \
@@ -67,6 +69,12 @@ SOURCES += \
     src/toolcore/PositionCorrection.cpp \
     src/toolcore/PositionCorrectionConsumer.cpp \
     src/toolcore/PositionCorrectionTransform.cpp \
+    src/calibration/CalibrationModel.cpp \
+    src/calibration/CalibrationSolver.cpp \
+    src/calibration/CalibrationFileLoader.cpp \
+    src/calibration/CalibrationCommunicationProtocol.cpp \
+    src/calibration/CalibrationMethodRegistry.cpp \
+    src/calibration/NPointCalibrationConfigWidget.cpp \
     src/toolcore/ToolEngine.cpp \
     src/tooladapters/OcrAdapter.cpp \
     src/tooladapters/ColorRecognitionAdapter.cpp \
@@ -75,6 +83,7 @@ SOURCES += \
     src/tooladapters/PatternPresenceAdapter.cpp \
     src/tooladapters/TemplateLocationAdapter.cpp \
     src/tooladapters/PositionCorrectionAdapter.cpp \
+    src/tooladapters/CalibrationTransformAdapter.cpp \
     src/tooladapters/BlobPresenceAdapter.cpp \
     src/tooladapters/CirclePresenceAdapter.cpp \
     src/tooladapters/EdgePresenceAdapter.cpp \
@@ -103,6 +112,7 @@ SOURCES += \
     src/algorithms/location/TemplateLocationHalconRunner.cpp \
     src/algorithms/location/PositionCorrectionHalconRunner.cpp \
     src/algorithms/location/PositionCorrectionHalconTransform.cpp \
+    src/algorithms/location/CalibrationTransformHalconRunner.cpp \
     src/algorithms/presence/BlobPresenceHalconRunner.cpp \
     src/algorithms/presence/CirclePresenceHalconRunner.cpp \
     src/algorithms/presence/EdgePresenceHalconRunner.cpp \
@@ -116,6 +126,8 @@ HEADERS += \
     src/PlanDialogUtils.h \
     src/UiStyleRoles.h \
     src/CameraParamsDialog.h \
+    src/CalibrationTransformDialog.h \
+    src/QuickCalibrationWizard.h \
     src/ReferenceImageDialog.h \
     src/PositionCorrectionDialog.h \
     src/PositionCorrectionDialogTestHelper.h \
@@ -155,6 +167,12 @@ HEADERS += \
     src/toolcore/PositionCorrection.h \
     src/toolcore/PositionCorrectionConsumer.h \
     src/toolcore/PositionCorrectionTransform.h \
+    src/calibration/CalibrationModel.h \
+    src/calibration/CalibrationSolver.h \
+    src/calibration/CalibrationFileLoader.h \
+    src/calibration/CalibrationCommunicationProtocol.h \
+    src/calibration/CalibrationMethodRegistry.h \
+    src/calibration/NPointCalibrationConfigWidget.h \
     src/toolcore/ToolPreviewSnapshot.h \
     src/toolcore/ToolAdapter.h \
     src/toolcore/ToolEngine.h \
@@ -165,6 +183,7 @@ HEADERS += \
     src/tooladapters/PatternPresenceAdapter.h \
     src/tooladapters/TemplateLocationAdapter.h \
     src/tooladapters/PositionCorrectionAdapter.h \
+    src/tooladapters/CalibrationTransformAdapter.h \
     src/tooladapters/BlobPresenceAdapter.h \
     src/tooladapters/CirclePresenceAdapter.h \
     src/tooladapters/EdgePresenceAdapter.h \
@@ -192,6 +211,7 @@ HEADERS += \
     src/algorithms/presence/PatternPresenceHalconRunner.h \
     src/algorithms/location/TemplateLocationHalconRunner.h \
     src/algorithms/location/PositionCorrectionHalconTransform.h \
+    src/algorithms/location/CalibrationTransformHalconRunner.h \
     src/algorithms/location/PositionCorrectionHalconRunner.h \
     src/algorithms/presence/BlobPresenceHalconRunner.h \
     src/algorithms/presence/CirclePresenceHalconRunner.h \
@@ -203,6 +223,7 @@ FORMS += \
     ui/LoginWindow.ui \
     ui/MainWindow.ui \
     ui/CameraParamsDialog.ui \
+    ui/CalibrationTransformDialog.ui \
     ui/ReferenceImageDialog.ui \
     ui/PositionCorrectionDialog.ui \
     ui/TemplateLocationDialog.ui \
@@ -210,6 +231,13 @@ FORMS += \
     ui/CharacterRecognitionDialog.ui \
     ui/ColorRecognitionDialog.ui \
     ui/ColorComparisonDialog.ui \
+    ui/ColorTemplateDialog.ui \
+    ui/RegisteredClassificationDialog.ui \
+    ui/RegisteredClassificationTrainingDialog.ui \
+    ui/RegisteredClassificationDetectionDialog.ui \
+    ui/RegisteredClassificationDetectionTrainingDialog.ui \
+    ui/RegisteredClassificationModelManagementDialog.ui \
+    ui/CreateDatasetDialog.ui \
     ui/ClassificationDialog.ui \
     ui/ObjectDetectionDialog.ui \
     ui/PatternPresenceDialog.ui \

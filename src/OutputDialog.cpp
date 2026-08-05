@@ -66,6 +66,9 @@ void OutputDialog::setupUiState()
     ui->referenceStepButton->setChecked(false);
     ui->toolsStepButton->setChecked(false);
     ui->outputStepButton->setChecked(true);
+    ui->setupQuickCalibrateButton->setEnabled(false);
+    ui->setupQuickCalibrateButton->setProperty(
+                "quickCalibrationState", QStringLiteral("locked"));
     refreshSchemeHeader();
 }
 

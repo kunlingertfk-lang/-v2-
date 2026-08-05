@@ -11,19 +11,22 @@
 #include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QFontMetrics>
+#include <QGridLayout>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QSize>
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QToolButton>
+#include <QTimer>
 #include <QUuid>
 
 #include <opencv2/imgcodecs.hpp>
@@ -38,6 +41,62 @@
 #include "toolcore/ToolRequest.h"
 
 namespace {
+
+constexpr int kComboFullTextRole = Qt::UserRole + 100;
+
+QString normalizedSourceText(QString text)
+{
+    const QString unavailablePrefix = QObject::tr("来源不可用：");
+    text = text.trimmed();
+    while (text.startsWith(unavailablePrefix + unavailablePrefix))
+        text.remove(0, unavailablePrefix.size());
+    return text;
+}
+
+void resetScrollAreaToTop(QScrollArea *scrollArea)
+{
+    if (!scrollArea)
+        return;
+
+    QTimer::singleShot(0, scrollArea, [scrollArea]() {
+        if (QScrollBar *scrollBar = scrollArea->verticalScrollBar())
+            scrollBar->setValue(scrollBar->minimum());
+    });
+}
+
+QString comboSelectedFullText(const QComboBox *comboBox)
+{
+    if (!comboBox)
+        return QString();
+    const int index = comboBox->currentIndex();
+    if (index < 0)
+        return comboBox->currentText();
+    const QString fullText = comboBox->itemData(index, kComboFullTextRole).toString();
+    return fullText.isEmpty() ? comboBox->itemText(index) : fullText;
+}
+
+void updateComboToolTip(QComboBox *comboBox)
+{
+    if (!comboBox || comboBox->currentIndex() < 0)
+        return;
+
+    const QString fullText = comboSelectedFullText(comboBox);
+    comboBox->setToolTip(fullText);
+}
+
+void configureSourceCombo(QComboBox *comboBox)
+{
+    if (!comboBox)
+        return;
+    comboBox->setEditable(false);
+    for (int index = 0; index < comboBox->count(); ++index)
+        comboBox->setItemData(index, comboBox->itemText(index), kComboFullTextRole);
+    QObject::connect(comboBox,
+                     QOverload<int>::of(&QComboBox::currentIndexChanged),
+                     comboBox,
+                     [comboBox]() { updateComboToolTip(comboBox); });
+    updateComboToolTip(comboBox);
+}
 
 QImage imageFromFrame(const cv::Mat &frame)
 {
@@ -219,7 +278,15 @@ void setComboBoxValue(QComboBox *comboBox, const QString &value)
     if (!comboBox || value.isEmpty())
         return;
 
-    const int index = comboBox->findText(value);
+    int index = -1;
+    for (int i = 0; i < comboBox->count(); ++i) {
+        if (comboBox->itemData(i, kComboFullTextRole).toString() == value) {
+            index = i;
+            break;
+        }
+    }
+    if (index < 0)
+        index = comboBox->findText(value);
     if (index >= 0)
         comboBox->setCurrentIndex(index);
 }
@@ -238,18 +305,24 @@ void populatePositionCorrectionCombo(
 
     int selectedIndex = -1;
     for (const PositionCorrectionSource &source : sources) {
-        comboBox->addItem(source.displayText, source.sourceId);
+        const QString displayText = normalizedSourceText(source.displayText);
+        comboBox->addItem(displayText, source.sourceId);
+        comboBox->setItemData(comboBox->count() - 1,
+                              displayText,
+                              kComboFullTextRole);
         if (source.sourceId == selectedId)
             selectedIndex = comboBox->count() - 1;
     }
 
     if (selectedIndex < 0 && !selectedId.trimmed().isEmpty()) {
-        comboBox->insertItem(
-                    0,
-                    QObject::tr("来源不可用：%1").arg(
-                        selectedText.trimmed().isEmpty()
-                        ? selectedId : selectedText),
-                    selectedId);
+        const QString unavailableSource = normalizedSourceText(
+                    selectedText.trimmed().isEmpty() ? selectedId : selectedText);
+        const QString unavailablePrefix = QObject::tr("来源不可用：");
+        const QString unavailableText = unavailableSource.startsWith(unavailablePrefix)
+                ? unavailableSource
+                : unavailablePrefix + unavailableSource;
+        comboBox->insertItem(0, unavailableText, selectedId);
+        comboBox->setItemData(0, unavailableText, kComboFullTextRole);
         selectedIndex = 0;
     }
 
@@ -258,6 +331,7 @@ void populatePositionCorrectionCombo(
 
     if (selectedIndex >= 0)
         comboBox->setCurrentIndex(selectedIndex);
+    updateComboToolTip(comboBox);
 }
 
 void configureRoiToolButton(QToolButton *button,
@@ -322,9 +396,9 @@ CirclePresenceConfig CirclePresenceDialog::configuration() const
     config.enablePositionCorrection = basicMode
             ? ui->basicPositionCorrectionSwitch->isChecked()
             : ui->positionCorrectionSwitch->isChecked();
-    config.positionCorrectionSource = basicMode
-            ? ui->basicPositionCorrectionComboBox->currentText()
-            : ui->positionCorrectionComboBox->currentText();
+    config.positionCorrectionSource = comboSelectedFullText(
+                basicMode ? ui->basicPositionCorrectionComboBox
+                          : ui->positionCorrectionComboBox);
 
     config.positionCorrectionSourceId = basicMode
             ? ui->basicPositionCorrectionComboBox->currentData().toString().trimmed()
@@ -552,6 +626,16 @@ void CirclePresenceDialog::setupUiState()
     ui->roundnessSpinBox->setValue(25);
     ui->edgePolarityComboBox->setCurrentIndex(2);
     ui->edgeTypeComboBox->setCurrentIndex(0);
+    configureSourceCombo(ui->basicPositionCorrectionComboBox);
+    configureSourceCombo(ui->positionCorrectionComboBox);
+    ui->basicGridLayout_position->setAlignment(
+                ui->basicPositionCorrectionSwitch, Qt::AlignRight);
+    ui->basicGridLayout_position->setAlignment(
+                ui->basicPositionCorrectionComboBox, Qt::AlignRight);
+    ui->gridLayout_position->setAlignment(
+                ui->positionCorrectionSwitch, Qt::AlignRight);
+    ui->gridLayout_position->setAlignment(
+                ui->positionCorrectionComboBox, Qt::AlignRight);
     ui->basicPositionCorrectionSwitch->setChecked(false);
     ui->positionCorrectionSwitch->setChecked(false);
     ui->basicPresentOkButton->setChecked(true);
@@ -568,6 +652,9 @@ void CirclePresenceDialog::setupUiState()
     configureRoiToolButton(ui->detectionCircleButton, QStringLiteral("○"), tr("圆形检测 ROI"));
     configureRoiToolButton(ui->basicDetectionPolygonButton, QStringLiteral("⬡"), tr("多边形检测 ROI"));
     configureRoiToolButton(ui->detectionPolygonButton, QStringLiteral("⬡"), tr("多边形检测 ROI"));
+    ui->basicSegmentButton->setFocus(Qt::OtherFocusReason);
+    resetScrollAreaToTop(ui->circleBasicParamsScrollArea);
+    resetScrollAreaToTop(ui->circleAllParamsScrollArea);
     configureRoiToolButton(ui->basicDetectionResetButton, QStringLiteral("⟳"), tr("恢复全图检测"));
     configureRoiToolButton(ui->detectionResetButton, QStringLiteral("⟳"), tr("恢复全图检测"));
 
@@ -608,9 +695,11 @@ void CirclePresenceDialog::connectControls()
     m_segmentGroup->addButton(ui->allSegmentButton, 1);
     connect(ui->basicSegmentButton, &QPushButton::clicked, this, [this]() {
         ui->circleParamsStackedWidget->setCurrentWidget(ui->basicParamsPage);
+        resetScrollAreaToTop(ui->circleBasicParamsScrollArea);
     });
     connect(ui->allSegmentButton, &QPushButton::clicked, this, [this]() {
         ui->circleParamsStackedWidget->setCurrentWidget(ui->allParamsPage);
+        resetScrollAreaToTop(ui->circleAllParamsScrollArea);
     });
     connect(ui->basicPositionCorrectionSwitch, &QCheckBox::toggled,
             ui->positionCorrectionSwitch, &QCheckBox::setChecked);

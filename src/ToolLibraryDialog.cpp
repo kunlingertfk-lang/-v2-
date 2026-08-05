@@ -156,6 +156,7 @@ void ToolLibraryDialog::setupButtonGroup()
     m_buttonGroup->addButton(ui->edgeLocationButton, EdgeLocationButton);   //边缘定位
     m_buttonGroup->addButton(ui->circleLocationButton, CircleLocationButton);   //圆定位
     m_buttonGroup->addButton(ui->positionCorrectionToolButton, PositionCorrectionTool);
+    m_buttonGroup->addButton(ui->calibrationTransformToolButton, CalibrationTransformTool);
 
     //识别工具
     m_buttonGroup->addButton(ui->colorRecognitionToolButton, ColorRecognition); //颜色识别
@@ -245,6 +246,12 @@ void ToolLibraryDialog::confirmSelection()
 
     if (tool == PositionCorrectionTool) {
         m_selectedToolType = ToolType::PositionCorrection;
+        accept();
+        return;
+    }
+
+    if (tool == CalibrationTransformTool) {
+        m_selectedToolType = ToolType::CalibrationTransform;
         accept();
         return;
     }
@@ -366,6 +373,10 @@ void ToolLibraryDialog::updatePreview(int id)
     case PositionCorrectionTool:
         ui->previewTitleLabel->setText(tr("位置修正"));
         ui->previewDescriptionLabel->setText(tr("根据基准与运行位置计算平移和旋转修正信息"));
+        break;
+    case CalibrationTransformTool:
+        ui->previewTitleLabel->setText(tr("标定转换"));
+        ui->previewDescriptionLabel->setText(tr("加载标定文件，在图像坐标与物理坐标之间双向转换"));
         break;
 
 /*===========================tfk add===========================*/       

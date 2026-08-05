@@ -30,6 +30,7 @@ class QToolButton;
 class QTimer;
 class QWidget;
 class ColorComparisonFeatureView;
+namespace Ui { class ColorComparisonDialog; }
 template <typename T> class QFutureWatcher;
 
 class ColorComparisonDialog : public QDialog
@@ -253,6 +254,7 @@ private:
     QPushButton *m_testRunButton = nullptr;
     QPushButton *m_finishButton = nullptr;
     QPushButton *m_exitTestButton = nullptr;
+    Ui::ColorComparisonDialog *ui = nullptr;
 };
 
 #endif // COLORCOMPARISONDIALOG_H

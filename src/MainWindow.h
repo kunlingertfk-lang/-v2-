@@ -27,6 +27,7 @@
 #include "tooladapters/RegisteredClassificationAdapter.h"
 #include "tooladapters/TemplateLocationAdapter.h"
 #include "tooladapters/PositionCorrectionAdapter.h"
+#include "tooladapters/CalibrationTransformAdapter.h"
 
 class FrameViewHelper;
 class QEvent;
@@ -159,6 +160,7 @@ private:
     RegisteredClassificationAdapter m_registeredClassificationAdapter;
     TemplateLocationAdapter m_templateLocationAdapter;
     PositionCorrectionAdapter m_positionCorrectionAdapter;
+    CalibrationTransformAdapter m_calibrationTransformAdapter;
     ToolEngine m_toolEngine;
     FrameViewHelper *m_previewHelper = nullptr;
     Ui::MainWindow *ui;

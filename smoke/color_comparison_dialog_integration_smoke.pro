@@ -57,6 +57,8 @@ HEADERS += \
     ../src/tooladapters/PositionCorrectionAdapter.h \
     ../src/tooladapters/TemplateLocationAdapter.h
 
+FORMS += ../ui/ColorComparisonDialog.ui
+
 LIBS += -L$$HALCON_ROOT/lib/x64-linux -Wl,-rpath,$$HALCON_ROOT/lib/x64-linux
 LIBS += -lhalconcpp -lhalcon
 

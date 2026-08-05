@@ -33,6 +33,7 @@
 #include "CharacterRecognitionDialog.h"
 #include "BlobPresenceDialog.h"
 #include "CameraParamsDialog.h"
+#include "CalibrationTransformDialog.h"
 #include "ColorComparisonDialog.h"
 #include "ColorRecognitionDialog.h"
 #include "ClassificationDialog.h"
@@ -48,6 +49,7 @@
 #include "TemplateLocationDialog.h"
 #include "PlanDialogUtils.h"
 #include "ReferenceImageDialog.h"
+#include "QuickCalibrationWizard.h"
 #include "RegisteredClassificationDialog.h"
 #include "RegisteredClassificationDetectionDialog.h"
 #include "SchemeStore.h"
@@ -215,6 +217,7 @@ QString toolIconForType(ToolType type)
     case ToolType::ContourPresence:
         return QStringLiteral(":/icons/eye.svg");
     case ToolType::PositionCorrection:
+    case ToolType::CalibrationTransform:
         return QStringLiteral(":/icons/fit.svg");
     default:
         return QStringLiteral(":/icons/tool.svg");
@@ -252,6 +255,23 @@ void configureProducerContext(PositionCorrectionDialog *dialog,
     }
     dialog->setAvailableProducers(toolsDialog->toolConfigs(), index,
                                   referenceProducers);
+}
+
+void configureProducerContext(CalibrationTransformDialog *dialog,
+                              ToolsDialog *toolsDialog,
+                              const ToolConfig *initialConfig)
+{
+    int index = toolsDialog->toolConfigs().size();
+    if (initialConfig) {
+        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
+            if (toolsDialog->toolConfigs().at(i).toolId == initialConfig->toolId) {
+                index = i;
+                break;
+            }
+        }
+    }
+    dialog->setProducerTools(toolsDialog->toolConfigs(), index,
+                             toolsDialog->referencePreviewSnapshots());
 }
 
 void configureProducerContext(BlobPresenceDialog *dialog,
@@ -371,6 +391,7 @@ bool runToolConfigDialog(QWidget *parent,
                          ToolPreviewSnapshot *snapshot)
 {
     Dialog configDialog(parent);
+    PlanDialogUtils::applyToolLevelStyle(&configDialog);
     configDialog.setWindowModality(Qt::WindowModal);
     configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     PlanDialogUtils::applyLargeWindow(&configDialog);
@@ -533,6 +554,9 @@ void ToolsDialog::setupUiState()
     ui->referenceStepButton->setChecked(false);
     ui->toolsStepButton->setChecked(true);
     ui->outputStepButton->setChecked(false);
+    ui->setupQuickCalibrateButton->setEnabled(true);
+    ui->setupQuickCalibrateButton->setProperty(
+                "quickCalibrationState", QStringLiteral("available"));
 
     ui->verticalLayout_toolsList->setSpacing(kToolListSpacing);
     ui->verticalLayout_toolsList->setContentsMargins(kToolListMargin,
@@ -559,6 +583,26 @@ void ToolsDialog::connectNavigation()
     connect(ui->setupExternalEditButton, &QToolButton::clicked, this, &ToolsDialog::editCurrentSchemeName);
     connect(ui->setupSaveButton, &QToolButton::clicked, this, &ToolsDialog::saveCurrentScheme);
     connect(ui->setupSaveAsButton, &QToolButton::clicked, this, &ToolsDialog::saveCurrentSchemeAs);
+    connect(ui->setupQuickCalibrateButton, &QToolButton::clicked,
+            this, &ToolsDialog::openQuickCalibration);
+}
+
+void ToolsDialog::openQuickCalibration()
+{
+    if (!commitToolStateToScheme(true))
+        return;
+    QuickCalibrationWizard wizard(this);
+    wizard.setProducerTools(m_toolConfigs, m_toolPreviewSnapshots);
+    wizard.setPreviewImage(currentReferenceImage());
+    PlanDialogUtils::fitDialogToScreen(&wizard, this, 24);
+    PlanDialogUtils::centerWindowOnScreen(&wizard, this, 24);
+    wizard.exec();
+    if (!wizard.generatedFilePath().isEmpty()) {
+        QMessageBox::information(this,
+                                 tr("快速标定"),
+                                 tr("标定文件已生成，并已进入当前方案的标定资产列表：\n%1")
+                                 .arg(wizard.generatedFilePath()));
+    }
 }
 
 void ToolsDialog::refreshSchemeHeader()
@@ -908,6 +952,9 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     case ToolType::PositionCorrection:
         accepted = runToolConfigDialog<PositionCorrectionDialog>(this, nullptr, &config, &snapshot);
         break;
+    case ToolType::CalibrationTransform:
+        accepted = runToolConfigDialog<CalibrationTransformDialog>(this, nullptr, &config, &snapshot);
+        break;
 /*============================tfk add=================================*/
     case ToolType::TemplateLocation:
         accepted = runToolConfigDialog<TemplateLocationDialog>(this, nullptr, &config, &snapshot);
@@ -989,6 +1036,9 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
         break;
     case ToolType::PositionCorrection:
         accepted = runToolConfigDialog<PositionCorrectionDialog>(this, &originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::CalibrationTransform:
+        accepted = runToolConfigDialog<CalibrationTransformDialog>(this, &originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::TemplateLocation:
         accepted = runToolConfigDialog<TemplateLocationDialog>(this, &originalConfig, &editedConfig, &snapshot);
@@ -1164,7 +1214,7 @@ QFrame *ToolsDialog::createToolCard(const ToolConfig &config, int index)
     QToolButton *gearButton = new QToolButton(card);
     gearButton->setObjectName(QStringLiteral("toolGearButton"));
     gearButton->setProperty("role", QStringLiteral("toolGear"));
-    gearButton->setIcon(QIcon(QStringLiteral(":/icons/settings.svg")));
+    gearButton->setIcon(QIcon(QStringLiteral(":/icons/settings-dark.svg")));
     gearButton->setIconSize(QSize(22, 22));
     gearButton->setToolTip(tr("编辑工具参数"));
     rowLayout->addWidget(gearButton);
@@ -1276,6 +1326,8 @@ QString ToolsDialog::toolDisplayName(const ToolConfig &config) const
         return tr("分类");
     case ToolType::PositionCorrection:
         return tr("位置修正");
+    case ToolType::CalibrationTransform:
+        return tr("标定转换");
     case ToolType::TemplateLocation:
         return tr("模板定位");
     default:
