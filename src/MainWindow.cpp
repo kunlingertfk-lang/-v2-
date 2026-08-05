@@ -57,6 +57,7 @@
 #include "RegisteredClassificationDetectionDialog.h"
 #include "TemplateLocationDialog.h"
 #include "SchemeStore.h"
+#include "SchemeSetupWindow.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -597,9 +598,6 @@ void MainWindow::openCameraParamsDialog()
         return;
     }
 
-    if (activateActiveSetupWindow())
-        return;
-
     if (m_isContinuousRunning)
         stopContinuousRun();
 
@@ -614,11 +612,7 @@ void MainWindow::openCameraParamsDialog()
 
     if (!persistCurrentSchemeState(QStringLiteral("openCameraParamsDialog")))
         return;
-    CameraParamsDialog *dialog = new CameraParamsDialog(this);// 打开相机参数窗口
-    PlanDialogUtils::setSessionInfo(dialog,
-                                    ui->headerDeviceComboBox->currentText(),
-                                    ui->headerUserButton->text());
-    PlanDialogUtils::showDialogFromWidget(this, dialog);
+    openSchemeSetupPage(QStringLiteral("camera"));
 
     qDebug() << "[SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive"
              << "mainWindow=" << this
@@ -635,38 +629,37 @@ void MainWindow::openToolsDialog()
         return;
     }
 
-    if (activateActiveSetupWindow())
-        return;
-
     if (m_isContinuousRunning)
         stopContinuousRun();
 
     applyCurrentSchemeState();
-    ToolsDialog dialog(this);
-    dialog.setAttribute(Qt::WA_DeleteOnClose, false);
-    dialog.setToolEngineForTesting(&m_toolEngine);
-    dialog.setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);
-    PlanDialogUtils::setSessionInfo(&dialog,
+    openSchemeSetupPage(QStringLiteral("tools"));
+}
+
+void MainWindow::openSchemeSetupPage(const QString &pageId)
+{
+    if (SchemeSetupWindow *existing =
+            qobject_cast<SchemeSetupWindow *>(m_activeSetupWindow.data())) {
+        existing->showSetupPage(pageId);
+        existing->show();
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+
+    if (activateActiveSetupWindow())
+        return;
+
+    SchemeSetupWindow *window = new SchemeSetupWindow(this);
+    window->setToolEngine(&m_toolEngine);
+    window->setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);
+    connect(window, &SchemeSetupWindow::toolStateCommitted,
+            this, &MainWindow::applySavedSchemeTools);
+    PlanDialogUtils::setSessionInfo(window,
                                     ui->headerDeviceComboBox->currentText(),
                                     ui->headerUserButton->text());
-    registerActiveSetupWindow(&dialog);
-
-    dialog.exec();
-
-    updateSchemeToolsFromToolsDialog(dialog.toolConfigs(), dialog.referencePreviewSnapshots());
-
-    qDebug() << "[MainWindow] 已同步工具配置数量:" << m_schemeToolConfigs.size();
-    for (const ToolConfig &config : m_schemeToolConfigs) {
-        qDebug() << "[MainWindow] ToolConfig"
-                 << config.toolId
-                 << toolTypeToString(config.toolType)
-                 << config.summary;
-    }
-
-    if (!dialog.openedOutputDialog()) {
-        raise();
-        activateWindow();
-    }
+    window->showSetupPage(pageId);
+    PlanDialogUtils::showDialogFromWidget(this, window);
 }
 
 void MainWindow::runSingleToolFlow()

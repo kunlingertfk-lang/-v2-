@@ -6,6 +6,7 @@
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
+#include "frame/RoiGeometry.h"
 #include "UiStyleRoles.h"
 #include "PlanDialogUtils.h"
 
@@ -856,10 +857,24 @@ void ColorTemplateDialog::connectControls()
     });
 }
 
+void ColorTemplateDialog::setAdvancedExpanded(bool expanded)
+{
+    if (!ui || !ui->advancedCollapseButton || !ui->advancedContentWidget)
+        return;
+
+    const QSignalBlocker blocker(ui->advancedCollapseButton);
+    ui->advancedCollapseButton->setChecked(!expanded);
+    ui->advancedCollapseButton->setText(expanded ? QStringLiteral("⌄") : QStringLiteral("›"));
+    ui->advancedContentWidget->setVisible(expanded);
+}
+
 void ColorTemplateDialog::updateAlgorithmUi()
 {
     const bool gmm = recognitionBackendFromUi(m_recognitionBackendComboBox->currentText()) ==
             QStringLiteral("cielab_gmm");
+    // 建模是 GMM 模板可用于检测的必经步骤，不能因卡片折叠而成为隐藏操作。
+    if (gmm)
+        setAdvancedExpanded(true);
     m_featureTypeRowWidget->setVisible(!gmm);
     m_featureTypeComboBox->setEnabled(!gmm);
     m_sensitivityComboBox->setEnabled(!gmm);
@@ -1837,11 +1852,7 @@ QImage ColorTemplateDialog::cropRoiImage(const QRectF &roiNormalized) const
         return QImage();
 
     const QRectF roi = normalizedRoiOrDefault(roiNormalized);
-    const QRect sourceRect(qBound(0, static_cast<int>(std::floor(roi.x() * source.width())), source.width() - 1),
-                           qBound(0, static_cast<int>(std::floor(roi.y() * source.height())), source.height() - 1),
-                           qMax(1, static_cast<int>(std::ceil(roi.width() * source.width()))),
-                           qMax(1, static_cast<int>(std::ceil(roi.height() * source.height()))));
-    return source.copy(sourceRect.intersected(source.rect()));
+    return source.copy(coveringPixelRect(roi, source.width(), source.height()));
 }
 
 cv::Mat ColorTemplateDialog::cropGmmRoiMat(const cv::Mat &frame,
@@ -1850,20 +1861,17 @@ cv::Mat ColorTemplateDialog::cropGmmRoiMat(const cv::Mat &frame,
     if (frame.empty())
         return cv::Mat();
     const QRectF roi = normalizedRoiOrDefault(roiNormalized);
-    const int left = qBound(0, static_cast<int>(std::floor(roi.x() * frame.cols)), frame.cols - 1);
-    const int top = qBound(0, static_cast<int>(std::floor(roi.y() * frame.rows)), frame.rows - 1);
-    const int width = qMax(1, static_cast<int>(std::ceil(roi.width() * frame.cols)));
-    const int height = qMax(1, static_cast<int>(std::ceil(roi.height() * frame.rows)));
-    const cv::Rect bounds(0, 0, frame.cols, frame.rows);
-    const cv::Rect clipped = cv::Rect(left, top, width, height) & bounds;
-    return clipped.width > 0 && clipped.height > 0 ? frame(clipped).clone() : cv::Mat();
+    const QRect crop = coveringPixelRect(roi, frame.cols, frame.rows);
+    if (crop.isEmpty())
+        return cv::Mat();
+    return frame(cv::Rect(crop.x(), crop.y(), crop.width(), crop.height())).clone();
 }
 
 QImage ColorTemplateDialog::roiThumbnailForSample(const ColorRecognitionSampleData &sample) const
 {
     const QSize targetSize(72, 48);
     QImage thumbnail(targetSize, QImage::Format_ARGB32_Premultiplied);
-    thumbnail.fill(Qt::white);
+    thumbnail.fill(QColor(QStringLiteral("#f8fafc")));
 
     QPainter painter(&thumbnail);
     painter.setRenderHint(QPainter::Antialiasing, true);
@@ -1876,9 +1884,13 @@ QImage ColorTemplateDialog::roiThumbnailForSample(const ColorRecognitionSampleDa
         cropped = cropRoiImage(sample.roiNormalized);
 
     if (!cropped.isNull()) {
-        painter.drawImage(thumbnail.rect(),
-                          cropped.scaled(targetSize, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation),
-                          QRect(QPoint(0, 0), targetSize));
+        const QRect contentRect = thumbnail.rect().adjusted(3, 3, -3, -3);
+        const QImage scaled = cropped.scaled(contentRect.size(),
+                                             Qt::KeepAspectRatio,
+                                             Qt::SmoothTransformation);
+        const QPoint topLeft(contentRect.center().x() - scaled.width() / 2,
+                             contentRect.center().y() - scaled.height() / 2);
+        painter.drawImage(topLeft, scaled);
     } else {
         painter.setPen(QPen(QColor(203, 213, 225), 1));
         painter.drawText(thumbnail.rect(), Qt::AlignCenter, tr("ROI"));

@@ -1091,6 +1091,13 @@ void RegisteredClassificationDialog::buildUi()
     m_deleteModelButton = ui->deleteModelButton;
     m_registerTrainingButton = ui->registerTrainingButton;
     m_modelManagementButton = ui->modelManagementButton;
+    for (QPushButton *button : {m_importModelButton,
+                                m_exportModelButton,
+                                m_deleteModelButton,
+                                m_registerTrainingButton,
+                                m_modelManagementButton}) {
+        button->setProperty("actionRole", QStringLiteral("secondary"));
+    }
     m_advancedCard = ui->advancedCard;
     m_modelTypeComboBox = ui->modelTypeComboBox;
     m_topKSpinBox = ui->topKSpinBox;
@@ -1135,6 +1142,7 @@ void RegisteredClassificationDialog::buildUi()
         "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;}"
         "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000000;border-color:#000000;}"
         "QCheckBox{color:#111827;}"));
+    PlanDialogUtils::applyToolLevelStyle(this);
 
     m_basicButton->setChecked(true);
     m_globalRegionButton->setChecked(true);

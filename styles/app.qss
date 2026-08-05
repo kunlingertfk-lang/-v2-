@@ -2545,6 +2545,15 @@ QDialog#CalibrationTransformDialog QCheckBox {
     color: #314968;
 }
 
+QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox {
+    min-height: 32px;
+    padding: 0;
+    spacing: 10px;
+    background: transparent;
+    border: 0;
+    color: #314968;
+}
+
 QDialog#QuickCalibrationWizard QCheckBox::indicator,
 QDialog#CalibrationTransformDialog QCheckBox::indicator {
     background: #ffffff;
@@ -2587,16 +2596,21 @@ QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"][binding
 }
 
 QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox::indicator {
-    width: 40px;
-    height: 20px;
-    border-radius: 10px;
-    background: #cbd2dc;
-    border: 1px solid #aeb7c3;
+    width: 54px;
+    height: 28px;
+    image: url(:/icons/toggle-off.svg);
+    background: transparent;
+    border: 0;
 }
 
 QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox::indicator:checked {
-    background: #ff7900;
-    border-color: #ff7900;
+    image: url(:/icons/toggle-on.svg);
+    background: transparent;
+    border: 0;
+}
+
+QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox:disabled {
+    color: #94a3b8;
 }
 
 QDialog#CalibrationTransformDialog QGroupBox#poseGroup QLabel[role="rowField"] {
@@ -3031,6 +3045,17 @@ QDialog[toolLevelStyle="true"] QWidget#configContents {
     border: 0;
 }
 
+QDialog#RegisteredClassificationDetectionDialog[toolLevelStyle="true"] QScrollArea#paramsScrollArea,
+QDialog#RegisteredClassificationDetectionDialog[toolLevelStyle="true"] QScrollArea#paramsScrollArea QWidget#qt_scrollarea_viewport,
+QDialog#RegisteredClassificationDetectionDialog[toolLevelStyle="true"] QWidget#paramsScrollContents,
+QDialog#RegisteredClassificationDialog[toolLevelStyle="true"] QScrollArea#paramsScrollArea,
+QDialog#RegisteredClassificationDialog[toolLevelStyle="true"] QScrollArea#paramsScrollArea QWidget#qt_scrollarea_viewport,
+QDialog#RegisteredClassificationDialog[toolLevelStyle="true"] QWidget#paramsScrollContents {
+    background: #eef2f6;
+    color: #0f172a;
+    border: 0;
+}
+
 QDialog[toolLevelStyle="true"] QFrame#setupEditorPanel QLabel,
 QDialog[toolLevelStyle="true"] QFrame#leftPanel QLabel,
 QDialog[toolLevelStyle="true"] QFrame#parameterPanel QLabel,
@@ -3294,6 +3319,58 @@ QDialog#ColorRecognitionDialog[toolLevelStyle="true"] QPushButton#finishButton {
     font-weight: 800;
 }
 
+/* Color-recognition template hierarchy: quiet groups, orange only for selection. */
+QDialog#ColorRecognitionDialog[toolLevelStyle="true"] QListWidget#templateListWidget {
+    background: #f1f5f9;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 4px;
+    outline: 0;
+}
+
+QDialog#ColorRecognitionDialog[toolLevelStyle="true"] QListWidget#templateListWidget::item {
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+QDialog#ColorRecognitionDialog[toolLevelStyle="true"] QListWidget#templateListWidget::item:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+QDialog#ColorRecognitionDialog[toolLevelStyle="true"] QListWidget#templateListWidget::item:selected {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fb923c;
+}
+
+QDialog#ContourPresenceDialog QCheckBox#basicShowContourSwitch,
+QDialog#ContourPresenceDialog QCheckBox#showContourSwitch {
+    min-width: 54px;
+    max-width: 54px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0;
+    spacing: 0;
+    background: transparent;
+    border: 0;
+}
+
+QDialog#ContourPresenceDialog QCheckBox#basicShowContourSwitch::indicator,
+QDialog#ContourPresenceDialog QCheckBox#showContourSwitch::indicator {
+    width: 54px;
+    height: 28px;
+    image: url(:/icons/toggle-off.svg);
+    background: transparent;
+    border: 0;
+}
+
+QDialog#ContourPresenceDialog QCheckBox#basicShowContourSwitch::indicator:checked,
+QDialog#ContourPresenceDialog QCheckBox#showContourSwitch::indicator:checked {
+    image: url(:/icons/toggle-on.svg);
+}
+
 /* Color-template editor is a tool-level child dialog and follows the same theme. */
 QDialog#ColorTemplateDialog[toolLevelStyle="true"] QFrame#previewPanel {
     background: #111418;
@@ -3375,6 +3452,36 @@ QDialog#ColorTemplateDialog[toolLevelStyle="true"] QListWidget::item:selected {
     border: 2px solid #f97316;
 }
 
+QDialog#ColorTemplateDialog[toolLevelStyle="true"] QCheckBox#brightnessEnabledCheckBox {
+    min-height: 34px;
+    padding: 0 10px;
+    spacing: 8px;
+    background: #f8fafc;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+QDialog#ColorTemplateDialog[toolLevelStyle="true"] QCheckBox#brightnessEnabledCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    background: #ffffff;
+    border: 1px solid #94a3b8;
+    border-radius: 3px;
+}
+
+QDialog#ColorTemplateDialog[toolLevelStyle="true"] QCheckBox#brightnessEnabledCheckBox::indicator:checked {
+    background: #f97316;
+    border-color: #ea580c;
+}
+
+QDialog#ColorTemplateDialog[toolLevelStyle="true"] QCheckBox#brightnessEnabledCheckBox:disabled {
+    background: #eef2f6;
+    color: #94a3b8;
+    border-color: #dbe3ec;
+}
+
 /* Shared position-correction switch; opt-in tool pages only. */
 QDialog[toolLevelStyle="true"] QCheckBox#basicPositionCorrectionSwitch,
 QDialog[toolLevelStyle="true"] QCheckBox#positionCorrectionSwitch,
@@ -3403,4 +3510,11 @@ QDialog[toolLevelStyle="true"] QCheckBox#basicPositionCorrectionSwitch::indicato
 QDialog[toolLevelStyle="true"] QCheckBox#positionCorrectionSwitch::indicator:checked,
 QDialog[toolLevelStyle="true"] QCheckBox#allPositionCorrectionSwitch::indicator:checked {
     image: url(:/icons/toggle-on.svg);
+}
+
+/* Persistent non-tool setup shell: keep a painted surface behind page swaps. */
+QDialog#SchemeSetupWindow,
+QDialog#SchemeSetupWindow QStackedWidget#pageStack {
+    background: #eef2f6;
+    border: 0;
 }

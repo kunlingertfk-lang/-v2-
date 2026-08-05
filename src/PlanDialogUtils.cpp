@@ -8,6 +8,7 @@
 #include <QLayout>
 #include <QList>
 #include <QMainWindow>
+#include <QMetaObject>
 #include <QPoint>
 #include <QPointer>
 #include <QRect>
@@ -70,11 +71,35 @@ bool isSetupWindow(QWidget *window)
     if (!window)
         return false;
 
+    if (window->property("schemeSetupHost").toBool())
+        return true;
+
     const QString objectName = window->objectName();
-    return objectName == QLatin1String("CameraParamsDialog")
+    return objectName == QLatin1String("SchemeSetupWindow")
+            || objectName == QLatin1String("CameraParamsDialog")
             || objectName == QLatin1String("ReferenceImageDialog")
             || objectName == QLatin1String("ToolsDialog")
             || objectName == QLatin1String("OutputDialog");
+}
+
+QWidget *findSchemeSetupHost(QWidget *source)
+{
+    QWidget *widget = source;
+    while (widget) {
+        if (widget->property("schemeSetupHost").toBool())
+            return widget;
+        widget = widget->parentWidget();
+    }
+    return nullptr;
+}
+
+bool isEmbeddedSetupPage(QWidget *window)
+{
+    if (!window || !isSetupWindow(window)
+            || window->property("schemeSetupHost").toBool()) {
+        return false;
+    }
+    return findSchemeSetupHost(window->parentWidget());
 }
 
 bool isLargeSetupWindow(QWidget *window)
@@ -502,10 +527,34 @@ void PlanDialogUtils::configureDialogWindow(QDialog *dialog, const QString &titl
     // WA_DeleteOnClose here would delete a stack object when accept()/reject()
     // closes it. Heap-allocated setup pages opt in from showDialogFromWidget().
     dialog->setAttribute(Qt::WA_DeleteOnClose, false);
+
+    if (isEmbeddedSetupPage(dialog)) {
+        dialog->setWindowFlags(Qt::Widget);
+        dialog->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        applyStandardSetupPageLayout(dialog);
+        return;
+    }
+
     dialog->setWindowFlag(Qt::Window, true);
     PlanDialogUtils::applyLargeWindow(dialog);
     scheduleSetupDialogSizeLog(dialog);
 
+}
+
+bool PlanDialogUtils::switchEmbeddedSetupPage(QWidget *current, const QString &pageId)
+{
+    QWidget *host = findSchemeSetupHost(current);
+    if (!host)
+        return false;
+
+    bool switched = false;
+    const bool invoked = QMetaObject::invokeMethod(
+                host,
+                "showSetupPage",
+                Qt::DirectConnection,
+                Q_RETURN_ARG(bool, switched),
+                Q_ARG(QString, pageId));
+    return invoked && switched;
 }
 
 void PlanDialogUtils::connectWindowButtons(QWidget *window,
@@ -559,8 +608,10 @@ void PlanDialogUtils::showWindowFromWidget(QWidget *source, QWidget *target)
 
 void PlanDialogUtils::showDialogFromWidget(QWidget *source, QDialog *dialog)
 {
-    if (dialog)
-        dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+    if (dialog) {
+        const bool persistentSetupHost = dialog->property("schemeSetupHost").toBool();
+        dialog->setAttribute(Qt::WA_DeleteOnClose, !persistentSetupHost);
+    }
     showWindowFromWidget(source, dialog);
 }
 
@@ -610,10 +661,14 @@ void PlanDialogUtils::returnToMainWindow(QWidget *source)
              << "mainWindow=" << mainWindow
              << "reuseExisting=" << true;
 
+    QWidget *windowToClose = findSchemeSetupHost(source);
+    if (!windowToClose)
+        windowToClose = source;
+
     showWindowFromWidget(source, mainWindow);
 
-    if (source) {
-        source->close();
+    if (windowToClose) {
+        windowToClose->close();
     }
 
     qDebug() << "[PlanDialogUtils] returnToMainWindow reused existing MainWindow";

@@ -8,6 +8,7 @@
 #include "frame/CameraFrameProvider.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
+#include "frame/RoiGeometry.h"
 #include "toolcore/ToolRequest.h"
 #include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolEngine.h"
@@ -2210,25 +2211,8 @@ QImage ColorComparisonDialog::templateRawRoiImage() const
     if (roi.width() <= 0.0 || roi.height() <= 0.0)
         return QImage();
 
-    const int left = qBound(0,
-                            qRound(roi.left() * referenceImage.width()),
-                            referenceImage.width() - 1);
-    const int top = qBound(0,
-                           qRound(roi.top() * referenceImage.height()),
-                           referenceImage.height() - 1);
-    const int rightExclusive = qBound(
-                left + 1,
-                qRound(roi.right() * referenceImage.width()),
-                referenceImage.width());
-    const int bottomExclusive = qBound(
-                top + 1,
-                qRound(roi.bottom() * referenceImage.height()),
-                referenceImage.height());
-    const QRect sourceRect(left,
-                           top,
-                           rightExclusive - left,
-                           bottomExclusive - top);
-    return referenceImage.copy(sourceRect.intersected(referenceImage.rect()));
+    return referenceImage.copy(coveringPixelRect(
+                                   roi, referenceImage.width(), referenceImage.height()));
 }
 
 void ColorComparisonDialog::refreshEditControls()

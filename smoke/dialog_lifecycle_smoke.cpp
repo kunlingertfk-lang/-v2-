@@ -8,6 +8,29 @@
 #include <QTextStream>
 #include <QTimer>
 
+class FakeSetupHost : public QDialog
+{
+    Q_OBJECT
+
+public:
+    explicit FakeSetupHost(QWidget *parent = nullptr)
+        : QDialog(parent)
+    {
+        setProperty("schemeSetupHost", true);
+    }
+
+    QString currentPage;
+    int switchCount = 0;
+
+public slots:
+    bool showSetupPage(const QString &pageId)
+    {
+        currentPage = pageId;
+        ++switchCount;
+        return !pageId.isEmpty();
+    }
+};
+
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
@@ -62,6 +85,38 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    QTextStream(stdout) << "PASS: dialog lifecycle and tool-style smoke\n";
+    FakeSetupHost setupHost;
+    setupHost.setObjectName(QStringLiteral("SchemeSetupWindow"));
+    QWidget stackContainer(&setupHost);
+    QDialog embeddedPage(&stackContainer);
+    embeddedPage.setObjectName(QStringLiteral("CameraParamsDialog"));
+    PlanDialogUtils::configureDialogWindow(&embeddedPage, QStringLiteral("embedded page"));
+    const int topLevelsBefore = QApplication::topLevelWidgets().size();
+    const bool switched = PlanDialogUtils::switchEmbeddedSetupPage(
+                &embeddedPage, QStringLiteral("reference"));
+    const int topLevelsAfter = QApplication::topLevelWidgets().size();
+    if (!switched
+            || embeddedPage.isWindow()
+            || embeddedPage.windowFlags().testFlag(Qt::Window)
+            || setupHost.currentPage != QStringLiteral("reference")
+            || setupHost.switchCount != 1
+            || topLevelsAfter != topLevelsBefore) {
+        QTextStream(stderr) << "FAIL: embedded setup-page switching created a top-level window\n";
+        return 1;
+    }
+
+    QDialog nestedToolDialog(&embeddedPage);
+    nestedToolDialog.setObjectName(QStringLiteral("CirclePresenceDialog"));
+    PlanDialogUtils::configureDialogWindow(
+                &nestedToolDialog, QStringLiteral("tool dialog isolation"));
+    if (!nestedToolDialog.isWindow()
+            || !nestedToolDialog.windowFlags().testFlag(Qt::Window)) {
+        QTextStream(stderr) << "FAIL: tool dialog was embedded into the setup-page stack\n";
+        return 1;
+    }
+
+    QTextStream(stdout) << "PASS: dialog lifecycle, embedded setup and tool-style smoke\n";
     return 0;
 }
+
+#include "dialog_lifecycle_smoke.moc"

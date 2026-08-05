@@ -78,6 +78,19 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
 
+    check(coveringPixelRect(QRectF(0.101, 0.203, 0.2, 0.3), 100, 100)
+          == QRect(10, 20, 21, 31),
+          "fractional ROI bounds must include every intersected edge pixel");
+    check(coveringPixelRect(QRectF(0.8, 0.7, 0.2, 0.3), 100, 100)
+          == QRect(80, 70, 20, 30),
+          "ROI touching the right and bottom edges must stay inside the image");
+    check(coveringPixelRect(QRectF(0.0, 0.0, 1.0, 1.0), 1448, 1086)
+          == QRect(0, 0, 1448, 1086),
+          "full-image ROI must preserve the complete source image");
+    check(coveringPixelRect(QRectF(-0.1, -0.2, 1.3, 1.4), 100, 80)
+          == QRect(0, 0, 100, 80),
+          "out-of-image ROI bounds must be clipped without losing image pixels");
+
     // 纯几何层先验证边界、最小尺寸和命中，避免测试只依赖图形事件。
     RoiEditorController controller;
     controller.setBounds(QRectF(0.0, 0.0, 100.0, 80.0));

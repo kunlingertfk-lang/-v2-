@@ -30,6 +30,7 @@ void connectWindowButtons(QWidget *window,
                           QToolButton *closeButton,
                           bool returnToMainWindow = false);
 void populatePreviewScene(QGraphicsView *view, Page page);
+bool switchEmbeddedSetupPage(QWidget *current, const QString &pageId);
 void replaceDialog(QWidget *current, QDialog *next);
 void setSessionInfo(QWidget *window, const QString &deviceName, const QString &userName);
 void returnToMainWindow(QWidget *source);

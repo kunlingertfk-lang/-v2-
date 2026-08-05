@@ -143,6 +143,10 @@ int main(int argc, char **argv)
     QComboBox *sensitivity = dialog.findChild<QComboBox *>(QStringLiteral("sensitivityComboBox"));
     QCheckBox *brightness = dialog.findChild<QCheckBox *>(QStringLiteral("brightnessEnabledCheckBox"));
     QPushButton *build = dialog.findChild<QPushButton *>(QStringLiteral("buildGmmModelButton"));
+    QToolButton *advancedCollapse = dialog.findChild<QToolButton *>(
+                QStringLiteral("advancedCollapseButton"));
+    QWidget *advancedContent = dialog.findChild<QWidget *>(
+                QStringLiteral("advancedContentWidget"));
     QWidget *featureRow = dialog.findChild<QWidget *>(QStringLiteral("featureTypeRowWidget"));
     QLabel *buildFeedback = dialog.findChild<QLabel *>(QStringLiteral("gmmBuildFeedbackLabel"));
     QLabel *hsvState = dialog.findChild<QLabel *>(QStringLiteral("hsvModelStateLabel"));
@@ -154,10 +158,21 @@ int main(int argc, char **argv)
     FrameViewHelper *previewHelper = dialog.findChild<FrameViewHelper *>();
     QToolButton *sampleRectButton = dialog.findChild<QToolButton *>(
                 QStringLiteral("sampleRectRoiButton"));
-    if (check(backend && feature && sensitivity && brightness && build && featureRow && buildFeedback &&
+    if (check(backend && feature && sensitivity && brightness && build && advancedCollapse &&
+              advancedContent && featureRow && buildFeedback &&
               hsvState && hsvFeedback && rebuildHsv && roiSamples && viewerTitle && preview &&
               previewHelper && sampleRectButton,
               "B2 GMM lifecycle controls must exist")) return 1;
+    if (check(advancedContent->isVisibleTo(&dialog) && !advancedCollapse->isChecked() &&
+              build->isVisibleTo(&dialog),
+              "GMM training controls must be expanded and visible when the template opens")) return 1;
+    advancedCollapse->click();
+    if (check(advancedCollapse->isChecked() && advancedContent->isHidden(),
+              "Advanced parameters must remain manually collapsible")) return 1;
+    dialog.setTemplateData(data);
+    if (check(!advancedCollapse->isChecked() && advancedContent->isVisibleTo(&dialog) &&
+              build->isVisibleTo(&dialog),
+              "Loading a GMM template must reveal the required model-build action")) return 1;
     if (check(previewHelper->navigationEnabled() && !sampleRectButton->isChecked() &&
               !previewHelper->isRoiDrawingEnabled(),
               "Template view must enable navigation without entering persisted ROI drawing")) return 1;

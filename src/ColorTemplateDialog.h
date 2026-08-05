@@ -136,6 +136,7 @@ private:
     void buildUi();                              // 代码构建模板编辑器界面控件。
     void setupUiState();                         // 初始化控件默认状态和预览 helper。
     void connectControls();                      // 连接标签、样本、ROI 和保存按钮的信号。
+    void setAdvancedExpanded(bool expanded);     // 同步高级参数卡片的展开状态、内容显隐和箭头。
     void updateAlgorithmUi();                    // 按后端和特征类型刷新参数、亮度和 GMM 模型控件。
     void updateHsvModelUi();                     // 刷新 HSV 派生特征状态和批量重建按钮。
     void updateGmmModelUi();                     // 刷新 GMM 状态、诊断和建模按钮。

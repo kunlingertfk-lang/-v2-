@@ -11,9 +11,11 @@
 
 #include <QButtonGroup>
 #include <QAbstractItemView>
+#include <QBrush>
 #include <QByteArray>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QColor>
 #include <QDebug>
 #include <QDoubleSpinBox>
 #include <QFile>
@@ -1855,7 +1857,7 @@ QWidget *makeTemplateRoiSampleCard(const QImage &sourceImage,
 
     if (!sourceImage.isNull()) {
         const QImage scaled = sourceImage.scaled(imageLabel->size(),
-                                                Qt::KeepAspectRatioByExpanding,
+                                                Qt::KeepAspectRatio,
                                                 Qt::SmoothTransformation);
         imageLabel->setPixmap(QPixmap::fromImage(scaled));
     } else {
@@ -1913,10 +1915,12 @@ void ColorRecognitionDialog::updateTemplateList()
         const QImage image = firstTemplateSampleImage(colorTemplate);
         if (!image.isNull()) {
             item->setIcon(QIcon(QPixmap::fromImage(image.scaled(QSize(72, 48),
-                                                             Qt::KeepAspectRatioByExpanding,
+                                                             Qt::KeepAspectRatio,
                                                              Qt::SmoothTransformation))));
             item->setSizeHint(QSize(260, 58));
         }
+        item->setBackground(QBrush(QColor(QStringLiteral("#f8fafc"))));
+        item->setForeground(QBrush(QColor(QStringLiteral("#0f172a"))));
         item->setData(ItemKindRole, kTemplateItem);
         item->setData(TemplateIdRole, colorTemplate.templateId);
         item->setData(SampleIndexRole, -1);
@@ -1939,6 +1943,11 @@ void ColorRecognitionDialog::updateTemplateList()
             labelItem->setData(TemplateIdRole, colorTemplate.templateId);
             labelItem->setData(ClassIdRole, label.classId);
             labelItem->setData(SampleIndexRole, -1);
+            labelItem->setBackground(QBrush(QColor(QStringLiteral("#eef2f6"))));
+            labelItem->setForeground(QBrush(QColor(QStringLiteral("#475569"))));
+            QFont labelFont = labelItem->font();
+            labelFont.setBold(true);
+            labelItem->setFont(labelFont);
             ui->templateListWidget->addItem(labelItem);
 
             int labelRoiIndex = 1;
@@ -2193,19 +2202,38 @@ void ColorRecognitionDialog::showPreviewImage()
     refreshDisplayedRoiOverlay();
 }
 
-// ROI 编辑前切换到可交互图像帧，优先使用当前基准图。
+// ROI 编辑前切换到可交互图像帧；测试态必须保持当前测试来源。
 void ColorRecognitionDialog::showFrameForRoiEditing()
 {
     if (!m_previewHelper)
         return;
 
-    QImage image = ReferenceImageProvider::instance().referenceImage();
-    QString title = tr("基准图");
-    m_previewUsesReferenceImage = !image.isNull();
-    if (image.isNull()) {
-        image = CameraFrameProvider::instance().currentImage();
-        title = tr("当前图像");
-        m_previewUsesReferenceImage = false;
+    QImage image;
+    QString title;
+    m_previewUsesReferenceImage = false;
+
+    if (m_liveTestSource == LiveTestSource::Imported
+            && !m_liveTestFrameSnapshot.empty()) {
+        image = MatImageConverter::matToDisplayImage(
+                    m_liveTestFrameSnapshot,
+                    QStringLiteral("ColorRecognitionDialogRoiImported"));
+        title = m_liveTestImageTitle.trimmed().isEmpty()
+                ? tr("PC导入图片") : m_liveTestImageTitle;
+    } else if (m_liveTestSource == LiveTestSource::Camera
+               && !m_liveTestFrameSnapshot.empty()) {
+        image = MatImageConverter::matToDisplayImage(
+                    m_liveTestFrameSnapshot,
+                    QStringLiteral("ColorRecognitionDialogRoiCamera"));
+        title = tr("测试图像");
+    } else {
+        image = ReferenceImageProvider::instance().referenceImage();
+        title = tr("基准图");
+        m_previewUsesReferenceImage = !image.isNull();
+        if (image.isNull()) {
+            image = CameraFrameProvider::instance().currentImage();
+            title = tr("当前图像");
+            m_previewUsesReferenceImage = false;
+        }
     }
 
     if (image.isNull()) {

@@ -80,6 +80,7 @@ private:
     void setupSchemeSelector();
     void refreshSchemeSelector();
     void showSchemeSelectorPopup();
+    void openSchemeSetupPage(const QString &pageId);
     void createAndSwitchToNewScheme();
     bool switchSchemeById(const QString &schemeId);
     void applyCurrentSchemeState();

@@ -53,6 +53,13 @@ CameraParamsDialog::~CameraParamsDialog()
     delete ui;
 }
 
+void CameraParamsDialog::prepareForDisplay()
+{
+    refreshSchemeHeader();
+    refreshLiveImage();
+    QTimer::singleShot(0, this, &CameraParamsDialog::ensureCameraRunning);
+}
+
 void CameraParamsDialog::setupCameraUI()
 {
     if (!m_previewHelper) {
@@ -216,19 +223,22 @@ void CameraParamsDialog::openReferenceImageDialog()
 {
     if (!saveCurrentScheme())
         return;
-    PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("reference")))
+        qWarning() << "[CameraParamsDialog] 未找到方案编辑宿主窗口";
 }
 
 void CameraParamsDialog::openToolsDialog()
 {
     if (!saveCurrentScheme())
         return;
-    PlanDialogUtils::replaceDialog(this, new ToolsDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("tools")))
+        qWarning() << "[CameraParamsDialog] 未找到方案编辑宿主窗口";
 }
 
 void CameraParamsDialog::openOutputDialog()
 {
     if (!saveCurrentScheme())
         return;
-    PlanDialogUtils::replaceDialog(this, new OutputDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("output")))
+        qWarning() << "[CameraParamsDialog] 未找到方案编辑宿主窗口";
 }

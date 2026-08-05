@@ -3,6 +3,8 @@ CONFIG += console c++17
 CONFIG -= app_bundle
 TEMPLATE = app
 TARGET = color_recognition_gmm_b2_lifecycle_smoke
+QMAKE_CXXFLAGS += -ffunction-sections -fdata-sections
+QMAKE_LFLAGS += -Wl,--gc-sections
 
 BUILD_ROOT = $$_PRO_FILE_PWD_/../build/smoke/color_recognition_gmm_b2_lifecycle
 DESTDIR = $$BUILD_ROOT/bin
@@ -19,6 +21,7 @@ include(../qmake/halcon_20_11.pri)
 SOURCES += \
     ../tests/color_recognition_gmm_b2_lifecycle_smoke.cpp \
     ../src/ColorTemplateDialog.cpp \
+    ../src/PlanDialogUtils.cpp \
     ../src/frame/CameraFrameProvider.cpp \
     ../src/frame/FrameInputMetadata.cpp \
     ../src/frame/FramePixelProbe.cpp \
@@ -36,6 +39,7 @@ SOURCES += \
 
 HEADERS += \
     ../src/ColorTemplateDialog.h \
+    ../src/PlanDialogUtils.h \
     ../src/frame/CameraFrameProvider.h \
     ../src/frame/FramePixelProbe.h \
     ../src/frame/FrameViewHelper.h \

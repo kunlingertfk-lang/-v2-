@@ -227,6 +227,13 @@ ReferenceImageDialog::~ReferenceImageDialog()
     delete ui;
 }
 
+void ReferenceImageDialog::prepareForDisplay()
+{
+    refreshSchemeHeader();
+    loadPositionCorrectionConfig();
+    showReferenceImageMode();
+}
+
 void ReferenceImageDialog::setupUiState()
 {
     PlanDialogUtils::configureDialogWindow(this, tr("方案编辑 - 基准图"));
@@ -1403,21 +1410,24 @@ void ReferenceImageDialog::openCameraParamsDialog()
 {
     if (!saveCurrentScheme())
         return;
-    PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("camera")))
+        qWarning() << "[ReferenceImageDialog] 未找到方案编辑宿主窗口";
 }
 
 void ReferenceImageDialog::openToolsDialog()
 {
     if (!saveCurrentScheme())
         return;
-    PlanDialogUtils::replaceDialog(this, new ToolsDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("tools")))
+        qWarning() << "[ReferenceImageDialog] 未找到方案编辑宿主窗口";
 }
 
 void ReferenceImageDialog::openOutputDialog()
 {
     if (!saveCurrentScheme())
         return;
-    PlanDialogUtils::replaceDialog(this, new OutputDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("output")))
+        qWarning() << "[ReferenceImageDialog] 未找到方案编辑宿主窗口";
 }
 
 void ReferenceImageDialog::showCurrentImageMode()

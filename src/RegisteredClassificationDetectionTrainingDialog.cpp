@@ -5,6 +5,7 @@
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
+#include "frame/RoiGeometry.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QAbstractItemView>
@@ -123,12 +124,7 @@ QRect imageCropRect(const QImage &image, const DetectionMark &mark)
     if (image.isNull())
         return QRect();
     const QRectF normalized = markBoundingRect(mark).intersected(QRectF(0.0, 0.0, 1.0, 1.0));
-    QRect crop(qRound(normalized.x() * image.width()),
-               qRound(normalized.y() * image.height()),
-               qRound(normalized.width() * image.width()),
-               qRound(normalized.height() * image.height()));
-    crop = crop.normalized().intersected(image.rect());
-    return crop.width() > 0 && crop.height() > 0 ? crop : QRect();
+    return coveringPixelRect(normalized, image.width(), image.height());
 }
 
 bool markContainsNormalizedPoint(const DetectionMark &mark, const QPointF &point)

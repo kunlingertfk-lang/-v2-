@@ -457,6 +457,19 @@ ToolsDialog::~ToolsDialog()
     delete ui;
 }
 
+void ToolsDialog::prepareForDisplay()
+{
+    QString error;
+    if (SchemeStore::instance().ensureLoaded(&error)) {
+        const SchemeState &scheme = SchemeStore::instance().currentScheme();
+        setInitialToolState(scheme.toolConfigs, scheme.referencePreviewSnapshots);
+    } else {
+        qWarning() << "[ToolsDialog] 页面刷新失败:" << error;
+    }
+    refreshSchemeHeader();
+    refreshReferencePreview();
+}
+
 const QVector<ToolConfig> &ToolsDialog::toolConfigs() const
 {
     return m_toolConfigs;
@@ -630,6 +643,7 @@ bool ToolsDialog::commitToolStateToScheme(bool saveToDisk)
             mainWindow->applySavedSchemeTools(m_toolConfigs,
                                               m_toolPreviewSnapshots);
         }
+        emit toolStateCommitted(m_toolConfigs, m_toolPreviewSnapshots);
     }
 
     refreshSchemeHeader();
@@ -870,14 +884,16 @@ void ToolsDialog::openCameraParamsDialog()
 {
     if (!commitToolStateToScheme(true))
         return;
-    PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("camera")))
+        qWarning() << "[ToolsDialog] 未找到方案编辑宿主窗口";
 }
 
 void ToolsDialog::openReferenceImageDialog()
 {
     if (!commitToolStateToScheme(true))
         return;
-    PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("reference")))
+        qWarning() << "[ToolsDialog] 未找到方案编辑宿主窗口";
 }
 
 void ToolsDialog::openOutputDialog()
@@ -886,11 +902,8 @@ void ToolsDialog::openOutputDialog()
         return;
     m_openedOutputDialog = true;
 
-    MainWindow *mainWindow = qobject_cast<MainWindow *>(parentWidget());
-    OutputDialog *dialog = new OutputDialog(mainWindow);
-    dialog->setSchemeTools(m_toolConfigs, m_toolPreviewSnapshots);
-    PlanDialogUtils::showDialogFromWidget(this, dialog);
-    close();
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("output")))
+        qWarning() << "[ToolsDialog] 未找到方案编辑宿主窗口";
 }
 
 void ToolsDialog::addConfiguredTool(const ToolConfig &config, const ToolPreviewSnapshot &snapshot)

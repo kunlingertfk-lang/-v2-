@@ -6,6 +6,7 @@
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
+#include "frame/RoiGeometry.h"
 
 #include <QAbstractItemView>
 #include <QButtonGroup>
@@ -261,14 +262,7 @@ QRect imageCropRect(const QImage &image, const TrainingRoiMark &mark)
         return image.rect();
 
     const QRectF normalized = normalizedBoundingRect(mark).intersected(QRectF(0.0, 0.0, 1.0, 1.0));
-    QRect crop(qRound(normalized.x() * image.width()),
-               qRound(normalized.y() * image.height()),
-               qRound(normalized.width() * image.width()),
-               qRound(normalized.height() * image.height()));
-    crop = crop.normalized().intersected(image.rect());
-    if (crop.width() <= 0 || crop.height() <= 0)
-        return QRect();
-    return crop;
+    return coveringPixelRect(normalized, image.width(), image.height());
 }
 
 bool markContainsNormalizedPoint(const TrainingRoiMark &mark, const QPointF &point)

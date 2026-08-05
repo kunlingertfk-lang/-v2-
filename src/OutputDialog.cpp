@@ -57,6 +57,13 @@ OutputDialog::~OutputDialog()
     delete ui;
 }
 
+void OutputDialog::prepareForDisplay()
+{
+    loadCurrentSchemeState();
+    refreshSchemeHeader();
+    refreshReferencePreview();
+}
+
 void OutputDialog::setupUiState()
 {
     PlanDialogUtils::configureDialogWindow(this, tr("方案编辑 - 输出"));
@@ -272,25 +279,24 @@ void OutputDialog::openCameraParamsDialog()
 {
     if (!commitOutputStateToScheme(true))
         return;
-    PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("camera")))
+        qWarning() << "[OutputDialog] 未找到方案编辑宿主窗口";
 }
 
 void OutputDialog::openReferenceImageDialog()
 {
     if (!commitOutputStateToScheme(true))
         return;
-    PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("reference")))
+        qWarning() << "[OutputDialog] 未找到方案编辑宿主窗口";
 }
 
 void OutputDialog::openToolsDialog()
 {
     if (!commitOutputStateToScheme(true))
         return;
-    MainWindow *mainWindow = sourceMainWindow();
-    ToolsDialog *dialog = new ToolsDialog(mainWindow);
-    dialog->setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);
-    PlanDialogUtils::showDialogFromWidget(this, dialog);
-    close();
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("tools")))
+        qWarning() << "[OutputDialog] 未找到方案编辑宿主窗口";
 }
 
 void OutputDialog::finishSetup()
@@ -332,6 +338,5 @@ void OutputDialog::returnToSourceMainWindow()
 
     mainWindow->applySavedSchemeTools(m_schemeToolConfigs,
                                       m_referencePreviewSnapshots);
-    PlanDialogUtils::showWindowFromWidget(this, mainWindow);
-    close();
+    PlanDialogUtils::returnToMainWindow(this);
 }

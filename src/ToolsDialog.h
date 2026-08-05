@@ -40,6 +40,14 @@ public:
     void setToolEngineForTesting(ToolEngine *engine);
     ToolEngine *toolEngineForTesting() const;
 
+public slots:
+    void prepareForDisplay();
+
+signals:
+    void toolStateCommitted(
+            const QVector<ToolConfig> &configs,
+            const QMap<QString, ToolPreviewSnapshot> &snapshots);
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 

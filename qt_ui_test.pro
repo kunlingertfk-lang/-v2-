@@ -32,6 +32,7 @@ SOURCES += \
     src/MainWindow.cpp \
     src/SchemeStore.cpp \
     src/PlanDialogUtils.cpp \
+    src/SchemeSetupWindow.cpp \
     src/CameraParamsDialog.cpp \
     src/CalibrationTransformDialog.cpp \
     src/QuickCalibrationWizard.cpp \
@@ -124,6 +125,7 @@ HEADERS += \
     src/MainWindow.h \
     src/SchemeStore.h \
     src/PlanDialogUtils.h \
+    src/SchemeSetupWindow.h \
     src/UiStyleRoles.h \
     src/CameraParamsDialog.h \
     src/CalibrationTransformDialog.h \
@@ -222,6 +224,7 @@ HEADERS += \
 FORMS += \
     ui/LoginWindow.ui \
     ui/MainWindow.ui \
+    ui/SchemeSetupWindow.ui \
     ui/CameraParamsDialog.ui \
     ui/CalibrationTransformDialog.ui \
     ui/ReferenceImageDialog.ui \

@@ -27,6 +27,9 @@ public:
     explicit ReferenceImageDialog(QWidget *parent = nullptr);
     ~ReferenceImageDialog() override;
 
+public slots:
+    void prepareForDisplay();
+
 private slots:
     void openCameraParamsDialog();
     void openToolsDialog();
