@@ -18,19 +18,20 @@
 class QButtonGroup;
 class QCheckBox;
 class QCloseEvent;
+class QColor;
 class QComboBox;
 class QFrame;
 class QGraphicsView;
 class QLabel;
+class QPixmap;
 class QPushButton;
 class QResizeEvent;
+class QSize;
 class QSpinBox;
 class QStackedWidget;
 class QToolButton;
 class QTimer;
 class QWidget;
-class ColorComparisonFeatureView;
-namespace Ui { class ColorComparisonDialog; }
 template <typename T> class QFutureWatcher;
 
 class ColorComparisonDialog : public QDialog
@@ -74,8 +75,7 @@ private:
     enum class LiveTestSource {
         None,
         Reference,
-        Camera,
-        Imported
+        Camera
     };
 
     void buildUi();
@@ -83,14 +83,9 @@ private:
     void connectAsyncWorkers();
     void setAllParamsMode(bool allMode);
     void setEditState(EditState state);
-    void toggleEditState(EditState requestedState);
     void showPreviewImage();
     void showFrameImage(const cv::Mat &frame, const QString &title);
     void refreshRoiOverlay();
-    QVector<ToolOverlay> configurationGeometryOverlays() const;
-    QVector<ToolOverlay> detectionGeometryOverlays() const;
-    QVector<ToolOverlay> combinedDisplayOverlays() const;
-    void refreshGeometryOverlays();
     void updateStatus(const QString &text);
     void updateTemplatePreview();
     void runTest();
@@ -99,9 +94,9 @@ private:
     void stopContinuousRun();
     void runContinuousTick();
     void runSingleShotTest();
-    void importTestImageFromPc();
     void exitTestMode();
     void rerunLiveComparison();
+    void applyDetectRoiEditState();
     void updateBottomButtons();
     void runComparisonOnFrame(const cv::Mat &frame,
                               const FrameInputMetadata &metadata,
@@ -131,16 +126,11 @@ private:
     void leaveInvalidConfigReadOnly();
     void updateInvalidConfigReadOnlyUi();
     QRectF normalizedRoiOrDefault(const QRectF &roi) const;
-    QImage templateRawRoiImage() const;
+    QImage templateRoiImage() const;
     void refreshEditControls();
-    void refreshTemplateRegionControls();
     void refreshDetectRegionButtons();
     void refreshPositionCorrectionControls();
-    void beginMaskRedraw(EditState state);
-    void clearTemplateMask();
-    void clearDetectionMask();
-    void handleDetectionGeometryChanged(const QString &reason);
-    void handleDetectionMaskChanged(const QString &reason);
+    void handleDetectionConfigChanged(const QString &reason);
     void invalidateAsyncWork();
     bool invalidateModelBuild();
     void markModelStale(const QString &reason);
@@ -152,7 +142,9 @@ private:
     void handleModelBuildFinished();
     void updateModelStateUi();
     void updateFeaturePreview();
-    bool updateDetectionFeaturePreview(const ToolResult &result);
+    QPixmap renderHistogram(const QVector<double> &values,
+                            const QColor &color,
+                            const QSize &size) const;
     QJsonObject colorComparisonParams() const;
 
     QString m_toolId;
@@ -170,8 +162,7 @@ private:
     CircleRoi m_detectCircle;
     QVector<QPointF> m_detectMask;
     bool m_positionCorrectionEnabled = false;
-    bool m_showPositionCorrectionMatchContour = true;
-    QString m_positionCorrectionSource = QStringLiteral("reference.positionCorrection");
+    QString m_positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
     EditState m_editState = EditState::None;
     bool m_previewUsesReferenceImage = true;
     QImage m_previewImage;
@@ -180,7 +171,6 @@ private:
     LiveTestSource m_liveTestSource = LiveTestSource::None;
     cv::Mat m_liveTestFrameSnapshot;
     FrameInputMetadata m_liveTestFrameMetadata;
-    QString m_liveTestImageTitle;
     QTimer *m_continuousTimer = nullptr;
     bool m_loadingConfig = false;
     bool m_invalidConfigReadOnly = false;
@@ -202,9 +192,6 @@ private:
     quint64 m_pendingTestGeneration = 0;
     QString m_activeImageTitle;
     bool m_activeReferenceSource = false;
-    QVector<ToolOverlay> m_runtimeResultOverlays;
-    QVector<QPointF> m_maskBeforeRedraw;
-    bool m_maskRedrawInProgress = false;
 
     QButtonGroup *m_segmentGroup = nullptr;
     QButtonGroup *m_detectRegionGroup = nullptr;
@@ -215,22 +202,20 @@ private:
     QWidget *m_positionCorrectionPanel = nullptr;
     QLabel *m_templatePreviewLabel = nullptr;
     QLabel *m_modelStateLabel = nullptr;
-    ColorComparisonFeatureView *m_featureView = nullptr;
+    QLabel *m_hueHistogramLabel = nullptr;
+    QLabel *m_saturationHistogramLabel = nullptr;
+    QLabel *m_valueHistogramLabel = nullptr;
     QLabel *m_viewerTitleLabel = nullptr;
     QLabel *m_viewerStatusLabel = nullptr;
     QGraphicsView *m_previewGraphicsView = nullptr;
-    QPushButton *m_pcImportButton = nullptr;
     QPushButton *m_basicButton = nullptr;
     QPushButton *m_allButton = nullptr;
     QComboBox *m_templateRegionModeComboBox = nullptr;
-    QLabel *m_templateSyncHintLabel = nullptr;
     QPushButton *m_templateEditButton = nullptr;
     QToolButton *m_templateRectButton = nullptr;
     QPushButton *m_templateFinishButton = nullptr;
     QPushButton *m_templateMaskEditButton = nullptr;
     QToolButton *m_templateMaskPolygonButton = nullptr;
-    QPushButton *m_templateMaskRedrawButton = nullptr;
-    QPushButton *m_templateMaskClearButton = nullptr;
     QPushButton *m_templateMaskFinishButton = nullptr;
     QPushButton *m_rebuildModelButton = nullptr;
     QToolButton *m_detectGlobalButton = nullptr;
@@ -239,12 +224,8 @@ private:
     QCheckBox *m_positionCorrectionCheckBox = nullptr;
     QWidget *m_positionCorrectionSourceRow = nullptr;
     QComboBox *m_positionCorrectionComboBox = nullptr;
-    QWidget *m_positionCorrectionContourRow = nullptr;
-    QCheckBox *m_positionCorrectionContourCheckBox = nullptr;
     QPushButton *m_detectMaskEditButton = nullptr;
     QToolButton *m_detectMaskPolygonButton = nullptr;
-    QPushButton *m_detectMaskRedrawButton = nullptr;
-    QPushButton *m_detectMaskClearButton = nullptr;
     QPushButton *m_detectMaskFinishButton = nullptr;
     QComboBox *m_sensitivityComboBox = nullptr;
     QComboBox *m_featureTypeComboBox = nullptr;
@@ -254,7 +235,6 @@ private:
     QPushButton *m_testRunButton = nullptr;
     QPushButton *m_finishButton = nullptr;
     QPushButton *m_exitTestButton = nullptr;
-    Ui::ColorComparisonDialog *ui = nullptr;
 };
 
 #endif // COLORCOMPARISONDIALOG_H

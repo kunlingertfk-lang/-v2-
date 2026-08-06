@@ -2,11 +2,7 @@
 #define REGISTEREDCLASSIFICATIONDIALOG_H
 
 #include "tooladapters/RegisteredClassificationAdapter.h"
-#include "tooladapters/PositionCorrectionAdapter.h"
-#include "tooladapters/TemplateLocationAdapter.h"
-#include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolConfig.h"
-#include "toolcore/ToolEngine.h"
 #include "toolcore/ToolPreviewSnapshot.h"
 
 #include <QDialog>
@@ -25,7 +21,6 @@ class QResizeEvent;
 class QSpinBox;
 class QToolButton;
 class QWidget;
-namespace Ui { class RegisteredClassificationDialog; }
 
 class RegisteredClassificationDialog : public QDialog
 {
@@ -39,10 +34,6 @@ public:
     ToolConfig toolConfig() const;
     ToolPreviewSnapshot referencePreviewSnapshot() const;
     void loadFromConfig(const ToolConfig &config);
-    void setToolChainTestContext(
-            const QVector<ToolConfig> &toolConfigs,
-            int currentToolIndex,
-            const ReferencePositionCorrectionConfig &referencePositionCorrection);
     bool validateModelPackageForTest(const QString &path, QString *errorMessage) const;
     QString summaryText() const;
 
@@ -54,8 +45,6 @@ private slots:
     void runReferenceTest();
     void executeReferenceTest();
     void runTest();
-    void importTestImageFromPc();
-    void exitTestMode();
     void importModel();
     void exportModel();
     void deleteModel();
@@ -76,10 +65,6 @@ private:
     void refreshRoiOverlay();
     void setViewerStatusText(const QString &text);
     void displayResult(const ToolResult &result);
-    ToolResult runOnFrame(const cv::Mat &frame,
-                          const cv::Mat &referenceImage,
-                          const QString &inputSource);
-    void updateTestButtons();
     QString resultStatusText(const ToolResult &result) const;
     void showTodoMessage(const QString &actionName);
     void updateModelLabels();
@@ -91,7 +76,6 @@ private:
     QString resultBasisText() const;
     QString roiStatusText() const;
 
-    Ui::RegisteredClassificationDialog *ui = nullptr;
     QString m_toolId;
     bool m_enabled = true;
     bool m_allParamsMode = false;
@@ -102,21 +86,9 @@ private:
     QString m_detectRegionType = QStringLiteral("full");
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     bool m_positionCorrectionEnabled = false;
-    QString m_positionCorrectionSource = QStringLiteral("0 基准图.位置修正信息");
-    QString m_positionCorrectionSourceId =
-            QStringLiteral("reference.positionCorrection");
-    bool m_showPositionCorrectionMatchContour = true;
+    QString m_positionCorrectionSource = QStringLiteral("1 基准图.位置修正信息");
     ToolPreviewSnapshot m_referencePreviewSnapshot;
-    TemplateLocationAdapter m_testTemplateLocationAdapter;
-    PositionCorrectionAdapter m_testPositionCorrectionAdapter;
-    RegisteredClassificationAdapter m_testRegisteredClassificationAdapter;
-    ToolEngine m_testToolEngine;
-    QVector<ToolConfig> m_toolChainTestConfigs;
-    int m_toolChainTestIndex = -1;
-    ReferencePositionCorrectionConfig m_referencePositionCorrection;
-    cv::Mat m_importedTestFrame;
-    QString m_importedTestImageTitle;
-    bool m_importedTestActive = false;
+    RegisteredClassificationAdapter m_placeholderAdapter;
 
     QButtonGroup *m_segmentGroup = nullptr;
     QButtonGroup *m_regionGroup = nullptr;
@@ -131,15 +103,12 @@ private:
     QGraphicsView *m_previewGraphicsView = nullptr;
     QPushButton *m_basicButton = nullptr;
     QPushButton *m_allButton = nullptr;
-    QPushButton *m_pcImportButton = nullptr;
     QToolButton *m_globalRegionButton = nullptr;
     QToolButton *m_rectRegionButton = nullptr;
     QPushButton *m_roiFinishButton = nullptr;
     QCheckBox *m_positionCorrectionCheckBox = nullptr;
     QWidget *m_positionSourceRow = nullptr;
     QComboBox *m_positionSourceComboBox = nullptr;
-    QWidget *m_positionContourRow = nullptr;
-    QCheckBox *m_positionContourCheckBox = nullptr;
     QPushButton *m_importModelButton = nullptr;
     QPushButton *m_exportModelButton = nullptr;
     QPushButton *m_deleteModelButton = nullptr;
@@ -156,7 +125,6 @@ private:
     QPushButton *m_referenceTestButton = nullptr;
     QPushButton *m_testRunButton = nullptr;
     QPushButton *m_finishButton = nullptr;
-    QPushButton *m_exitTestButton = nullptr;
 };
 
 #endif // REGISTEREDCLASSIFICATIONDIALOG_H

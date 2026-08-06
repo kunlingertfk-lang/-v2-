@@ -671,21 +671,6 @@ QWidget[viewerCanvas=&quot;true&quot;] {
         </property>
        </widget>
       </item>
-      <item>
-       <widget class="QToolButton" name="setupQuickCalibrateButton">
-        <property name="minimumSize">
-         <size><width>82</width><height>56</height></size>
-        </property>
-        <property name="text"><string>快速标定</string></property>
-        <property name="icon">
-         <iconset resource="../resources/resources.qrc">
-          <normaloff>:/icons/fit.svg</normaloff>:/icons/fit.svg</iconset>
-        </property>
-        <property name="iconSize"><size><width>24</width><height>24</height></size></property>
-        <property name="toolButtonStyle"><enum>Qt::ToolButtonTextUnderIcon</enum></property>
-        <property name="toolTip"><string>仅可在工具页使用快速标定</string></property>
-       </widget>
-      </item>
      </layout>
     </widget>
    </item>

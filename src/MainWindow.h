@@ -7,7 +7,6 @@
 #include <QImage>
 #include <QMap>
 #include <QMetaObject>
-#include <QPointer>
 #include <QVector>
 
 #include "toolcore/ToolConfig.h"
@@ -25,9 +24,6 @@
 #include "tooladapters/LinePresenceAdapter.h"
 #include "tooladapters/AiDetectionAdapter.h"
 #include "tooladapters/RegisteredClassificationAdapter.h"
-#include "tooladapters/TemplateLocationAdapter.h"
-#include "tooladapters/PositionCorrectionAdapter.h"
-#include "tooladapters/CalibrationTransformAdapter.h"
 
 class FrameViewHelper;
 class QEvent;
@@ -50,12 +46,8 @@ public:
     void setSessionInfo(const QString &deviceName, const QString &userName);
     void setSchemeTools(const QVector<ToolConfig> &configs,
                         const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
-    void applySavedSchemeTools(const QVector<ToolConfig> &configs,
-                               const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
     void updateSchemeToolsFromToolsDialog(const QVector<ToolConfig> &configs,
                                           const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
-    void registerActiveSetupWindow(QWidget *window);
-    bool activateActiveSetupWindow();
 
 protected:
     void showEvent(QShowEvent *event) override;
@@ -80,7 +72,6 @@ private:
     void setupSchemeSelector();
     void refreshSchemeSelector();
     void showSchemeSelectorPopup();
-    void openSchemeSetupPage(const QString &pageId);
     void createAndSwitchToNewScheme();
     bool switchSchemeById(const QString &schemeId);
     void applyCurrentSchemeState();
@@ -118,11 +109,9 @@ private:
 
     bool m_isContinuousRunning = false;
     bool m_isToolChainRunning = false;
-    QPointer<QWidget> m_activeSetupWindow;
     QVector<ToolConfig> m_schemeToolConfigs;
     QMap<QString, ToolPreviewSnapshot> m_referencePreviewSnapshots;
     QMap<QString, ToolPreviewSnapshot> m_lastRunSnapshots;
-    QVector<ToolOverlay> m_lastReferenceCorrectionOverlays;
     QImage m_lastRunImage;
     int m_selectedToolIndex = -1;
     QFutureWatcher<ToolChainRunOutput> *m_toolChainWatcher = nullptr;
@@ -159,9 +148,6 @@ private:
     LinePresenceAdapter m_linePresenceAdapter;
     AiDetectionAdapter m_aiDetectionAdapter;
     RegisteredClassificationAdapter m_registeredClassificationAdapter;
-    TemplateLocationAdapter m_templateLocationAdapter;
-    PositionCorrectionAdapter m_positionCorrectionAdapter;
-    CalibrationTransformAdapter m_calibrationTransformAdapter;
     ToolEngine m_toolEngine;
     FrameViewHelper *m_previewHelper = nullptr;
     Ui::MainWindow *ui;

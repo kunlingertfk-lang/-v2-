@@ -18,7 +18,6 @@ enum class Page {
 };
 
 void applyLargeWindow(QWidget *window);
-void applyToolLevelStyle(QWidget *window);
 bool isLargeWindow(QWidget *window);
 void fitDialogToScreen(QWidget *dialog, QWidget *parent = nullptr, int margin = 40);
 void fitWindowToScreen(QWidget *window, int margin = 40);
@@ -30,7 +29,6 @@ void connectWindowButtons(QWidget *window,
                           QToolButton *closeButton,
                           bool returnToMainWindow = false);
 void populatePreviewScene(QGraphicsView *view, Page page);
-bool switchEmbeddedSetupPage(QWidget *current, const QString &pageId);
 void replaceDialog(QWidget *current, QDialog *next);
 void setSessionInfo(QWidget *window, const QString &deviceName, const QString &userName);
 void returnToMainWindow(QWidget *source);

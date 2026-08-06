@@ -1,12 +1,10 @@
 #include "RegisteredClassificationTrainingDialog.h"
-#include "ui_RegisteredClassificationTrainingDialog.h"
 
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
-#include "frame/RoiGeometry.h"
 
 #include <QAbstractItemView>
 #include <QButtonGroup>
@@ -59,6 +57,19 @@
 
 namespace {
 
+QFrame *trainingCard(QWidget *parent, const QString &title)
+{
+    QFrame *frame = new QFrame(parent);
+    frame->setProperty("panelRole", QStringLiteral("trainingCard"));
+    QVBoxLayout *layout = new QVBoxLayout(frame);
+    layout->setContentsMargins(16, 14, 16, 14);
+    layout->setSpacing(12);
+    QLabel *titleLabel = new QLabel(title, frame);
+    titleLabel->setProperty("role", QStringLiteral("cardTitle"));
+    layout->addWidget(titleLabel);
+    return frame;
+}
+
 QSize initialDialogSize(QWidget *parent, const QSize &fallback)
 {
     if (!parent)
@@ -72,6 +83,22 @@ QSize initialDialogSize(QWidget *parent, const QSize &fallback)
 
     return QSize(qMax(760, qRound(parentSize.width() * 0.76)),
                  qMax(520, qRound(parentSize.height() * 0.76)));
+}
+
+QPushButton *smallButton(QWidget *parent, const QString &text)
+{
+    QPushButton *button = new QPushButton(text, parent);
+    button->setMinimumHeight(38);
+    return button;
+}
+
+QToolButton *iconButton(QWidget *parent, const QString &text, const QString &tooltip)
+{
+    QToolButton *button = new QToolButton(parent);
+    button->setText(text);
+    button->setToolTip(tooltip);
+    button->setMinimumSize(38, 38);
+    return button;
 }
 
 QToolButton *rowIconButton(QWidget *parent,
@@ -123,6 +150,24 @@ QIcon roiIcon(const QString &kind)
     }
 
     return QIcon(pixmap);
+}
+
+QToolButton *roiButton(QWidget *parent,
+                       const QString &objectName,
+                       const QString &text,
+                       const QIcon &icon)
+{
+    QToolButton *button = new QToolButton(parent);
+    button->setObjectName(objectName);
+    button->setText(text);
+    button->setToolTip(text);
+    button->setIcon(icon);
+    button->setIconSize(QSize(26, 26));
+    button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    button->setCheckable(true);
+    button->setMinimumHeight(44);
+    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    return button;
 }
 
 using TrainingRoiMark = RegisteredClassificationTrainingRoiMark;
@@ -262,7 +307,14 @@ QRect imageCropRect(const QImage &image, const TrainingRoiMark &mark)
         return image.rect();
 
     const QRectF normalized = normalizedBoundingRect(mark).intersected(QRectF(0.0, 0.0, 1.0, 1.0));
-    return coveringPixelRect(normalized, image.width(), image.height());
+    QRect crop(qRound(normalized.x() * image.width()),
+               qRound(normalized.y() * image.height()),
+               qRound(normalized.width() * image.width()),
+               qRound(normalized.height() * image.height()));
+    crop = crop.normalized().intersected(image.rect());
+    if (crop.width() <= 0 || crop.height() <= 0)
+        return QRect();
+    return crop;
 }
 
 bool markContainsNormalizedPoint(const TrainingRoiMark &mark, const QPointF &point)
@@ -404,9 +456,7 @@ QString defaultRegisteredClassificationModelDir()
 RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(QWidget *parent)
     : QDialog(parent)
     , m_state(new TrainingSessionState)
-    , ui(new Ui::RegisteredClassificationTrainingDialog)
 {
-#if 0
     setWindowTitle(tr("注册分类"));
     resize(initialDialogSize(parent, QSize(1120, 720)));
     setMinimumSize(760, 520);
@@ -507,17 +557,12 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QAbstractItemView::item{min-height:34px;padding:6px 10px;background:#2d333f;color:#ffffff;}"
         "QAbstractItemView::item:hover,QAbstractItemView::item:selected{background:#0ea5e9;color:#ffffff;}"));
     QLabel *imageStatusLabel = new QLabel(tr("图像 0 / 标注 0 / 类别 1"), statusBar);
-    QLabel *pixelLabel = new QLabel(statusBar);
-    pixelLabel->setObjectName(QStringLiteral("registeredTrainingPixelLabel"));
     statusLayout->addWidget(filterCombo);
     statusLayout->addSpacing(18);
     statusLayout->addWidget(imageStatusLabel);
     statusLayout->addStretch(1);
-    statusLayout->addWidget(pixelLabel);
-    statusLayout->addSpacing(18);
     QLabel *editStatusLabel = new QLabel(tr("请添加注册图并标注至少两个类别样本"), statusBar);
     statusLayout->addWidget(editStatusLabel);
-    previewHelper->bindPixelStatusLabel(pixelLabel);
     previewLayout->addWidget(statusBar);
 
     QListWidget *thumbnailList = new QListWidget(previewPanel);
@@ -650,66 +695,6 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
     bottom->addWidget(m_trainButton);
     rightLayout->addLayout(bottom);
     root->addWidget(rightPanel);
-#endif
-
-    ui->setupUi(this);
-    resize(initialDialogSize(parent, QSize(1120, 720)));
-
-    QToolButton *previousImageButton = ui->registeredTrainingPreviousImageButton;
-    QToolButton *nextImageButton = ui->registeredTrainingNextImageButton;
-    QStackedWidget *previewStack = ui->registeredTrainingPreviewStack;
-    QWidget *imagePage = ui->registeredTrainingImagePage;
-    QGraphicsView *view = ui->registeredTrainingPreviewView;
-    FrameViewHelper *previewHelper = new FrameViewHelper(view, this);
-    previewHelper->setObjectName(QStringLiteral("registeredTrainingPreviewHelper"));
-    QWidget *previewPage = ui->registeredTrainingPreviewPage;
-    QLabel *previewPageTitle = ui->registeredTrainingPreviewPageTitle;
-    QToolButton *previewCloseButton = ui->registeredTrainingPreviewCloseButton;
-    QLabel *previewEmptyLabel = ui->registeredTrainingPreviewEmptyLabel;
-    QScrollArea *roiPreviewScrollArea = ui->registeredTrainingRoiPreviewScrollArea;
-    QWidget *roiPreviewListWidget = ui->registeredTrainingRoiPreviewList;
-    QVBoxLayout *roiPreviewListLayout = ui->registeredTrainingRoiPreviewListLayout;
-    QComboBox *filterCombo = ui->registeredTrainingFilterCombo;
-    filterCombo->clear();
-    filterCombo->addItem(tr("全部"), QStringLiteral("all"));
-    filterCombo->addItem(tr("标注"), QStringLiteral("marked"));
-    filterCombo->addItem(tr("未标注"), QStringLiteral("unmarked"));
-    QLabel *imageStatusLabel = ui->registeredTrainingImageStatusLabel;
-    QLabel *pixelLabel = ui->registeredTrainingPixelLabel;
-    QLabel *editStatusLabel = ui->registeredTrainingEditStatusLabel;
-    QListWidget *thumbnailList = ui->registeredTrainingThumbnailList;
-    QToolButton *deleteAllImagesButton = ui->registeredTrainingDeleteAllImagesButton;
-    QPushButton *cameraButton = ui->trainingCameraCaptureButton;
-    QPushButton *storedImageButton = ui->trainingStoredImageButton;
-    QPushButton *externalImportButton = ui->trainingExternalImportButton;
-    QToolButton *fullButton = ui->trainingFullRoiButton;
-    QToolButton *rectButton = ui->trainingRectRoiButton;
-    QToolButton *polygonButton = ui->trainingPolygonRoiButton;
-    QLabel *classCountLabel = ui->registeredTrainingClassCountLabel;
-    QPushButton *createClassButton = ui->registeredTrainingCreateClassButton;
-    QPushButton *clearAllMarksButton = ui->registeredTrainingClearAllMarksButton;
-    QWidget *classListWidget = ui->registeredTrainingClassList;
-    QVBoxLayout *classListLayout = ui->registeredTrainingClassListLayout;
-    QComboBox *modelTypeCombo = ui->registeredTrainingModelTypeCombo;
-    QComboBox *taskTypeCombo = ui->registeredTrainingTaskTypeCombo;
-    m_trainStatusLabel = ui->registeredTrainingStateLabel;
-    m_trainButton = ui->registeredTrainingStartButton;
-
-    Q_UNUSED(roiPreviewScrollArea)
-    Q_UNUSED(roiPreviewListWidget)
-    Q_UNUSED(modelTypeCombo)
-    Q_UNUSED(taskTypeCombo)
-    Q_UNUSED(storedImageButton)
-    previewStack->setCurrentWidget(imagePage);
-    previewHelper->bindPixelStatusLabel(pixelLabel);
-    deleteAllImagesButton->setIcon(QApplication::style()->standardIcon(QStyle::SP_TrashIcon));
-    fullButton->setIcon(roiIcon(QStringLiteral("full")));
-    rectButton->setIcon(roiIcon(QStringLiteral("rect")));
-    polygonButton->setIcon(roiIcon(QStringLiteral("polygon")));
-    for (QToolButton *button : {fullButton, rectButton, polygonButton}) {
-        button->setIconSize(QSize(26, 26));
-        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    }
 
     QSharedPointer<TrainingSessionState> state = m_state;
 
@@ -1686,7 +1671,7 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QLabel[role=\"cardTitle\"]{font-size:23px;font-weight:800;color:#08386f;}"
         "QLabel[role=\"previewPageTitle\"]{font-size:26px;font-weight:800;color:#ffffff;}"
         "QLabel[role=\"previewEmpty\"]{font-size:22px;font-weight:700;color:#e2e8f0;}"
-        "QLabel[role=\"stateLabel\"]{font-size:20px;font-weight:800;color:#c2410c;}"
+        "QLabel[role=\"stateLabel\"]{font-size:24px;font-weight:800;color:#c2410c;}"
         "QLabel[role=\"thumbnailCaption\"]{color:#ffffff;font-size:15px;font-weight:800;}"
         "QComboBox[role=\"filterBox\"]{background:#2d333f;border:2px solid #94a3b8;border-radius:3px;color:#ffffff;padding:8px 38px 8px 12px;font-size:18px;font-weight:700;min-width:150px;}"
         "QComboBox[role=\"filterBox\"]:hover{border-color:#cbd5e1;background:#343b49;}"
@@ -1705,11 +1690,6 @@ RegisteredClassificationTrainingDialog::RegisteredClassificationTrainingDialog(Q
         "QScrollArea > QWidget > QWidget{background:#ffffff;}"
         "QTableWidget{background:#ffffff;color:#0f172a;border:2px solid #93c5fd;gridline-color:#bfdbfe;font-size:18px;selection-background-color:#dbeafe;}"
         "QHeaderView::section{background:#dbeafe;color:#08386f;font-weight:800;font-size:18px;border:0;padding:8px;}"));
-}
-
-RegisteredClassificationTrainingDialog::~RegisteredClassificationTrainingDialog()
-{
-    delete ui;
 }
 
 QJsonObject RegisteredClassificationTrainingDialog::buildTrainingRequestPreviewForTest() const

@@ -36,10 +36,6 @@ FrameInputMetadata FrameInputMetadata::fromMat(const cv::Mat &image,
 
     metadata.originalChannels = image.channels();
     metadata.originalDepth = bitDepthForOpenCvDepth(image.depth());
-    if (metadata.originalDepth > 0) {
-        metadata.validBits = metadata.originalDepth;
-        metadata.bitShift = 0;
-    }
 
     switch (image.type()) {
     case CV_8UC1:
@@ -57,18 +53,6 @@ FrameInputMetadata FrameInputMetadata::fromMat(const cv::Mat &image,
     case CV_8UC4:
         metadata.colorMode = QStringLiteral("color");
         metadata.pixelFormat = QStringLiteral("BGRA8");
-        break;
-    case CV_16UC1:
-        metadata.colorMode = QStringLiteral("mono");
-        metadata.pixelFormat = QStringLiteral("Mono16");
-        break;
-    case CV_16UC3:
-        metadata.colorMode = QStringLiteral("color");
-        metadata.pixelFormat = QStringLiteral("BGR16");
-        break;
-    case CV_16UC4:
-        metadata.colorMode = QStringLiteral("color");
-        metadata.pixelFormat = QStringLiteral("BGRA16");
         break;
     default:
         break;
@@ -176,8 +160,6 @@ FrameInputMetadata FrameInputMetadata::fromJson(const QJsonObject &json)
     metadata.pixelFormat = json.value(QStringLiteral("pixelFormat")).toString();
     metadata.originalChannels = json.value(QStringLiteral("originalChannels")).toInt(0);
     metadata.originalDepth = json.value(QStringLiteral("originalDepth")).toInt(-1);
-    metadata.validBits = json.value(QStringLiteral("validBits")).toInt(-1);
-    metadata.bitShift = json.value(QStringLiteral("bitShift")).toInt(-1);
     metadata.source = json.value(QStringLiteral("source")).toString();
     return metadata;
 }
@@ -189,8 +171,6 @@ QJsonObject FrameInputMetadata::toJson() const
     json.insert(QStringLiteral("pixelFormat"), pixelFormat);
     json.insert(QStringLiteral("originalChannels"), originalChannels);
     json.insert(QStringLiteral("originalDepth"), originalDepth);
-    json.insert(QStringLiteral("validBits"), validBits);
-    json.insert(QStringLiteral("bitShift"), bitShift);
     json.insert(QStringLiteral("source"), source);
     return json;
 }

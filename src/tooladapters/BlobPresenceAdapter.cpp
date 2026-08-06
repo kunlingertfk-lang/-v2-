@@ -1,8 +1,6 @@
 #include "tooladapters/BlobPresenceAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
-#include "toolcore/PositionCorrection.h"
-#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -177,29 +175,7 @@ ToolResult BlobPresenceAdapter::run(const ToolRequest &request)
                                      QStringLiteral("BlobPresenceAdapter only supports ToolType::BlobPresence."));
     }
 
-    BlobPresenceHalconConfig halconConfig = toHalconConfig(config);
-    QString stableSourceId = config.params
-            .value(QStringLiteral("positionCorrectionSourceId"))
-            .toString().trimmed();
-    if (stableSourceId.isEmpty())
-        stableSourceId = halconConfig.positionCorrectionSource.trimmed();
-    stableSourceId = PositionCorrection::normalizedSourceId(stableSourceId);
-
-    PositionCorrectionConsumerOptions correctionOptions;
-    correctionOptions.requested = halconConfig.enablePositionCorrection;
-    correctionOptions.sourceId = stableSourceId;
-    correctionOptions.showMatchContour = boolParam(
-                config.params,
-                QStringLiteral("showPositionCorrectionMatchContour"),
-                true);
-    const PositionCorrectionResolveResult correction =
-            PositionCorrectionConsumer::resolve(request, correctionOptions);
-    if (!correction.success) {
-        return makeBlobPresenceError(config,
-                                     correction.status,
-                                     correction.message);
-    }
-    halconConfig.positionCorrection = correction.context;
+    const BlobPresenceHalconConfig halconConfig = toHalconConfig(config);
     const BlobPresenceHalconResult runnerResult = m_runner.run(request.image, halconConfig);
 
     ToolResult result;

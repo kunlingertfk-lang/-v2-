@@ -2,10 +2,8 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QFile>
-#include <QGuiApplication>
 #include <QMutex>
 #include <QMutexLocker>
-#include <QScreen>
 #include <QTextStream>
 
 #include "LoginWindow.h"
@@ -56,38 +54,10 @@ void loadStyleSheet(QApplication &app)
     }
 }
 
-void logScreenDpi(QScreen *screen)
-{
-    if (!screen)
-        return;
-
-    qInfo().nospace()
-            << "[Display] name=" << screen->name()
-            << " geometry=" << screen->geometry()
-            << " available=" << screen->availableGeometry()
-            << " logicalDpi=" << screen->logicalDotsPerInch()
-            << " physicalDpi=" << screen->physicalDotsPerInch()
-            << " devicePixelRatio=" << screen->devicePixelRatio();
-}
-
 } // namespace
 
 int main(int argc, char *argv[])
 {
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    // Qt 5 does not consistently enable high-DPI scaling on Linux. These
-    // attributes must be set before QApplication is constructed so widget
-    // geometry, fonts, stylesheets and pixmaps all use logical pixels.
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
-#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
-    // Preserve common desktop scale factors such as 125% and 150% instead of
-    // rounding them to an integer device-pixel ratio.
-    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
-            Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
-#endif
-
     const QString halconLicense =
             HalconRuntimePaths::initializeHalconEnvironment();
 
@@ -105,26 +75,13 @@ int main(int argc, char *argv[])
     app.setOrganizationName(QStringLiteral("汇众智慧"));
 
     loadStyleSheet(app);
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    qInfo().nospace()
-            << "[Display] highDpiScaling="
-            << QCoreApplication::testAttribute(Qt::AA_EnableHighDpiScaling)
-            << " highDpiPixmaps="
-            << QCoreApplication::testAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
-    const QList<QScreen *> screens = QGuiApplication::screens();
-    for (QScreen *screen : screens)
-        logScreenDpi(screen);
-    QObject::connect(&app, &QGuiApplication::screenAdded, &app, [](QScreen *screen) {
-        logScreenDpi(screen);
-    });
     QObject::connect(&app, &QApplication::aboutToQuit, []() {
-    CameraFrameProvider::instance().closeCamera(
-                QStringLiteral("aboutToQuit"));
+        CameraFrameProvider::instance().stopGrab();
+        CameraFrameProvider::instance().closeCamera(QStringLiteral("aboutToQuit"));
     });
 
     LoginWindow loginWindow;
-    loginWindow.showMaximized();
+    loginWindow.show();
 
     return app.exec();
 }

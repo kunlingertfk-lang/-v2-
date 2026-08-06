@@ -1,5 +1,4 @@
 #include "algorithms/presence/LinePresenceHalconRunner.h"
-#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
@@ -313,21 +312,8 @@ void fillPayload(LinePresenceHalconResult &result,
     result.payload.insert(QStringLiteral("existOk"), config.existOk);
     result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
     result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
-    result.payload.insert(QStringLiteral("positionCorrectionRequested"),
-                          config.enablePositionCorrection);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"),
-                          config.positionCorrection.applied);
-    result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
-                          config.positionCorrection.sourceId);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"),
-                          config.positionCorrection.applied
-                          ? QStringLiteral("applied") : QStringLiteral("not_requested"));
-    result.payload.insert(QStringLiteral("referenceScale"),
-                          config.positionCorrection.referenceScale);
-    result.payload.insert(QStringLiteral("runScale"),
-                          config.positionCorrection.runScale);
-    result.payload.insert(QStringLiteral("scaleRatio"),
-                          config.positionCorrection.scaleRatio);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("maskApplied"), false);
     result.payload.insert(QStringLiteral("detectMaskApplied"), false);
     result.payload.insert(QStringLiteral("maskReason"), QStringLiteral("not implemented"));
@@ -693,7 +679,7 @@ LinePresenceHalconResult runMetrologyLinePresence(const cv::Mat &image,
     }
 
     QString fallbackReason;
-    MetrologyLineGeometry geometry = lineGeometryFromConfig(config, image, &fallbackReason);
+    const MetrologyLineGeometry geometry = lineGeometryFromConfig(config, image, &fallbackReason);
     if (!geometry.valid) {
         LinePresenceHalconResult result = makeMetrologyLineError(QStringLiteral("invalid_line_band"),
                                                                  fallbackReason.isEmpty()
@@ -704,44 +690,6 @@ LinePresenceHalconResult runMetrologyLinePresence(const cv::Mat &image,
         result.elapsedMs = timer.elapsed();
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
         return result;
-    }
-    const bool correctionApplied = config.positionCorrection.applied;
-    if (correctionApplied) {
-        geometry.p1 = PositionCorrectionTransform::transformPoint(
-                    geometry.p1, config.positionCorrection.referenceToRunHomMat2D);
-        geometry.p2 = PositionCorrectionTransform::transformPoint(
-                    geometry.p2, config.positionCorrection.referenceToRunHomMat2D);
-        geometry.length = std::hypot(geometry.p2.x() - geometry.p1.x(),
-                                     geometry.p2.y() - geometry.p1.y());
-        geometry.halfBandWidth *= config.positionCorrection.scaleRatio;
-        if (!std::isfinite(geometry.length) || geometry.length <= 2.0) {
-            LinePresenceHalconResult errorResult =
-                    makeMetrologyLineError(QStringLiteral("corrected_roi_out_of_image"),
-                                           QStringLiteral("Position-corrected line ROI is invalid"),
-                                           image,
-                                           config);
-            errorResult.elapsedMs = timer.elapsed();
-            return errorResult;
-        }
-        const QRectF correctedBounds(
-                    QPointF(qMin(geometry.p1.x(), geometry.p2.x()) - geometry.halfBandWidth,
-                            qMin(geometry.p1.y(), geometry.p2.y()) - geometry.halfBandWidth),
-                    QPointF(qMax(geometry.p1.x(), geometry.p2.x()) + geometry.halfBandWidth,
-                            qMax(geometry.p1.y(), geometry.p2.y()) + geometry.halfBandWidth));
-        const QRectF imageBounds(0.0, 0.0,
-                                 static_cast<double>(image.cols),
-                                 static_cast<double>(image.rows));
-        if (!std::isfinite(geometry.halfBandWidth)
-                || geometry.halfBandWidth <= 0.0
-                || !correctedBounds.intersects(imageBounds)) {
-            LinePresenceHalconResult errorResult =
-                    makeMetrologyLineError(QStringLiteral("corrected_roi_out_of_image"),
-                                           QStringLiteral("Position-corrected line ROI is outside the image"),
-                                           image,
-                                           config);
-            errorResult.elapsedMs = timer.elapsed();
-            return errorResult;
-        }
     }
 
     LinePresenceHalconResult result;
@@ -797,48 +745,16 @@ LinePresenceHalconResult runMetrologyLinePresence(const cv::Mat &image,
     result.payload.insert(QStringLiteral("manualUnsupported"), manualUnsupported);
     result.payload.insert(QStringLiteral("edgePolarityApplied"), true);
     result.payload.insert(QStringLiteral("maskApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
     result.payload.insert(QStringLiteral("okNgReason"), QString());
 
-    ToolOverlay detectOverlay = rectOverlay(
-                QRectF(normalizedRoiToPixels(config.roiNormalized,
-                                             image.cols,
-                                             image.rows,
-                                             nullptr)),
-                QStringLiteral("detect_roi"));
-    if (correctionApplied) {
-        detectOverlay = PositionCorrectionTransform::transformOverlay(
-                    detectOverlay,
-                    config.positionCorrection.referenceToRunHomMat2D);
-        detectOverlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
-                                   config.positionCorrection.sourceId);
-    }
-    detectOverlay.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
-    result.overlays.append(detectOverlay);
-    if (correctionApplied && config.positionCorrection.showMatchContour) {
-        result.overlays += PositionCorrectionTransform::matchContourOverlays(
-                    config.positionCorrection.matchContours,
-                    config.positionCorrection.sourceId);
-    }
-    if (correctionApplied) {
-        result.overlays += PositionCorrectionTransform::matchOriginOverlays(
-                    config.positionCorrection.matchOrigins,
-                    config.positionCorrection.sourceId);
-    }
     result.overlays.append(lineOverlay(geometry.p1, geometry.p2, QStringLiteral("line_band_center")));
     const QVector<QPointF> band = lineBandPolygonPixels(config, image.cols, image.rows);
     if (!geometry.fallback && band.size() == 4) {
-        for (int index = 0; index < band.size(); ++index) {
-            ToolOverlay boundary = lineOverlay(
-                        band.at(index),
-                        band.at((index + 1) % band.size()),
-                        QStringLiteral("line_band_boundary"));
-            if (correctionApplied) {
-                boundary = PositionCorrectionTransform::transformOverlay(
-                            boundary,
-                            config.positionCorrection.referenceToRunHomMat2D);
-            }
-            result.overlays.append(boundary);
-        }
+        for (int index = 0; index < band.size(); ++index)
+            result.overlays.append(lineOverlay(band.at(index),
+                                               band.at((index + 1) % band.size()),
+                                               QStringLiteral("line_band_boundary")));
     }
     appendMetrologyMeasureRectangleOverlays(&result.overlays, geometry, sampleCount, measureLength2);
 

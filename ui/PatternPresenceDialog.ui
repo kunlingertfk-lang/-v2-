@@ -928,7 +928,7 @@
                         </property>
                         <item>
                          <property name="text">
-                          <string>0 基准图.位置修正信息</string>
+                          <string>1 基准图.位置修正信息</string>
                          </property>
                         </item>
                        </widget>
@@ -2062,7 +2062,7 @@
                         </property>
                         <item>
                          <property name="text">
-                          <string>0 基准图.位置修正信息</string>
+                          <string>1 基准图.位置修正信息</string>
                          </property>
                         </item>
                        </widget>

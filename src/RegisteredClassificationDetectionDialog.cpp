@@ -1,5 +1,4 @@
 #include "RegisteredClassificationDetectionDialog.h"
-#include "ui_RegisteredClassificationDetectionDialog.h"
 
 #include "PlanDialogUtils.h"
 #include "RegisteredClassificationDetectionTrainingDialog.h"
@@ -87,6 +86,37 @@ QRectF normalizedRoiOrDefault(const QRectF &source)
             : QRectF(0.0, 0.0, 1.0, 1.0);
 }
 
+QFrame *card(QWidget *parent, const QString &title)
+{
+    QFrame *frame = new QFrame(parent);
+    frame->setProperty("panelRole", QStringLiteral("configCard"));
+    frame->setStyleSheet(QStringLiteral(
+        "QFrame[panelRole=\"configCard\"]{background:#ffffff;border:1px solid #d8dee8;border-radius:6px;}"
+        "QLabel[role=\"cardTitle\"]{font-weight:600;color:#111827;}"
+        "QLabel[role=\"rowField\"]{color:#4b5563;}"));
+
+    QVBoxLayout *layout = new QVBoxLayout(frame);
+    layout->setContentsMargins(14, 12, 14, 12);
+    layout->setSpacing(10);
+    QLabel *titleLabel = new QLabel(title, frame);
+    titleLabel->setProperty("role", QStringLiteral("cardTitle"));
+    layout->addWidget(titleLabel);
+    return frame;
+}
+
+QHBoxLayout *row(const QString &label, QWidget *field)
+{
+    QHBoxLayout *layout = new QHBoxLayout;
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(10);
+    QLabel *labelWidget = new QLabel(label);
+    labelWidget->setProperty("role", QStringLiteral("rowField"));
+    labelWidget->setMinimumWidth(118);
+    layout->addWidget(labelWidget);
+    layout->addWidget(field, 1);
+    return layout;
+}
+
 void applyActionButtonMetrics(QPushButton *button)
 {
     if (!button)
@@ -137,7 +167,6 @@ void setComboBoxText(QComboBox *comboBox, const QString &text)
 
 RegisteredClassificationDetectionDialog::RegisteredClassificationDetectionDialog(QWidget *parent)
     : QDialog(parent)
-    , ui(new Ui::RegisteredClassificationDetectionDialog)
     , m_toolId(QStringLiteral("registered_classification_detection_%1")
                        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)))
 {
@@ -147,10 +176,7 @@ RegisteredClassificationDetectionDialog::RegisteredClassificationDetectionDialog
     refreshPreview();
 }
 
-RegisteredClassificationDetectionDialog::~RegisteredClassificationDetectionDialog()
-{
-    delete ui;
-}
+RegisteredClassificationDetectionDialog::~RegisteredClassificationDetectionDialog() = default;
 
 ToolConfig RegisteredClassificationDetectionDialog::toToolConfig() const
 {
@@ -433,8 +459,7 @@ void RegisteredClassificationDetectionDialog::handleRoiSelectionRejected()
     setViewerStatusText(tr("检测区域无效，请重新绘制矩形 ROI。"));
 }
 
-#if 0
-void RegisteredClassificationDetectionDialog::buildLegacyUi()
+void RegisteredClassificationDetectionDialog::buildUi()
 {
     setWindowTitle(tr("方案编辑 - 注册目标检测"));
     setWindowModality(Qt::WindowModal);
@@ -450,15 +475,14 @@ void RegisteredClassificationDetectionDialog::buildLegacyUi()
     root->setSpacing(0);
 
     QFrame *header = new QFrame(this);
-    header->setObjectName(QStringLiteral("setupTopBar"));
+    header->setStyleSheet(QStringLiteral("background:#3f444e;color:#ffffff;"));
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
     headerLayout->setContentsMargins(28, 0, 22, 0);
     QLabel *headerTitle = new QLabel(tr("方案编辑"), header);
-    headerTitle->setObjectName(QStringLiteral("setupWindowTitleLabel"));
     QToolButton *closeButton = new QToolButton(header);
     closeButton->setObjectName(QStringLiteral("registeredClassificationDetectionCloseButton"));
-    closeButton->setProperty("actionRole", QStringLiteral("windowClose"));
     closeButton->setText(QStringLiteral("×"));
+    closeButton->setStyleSheet(QStringLiteral("color:#ffffff;font-size:24px;border:0;"));
     headerLayout->addWidget(headerTitle);
     headerLayout->addStretch(1);
     headerLayout->addWidget(closeButton);
@@ -470,9 +494,9 @@ void RegisteredClassificationDetectionDialog::buildLegacyUi()
     root->addLayout(content, 1);
 
     QFrame *leftPanel = new QFrame(this);
-    leftPanel->setObjectName(QStringLiteral("setupEditorPanel"));
-    leftPanel->setMinimumWidth(610);
-    leftPanel->setMaximumWidth(610);
+    leftPanel->setMinimumWidth(420);
+    leftPanel->setMaximumWidth(500);
+    leftPanel->setStyleSheet(QStringLiteral("background:#eef1f5;color:#111827;"));
     QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->setContentsMargins(24, 18, 24, 18);
     leftLayout->setSpacing(14);
@@ -480,11 +504,9 @@ void RegisteredClassificationDetectionDialog::buildLegacyUi()
 
     QHBoxLayout *titleLayout = new QHBoxLayout;
     QLabel *dialogTitle = new QLabel(tr("注册目标检测"), leftPanel);
-    dialogTitle->setObjectName(QStringLiteral("editorTitleLabel"));
+    dialogTitle->setStyleSheet(QStringLiteral("font-size:18px;font-weight:600;color:#111827;"));
     m_basicButton = new QPushButton(tr("基础"), leftPanel);
     m_allButton = new QPushButton(tr("全部"), leftPanel);
-    m_basicButton->setObjectName(QStringLiteral("basicSegmentButton"));
-    m_allButton->setObjectName(QStringLiteral("allSegmentButton"));
     m_basicButton->setCheckable(true);
     m_allButton->setCheckable(true);
     m_segmentGroup->addButton(m_basicButton, 0);
@@ -514,17 +536,14 @@ void RegisteredClassificationDetectionDialog::buildLegacyUi()
     m_globalRegionButton->setText(QStringLiteral("▣"));
     m_globalRegionButton->setToolTip(tr("全屏检测"));
     m_globalRegionButton->setCheckable(true);
-    m_globalRegionButton->setProperty("actionRole", QStringLiteral("toolbarIcon"));
     m_rectRegionButton = new QToolButton(regionButtons);
     m_rectRegionButton->setText(QStringLiteral("□"));
     m_rectRegionButton->setToolTip(tr("矩形检测区域"));
     m_rectRegionButton->setCheckable(true);
-    m_rectRegionButton->setProperty("actionRole", QStringLiteral("toolbarIcon"));
     m_regionGroup->setExclusive(true);
     m_regionGroup->addButton(m_globalRegionButton, 0);
     m_regionGroup->addButton(m_rectRegionButton, 1);
     m_roiFinishButton = new QPushButton(tr("完成"), regionButtons);
-    m_roiFinishButton->setProperty("actionRole", QStringLiteral("secondary"));
     regionLayout->addWidget(new QLabel(tr("检测区"), regionButtons));
     regionLayout->addStretch(1);
     regionLayout->addWidget(m_globalRegionButton);
@@ -549,7 +568,7 @@ void RegisteredClassificationDetectionDialog::buildLegacyUi()
     positionLabel->setProperty("role", QStringLiteral("rowField"));
     positionLabel->setMinimumWidth(118);
     m_positionSourceComboBox = new QComboBox(m_positionSourceRow);
-    m_positionSourceComboBox->addItem(QStringLiteral("0 基准图.位置修正信息"));
+    m_positionSourceComboBox->addItem(QStringLiteral("1 基准图.位置修正信息"));
     positionSourceLayout->addWidget(positionLabel);
     positionSourceLayout->addWidget(m_positionSourceComboBox, 1);
     detectLayout->addWidget(m_positionSourceRow);
@@ -638,21 +657,16 @@ void RegisteredClassificationDetectionDialog::buildLegacyUi()
     m_viewerStatusLabel = new QLabel(rightPanel);
     m_viewerStatusLabel->setMinimumHeight(42);
     m_viewerStatusLabel->setContentsMargins(18, 0, 0, 0);
-    QLabel *viewerCursorLabel = new QLabel(rightPanel);
-    viewerCursorLabel->setObjectName(QStringLiteral("viewerCursorLabel"));
-    viewerCursorLabel->setMinimumHeight(32);
-    viewerCursorLabel->setContentsMargins(18, 0, 18, 0);
-    viewerCursorLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     rightLayout->addWidget(m_viewerTitleLabel);
     rightLayout->addWidget(m_previewGraphicsView, 1);
     rightLayout->addWidget(m_viewerStatusLabel);
-    rightLayout->addWidget(viewerCursorLabel);
     content->addWidget(rightPanel, 1);
 
     m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
-    m_previewHelper->bindPixelStatusLabel(viewerCursorLabel);
 
     setStyleSheet(styleSheet() + QStringLiteral(
+        "QPushButton,QToolButton,QComboBox,QSpinBox,QLineEdit{background:#ffffff;color:#111827;border:1px solid #cfd6df;border-radius:4px;padding:6px;}"
+        "QPushButton:checked,QToolButton:checked{background:#fff3e6;color:#ff7a00;border-color:#ff7a00;}"
         "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;}"
         "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000000;border-color:#000000;}"
         "QCheckBox{color:#111827;}"));
@@ -662,93 +676,6 @@ void RegisteredClassificationDetectionDialog::buildLegacyUi()
     m_positionCorrectionCheckBox->setChecked(false);
     m_positionCorrectionCheckBox->setEnabled(false);
     m_positionCorrectionCheckBox->setToolTip(tr("位置修正补偿尚未实现，当前版本默认关闭。"));
-}
-
-#endif
-
-void RegisteredClassificationDetectionDialog::buildUi()
-{
-    ui->setupUi(this);
-    setWindowTitle(tr("方案编辑 - 注册目标检测"));
-    setWindowModality(Qt::WindowModal);
-    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
-    PlanDialogUtils::applyLargeWindow(this);
-
-    m_segmentGroup = new QButtonGroup(this);
-    m_regionGroup = new QButtonGroup(this);
-    m_judgeGroup = new QButtonGroup(this);
-
-    m_basicButton = ui->basicSegmentButton;
-    m_allButton = ui->allSegmentButton;
-    m_globalRegionButton = ui->globalRegionButton;
-    m_rectRegionButton = ui->rectRegionButton;
-    m_roiFinishButton = ui->roiFinishButton;
-    m_positionCorrectionCheckBox = ui->positionCorrectionSwitch;
-    m_positionSourceRow = ui->positionSourceRow;
-    m_positionSourceComboBox = ui->positionSourceComboBox;
-    m_modelNameLabel = ui->modelNameLabel;
-    m_modelPathLabel = ui->modelPathLabel;
-    m_importModelButton = ui->importModelButton;
-    m_exportModelButton = ui->exportModelButton;
-    m_deleteModelButton = ui->deleteModelButton;
-    m_registerTrainingButton = ui->registerTrainingButton;
-    m_modelManagementButton = ui->modelManagementButton;
-    for (QPushButton *button : {m_importModelButton,
-                                m_exportModelButton,
-                                m_deleteModelButton,
-                                m_registerTrainingButton,
-                                m_modelManagementButton}) {
-        button->setProperty("actionRole", QStringLiteral("secondary"));
-    }
-    m_advancedCard = ui->advancedCard;
-    m_modelTypeComboBox = ui->modelTypeComboBox;
-    m_topKSpinBox = ui->topKSpinBox;
-    m_minSimilaritySpinBox = ui->minSimilaritySpinBox;
-    m_resultBasisComboBox = ui->resultBasisComboBox;
-    m_expectedLabelLineEdit = ui->expectedLabelLineEdit;
-    m_minScoreSpinBox = ui->minScoreSpinBox;
-    m_judgeTypeComboBox = ui->judgeTypeComboBox;
-    m_referenceTestButton = ui->referenceTestButton;
-    m_testRunButton = ui->testRunButton;
-    m_finishButton = ui->finishButton;
-    m_viewerTitleLabel = ui->viewerTitleLabel;
-    m_viewerStatusLabel = ui->viewerStatusLabel;
-    m_previewGraphicsView = ui->previewGraphicsView;
-
-    m_segmentGroup->addButton(m_basicButton, 0);
-    m_segmentGroup->addButton(m_allButton, 1);
-    m_regionGroup->setExclusive(true);
-    m_regionGroup->addButton(m_globalRegionButton, 0);
-    m_regionGroup->addButton(m_rectRegionButton, 1);
-
-    m_positionSourceComboBox->addItem(QStringLiteral("0 基准图.位置修正信息"));
-    m_modelTypeComboBox->addItem(tr("HALCON DL 分类"),
-                                 QStringLiteral("halcon_dl_classification"));
-    m_minSimilaritySpinBox->setValue(68);
-    m_resultBasisComboBox->addItem(tr("类别判断"), QStringLiteral("class_match"));
-    m_resultBasisComboBox->addItem(tr("最低得分"), QStringLiteral("min_score"));
-    m_judgeTypeComboBox->addItem(tr("所有检测区域输出结果为 OK"));
-    m_judgeTypeComboBox->addItem(tr("任意检测区域输出结果为 OK"));
-
-    applyActionButtonMetrics(m_referenceTestButton);
-    applyActionButtonMetrics(m_testRunButton);
-    applyActionButtonMetrics(m_finishButton);
-
-    m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
-    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
-
-    setStyleSheet(styleSheet() + QStringLiteral(
-        "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;}"
-        "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000000;border-color:#000000;}"
-        "QCheckBox{color:#111827;}"));
-    PlanDialogUtils::applyToolLevelStyle(this);
-
-    m_basicButton->setChecked(true);
-    m_globalRegionButton->setChecked(true);
-    m_positionCorrectionCheckBox->setChecked(false);
-    m_positionCorrectionCheckBox->setEnabled(false);
-    m_positionCorrectionCheckBox->setToolTip(
-                tr("位置修正补偿尚未实现，当前版本默认关闭。"));
 }
 
 void RegisteredClassificationDetectionDialog::connectControls()

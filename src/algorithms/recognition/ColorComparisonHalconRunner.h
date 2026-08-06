@@ -2,7 +2,7 @@
 #define ALGORITHMS_RECOGNITION_COLORCOMPARISONHALCONRUNNER_H
 
 #include "algorithms/recognition/ColorComparisonModel.h"
-#include "toolcore/PositionCorrectionConsumer.h"
+#include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
 #include <QPointF>
@@ -29,7 +29,8 @@ struct ColorComparisonHalconConfig
     ColorComparisonInputSignature inputSignature;
     QString sensitivity = QStringLiteral("medium");
     bool brightnessCompensation = false;
-    PositionCorrectionContext positionCorrection;
+    bool positionCorrectionRequested = false;
+    QString positionCorrectionSourceId;
     int minScore = 80;
 };
 
@@ -53,33 +54,13 @@ struct ColorComparisonHalconResult
     double similarity = 0.0;
     qint64 elapsedMs = 0;
     QVector<double> detectFeature;
-    QVector<double> detectValueHistogram;
     QVector<ToolOverlay> overlays;
     QJsonObject payload;
-};
-
-struct ColorComparisonScoreBreakdown
-{
-    double hsScore = 0.0;
-    double brightnessDifference = 0.0;
-    double brightnessFactor = 1.0;
-    double grayScore = 0.0;
-    double grayWeight = 0.0;
-    double baseScoreBeforeSaturationPenalty = 0.0;
-    double saturationMismatchProgress = 0.0;
-    double saturationFactor = 1.0;
-    double finalScore = 0.0;
 };
 
 class ColorComparisonHalconRunner
 {
 public:
-    static ColorComparisonScoreBreakdown scoreBreakdown(
-            double hsScore,
-            double templateBrightnessMean,
-            double detectBrightnessMean,
-            double templateMeanSaturation,
-            double detectMeanSaturation);
     ColorComparisonTemplateBuildResult buildTemplateModel(
             const cv::Mat &referenceImage,
             const ColorComparisonHalconConfig &config) const;

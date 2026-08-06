@@ -6,12 +6,9 @@
 
 #include "frame/FrameViewHelper.h"
 #include "tooladapters/EdgePresenceAdapter.h"
-#include "tooladapters/PositionCorrectionAdapter.h"
-#include "tooladapters/TemplateLocationAdapter.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolEngine.h"
 #include "toolcore/ToolPreviewSnapshot.h"
-#include "PositionCorrectionDialogTestHelper.h"
 #include "toolcore/ToolResult.h"
 
 #include <opencv2/core.hpp>
@@ -34,8 +31,6 @@ struct EdgePresenceConfig
     double searchBandWidth = 0.08;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
-    QString positionCorrectionSourceId;
-    bool showPositionCorrectionMatchContour = true;
     int sensitivity = 60;
     QString edgePolarity = QStringLiteral("any");
     QString judgeBasis = QStringLiteral("presence");
@@ -55,10 +50,6 @@ public:
     ToolConfig toolConfig() const;
     ToolPreviewSnapshot referencePreviewSnapshot() const;
     void loadFromConfig(const ToolConfig &config);
-    void setToolChainTestContext(
-            const QVector<ToolConfig> &toolConfigs,
-            int currentToolIndex,
-            const ReferencePositionCorrectionConfig &referencePositionCorrection);
     QString summaryText() const;
 
 protected:
@@ -68,16 +59,12 @@ private slots:
     void finishConfiguration();
     void runReferenceTest();
     void runCameraTest();
-    void importTestImageFromPc();
-    void exitTestMode();
 
 private:
     void setupUiState();
     void connectControls();
     void applyAdaptiveWindowSize();
     void fitPreview();
-    void updateBottomButtons();
-    void rerunImportedTest();
     void showReferenceImage();
     void showFrameForRoiEditing();
     void startDetectRoiEditing();
@@ -103,21 +90,13 @@ private:
     QButtonGroup *m_basicResultPresenceGroup;
     QButtonGroup *m_resultPresenceGroup;
     FrameViewHelper *m_previewHelper = nullptr;
-    QPushButton *m_exitTestButton = nullptr;
-    QPushButton *m_pcImportButton = nullptr;
     EdgePresenceAdapter m_testEdgePresenceAdapter;
-    TemplateLocationAdapter m_testTemplateLocationAdapter;
-    PositionCorrectionAdapter m_testPositionCorrectionAdapter;
     ToolEngine m_testToolEngine;
-    PositionCorrectionDialogTestContext m_toolChainTestContext;
     QString m_toolId;
     bool m_enabled = true;
     ToolPreviewSnapshot m_referencePreviewSnapshot;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     LineBandRoi m_lineBandRoi;
-    cv::Mat m_importedTestFrame;
-    QString m_importedTestImageTitle;
-    bool m_importedTestActive = false;
     bool m_edgePresenceRunning = false;
     bool m_hasAcceptedToolConfig = false;
     ToolConfig m_acceptedToolConfig;

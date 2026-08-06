@@ -1,6 +1,4 @@
 #include "algorithms/presence/BlobPresenceHalconRunner.h"
-#include "algorithms/location/PositionCorrectionHalconTransform.h"
-#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
@@ -9,7 +7,6 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPointF>
-#include <QPolygonF>
 #include <QRect>
 #include <QtGlobal>
 
@@ -290,15 +287,8 @@ void fillPayload(BlobPresenceHalconResult &result,
     result.payload.insert(QStringLiteral("maskOutputRequested"), config.maskOutputEnabled);
     result.payload.insert(QStringLiteral("maskOutputApplied"), false);
     result.payload.insert(QStringLiteral("maskOutputReason"), QStringLiteral("not implemented in runner"));
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"),
-                          config.positionCorrection.applied);
-    result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
-                          config.positionCorrection.sourceId);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"),
-                          config.positionCorrection.applied
-                          ? QStringLiteral("applied") : QStringLiteral("not_requested"));
-    result.payload.insert(QStringLiteral("positionCorrectionScaleRatio"),
-                          config.positionCorrection.scaleRatio);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("detectMaskApplied"), false);
     result.payload.insert(QStringLiteral("polygonDetectRoiApplied"), false);
     result.payload.insert(QStringLiteral("circleDetectRoiApplied"), false);
@@ -328,7 +318,6 @@ struct HalconCApi
     using GetErrorTextFn = Herror (*)(Hlong, char *);
     using CreateTupleFn = void (*)(Htuple *, Hlong);
     using SetDoubleFn = void (*)(Htuple *, double, Hlong);
-    using SetStringFn = void (*)(Htuple *, const char *, Hlong);
     using DestroyTupleFn = void (*)(Htuple *);
     using GetDoubleFn = double (*)(const Htuple *, Hlong);
     using GenImage1Fn = Herror (*)(Hobject *, const char *, Hlong, Hlong, Hlong);
@@ -338,12 +327,6 @@ struct HalconCApi
     using ThresholdFn = Herror (*)(const Hobject, Hobject *, double, double);
     using GenRegionPolygonFn = Herror (*)(Hobject *, const Htuple, const Htuple);
     using GenCircleFn = Herror (*)(Hobject *, double, double, double);
-    using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
-    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *,
-                                           const Htuple, const Htuple);
-    using ClipRegionFn = Herror (*)(const Hobject, Hobject *,
-                                    const Htuple, const Htuple,
-                                    const Htuple, const Htuple);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using GenEmptyRegionFn = Herror (*)(Hobject *);
     using Union2Fn = Herror (*)(const Hobject, const Hobject, Hobject *);
@@ -358,7 +341,6 @@ struct HalconCApi
     GetErrorTextFn getErrorText = nullptr;
     CreateTupleFn createTuple = nullptr;
     SetDoubleFn setDouble = nullptr;
-    SetStringFn setString = nullptr;
     DestroyTupleFn destroyTuple = nullptr;
     GetDoubleFn getDouble = nullptr;
     GenImage1Fn genImage1 = nullptr;
@@ -367,9 +349,6 @@ struct HalconCApi
     ThresholdFn threshold = nullptr;
     GenRegionPolygonFn genRegionPolygon = nullptr;
     GenCircleFn genCircle = nullptr;
-    GenRectangle1Fn genRectangle1 = nullptr;
-    AffineTransRegionFn affineTransRegion = nullptr;
-    ClipRegionFn clipRegion = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
     GenEmptyRegionFn genEmptyRegion = nullptr;
     Union2Fn union2 = nullptr;
@@ -432,14 +411,10 @@ public:
         resolveOptional(m_handle, api.setUtf8, "SetHcInterfaceStringEncodingIsUtf8");
         resolveOptional(m_handle, api.createTuple, "F_create_tuple");
         resolveOptional(m_handle, api.setDouble, "F_set_d");
-        resolveOptional(m_handle, api.setString, "F_set_s");
         resolveOptional(m_handle, api.genRegionPolygon, "T_gen_region_polygon");
         if (!api.genRegionPolygon)
             resolveOptional(m_handle, api.genRegionPolygon, "gen_region_polygon");
         resolveOptional(m_handle, api.genCircle, "gen_circle");
-        resolveOptional(m_handle, api.genRectangle1, "gen_rectangle1");
-        resolveOptional(m_handle, api.affineTransRegion, "T_affine_trans_region");
-        resolveOptional(m_handle, api.clipRegion, "T_clip_region");
         resolveOptional(m_handle, api.reduceDomain, "reduce_domain");
 
         if (!resolveRequired(m_handle, api.getErrorText, "get_error_text", errorMessage) ||
@@ -474,21 +449,6 @@ public:
 private:
     void *m_handle = nullptr;
 };
-
-PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
-        const HalconCApi &api)
-{
-    PositionCorrectionHalconRegionApi transformApi;
-    transformApi.createTuple = api.createTuple;
-    transformApi.setDouble = api.setDouble;
-    transformApi.setString = api.setString;
-    transformApi.destroyTuple = api.destroyTuple;
-    transformApi.getDouble = api.getDouble;
-    transformApi.affineTransRegion = api.affineTransRegion;
-    transformApi.clipRegion = api.clipRegion;
-    transformApi.areaCenter = api.areaCenter;
-    return transformApi;
-}
 
 struct GrayHalconImage
 {
@@ -628,7 +588,6 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
     result.payload.insert(QStringLiteral("detectRoiPixelH"), detectRoiPixels.height());
     const bool polygonDetectRoi = isPolygonRegionType(config.detectRegionType);
     const bool circleDetectRoi = isCircleRegionType(config.detectRegionType);
-    const bool correctionApplied = config.positionCorrection.applied;
     const QVector<QPointF> detectPolygonPixels = polygonDetectRoi
             ? normalizedPolygonToPixels(config.detectPolygonNormalized, image.cols, image.rows)
             : QVector<QPointF>();
@@ -645,44 +604,19 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
     result.payload.insert(QStringLiteral("detectPolygonPixels"), pointsToJson(detectPolygonPixels));
     result.payload.insert(QStringLiteral("detectCircleCenterPixels"), pointToJson(detectCircleCenterPixels));
     result.payload.insert(QStringLiteral("detectCircleRadiusPixels"), detectCircleRadiusPixels);
-    ToolOverlay detectOverlay;
-    if (polygonDetectRoi && detectPolygonPixels.size() >= 3) {
-        detectOverlay = polygonOverlay(detectPolygonPixels,
-                                       QStringLiteral("detect_roi"));
-    } else if (circleDetectRoi && detectCircleRadiusPixels > 0.0) {
-        detectOverlay = circleOverlay(detectCircleCenterPixels,
-                                      detectCircleRadiusPixels,
-                                      QStringLiteral("detect_roi"));
-    } else {
-        detectOverlay = rectOverlay(QRectF(detectRoiPixels),
-                                    QStringLiteral("detect_roi"));
-    }
-    if (correctionApplied) {
-        detectOverlay = PositionCorrectionTransform::transformOverlay(
-                    detectOverlay,
-                    config.positionCorrection.referenceToRunHomMat2D);
-        detectOverlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
-                                   config.positionCorrection.sourceId);
-    }
-    detectOverlay.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
-    result.overlays.append(detectOverlay);
-    if (correctionApplied && config.positionCorrection.showMatchContour) {
-        result.overlays += PositionCorrectionTransform::matchContourOverlays(
-                    config.positionCorrection.matchContours,
-                    config.positionCorrection.sourceId);
-    }
-    if (correctionApplied) {
-        result.overlays += PositionCorrectionTransform::matchOriginOverlays(
-                    config.positionCorrection.matchOrigins,
-                    config.positionCorrection.sourceId);
-    }
+    if (polygonDetectRoi && detectPolygonPixels.size() >= 3)
+        result.overlays.append(polygonOverlay(detectPolygonPixels, QStringLiteral("detect_roi")));
+    else if (circleDetectRoi && detectCircleRadiusPixels > 0.0)
+        result.overlays.append(circleOverlay(detectCircleCenterPixels,
+                                             detectCircleRadiusPixels,
+                                             QStringLiteral("detect_roi")));
+    else
+        result.overlays.append(rectOverlay(QRectF(detectRoiPixels), QStringLiteral("detect_roi")));
 
-    cv::Mat detectMat = correctionApplied
-            ? image.clone()
-            : image(cv::Rect(detectRoiPixels.x(),
-                             detectRoiPixels.y(),
-                             detectRoiPixels.width(),
-                             detectRoiPixels.height())).clone();
+    cv::Mat detectMat = image(cv::Rect(detectRoiPixels.x(),
+                                       detectRoiPixels.y(),
+                                       detectRoiPixels.width(),
+                                       detectRoiPixels.height())).clone();
     if (detectMat.empty()) {
         BlobPresenceHalconResult errorResult = makeParameterError(QStringLiteral("invalid_detect_roi"),
                                                                   QStringLiteral("detect ROI is invalid"),
@@ -715,8 +649,6 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
     HalconCApi *api = &library.api;
     GrayHalconImage detectImage;
     Hobject detectRoiRegion = NO_OBJECTS;
-    Hobject transformedDetectRoiRegion = NO_OBJECTS;
-    Hobject clippedDetectRoiRegion = NO_OBJECTS;
     Hobject detectReducedImage = NO_OBJECTS;
     Hobject thresholdRegion = NO_OBJECTS;
     Hobject lowerRegion = NO_OBJECTS;
@@ -777,8 +709,6 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
         clearObject(lowerRegion);
         clearObject(thresholdRegion);
         clearObject(detectReducedImage);
-        clearObject(clippedDetectRoiRegion);
-        clearObject(transformedDetectRoiRegion);
         clearObject(detectRoiRegion);
         clearObject(detectImage.grayImage);
         clearObject(detectImage.inputImage);
@@ -840,96 +770,8 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
     try {
         generateGrayImage(detectMat, detectImage, QStringLiteral("detect"));
         Hobject thresholdSource = detectImage.graySource;
-        Hobject effectiveRoiRegion = NO_OBJECTS;
 
-        if (correctionApplied) {
-            if (!api->reduceDomain || !api->affineTransRegion
-                    || !api->clipRegion || !api->setString) {
-                throw std::pair<QString, QString>(
-                        QStringLiteral("BlobPresence HALCON error"),
-                        QStringLiteral("HALCON position-correction ROI symbols are unavailable"));
-            }
-
-            if (polygonDetectRoi) {
-                if (detectPolygonPixels.size() < 3 || !api->genRegionPolygon) {
-                    throw std::pair<QString, QString>(
-                            QStringLiteral("BlobPresence HALCON error"),
-                            QStringLiteral("polygon detect ROI requires HALCON polygon support"));
-                }
-                QVector<double> rows;
-                QVector<double> columns;
-                rows.reserve(detectPolygonPixels.size());
-                columns.reserve(detectPolygonPixels.size());
-                for (const QPointF &point : detectPolygonPixels) {
-                    rows.append(point.y());
-                    columns.append(point.x());
-                }
-                createDoubleArrayTuple(polygonRowsTuple, rows);
-                createDoubleArrayTuple(polygonColumnsTuple, columns);
-                checkStatus(api->genRegionPolygon(&detectRoiRegion,
-                                                  polygonRowsTuple,
-                                                  polygonColumnsTuple),
-                            QStringLiteral("gen_region_polygon.reference_roi"));
-            } else if (circleDetectRoi) {
-                if (detectCircleRadiusPixels <= 0.0 || !api->genCircle) {
-                    throw std::pair<QString, QString>(
-                            QStringLiteral("BlobPresence HALCON error"),
-                            QStringLiteral("circle detect ROI requires HALCON circle support"));
-                }
-                checkStatus(api->genCircle(&detectRoiRegion,
-                                           detectCircleCenterPixels.y(),
-                                           detectCircleCenterPixels.x(),
-                                           detectCircleRadiusPixels),
-                            QStringLiteral("gen_circle.reference_roi"));
-            } else {
-                if (!api->genRectangle1) {
-                    throw std::pair<QString, QString>(
-                            QStringLiteral("BlobPresence HALCON error"),
-                            QStringLiteral("HALCON rectangle ROI symbol is unavailable"));
-                }
-                checkStatus(api->genRectangle1(
-                                &detectRoiRegion,
-                                detectRoiPixels.top(),
-                                detectRoiPixels.left(),
-                                detectRoiPixels.bottom(),
-                                detectRoiPixels.right()),
-                            QStringLiteral("gen_rectangle1.reference_roi"));
-            }
-
-            const PositionCorrectionHalconTransformResult transformed =
-                    PositionCorrectionHalconTransform::transformAndClipRegion(
-                        positionCorrectionRegionApi(*api),
-                        detectRoiRegion,
-                        &transformedDetectRoiRegion,
-                        &clippedDetectRoiRegion,
-                        config.positionCorrection.referenceToRunHomMat2D,
-                        image.cols,
-                        image.rows);
-            if (!transformed.success) {
-                if (transformed.halconStatus != H_MSG_OK) {
-                    checkStatus(
-                                transformed.halconStatus,
-                                QStringLiteral("position_correction.%1")
-                                .arg(transformed.operation));
-                }
-                throw std::pair<QString, QString>(
-                        transformed.status,
-                        QStringLiteral("Position-corrected Blob ROI is invalid (%1)")
-                        .arg(transformed.operation));
-            }
-            if (transformed.area <= 0.0) {
-                throw std::pair<QString, QString>(
-                        QStringLiteral("corrected_roi_out_of_image"),
-                        QStringLiteral("Position-corrected Blob ROI is outside the image"));
-            }
-            effectiveRoiRegion = clippedDetectRoiRegion;
-            checkStatus(api->reduceDomain(detectImage.graySource,
-                                          effectiveRoiRegion,
-                                          &detectReducedImage),
-                        QStringLiteral("reduce_domain.corrected_roi"));
-            thresholdSource = detectReducedImage;
-            result.payload.insert(QStringLiteral("detectMaskApplied"), true);
-        } else if (polygonDetectRoi) {
+        if (polygonDetectRoi) {
             if (detectPolygonPixels.size() < 3)
                 throw std::pair<QString, QString>(
                         QStringLiteral("BlobPresence HALCON error"),
@@ -963,7 +805,6 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
                                           &detectReducedImage),
                         QStringLiteral("reduce_domain.detect_polygon_roi"));
             thresholdSource = detectReducedImage;
-            effectiveRoiRegion = detectRoiRegion;
             result.payload.insert(QStringLiteral("polygonDetectRoiApplied"), true);
             result.payload.insert(QStringLiteral("detectMaskApplied"), true);
         } else if (circleDetectRoi) {
@@ -988,7 +829,6 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
                                           &detectReducedImage),
                         QStringLiteral("reduce_domain.detect_circle_roi"));
             thresholdSource = detectReducedImage;
-            effectiveRoiRegion = detectRoiRegion;
             result.payload.insert(QStringLiteral("circleDetectRoiApplied"), true);
             result.payload.insert(QStringLiteral("detectMaskApplied"), true);
         }
@@ -996,8 +836,8 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
         double roiArea = static_cast<double>(detectRoiPixels.width()) *
                 static_cast<double>(detectRoiPixels.height());
         QString areaRateMode = QStringLiteral("bbox_fallback");
-        if (halconObjectAllocated(effectiveRoiRegion)) {
-            checkStatus(api->areaCenter(effectiveRoiRegion,
+        if (halconObjectAllocated(detectRoiRegion)) {
+            checkStatus(api->areaCenter(detectRoiRegion,
                                         &roiAreaTuple,
                                         &roiCenterRowTuple,
                                         &roiCenterColTuple),
@@ -1070,10 +910,6 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
         double totalArea = 0.0;
         double largestArea = 0.0;
         int largestBlobIndex = -1;
-        const double coordinateOffsetX =
-                correctionApplied ? 0.0 : detectRoiPixels.x();
-        const double coordinateOffsetY =
-                correctionApplied ? 0.0 : detectRoiPixels.y();
 
         if (blobCount > 0) {
             checkStatus(api->smallestRectangle1(selectedRegions,
@@ -1097,8 +933,8 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
                 const double col1 = api->getDouble(&col1Tuple, index);
                 const double row2 = api->getDouble(&row2Tuple, index);
                 const double col2 = api->getDouble(&col2Tuple, index);
-                const QRectF blobRect(col1 + coordinateOffsetX,
-                                      row1 + coordinateOffsetY,
+                const QRectF blobRect(col1 + detectRoiPixels.x(),
+                                      row1 + detectRoiPixels.y(),
                                       qMax(1.0, col2 - col1 + 1.0),
                                       qMax(1.0, row2 - row1 + 1.0));
                 blobRects.append(blobRect);
@@ -1116,10 +952,8 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
 
                 QPointF center(blobRect.center());
                 if (index < centerCount) {
-                    center = QPointF(api->getDouble(&centerColTuple, index)
-                                     + coordinateOffsetX,
-                                     api->getDouble(&centerRowTuple, index)
-                                     + coordinateOffsetY);
+                    center = QPointF(api->getDouble(&centerColTuple, index) + detectRoiPixels.x(),
+                                     api->getDouble(&centerRowTuple, index) + detectRoiPixels.y());
                 }
                 blobCenters.append(center);
 
@@ -1185,18 +1019,7 @@ BlobPresenceHalconResult BlobPresenceHalconRunner::run(
         result.payload.insert(QStringLiteral("okNgReason"), okNgReason);
         result.payload.insert(QStringLiteral("text"), result.text);
 
-        QRectF countAnchor = QRectF(detectRoiPixels);
-        if (detectOverlay.type == ToolOverlayType::Polygon)
-            countAnchor = QPolygonF(detectOverlay.points).boundingRect();
-        else if (detectOverlay.type == ToolOverlayType::Circle) {
-            countAnchor = QRectF(
-                        detectOverlay.center.x() - detectOverlay.radius,
-                        detectOverlay.center.y() - detectOverlay.radius,
-                        detectOverlay.radius * 2.0,
-                        detectOverlay.radius * 2.0);
-        }
-        const QPointF countPosition(countAnchor.x() + 4.0,
-                                    countAnchor.y() + 4.0);
+        const QPointF countPosition(detectRoiPixels.x() + 4.0, detectRoiPixels.y() + 4.0);
         result.overlays.append(textOverlay(countPosition,
                                            QStringLiteral("count=%1").arg(blobCount),
                                            QStringLiteral("blob_count_text"),

@@ -4,7 +4,6 @@
 
 #include <QDebug>
 #include <QElapsedTimer>
-#include <QFileInfo>
 #include <QMutexLocker>
 #include <QStringList>
 
@@ -20,31 +19,7 @@ CameraFrameProvider::CameraFrameProvider(QObject *parent)
 
 CameraFrameProvider::~CameraFrameProvider()
 {
-    m_grabRunning.storeRelease(0);
-
-    if (m_workerThread) {
-        m_workerThread->requestInterruption();
-
-        if (!m_workerThread->wait(5000)) {
-            qCritical()
-                    << "[CameraFrameProvider] worker did not exit in 5 seconds;"
-                    << "waiting indefinitely to avoid use-after-free";
-
-            // 当前结构下只能继续等待。
-            // 不能 terminate、delete、release m_capture。
-            m_workerThread->wait();
-        }
-
-        // 只有确认线程结束后才能删除。
-        Q_ASSERT(m_workerThread->isFinished());
-        delete m_workerThread;
-        m_workerThread = nullptr;
-    }
-
-    // worker 已结束，不可能再访问 m_capture。
-    QMutexLocker locker(&m_cameraMutex);
-    if (m_capture.isOpened())
-        m_capture.release();
+    closeCamera(QStringLiteral("provider destructor"));
 }
 
 CameraFrameProvider &CameraFrameProvider::instance()
@@ -59,18 +34,15 @@ bool CameraFrameProvider::openCamera(const QString &devicePath)
         return true;
     }
 
-    if(!stopGrab()){
-        qCritical() << "[CameraFrameProvider] open aborted because worker is still running";   
-        return false;
-    };
+    stopGrab();
 
     const QString path = devicePath.isEmpty()
             ? QStringLiteral("/dev/video0")
             : devicePath;
+
     {
         QMutexLocker locker(&m_cameraMutex);
         m_devicePath = path;
-        m_captureMode.clear();
         m_useNv12Path = false;
         if (m_capture.isOpened()) {
             m_capture.release();
@@ -108,10 +80,7 @@ bool CameraFrameProvider::openCamera(const QString &devicePath)
 
 void CameraFrameProvider::closeCamera(const QString &reason)
 {
-    if(!stopGrab()){
-        qCritical() << "[CameraFrameProvider] close aborted beacuse worker is still running";
-        return;
-    }
+    stopGrab();
 
     {
         QMutexLocker locker(&m_cameraMutex);
@@ -122,7 +91,6 @@ void CameraFrameProvider::closeCamera(const QString &reason)
             qDebug() << "[CameraFrameProvider] camera closed";
         }
         m_useNv12Path = false;
-        m_captureMode.clear();
     }
 
     clearFrame();
@@ -130,16 +98,6 @@ void CameraFrameProvider::closeCamera(const QString &reason)
 
 bool CameraFrameProvider::startGrab()
 {
-    if (m_workerThread){
-        if(m_workerThread->isRunning()){
-            qWarning() << "[CameraFrameProvider] previous grab thread is still running";
-            emit cameraError(tr("上一次采集线程尚未退出"));
-            return false;
-        }
-        delete m_workerThread;
-        m_workerThread = nullptr;
-    }
-
     if (isGrabbing()) {
         return true;
     }
@@ -160,52 +118,25 @@ bool CameraFrameProvider::startGrab()
     return true;
 }
 
-/*===============没有返回值。使用terminate()存在资源未完全释放的风险===================*/
-// void CameraFrameProvider::stopGrab(int timeoutMs)
-// {
-//     if (!m_grabRunning.loadAcquire() && !m_workerThread) {
-//         return;
-//     }
-//     m_grabRunning.storeRelease(0);
-//     if (m_workerThread) {
-//         if (!m_workerThread->wait(3000)) {
-//             qWarning() << "[CameraFrameProvider] grab thread did not stop in time, terminating";
-//             m_workerThread->terminate();
-//             m_workerThread->wait();
-//         }
-//         delete m_workerThread;
-//         m_workerThread = nullptr;
-//     }
-//     qDebug() << "[CameraFrameProvider] grab thread stopped";
-// }
-
-//===============有返回值。使用requestInterruption()等待线程退出，避免资源未释放的风险===================*/
-bool CameraFrameProvider::stopGrab(int timeoutMs)
+void CameraFrameProvider::stopGrab()
 {
-    m_grabRunning.storeRelease(0);
-
-    QThread *thread = m_workerThread;
-    if(!thread) 
-        return true;
-
-    thread->requestInterruption();
-
-    if(!thread->wait(timeoutMs)){
-        const QString message = tr("相机采集线程停止超时，暂不释放相机资源");
-        qCritical() << "[CameraFrameProvider]" << message;
-        emit cameraError(message);
-
-        //不能terminate线程，可能导致资源未释放，后续无法重新打开相机
-        //不能delete，因为线程还在运行，delete会导致崩溃
-        //也不能继续release m_capture，因为线程还在运行，release会导致崩溃
-        return false;
+    if (!m_grabRunning.loadAcquire() && !m_workerThread) {
+        return;
     }
 
-    delete thread;
-    m_workerThread = nullptr;
+    m_grabRunning.storeRelease(0);
+
+    if (m_workerThread) {
+        if (!m_workerThread->wait(3000)) {
+            qWarning() << "[CameraFrameProvider] grab thread did not stop in time, terminating";
+            m_workerThread->terminate();
+            m_workerThread->wait();
+        }
+        delete m_workerThread;
+        m_workerThread = nullptr;
+    }
 
     qDebug() << "[CameraFrameProvider] grab thread stopped";
-    return true;
 }
 
 bool CameraFrameProvider::isOpened() const
@@ -341,7 +272,6 @@ bool CameraFrameProvider::tryOpenV4L2Device(const QString &devicePath)
 
     if (testCameraRead()) {
         m_devicePath = devicePath;
-        m_captureMode = QStringLiteral("v4l2");
         m_useNv12Path = false;
         qDebug() << QString("[CameraFrameProvider] V4L2 test frame ok: %1, %2x%3")
                         .arg(devicePath)
@@ -356,6 +286,30 @@ bool CameraFrameProvider::tryOpenV4L2Device(const QString &devicePath)
 
 bool CameraFrameProvider::initCameraWithGStreamer(const QString &devicePath)
 {
+    auto tryPipeline = [this](const QString &pipeline, bool useNv12, const QString &tag) -> bool {
+        QMutexLocker locker(&m_cameraMutex);
+        if (m_capture.isOpened()) {
+            m_capture.release();
+        }
+
+        qDebug() << "[CameraFrameProvider] try GStreamer pipeline:" << tag;
+        if (!m_capture.open(pipeline.toStdString(), cv::CAP_GSTREAMER)) {
+            qDebug() << "[CameraFrameProvider] GStreamer open failed:" << tag;
+            return false;
+        }
+
+        if (!testCameraRead()) {
+            qDebug() << "[CameraFrameProvider] GStreamer opened but no frame:" << tag;
+            m_capture.release();
+            return false;
+        }
+
+        m_useNv12Path = useNv12;
+        qDebug() << "[CameraFrameProvider] opened GStreamer pipeline:" << tag
+                 << "useNv12=" << m_useNv12Path;
+        return true;
+    };
+
     const QString pipeline1920 = QStringLiteral(
         "v4l2src device=%1 io-mode=mmap ! "
         "image/jpeg, width=1920, height=1080, framerate=60/1 ! "
@@ -364,10 +318,7 @@ bool CameraFrameProvider::initCameraWithGStreamer(const QString &devicePath)
         "appsink max-buffers=1 drop=true sync=false"
     ).arg(devicePath);
 
-    if (tryOpenGStreamerPipeline(pipeline1920,
-                                 true,
-                                 QStringLiteral("1920x1080 MJPG->NV12"),
-                                 QStringLiteral("gstreamer-1920-nv12"))) {
+    if (tryPipeline(pipeline1920, true, QStringLiteral("1920x1080 MJPG->NV12"))) {
         return true;
     }
 
@@ -380,42 +331,7 @@ bool CameraFrameProvider::initCameraWithGStreamer(const QString &devicePath)
         "appsink max-buffers=1 drop=true sync=false"
     ).arg(devicePath);
 
-    return tryOpenGStreamerPipeline(pipeline640,
-                                    false,
-                                    QStringLiteral("640x480 MJPG->BGR"),
-                                    QStringLiteral("gstreamer-640-bgr"));
-}
-
-bool CameraFrameProvider::tryOpenGStreamerPipeline(const QString &pipeline,
-                                                   bool useNv12,
-                                                   const QString &tag,
-                                                   const QString &captureMode)
-{
-    QMutexLocker locker(&m_cameraMutex);
-    if (m_capture.isOpened()) {
-        m_capture.release();
-    }
-
-    qDebug() << "[CameraFrameProvider] try GStreamer pipeline:" << tag;
-    if (!m_capture.open(pipeline.toStdString(), cv::CAP_GSTREAMER)) {
-        qDebug() << "[CameraFrameProvider] GStreamer open failed:" << tag;
-        return false;
-    }
-
-    const bool timeoutSupported = m_capture.set(cv::CAP_PROP_READ_TIMEOUT_MSEC, 500);
-    qDebug() << "[CameraFrameProvider] CAP_PROP_READ_TIMEOUT_MSEC supported:" << timeoutSupported;
-
-    if (!testCameraRead()) {
-        qDebug() << "[CameraFrameProvider] GStreamer opened but no frame:" << tag;
-        m_capture.release();
-        return false;
-    }
-
-    m_captureMode = captureMode;
-    m_useNv12Path = useNv12;
-    qDebug() << "[CameraFrameProvider] opened GStreamer pipeline:" << tag
-             << "useNv12=" << m_useNv12Path;
-    return true;
+    return tryPipeline(pipeline640, false, QStringLiteral("640x480 MJPG->BGR"));
 }
 
 bool CameraFrameProvider::initCameraWithV4L2(const QString &devicePath)
@@ -437,63 +353,12 @@ bool CameraFrameProvider::initCameraWithV4L2(const QString &devicePath)
 
     if (testCameraRead()) {
         m_devicePath = devicePath;
-        m_captureMode = QStringLiteral("v4l2");
         m_useNv12Path = false;
         return true;
     }
 
     m_capture.release();
     return false;
-}
-
-bool CameraFrameProvider::tryReconnectCamera()
-{
-    QString devicePath;
-    QString captureMode;
-    {
-        QMutexLocker locker(&m_cameraMutex);
-        devicePath = m_devicePath;
-        captureMode = m_captureMode;
-        if (m_capture.isOpened()) {
-            m_capture.release();
-        }
-        m_useNv12Path = false;
-    }
-
-    if (devicePath.isEmpty() || !QFileInfo::exists(devicePath)) {
-        return false;
-    }
-
-    if (captureMode == QStringLiteral("gstreamer-1920-nv12")) {
-        const QString pipeline = QStringLiteral(
-            "v4l2src device=%1 io-mode=mmap ! "
-            "image/jpeg, width=1920, height=1080, framerate=60/1 ! "
-            "mppjpegdec ! "
-            "video/x-raw, format=NV12 ! "
-            "appsink max-buffers=1 drop=true sync=false"
-        ).arg(devicePath);
-        return tryOpenGStreamerPipeline(pipeline,
-                                        true,
-                                        QStringLiteral("1920x1080 MJPG->NV12 reconnect"),
-                                        captureMode);
-    }
-
-    if (captureMode == QStringLiteral("gstreamer-640-bgr")) {
-        const QString pipeline = QStringLiteral(
-            "v4l2src device=%1 io-mode=mmap ! "
-            "image/jpeg, width=640, height=480, framerate=30/1 ! "
-            "jpegdec ! "
-            "videoconvert ! "
-            "video/x-raw, format=BGR ! "
-            "appsink max-buffers=1 drop=true sync=false"
-        ).arg(devicePath);
-        return tryOpenGStreamerPipeline(pipeline,
-                                        false,
-                                        QStringLiteral("640x480 MJPG->BGR reconnect"),
-                                        captureMode);
-    }
-
-    return initCameraWithV4L2(devicePath);
 }
 
 bool CameraFrameProvider::testCameraRead()
@@ -553,50 +418,28 @@ cv::Mat CameraFrameProvider::decodeCapturedFrame(const cv::Mat &frame) const
 
 void CameraFrameProvider::workerLoop()
 {
-
-    QThread *currentThread = QThread::currentThread();
-
     qDebug() << "[CameraFrameProvider] worker loop started";
 
     QElapsedTimer frameTimer;
     int failureCount = 0;
     int frameCount = 0;
-    bool reconnecting = false;
 
-    const int reconnectFailureThreshold = 30;
-    const unsigned long reconnectBackoffMs = 1000;
-
-    while (m_grabRunning.loadAcquire() 
-            && !currentThread->isInterruptionRequested()) {
+    while (m_grabRunning.loadAcquire()) {
         frameTimer.restart();
 
         cv::Mat capturedFrame;
         bool grabSuccess = false;
-        
         {
             QMutexLocker locker(&m_cameraMutex);
-
-            if(!m_grabRunning.loadAcquire() 
-                    || currentThread->isInterruptionRequested()) {
-                break;
-            }
-
             if (m_capture.isOpened()) {
                 try {
                     const bool grabbed = m_capture.grab();
-                    grabSuccess = grabbed
-                            && m_capture.retrieve(capturedFrame)
-                            && !capturedFrame.empty();
-                } catch (const cv::Exception &exception) {
-                    qWarning() << "[CameraFrameProvider] OpenCV exception in worker:"
-                                << exception.what();
+                    grabSuccess = grabbed && m_capture.retrieve(capturedFrame) && !capturedFrame.empty();
+                } catch (const cv::Exception &e) {
+                    qWarning() << "[CameraFrameProvider] OpenCV exception in worker:" << e.what();
+                    grabSuccess = false;
                 }
             }
-        }
-
-        if(!m_grabRunning.loadAcquire()
-                ||currentThread->isInterruptionRequested()){
-            break;
         }
 
         if (!grabSuccess) {
@@ -604,38 +447,11 @@ void CameraFrameProvider::workerLoop()
             if (failureCount == 1 || failureCount % 120 == 0) {
                 qWarning() << "[CameraFrameProvider] failed to grab frame, count:" << failureCount;
             }
-
-            if (failureCount >= reconnectFailureThreshold) {
-                if (!reconnecting) {
-                    reconnecting = true;
-                    qWarning() << "[CameraFrameProvider] camera stream lost; starting reconnect";
-                    emit cameraError(tr("相机连接中断，正在自动重连"));
-                    clearFrame();
-                }
-
-                if (tryReconnectCamera()) {
-                    qDebug() << "[CameraFrameProvider] camera reconnected successfully";
-                    failureCount = 0;
-                    reconnecting = false;
-                    continue;
-                }
-
-                for (unsigned long waited = 0;
-                     waited < reconnectBackoffMs
-                     && m_grabRunning.loadAcquire()
-                     && !currentThread->isInterruptionRequested();
-                     waited += 50) {
-                    QThread::msleep(50);
-                }
-                continue;
-            }
-
             QThread::msleep(5);
             continue;
         }
 
         failureCount = 0;
-        reconnecting = false;
         FrameInputMetadata capturedMetadata =
                 FrameInputMetadata::fromMat(capturedFrame, QStringLiteral("camera"));
         if (m_useNv12Path) {

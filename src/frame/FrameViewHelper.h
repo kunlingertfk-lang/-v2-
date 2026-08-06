@@ -9,9 +9,6 @@
 #include <QSize>
 #include <QVector>
 
-#include "frame/RoiEditorController.h"
-#include "frame/RoiGeometry.h"
-#include "frame/FramePixelProbe.h"
 #include "toolcore/ToolOverlay.h"
 
 class QEvent;
@@ -23,7 +20,38 @@ class QGraphicsPolygonItem;
 class QGraphicsRectItem;
 class QGraphicsScene;
 class QGraphicsView;
-class QLabel;
+
+enum class RoiShapeType {
+    Rectangle,
+    Polygon,
+    Circle,
+    FreeDraw,
+    LineBand
+};
+
+enum class RoiEditTarget {
+    None,
+    TemplateRoi,
+    DetectRoi,
+    TemplateMask,
+    DetectMask
+};
+
+struct LineBandRoi
+{
+    QPointF p1Normalized;
+    QPointF p2Normalized;
+    double widthNormalized = 0.04;
+    bool valid = false;
+};
+
+struct CircleRoi
+{
+    QPointF centerNormalized;
+    double radiusNormalized = 0.0;
+    QRectF boundingRectNormalized;
+    bool valid = false;
+};
 
 class FrameViewHelper : public QObject
 {
@@ -36,18 +64,11 @@ public:
     void clear();
     void fitToView();
     bool hasImage() const;
-    void setNavigationEnabled(bool enabled);
-    bool navigationEnabled() const;
-    qreal viewScale() const;
-    bool isFitToView() const;
-    void zoomIn();
-    void zoomOut();
 
     QPointF viewToImage(const QPoint &viewPos) const;
     QRectF imageRectToNormalized(const QRectF &imageRect) const;
     QRectF normalizedToImageRect(const QRectF &normalized) const;
     QSize imageSize() const;
-    void bindPixelStatusLabel(QLabel *label);
 
     void setRoiDrawingEnabled(bool enabled);
     bool isRoiDrawingEnabled() const;
@@ -69,9 +90,6 @@ public:
     QRectF circleBoundingRectNormalized(const CircleRoi &roi) const;
     void clearCircleRoi();
 
-    void setPointSelectionEnabled(bool enabled);
-    bool isPointSelectionEnabled() const;
-
     void setLineBandDrawingEnabled(bool enabled);
     bool isLineBandDrawingEnabled() const;
     void setLineBandRoiNormalized(const LineBandRoi &roi);
@@ -83,15 +101,12 @@ public:
     void clearToolOverlays();
 
 signals:
-    void viewTransformChanged(qreal scale, bool fitToView);
-    void cursorPixelChanged(const FramePixelSample &sample);
     void roiChanged(const QRectF &roiNormalized);
     void roiSelectionRejected(const QRectF &imageRect);
     void polygonChanged(const QVector<QPointF> &pointsNormalized);
     void polygonSelectionRejected(int pointCount);
     void circleChanged(const CircleRoi &roi);
     void circleSelectionRejected();
-    void pointSelected(const QPointF &pointNormalized);
     void lineBandChanged(const LineBandRoi &roi);
     void lineBandSelectionRejected();
 
@@ -105,14 +120,6 @@ private:
         CompletedPolygon
     };
 
-    bool drawingInteractionActive() const;
-    bool navigationGestureAllowed(Qt::KeyboardModifiers modifiers) const;
-    bool viewPositionInsideImage(const QPoint &viewPosition) const;
-    qreal sceneUnitsForViewportPixels(qreal pixels) const;
-    void applyWheelZoom(const QPoint &viewPosition, int angleDeltaY);
-    void beginPan(const QPoint &viewPosition);
-    void updatePan(const QPoint &viewPosition);
-    void endPan();
     bool viewPosToImagePoint(const QPoint &viewPos, QPointF *imagePoint) const;
     QRectF clampedImageRect(const QRectF &rect) const;
     QPointF clampedImagePoint(const QPointF &point) const;
@@ -128,32 +135,20 @@ private:
     CircleRoi validCircleRoi(const CircleRoi &roi) const;
     CircleRoi imageCircleToNormalized(const QPointF &center, double radiusPixels) const;
     QRectF circleBoundingRectImage(const CircleRoi &roi) const;
-    RoiEditorController::CircleGeometry circleEditGeometry(const CircleRoi &roi) const;
     bool isValidLineBand(const LineBandRoi &roi) const;
     LineBandRoi validLineBand(const LineBandRoi &roi) const;
     LineBandRoi imageLineBandToNormalized(const QPointF &p1,
                                           const QPointF &p2,
                                           double widthPixels) const;
-    RoiEditorController::LineBandGeometry lineBandEditGeometry(const LineBandRoi &roi) const;
     QVector<QPointF> lineBandPolygonImagePoints(const LineBandRoi &roi) const;
     QPointF clampedTextPosition(const QPointF &position, const QRectF &textBounds) const;
     QRectF validNormalizedRect(const QRectF &rect) const;
-    bool roiCoversFullImage() const;
     void updateRoiItem();
-    void updateRoiHandleItems();
-    void clearRoiHandleItems();
-    void updateRoiEditCursor(const QPointF &imagePoint);
     void updatePolygonItem();
     void updatePolygonVertexItems();
     void clearPolygonVertexItems();
     void updateCircleItem();
-    void updateCircleHandleItems();
-    void clearCircleHandleItems();
-    void updateCircleEditCursor(const QPointF &imagePoint);
     void updateLineBandItem();
-    void updateLineBandWidthHandleItem();
-    void clearLineBandWidthHandleItem();
-    void updateLineBandEditCursor(const QPointF &imagePoint);
     void updateDraftRoiItem(const QRectF &imageRect);
     void clearDraftRoiItem();
     void updateDraftPolygonItem();
@@ -165,8 +160,6 @@ private:
     void addLineBandItems(const LineBandRoi &roi, QVector<QGraphicsItem *> *items, qreal zValue);
     void addOverlayItem(QGraphicsItem *item, qreal zValue = 110.0);
     void restoreImageSceneRect();
-    void updateCursorPixel(const QPoint &viewPosition);
-    void publishCursorPixel(const FramePixelSample &sample);
 
     QGraphicsView *m_view;
     QGraphicsScene *m_scene;
@@ -203,31 +196,17 @@ private:
     bool m_roiDrawingEnabled = false;
     bool m_polygonDrawingEnabled = false;
     bool m_circleDrawingEnabled = false;
-    bool m_pointSelectionEnabled = false;
     bool m_lineBandDrawingEnabled = false;
     bool m_roiDrawing = false;
-    bool m_roiTransforming = false;
     bool m_polygonDragging = false;
     bool m_circleDrawing = false;
-    bool m_circleTransforming = false;
     bool m_lineBandDrawingLine = false;
     bool m_lineBandAdjustingWidth = false;
-    bool m_lineBandTransforming = false;
-    bool m_navigationEnabled = false;
-    bool m_isFitToView = true;
-    qreal m_viewScale = 1.0;
-    bool m_panning = false;
-    QPoint m_lastPanPosition;
     PolygonDrawingState m_polygonDrawingState = PolygonDrawingState::Idle;
     QPointF m_roiDrawStart;
-    RoiEditorController m_roiEditor;
-    QVector<QGraphicsItem *> m_roiHandleItems;
-    QVector<QGraphicsItem *> m_circleHandleItems;
     QVector<QGraphicsItem *> m_overlayItems;
     QVector<QGraphicsItem *> m_lineBandItems;
     QVector<QGraphicsItem *> m_lineBandDraftItems;
-    QGraphicsItem *m_lineBandWidthHandleItem = nullptr;
-    FramePixelSample m_lastPixelSample;
 };
 
 #endif // FRAME_FRAMEVIEWHELPER_H

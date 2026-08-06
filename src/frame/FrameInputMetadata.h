@@ -13,8 +13,6 @@ struct FrameInputMetadata
     QString pixelFormat;
     int originalChannels = 0;
     int originalDepth = -1;
-    int validBits = -1;
-    int bitShift = -1;
     QString source;
 
     static FrameInputMetadata fromMat(const cv::Mat &image,

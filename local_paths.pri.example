@@ -9,6 +9,6 @@
 # INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
 # LIBS += -L$$OPENCV_ROOT/lib -Wl,-rpath,$$OPENCV_ROOT/lib
 
-# --- HALCON 20.11 安装目录(等价于 export HALCONROOT=...) ---
-# HALCON_ROOT = $$quote(/opt/halcon)
+# --- HALCON 安装目录(等价于 export HALCONROOT=...) ---
+# HALCON_ROOT = $$quote(/opt/halcon/24.11)
 # INCLUDEPATH += $$HALCON_ROOT/include

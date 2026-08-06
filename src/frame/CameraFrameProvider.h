@@ -30,7 +30,7 @@ public:
     bool openCamera(const QString &devicePath = QStringLiteral("/dev/video0"));
     void closeCamera(const QString &reason = QString());
     bool startGrab();
-    bool stopGrab(int timeoutMs = 3000);
+    void stopGrab();
     bool isOpened() const;
     bool isGrabbing() const;
 
@@ -57,11 +57,6 @@ private:
 
     bool initCameraWithGStreamer(const QString &devicePath);
     bool initCameraWithV4L2(const QString &devicePath);
-    bool tryOpenGStreamerPipeline(const QString &pipeline,
-                                  bool useNv12,
-                                  const QString &tag,
-                                  const QString &captureMode);
-    bool tryReconnectCamera();
     bool testCameraRead();
     bool tryOpenV4L2Device(const QString &devicePath);
     cv::Mat decodeCapturedFrame(const cv::Mat &frame) const;
@@ -77,7 +72,6 @@ private:
     qint64 m_frameIndex = 0;
     cv::VideoCapture m_capture;
     QString m_devicePath;
-    QString m_captureMode;
     bool m_useNv12Path = false;
     QThread *m_workerThread = nullptr;
     QAtomicInt m_grabRunning;

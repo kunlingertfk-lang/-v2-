@@ -19,8 +19,7 @@ public:
     QVector<ToolResult> runTools(const QVector<ToolConfig> &configs,
                                   const cv::Mat &image,
                                   const cv::Mat &referenceImage = cv::Mat(),
-                                  const QJsonObject &runtimeContext = QJsonObject(),
-                                  ToolResult *referenceCorrectionResult = nullptr) const;
+                                  const QJsonObject &runtimeContext = QJsonObject()) const;
 
 private:
     ToolAdapter *findAdapter(ToolType type) const;

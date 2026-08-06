@@ -2,8 +2,6 @@
 
 #include "algorithms/presence/PatternPresenceAutoModelDomain.h"
 #include "algorithms/presence/PatternPresenceHalconApi.h"
-#include "algorithms/location/PositionCorrectionHalconTransform.h"
-#include "toolcore/PositionCorrectionTransform.h"
 
 #include <QDateTime>
 #include <QDebug>
@@ -36,21 +34,6 @@ constexpr int kMinRoiPixelSize = 2;
 constexpr int kMaxContourOverlayLineSegments = 4096;
 constexpr double kMinPolygonAreaPixels = 4.0;
 constexpr double kMinReducedDomainAreaPixels = 8.0;
-
-PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
-        const PatternPresenceHalconApi &api)
-{
-    PositionCorrectionHalconRegionApi transformApi;
-    transformApi.createTuple = api.createTuple;
-    transformApi.setDouble = api.setDouble;
-    transformApi.setString = api.setString;
-    transformApi.destroyTuple = api.destroyTuple;
-    transformApi.getDouble = api.getDouble;
-    transformApi.affineTransRegion = api.affineTransRegion;
-    transformApi.clipRegion = api.clipRegion;
-    transformApi.areaCenter = api.areaCenter;
-    return transformApi;
-}
 
 double normalizedScore(const int percentScore)
 {
@@ -452,11 +435,6 @@ QString buildShapeModelCacheKey(const PatternPresenceHalconConfig &config,
             QStringLiteral("contrast=%1:minContrast=%2")
                     .arg(contrastSettings.contrast)
                     .arg(contrastSettings.minContrast),
-            QStringLiteral("contrastMode=%1:manual=%2:%3:numLevels=%4")
-                    .arg(config.contrastMode.trimmed())
-                    .arg(config.contrast)
-                    .arg(config.minContrast)
-                    .arg(config.numLevels),
             QStringLiteral("autoModelDomain=%1:thresholds=%2:minAreaRatio=%3:maxAreaRatio=%4:opening=%5:closing=%6:dilation=%7")
                     .arg(autoParams.version)
                     .arg(intsToKey(autoParams.thresholdHighCandidates))
@@ -811,21 +789,8 @@ void fillPayload(PatternPresenceHalconResult &result,
     result.payload.insert(QStringLiteral("maxCount"), config.maxCount);
     result.payload.insert(QStringLiteral("expectedCount"), config.expectedCount);
     result.payload.insert(QStringLiteral("scaleApplied"), true);
-    result.payload.insert(QStringLiteral("positionCorrectionRequested"),
-                          config.enablePositionCorrection);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"),
-                          config.positionCorrection.applied);
-    result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
-                          config.positionCorrection.sourceId);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"),
-                          config.positionCorrection.applied
-                          ? QStringLiteral("applied") : QStringLiteral("not_requested"));
-    result.payload.insert(QStringLiteral("referenceScale"),
-                          config.positionCorrection.referenceScale);
-    result.payload.insert(QStringLiteral("runScale"),
-                          config.positionCorrection.runScale);
-    result.payload.insert(QStringLiteral("scaleRatio"),
-                          config.positionCorrection.scaleRatio);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("UI exists but runner does not support yet"));
     result.payload.insert(QStringLiteral("maskApplied"), false);
     result.payload.insert(QStringLiteral("maskReason"), QStringLiteral("UI exists but runner does not support yet"));
     result.payload.insert(QStringLiteral("templateMaskApplied"), false);
@@ -1873,40 +1838,19 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
     result.payload.insert(QStringLiteral("detectRoiPixelY"), detectRoiPixels.y());
     result.payload.insert(QStringLiteral("detectRoiPixelW"), detectRoiPixels.width());
     result.payload.insert(QStringLiteral("detectRoiPixelH"), detectRoiPixels.height());
-    const bool correctionApplied = config.positionCorrection.applied;
-    ToolOverlay detectOverlay = polygonDetectRoi && detectPolygonPixels.size() >= 3
-            ? polygonOverlay(detectPolygonPixels, QStringLiteral("detect_roi"))
-            : rectOverlay(QRectF(detectRoiPixels), QStringLiteral("detect_roi"));
-    if (correctionApplied) {
-        detectOverlay = PositionCorrectionTransform::transformOverlay(
-                    detectOverlay,
-                    config.positionCorrection.referenceToRunHomMat2D);
-        detectOverlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
-                                   config.positionCorrection.sourceId);
-    }
-    detectOverlay.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
-    result.overlays.append(detectOverlay);
-    if (correctionApplied && config.positionCorrection.showMatchContour) {
-        result.overlays += PositionCorrectionTransform::matchContourOverlays(
-                    config.positionCorrection.matchContours,
-                    config.positionCorrection.sourceId);
-    }
-    if (correctionApplied) {
-        result.overlays += PositionCorrectionTransform::matchOriginOverlays(
-                    config.positionCorrection.matchOrigins,
-                    config.positionCorrection.sourceId);
-    }
+    if (polygonDetectRoi && detectPolygonPixels.size() >= 3)
+        result.overlays.append(polygonOverlay(detectPolygonPixels, QStringLiteral("detect_roi")));
+    else
+        result.overlays.append(rectOverlay(QRectF(detectRoiPixels), QStringLiteral("detect_roi")));
 
     cv::Mat templateMat = referenceImage(cv::Rect(templateRoiPixels.x(),
                                                   templateRoiPixels.y(),
                                                   templateRoiPixels.width(),
                                                   templateRoiPixels.height())).clone();
-    cv::Mat detectMat = correctionApplied
-            ? image.clone()
-            : image(cv::Rect(detectRoiPixels.x(),
-                             detectRoiPixels.y(),
-                             detectRoiPixels.width(),
-                             detectRoiPixels.height())).clone();
+    cv::Mat detectMat = image(cv::Rect(detectRoiPixels.x(),
+                                       detectRoiPixels.y(),
+                                       detectRoiPixels.width(),
+                                       detectRoiPixels.height())).clone();
     if (templateMat.empty()) {
         PatternPresenceHalconResult errorResult = makeParameterError(QStringLiteral("invalid_template_roi"),
                                                                      QStringLiteral("template ROI is invalid"),
@@ -2073,9 +2017,6 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
     Hobject templatePolygonRegion = NO_OBJECTS;
     Hobject templateReducedImage = NO_OBJECTS;
     Hobject detectPolygonRegion = NO_OBJECTS;
-    Hobject detectReferenceRegion = NO_OBJECTS;
-    Hobject transformedDetectRegion = NO_OBJECTS;
-    Hobject clippedDetectRegion = NO_OBJECTS;
     Hobject detectReducedImage = NO_OBJECTS;
     Hobject transformedDisplayContour = NO_OBJECTS;
     Htuple createNumLevelsTuple = HTUPLE_INITIALIZER;
@@ -2118,15 +2059,6 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
     Htuple displayScaleXTuple = HTUPLE_INITIALIZER;
     Htuple displayScaleYTuple = HTUPLE_INITIALIZER;
     Htuple displayScaledHomMatTuple = HTUPLE_INITIALIZER;
-    Htuple paramsNumLevelsTuple = HTUPLE_INITIALIZER;
-    Htuple paramsAngleStartTuple = HTUPLE_INITIALIZER;
-    Htuple paramsAngleExtentTuple = HTUPLE_INITIALIZER;
-    Htuple paramsAngleStepTuple = HTUPLE_INITIALIZER;
-    Htuple paramsScaleMinTuple = HTUPLE_INITIALIZER;
-    Htuple paramsScaleMaxTuple = HTUPLE_INITIALIZER;
-    Htuple paramsScaleStepTuple = HTUPLE_INITIALIZER;
-    Htuple paramsMetricTuple = HTUPLE_INITIALIZER;
-    Htuple paramsMinContrastTuple = HTUPLE_INITIALIZER;
     QVector<Htuple *> createdTuples;
     QSharedPointer<CachedShapeModel> shapeModel;
     bool localModelCreated = false;
@@ -2276,9 +2208,6 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
 
         clearObject(api, transformedDisplayContour);
         clearObject(api, detectReducedImage);
-        clearObject(api, clippedDetectRegion);
-        clearObject(api, transformedDetectRegion);
-        clearObject(api, detectReferenceRegion);
         clearObject(api, detectPolygonRegion);
         clearObject(api, templateReducedImage);
         clearObject(api, templatePolygonRegion);
@@ -2409,10 +2338,7 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
         const QString metric = halconMetricForPolarity(config.polarity, &polarityFallback);
         const ShapeModelContrastSettings contrastSettings = shapeModelContrastSettings(config);
 
-        if (config.numLevels > 0)
-            createIntTuple(createNumLevelsTuple, static_cast<Hlong>(qBound(1, config.numLevels, 10)));
-        else
-            createStringTuple(createNumLevelsTuple, QByteArray("auto"));
+        createStringTuple(createNumLevelsTuple, QByteArray("auto"));
         createDoubleTuple(angleStartTuple, angleStartRad);
         createDoubleTuple(angleExtentTuple, angleExtentRad);
         createStringTuple(angleStepTuple, QByteArray("auto"));
@@ -2421,31 +2347,17 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
         createStringTuple(scaleStepTuple, QByteArray("auto"));
         createStringTuple(optimizationTuple, QByteArray("auto"));
         createStringTuple(metricTuple, metric.toLatin1());
-        const QString contrastMode = config.contrastMode.trimmed().toLower();
-        if (contrastMode == QStringLiteral("auto")) {
-            createStringTuple(contrastTuple, QByteArray("auto"));
-            createStringTuple(minContrastTuple, QByteArray("auto"));
-        } else if (contrastMode == QStringLiteral("manual")) {
-            createIntTuple(contrastTuple, static_cast<Hlong>(qBound(2, config.contrast, 255)));
-            createIntTuple(minContrastTuple,
-                           static_cast<Hlong>(qBound(1, config.minContrast,
-                                                     qMax(1, qBound(2, config.contrast, 255) - 1))));
-        } else {
-            createIntTuple(contrastTuple, static_cast<Hlong>(contrastSettings.contrast));
-            createIntTuple(minContrastTuple, static_cast<Hlong>(contrastSettings.minContrast));
-        }
+        createIntTuple(contrastTuple, static_cast<Hlong>(contrastSettings.contrast));
+        createIntTuple(minContrastTuple, static_cast<Hlong>(contrastSettings.minContrast));
         createStringTuple(timeoutParamNameTuple, QByteArray("timeout"));
         createIntTuple(timeoutValueTuple, static_cast<Hlong>(qMax(0, config.timeoutMs)));
         createIntTuple(contourLevelTuple, 1);
         createDoubleTuple(minScoreTuple, minScore);
         createIntTuple(numMatchesTuple, static_cast<Hlong>(numMatches));
         createDoubleTuple(maxOverlapTuple, 0.5);
-        createStringTuple(subPixelTuple,
-                          config.subPixel.trimmed().toLower() == QStringLiteral("none")
-                                  ? QByteArray("none") : QByteArray("least_squares"));
-        createIntTuple(findNumLevelsTuple,
-                       static_cast<Hlong>(config.numLevels > 0 ? qBound(1, config.numLevels, 10) : 0));
-        createDoubleTuple(greedinessTuple, qBound(0.0, config.greediness, 1.0));
+        createStringTuple(subPixelTuple, QByteArray("least_squares"));
+        createIntTuple(findNumLevelsTuple, 0);
+        createDoubleTuple(greedinessTuple, 0.5);
 
         result.payload.insert(QStringLiteral("scaleRangeFallback"), scaleSettings.fallback);
         result.payload.insert(QStringLiteral("scaleRangeFallbackReason"), scaleSettings.fallbackReason);
@@ -2457,7 +2369,6 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
         result.payload.insert(QStringLiteral("judgeScoreThresholdUsed"), normalizedScore(config.scoreThreshold));
         result.payload.insert(QStringLiteral("metricUsed"), metric);
         result.payload.insert(QStringLiteral("polarityFallback"), polarityFallback);
-        result.payload.insert(QStringLiteral("contrastMode"), contrastMode);
 
         {
             QMutexLocker cacheLocker(&shapeModelCacheMutex());
@@ -2711,44 +2622,6 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
             }
         }
 
-        if (api->getShapeModelParams) {
-            QMutexLocker modelLocker(&shapeModel->mutex);
-            const Herror paramsStatus = api->getShapeModelParams(shapeModel->modelIdTuple,
-                                                                 &paramsNumLevelsTuple,
-                                                                 &paramsAngleStartTuple,
-                                                                 &paramsAngleExtentTuple,
-                                                                 &paramsAngleStepTuple,
-                                                                 &paramsScaleMinTuple,
-                                                                 &paramsScaleMaxTuple,
-                                                                 &paramsScaleStepTuple,
-                                                                 &paramsMetricTuple,
-                                                                 &paramsMinContrastTuple);
-            trackTuple(paramsNumLevelsTuple);
-            trackTuple(paramsAngleStartTuple);
-            trackTuple(paramsAngleExtentTuple);
-            trackTuple(paramsAngleStepTuple);
-            trackTuple(paramsScaleMinTuple);
-            trackTuple(paramsScaleMaxTuple);
-            trackTuple(paramsScaleStepTuple);
-            trackTuple(paramsMetricTuple);
-            trackTuple(paramsMinContrastTuple);
-            if (patternPresenceHalconStatusOk(paramsStatus)) {
-                if (paramsNumLevelsTuple.num > 0)
-                    result.payload.insert(QStringLiteral("numLevelsUsed"),
-                                          api->getDouble(&paramsNumLevelsTuple, 0));
-                if (paramsMinContrastTuple.num > 0)
-                    result.payload.insert(QStringLiteral("minContrastUsed"),
-                                          api->getDouble(&paramsMinContrastTuple, 0));
-            } else {
-                result.payload.insert(QStringLiteral("shapeModelParamsWarning"),
-                                      library->errorText(paramsStatus));
-            }
-        }
-        result.payload.insert(QStringLiteral("contrastUsed"),
-                              contrastMode == QStringLiteral("manual")
-                                      ? QJsonValue(qBound(2, config.contrast, 255))
-                                      : QJsonValue(QStringLiteral("auto")));
-
         if (!shapeModel) {
             HalconFailure failure;
             failure.status = QStringLiteral("PatternPresence HALCON error");
@@ -2813,79 +2686,7 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
         }
 
         Hobject detectSearchSource = detectImage.graySource;
-        if (correctionApplied) {
-            if (!api->reduceDomain || !api->genRectangle1
-                    || !api->affineTransRegion || !api->clipRegion
-                    || !api->areaCenter || !api->setString) {
-                HalconFailure failure;
-                failure.status = QStringLiteral("halcon_symbol_missing");
-                failure.message = QStringLiteral("HALCON position-correction ROI symbols are unavailable");
-                failure.stage = QStringLiteral("position_correction");
-                failure.halconMessage = failure.message;
-                throw failure;
-            }
-            if (polygonDetectRoi) {
-                if (!api->genRegionPolygon) {
-                    HalconFailure failure;
-                    failure.status = QStringLiteral("halcon_symbol_missing");
-                    failure.message = QStringLiteral("HALCON polygon ROI symbol is unavailable");
-                    failure.stage = QStringLiteral("position_correction.reference_roi");
-                    failure.halconMessage = failure.message;
-                    throw failure;
-                }
-                QVector<double> rows;
-                QVector<double> columns;
-                rows.reserve(detectPolygonPixels.size());
-                columns.reserve(detectPolygonPixels.size());
-                for (const QPointF &point : detectPolygonPixels) {
-                    rows.append(point.y());
-                    columns.append(point.x());
-                }
-                createDoubleArrayTuple(detectPolygonRowsTuple, rows);
-                createDoubleArrayTuple(detectPolygonColumnsTuple, columns);
-                checkStatus(api->genRegionPolygon(&detectReferenceRegion,
-                                                  detectPolygonRowsTuple,
-                                                  detectPolygonColumnsTuple),
-                            QStringLiteral("gen_region_polygon.reference_detect_roi"));
-            } else {
-                checkStatus(api->genRectangle1(&detectReferenceRegion,
-                                               detectRoiPixels.top(),
-                                               detectRoiPixels.left(),
-                                               detectRoiPixels.bottom(),
-                                               detectRoiPixels.right()),
-                            QStringLiteral("gen_rectangle1.reference_detect_roi"));
-            }
-            const PositionCorrectionHalconTransformResult transformed =
-                    PositionCorrectionHalconTransform::transformAndClipRegion(
-                        positionCorrectionRegionApi(*api),
-                        detectReferenceRegion,
-                        &transformedDetectRegion,
-                        &clippedDetectRegion,
-                        config.positionCorrection.referenceToRunHomMat2D,
-                        image.cols,
-                        image.rows);
-            if (!transformed.success || transformed.area <= 0.0) {
-                HalconFailure failure;
-                failure.status = !transformed.success
-                        ? transformed.status
-                        : QStringLiteral("corrected_roi_out_of_image");
-                failure.message = QStringLiteral("Position-corrected Pattern ROI is invalid (%1)")
-                        .arg(transformed.operation);
-                failure.stage = QStringLiteral("position_correction.%1")
-                        .arg(transformed.operation);
-                failure.code = transformed.halconStatus;
-                failure.halconMessage = failure.message;
-                throw failure;
-            }
-            checkStatus(api->reduceDomain(detectImage.graySource,
-                                          clippedDetectRegion,
-                                          &detectReducedImage),
-                        QStringLiteral("reduce_domain.corrected_roi"));
-            detectSearchSource = detectReducedImage;
-            result.payload.insert(QStringLiteral("correctedRoiArea"), transformed.area);
-            result.payload.insert(QStringLiteral("detectMaskApplied"), true);
-            result.payload.insert(QStringLiteral("polygonDetectRoiApplied"), polygonDetectRoi);
-        } else if (polygonDetectRoi) {
+        if (polygonDetectRoi) {
             if (detectPolygonPixels.size() < 3) {
                 HalconFailure failure;
                 failure.status = QStringLiteral("invalid_detect_polygon");
@@ -2980,10 +2781,8 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
             const double angle = api->getDouble(&angleTuple, index);
             const double scale = api->getDouble(&scaleTuple, index);
             const double score = api->getDouble(&scoreTuple, index);
-            const double imageRow = localRow +
-                    (correctionApplied ? 0.0 : static_cast<double>(detectRoiPixels.y()));
-            const double imageColumn = localColumn +
-                    (correctionApplied ? 0.0 : static_cast<double>(detectRoiPixels.x()));
+            const double imageRow = localRow + static_cast<double>(detectRoiPixels.y());
+            const double imageColumn = localColumn + static_cast<double>(detectRoiPixels.x());
 
             matchScores.append(score);
             QJsonObject matchJson;
@@ -3177,10 +2976,8 @@ PatternPresenceHalconResult PatternPresenceHalconRunner::run(
                         readXldContours(api, transformedDisplayContour);
                 QVector<QVector<QPointF>> globalContours =
                         translatedContours(transformedRead.contours,
-                                           correctionApplied
-                                           ? QPointF()
-                                           : QPointF(static_cast<double>(detectRoiPixels.x()),
-                                                     static_cast<double>(detectRoiPixels.y())));
+                                           QPointF(static_cast<double>(detectRoiPixels.x()),
+                                                   static_cast<double>(detectRoiPixels.y())));
 
                 int displayPointCount = 0;
                 const int overlayLineCount = appendContourLineOverlays(&result.overlays,

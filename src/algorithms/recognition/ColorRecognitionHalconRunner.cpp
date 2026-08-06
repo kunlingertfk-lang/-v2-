@@ -1,21 +1,14 @@
 #include "algorithms/recognition/ColorRecognitionHalconRunner.h"
-#include "algorithms/location/PositionCorrectionHalconTransform.h"
-#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
 #include <QElapsedTimer>
 #include <QFileInfo>
-#include <QHash>
-#include <QCryptographicHash>
+#include <QDebug>
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QPointF>
-#include <QPolygonF>
 #include <QRect>
-#include <QMutex>
-#include <QMutexLocker>
 #include <QtGlobal>
 
 #include <algorithm>
@@ -23,21 +16,11 @@
 #include <dlfcn.h>
 #include <exception>
 #include <limits>
-#include <memory>
 #include <opencv2/imgproc.hpp>
-#include <utility>
 
 namespace {
 
 constexpr int kMinRoiPixelSize = 2;
-const char kAlgorithmVersion[] = "halcon_hs_histogram_transition_v2";
-const char kHsJointFeatureSchemaVersion[] = "hs_joint_histogram_v2";
-const char kHsLinearFeatureSchemaVersion[] = "hs_linear_histogram_v2";
-const char kHsvLinearFeatureSchemaVersion[] = "hsv_linear_histogram_v2";
-const char kHsSmoothingKernelVersion[] = "hs_anisotropic_3x3_v2";
-const char kCurrentHsvClassifierVersion[] = "hsv_category_topn_intersection_v1";
-const char kLegacyHsvClassifierVersion[] = "hsv_category_best_sample_v2";
-constexpr int kHsvClassTopN = 3;
 
 // 判断 HALCON C API 返回码是否属于正常状态。
 bool halconStatusOk(const Herror status)
@@ -191,36 +174,6 @@ ToolOverlay circleOverlay(const QPointF &center,
     return overlay;
 }
 
-void writePositionCorrectionPayload(
-        const ColorRecognitionHalconConfig &config,
-        QJsonObject *payload)
-{
-    if (!payload)
-        return;
-    const PositionCorrectionContext &correction = config.positionCorrection;
-    QJsonArray matrix;
-    for (double value : correction.referenceToRunHomMat2D)
-        matrix.append(value);
-    payload->insert(QStringLiteral("enablePositionCorrection"),
-                    config.enablePositionCorrection);
-    payload->insert(QStringLiteral("positionCorrectionRequested"),
-                    correction.requested);
-    payload->insert(QStringLiteral("positionCorrectionApplied"),
-                    correction.applied);
-    payload->insert(QStringLiteral("positionCorrectionSource"),
-                    config.positionCorrectionSource);
-    payload->insert(QStringLiteral("positionCorrectionSourceId"),
-                    correction.sourceId.isEmpty()
-                    ? config.positionCorrectionSourceId : correction.sourceId);
-    payload->insert(QStringLiteral("positionCorrectionReason"),
-                    correction.applied ? QStringLiteral("applied")
-                                       : QStringLiteral("disabled"));
-    payload->insert(QStringLiteral("referenceToRunHomMat2D"), matrix);
-    payload->insert(QStringLiteral("referenceScale"), correction.referenceScale);
-    payload->insert(QStringLiteral("runScale"), correction.runScale);
-    payload->insert(QStringLiteral("scaleRatio"), correction.scaleRatio);
-}
-
 // 将矩形写入 overlay.extra 使用的 JSON 结构。
 QJsonObject rectToJsonObject(const QRectF &rect)
 {
@@ -267,140 +220,30 @@ bool isHisto2DimFeatureType(const QString &featureType)
             key == QStringLiteral("histogram_2dim");
 }
 
-bool effectiveBrightnessEnabled(const ColorRecognitionHalconConfig &config)
-{
-    return !isHisto2DimFeatureType(config.featureType) && config.brightnessEnabled;
-}
-
-QString actualFeatureType(const ColorRecognitionHalconConfig &config)
-{
-    if (isHisto2DimFeatureType(config.featureType))
-        return QStringLiteral("histogram_2dim_hs");
-    return effectiveBrightnessEnabled(config)
-            ? QStringLiteral("histogram_1dim_hsv")
-            : QStringLiteral("histogram_1dim_hs");
-}
-
-QString featureSchemaVersion(const ColorRecognitionHalconConfig &config)
-{
-    if (isHisto2DimFeatureType(config.featureType))
-        return QString::fromLatin1(kHsJointFeatureSchemaVersion);
-    return effectiveBrightnessEnabled(config)
-            ? QString::fromLatin1(kHsvLinearFeatureSchemaVersion)
-            : QString::fromLatin1(kHsLinearFeatureSchemaVersion);
-}
-
-QString inferredPixelFormat(const ColorRecognitionHalconConfig &config, const cv::Mat &image)
-{
-    if (!config.pixelFormat.trimmed().isEmpty())
-        return config.pixelFormat.trimmed();
-    if (image.depth() == CV_8U)
-        return image.channels() == 4 ? QStringLiteral("BGRA8") : QStringLiteral("BGR8");
-    if (image.depth() == CV_16U)
-        return image.channels() == 4 ? QStringLiteral("BGRA16") : QStringLiteral("BGR16");
-    return QStringLiteral("unsupported");
-}
-
-int resolvedValidBits(const ColorRecognitionHalconConfig &config, const cv::Mat &image)
-{
-    if (config.validBits > 0)
-        return config.validBits;
-    return image.depth() == CV_8U ? 8 : -1;
-}
-
-int resolvedBitShift(const ColorRecognitionHalconConfig &config, const cv::Mat &image)
-{
-    if (config.bitShift >= 0)
-        return config.bitShift;
-    return image.depth() == CV_8U ? 0 : -1;
-}
-
-QString featureSignature(const ColorRecognitionHalconConfig &config, const cv::Mat &image)
-{
-    QJsonObject contract;
-    contract.insert(QStringLiteral("algorithmVersion"), QString::fromLatin1(kAlgorithmVersion));
-    contract.insert(QStringLiteral("axisOrder"), QStringLiteral("row_hue_column_saturation"));
-    contract.insert(QStringLiteral("bitShift"), resolvedBitShift(config, image));
-    contract.insert(QStringLiteral("brightnessEnabled"), effectiveBrightnessEnabled(config));
-    contract.insert(QStringLiteral("featureSchemaVersion"), featureSchemaVersion(config));
-    contract.insert(QStringLiteral("featureType"), actualFeatureType(config));
-    contract.insert(QStringLiteral("flattenOrder"), QStringLiteral("hue_major_saturation_minor"));
-    contract.insert(QStringLiteral("histogramBins"), histogramBinsForSensitivity(config.sensitivity));
-    contract.insert(QStringLiteral("hueCircular"), isHisto2DimFeatureType(config.featureType));
-    contract.insert(QStringLiteral("pixelFormat"), inferredPixelFormat(config, image));
-    contract.insert(QStringLiteral("smoothingKernelVersion"),
-                    isHisto2DimFeatureType(config.featureType)
-                    ? QString::fromLatin1(kHsSmoothingKernelVersion)
-                    : QStringLiteral("none"));
-    contract.insert(QStringLiteral("validBits"), resolvedValidBits(config, image));
-    const QByteArray canonical = QJsonDocument(contract).toJson(QJsonDocument::Compact);
-    return QStringLiteral("sha256:%1").arg(QString::fromLatin1(
-                QCryptographicHash::hash(canonical, QCryptographicHash::Sha256).toHex()));
-}
-
-// 将三/四通道彩色输入转换为连续 BGR，并保留 8/16 位深度。
-cv::Mat toBgrPreservingDepth(const cv::Mat &image)
+// 将输入 cv::Mat 统一转换为连续的 8-bit BGR，作为进入 HALCON 前的桥接格式。
+cv::Mat toBgr8(const cv::Mat &image)
 {
     if (image.empty())
         return cv::Mat();
-    if (image.depth() != CV_8U && image.depth() != CV_16U)
-        return cv::Mat();
+
+    cv::Mat source;
+    if (image.depth() == CV_8U)
+        source = image;
+    else
+        image.convertTo(source, CV_8U);
 
     cv::Mat bgr;
-    if (image.channels() == 3)
-        bgr = image;
-    else if (image.channels() == 4)
-        cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
+    if (source.channels() == 1) {
+        cv::cvtColor(source, bgr, cv::COLOR_GRAY2BGR);
+    } else if (source.channels() == 3) {
+        bgr = source;
+    } else if (source.channels() == 4) {
+        cv::cvtColor(source, bgr, cv::COLOR_BGRA2BGR);
+    }
 
     if (!bgr.empty() && !bgr.isContinuous())
         bgr = bgr.clone();
     return bgr;
-}
-
-bool validInputBitContract(const cv::Mat &image,
-                           const ColorRecognitionHalconConfig &config,
-                           QString *status,
-                           QString *message)
-{
-    if (image.empty()) {
-        *status = QStringLiteral("image_empty");
-        *message = QStringLiteral("Input image is empty.");
-        return false;
-    }
-    if (image.channels() == 1) {
-        *status = QStringLiteral("unsupported_mono_for_color_recognition");
-        *message = QStringLiteral("Monochrome input has no color information.");
-        return false;
-    }
-    if (image.channels() != 3 && image.channels() != 4) {
-        *status = QStringLiteral("unsupported_channel_count");
-        *message = QStringLiteral("Color recognition requires three or four channels.");
-        return false;
-    }
-    if (image.depth() == CV_8U)
-        return true;
-    if (image.depth() != CV_16U) {
-        *status = QStringLiteral("unsupported_image_format");
-        *message = QStringLiteral("Only unsigned 8-bit and 16-bit color input is supported.");
-        return false;
-    }
-    if (config.validBits < 0 || config.bitShift < 0) {
-        *status = QStringLiteral("missing_pixel_format_metadata");
-        *message = QStringLiteral("16-bit color input requires validBits and bitShift metadata.");
-        return false;
-    }
-    if (config.validBits < 1 || config.validBits > 16) {
-        *status = QStringLiteral("invalid_valid_bits");
-        *message = QStringLiteral("validBits must be in the range 1..16.");
-        return false;
-    }
-    if (config.bitShift < 0 || config.bitShift > 15 ||
-        config.validBits + config.bitShift > 16) {
-        *status = QStringLiteral("invalid_bit_shift");
-        *message = QStringLiteral("bitShift is incompatible with validBits.");
-        return false;
-    }
-    return true;
 }
 
 // 生成特征提取阶段的错误结果，并保留图像、ROI、HALCON 路径等诊断信息。
@@ -416,18 +259,12 @@ ColorRecognitionHalconFeatureResult featureError(const QString &status,
     result.message = message;
     result.elapsedMs = elapsedMs;
     result.payload.insert(QStringLiteral("error"), message);
-    result.payload.insert(QStringLiteral("algorithmVersion"), QString::fromLatin1(kAlgorithmVersion));
-    result.payload.insert(QStringLiteral("featureType"), actualFeatureType(config));
-    result.payload.insert(QStringLiteral("featureSchemaVersion"), featureSchemaVersion(config));
-    result.payload.insert(QStringLiteral("requestedFeatureType"), config.featureType);
+    result.payload.insert(QStringLiteral("featureType"), config.featureType);
     result.payload.insert(QStringLiteral("colorDecisionMode"),
                           normalizedColorDecisionMode(config.colorDecisionMode));
     result.payload.insert(QStringLiteral("hasImage"), !image.empty());
     result.payload.insert(QStringLiteral("imageWidth"), image.empty() ? 0 : image.cols);
     result.payload.insert(QStringLiteral("imageHeight"), image.empty() ? 0 : image.rows);
-    result.payload.insert(QStringLiteral("declaredPixelFormat"), config.pixelFormat);
-    result.payload.insert(QStringLiteral("actualMatDepth"), image.empty() ? -1 : image.depth());
-    result.payload.insert(QStringLiteral("actualChannelCount"), image.empty() ? 0 : image.channels());
     result.payload.insert(QStringLiteral("roiNormalized"), rectToJson(config.roiNormalized));
     result.payload.insert(QStringLiteral("detectRegionType"), config.detectRegionType);
     result.payload.insert(QStringLiteral("detectCircleCenterNormalized"),
@@ -440,7 +277,10 @@ ColorRecognitionHalconFeatureResult featureError(const QString &status,
                           pointsToJson(config.detectMaskPolygonNormalized));
     result.payload.insert(QStringLiteral("detectMaskConfigured"),
                           config.detectMaskPolygonNormalized.size() >= 3);
-    writePositionCorrectionPayload(config, &result.payload);
+    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
     result.payload.insert(QStringLiteral("halconSoPathCandidates"),
                           config.halconSoPathCandidates.join(QStringLiteral("; ")));
@@ -462,19 +302,13 @@ ColorRecognitionHalconResult runError(const QString &status,
     result.message = message;
     result.elapsedMs = elapsedMs;
     result.payload.insert(QStringLiteral("error"), message);
-    result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_hsv_histogram_transition"));
-    result.payload.insert(QStringLiteral("algorithmVersion"), QString::fromLatin1(kAlgorithmVersion));
-    result.payload.insert(QStringLiteral("featureType"), actualFeatureType(config));
-    result.payload.insert(QStringLiteral("featureSchemaVersion"), featureSchemaVersion(config));
-    result.payload.insert(QStringLiteral("requestedFeatureType"), config.featureType);
+    result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_intersection_color_recognition"));
+    result.payload.insert(QStringLiteral("featureType"), config.featureType);
     result.payload.insert(QStringLiteral("colorDecisionMode"),
                           normalizedColorDecisionMode(config.colorDecisionMode));
     result.payload.insert(QStringLiteral("hasImage"), !image.empty());
     result.payload.insert(QStringLiteral("imageWidth"), image.empty() ? 0 : image.cols);
     result.payload.insert(QStringLiteral("imageHeight"), image.empty() ? 0 : image.rows);
-    result.payload.insert(QStringLiteral("declaredPixelFormat"), config.pixelFormat);
-    result.payload.insert(QStringLiteral("actualMatDepth"), image.empty() ? -1 : image.depth());
-    result.payload.insert(QStringLiteral("actualChannelCount"), image.empty() ? 0 : image.channels());
     result.payload.insert(QStringLiteral("roiNormalized"), rectToJson(config.roiNormalized));
     result.payload.insert(QStringLiteral("detectRegionType"), config.detectRegionType);
     result.payload.insert(QStringLiteral("detectCircleCenterNormalized"),
@@ -487,7 +321,10 @@ ColorRecognitionHalconResult runError(const QString &status,
                           pointsToJson(config.detectMaskPolygonNormalized));
     result.payload.insert(QStringLiteral("detectMaskConfigured"),
                           config.detectMaskPolygonNormalized.size() >= 3);
-    writePositionCorrectionPayload(config, &result.payload);
+    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("halconSoPath"), config.halconSoPath);
     result.payload.insert(QStringLiteral("halconSoPathCandidates"),
                           config.halconSoPathCandidates.join(QStringLiteral("; ")));
@@ -533,11 +370,8 @@ ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig 
         result.overlays.append(statusText);
     }
 
-    result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_hsv_histogram_transition"));
-    result.payload.insert(QStringLiteral("algorithmVersion"), QString::fromLatin1(kAlgorithmVersion));
-    result.payload.insert(QStringLiteral("featureType"), actualFeatureType(config));
-    result.payload.insert(QStringLiteral("featureSchemaVersion"), featureSchemaVersion(config));
-    result.payload.insert(QStringLiteral("requestedFeatureType"), config.featureType);
+    result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_intersection_color_recognition"));
+    result.payload.insert(QStringLiteral("featureType"), config.featureType);
     result.payload.insert(QStringLiteral("colorDecisionMode"),
                           normalizedColorDecisionMode(config.colorDecisionMode));
     result.payload.insert(QStringLiteral("detectMaskApplied"), true);
@@ -553,7 +387,10 @@ ColorRecognitionHalconResult maskedRoiResult(const ColorRecognitionHalconConfig 
     result.payload.insert(QStringLiteral("detectCircleBoundingRectNormalized"),
                           rectToJson(config.detectCircleBoundingRectNormalized));
     result.payload.insert(QStringLiteral("roiPixelsRect"), rectToJson(QRectF(roiPixels)));
-    writePositionCorrectionPayload(config, &result.payload);
+    result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(elapsedMs));
     return result;
 }
@@ -573,19 +410,12 @@ struct HalconCApi
     using GenImageInterleavedFn = Herror (*)(Hobject *, Hlong, const char *, Hlong, Hlong, Hlong,
                                              const char *, Hlong, Hlong, Hlong, Hlong, Hlong, Hlong);
     using Decompose3Fn = Herror (*)(const Hobject, Hobject *, Hobject *, Hobject *);
-    using ScaleImageFn = Herror (*)(const Hobject, Hobject *, double, double);
-    using ConvertImageTypeFn = Herror (*)(const Hobject, Hobject *, const char *);
     using TransFromRgbFn = Herror (*)(const Hobject, const Hobject, const Hobject,
                                       Hobject *, Hobject *, Hobject *, const char *);
     using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
     using GenCircleFn = Herror (*)(Hobject *, double, double, double);
     using GenRegionPolygonFilledFn = Herror (*)(Hobject *, const Htuple, const Htuple);
     using DifferenceFn = Herror (*)(const Hobject, const Hobject, Hobject *);
-    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *,
-                                           const Htuple, const Htuple);
-    using ClipRegionFn = Herror (*)(const Hobject, Hobject *,
-                                    const Htuple, const Htuple,
-                                    const Htuple, const Htuple);
     using AreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using Histo2DimFn = Herror (*)(const Hobject, const Hobject, const Hobject, Hobject *);
@@ -609,15 +439,11 @@ struct HalconCApi
     GetIntFn getInt = nullptr;
     GenImageInterleavedFn genImageInterleaved = nullptr;
     Decompose3Fn decompose3 = nullptr;
-    ScaleImageFn scaleImage = nullptr;
-    ConvertImageTypeFn convertImageType = nullptr;
     TransFromRgbFn transFromRgb = nullptr;
     GenRectangle1Fn genRectangle1 = nullptr;
     GenCircleFn genCircle = nullptr;
     GenRegionPolygonFilledFn genRegionPolygonFilled = nullptr;
     DifferenceFn difference = nullptr;
-    AffineTransRegionFn affineTransRegion = nullptr;
-    ClipRegionFn clipRegion = nullptr;
     AreaCenterFn areaCenter = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
     Histo2DimFn histo2Dim = nullptr;
@@ -693,15 +519,11 @@ public:
             !resolveRequired(m_handle, api.getInt, "F_get_i", errorMessage) ||
             !resolveRequired(m_handle, api.genImageInterleaved, "gen_image_interleaved", errorMessage) ||
             !resolveRequired(m_handle, api.decompose3, "decompose3", errorMessage) ||
-            !resolveRequired(m_handle, api.scaleImage, "scale_image", errorMessage) ||
-            !resolveRequired(m_handle, api.convertImageType, "convert_image_type", errorMessage) ||
             !resolveRequired(m_handle, api.transFromRgb, "trans_from_rgb", errorMessage) ||
             !resolveRequired(m_handle, api.genRectangle1, "gen_rectangle1", errorMessage) ||
             !resolveRequired(m_handle, api.genCircle, "gen_circle", errorMessage) ||
             !resolveRequired(m_handle, api.genRegionPolygonFilled, "T_gen_region_polygon_filled", errorMessage) ||
             !resolveRequired(m_handle, api.difference, "difference", errorMessage) ||
-            !resolveRequired(m_handle, api.affineTransRegion, "T_affine_trans_region", errorMessage) ||
-            !resolveRequired(m_handle, api.clipRegion, "T_clip_region", errorMessage) ||
             !resolveRequired(m_handle, api.areaCenter, "T_area_center", errorMessage) ||
             !resolveRequired(m_handle, api.reduceDomain, "reduce_domain", errorMessage) ||
             !resolveRequired(m_handle, api.histo2Dim, "T_histo_2dim", errorMessage) ||
@@ -727,34 +549,6 @@ public:
 private:
     void *m_handle = nullptr;
 };
-
-// 颜色识别内部 runtime 缓存：同一路径/符号 profile 仅加载和解析一次。
-std::shared_ptr<HalconLibrary> acquireHalconLibrary(const QString &path,
-                                                   QString &errorMessage,
-                                                   bool &symbolMissing)
-{
-    static QMutex mutex;
-    static QHash<QString, std::shared_ptr<HalconLibrary>> cache;
-
-    const QFileInfo fileInfo(path);
-    QString normalizedPath = fileInfo.canonicalFilePath();
-    if (normalizedPath.isEmpty())
-        normalizedPath = fileInfo.absoluteFilePath();
-    const QString cacheKey = normalizedPath + QStringLiteral("|legacy_hs");
-
-    QMutexLocker locker(&mutex);
-    const auto existing = cache.constFind(cacheKey);
-    if (existing != cache.constEnd()) {
-        symbolMissing = false;
-        return existing.value();
-    }
-
-    std::shared_ptr<HalconLibrary> library = std::make_shared<HalconLibrary>();
-    if (!library->load(normalizedPath, errorMessage, symbolMissing))
-        return std::shared_ptr<HalconLibrary>();
-    cache.insert(cacheKey, library);
-    return library;
-}
 
 // HTuple RAII 封装：自动管理 HALCON tuple 生命周期，避免泄漏和重复释放。
 class HalconTuple
@@ -910,6 +704,127 @@ double tupleSumValue(HalconCApi *api, const HalconTuple &tuple, const QString &s
     return sum.size() > 0 ? sum.doubleAt(0) : 0.0;
 }
 
+// 调用 OpenCV compareHist 只做调试对比，不参与颜色识别核心判定。
+double openCvBhattacharyyaDebugDistance(const QVector<double> &referenceHistogram,
+                                        const QVector<double> &testHistogram)
+{
+    const int count = qMin(referenceHistogram.size(), testHistogram.size());
+    if (count <= 0)
+        return 0.0;
+
+    cv::Mat referenceMat(1, count, CV_32F);
+    cv::Mat testMat(1, count, CV_32F);
+    for (int i = 0; i < count; ++i) {
+        referenceMat.at<float>(0, i) = static_cast<float>(qMax(0.0, referenceHistogram.at(i)));
+        testMat.at<float>(0, i) = static_cast<float>(qMax(0.0, testHistogram.at(i)));
+    }
+
+    return cv::compareHist(referenceMat, testMat, cv::HISTCMP_BHATTACHARYYA);
+}
+
+// 格式化直方图指定区间，供调试日志输出。
+QString histogramFirstBinsText(const QVector<double> &histogram, int start, int count)
+{
+    QStringList values;
+    const int end = qMin(histogram.size(), start + count);
+    for (int i = qMax(0, start); i < end; ++i)
+        values.append(QString::number(histogram.at(i), 'f', 6));
+    return values.join(QStringLiteral(","));
+}
+
+// 计算直方图指定通道区间的归一化和值。
+double histogramChannelSum(const QVector<double> &histogram, int start, int count)
+{
+    double sum = 0.0;
+    const int end = qMin(histogram.size(), start + count);
+    for (int i = qMax(0, start); i < end; ++i)
+        sum += histogram.at(i);
+    return sum;
+}
+
+// 找到直方图指定通道区间的最大 bin 下标。
+int histogramMaxBin(const QVector<double> &histogram, int start, int count)
+{
+    int maxIndex = -1;
+    double maxValue = -1.0;
+    const int begin = qMax(0, start);
+    const int end = qMin(histogram.size(), start + count);
+    for (int i = begin; i < end; ++i) {
+        const double value = histogram.at(i);
+        if (value > maxValue) {
+            maxValue = value;
+            maxIndex = i - begin;
+        }
+    }
+    return maxIndex;
+}
+
+// 输出一维 H/S(/V) 直方图调试信息。
+void logHistogramDebugChannels(const QString &name,
+                               const QVector<double> &histogram,
+                               int bins,
+                               bool brightnessEnabled)
+{
+    qInfo().noquote()
+            << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1] featureLength=%2 expectedLength=%3 binsPerChannel=%4 channels=%5 first10=[%6]")
+               .arg(name,
+                    QString::number(histogram.size()),
+                    QString::number(bins * (brightnessEnabled ? 3 : 2)),
+                    QString::number(bins),
+                    brightnessEnabled ? QStringLiteral("H,S,V") : QStringLiteral("H,S"),
+                    histogramFirstBinsText(histogram, 0, 10));
+
+    const QStringList channelNames = brightnessEnabled
+            ? QStringList{QStringLiteral("H"), QStringLiteral("S"), QStringLiteral("V")}
+            : QStringList{QStringLiteral("H"), QStringLiteral("S")};
+    for (int channel = 0; channel < channelNames.size(); ++channel) {
+        const int start = channel * bins;
+        qInfo().noquote()
+                << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1][%2] dim=%3 sum=%4 maxBin=%5 first10=[%6]")
+                   .arg(name,
+                        channelNames.at(channel),
+                        QString::number(qMax(0, qMin(bins, histogram.size() - start))),
+                        QString::number(histogramChannelSum(histogram, start, bins), 'f', 6),
+                        QString::number(histogramMaxBin(histogram, start, bins)),
+                        histogramFirstBinsText(histogram, start, 10));
+    }
+}
+
+// 输出二维 H/S 联合直方图调试信息。
+void logHistogram2DimDebug(const QString &name, const QVector<double> &histogram, int bins)
+{
+    const int expectedLength = bins * bins;
+    qInfo().noquote()
+            << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1] featureType=histogram_2dim_hs colorSpace=HSV channels=H,S joint featureLength=%2 expectedLength=%3 binsPerAxis=%4 first10=[%5]")
+               .arg(name,
+                    QString::number(histogram.size()),
+                    QString::number(expectedLength),
+                    QString::number(bins),
+                    histogramFirstBinsText(histogram, 0, 10));
+
+    if (histogram.size() != expectedLength)
+        return;
+
+    int maxIndex = -1;
+    double maxValue = -1.0;
+    for (int i = 0; i < histogram.size(); ++i) {
+        if (histogram.at(i) > maxValue) {
+            maxValue = histogram.at(i);
+            maxIndex = i;
+        }
+    }
+    const int maxSaturationBin = maxIndex >= 0 ? maxIndex / bins : -1;
+    const int maxHueBin = maxIndex >= 0 ? maxIndex % bins : -1;
+    qInfo().noquote()
+            << QStringLiteral("[ColorComparison][Bhattacharyya debug][%1][HS2D] dim=%2 sum=%3 maxHueBin=%4 maxSaturationBin=%5 maxValue=%6")
+               .arg(name,
+                    QString::number(histogram.size()),
+                    QString::number(histogramChannelSum(histogram, 0, histogram.size()), 'f', 6),
+                    QString::number(maxHueBin),
+                    QString::number(maxSaturationBin),
+                    QString::number(maxValue, 'f', 6));
+}
+
 // 将 double 数组写入已创建的 HALCON tuple。
 void createDoubleArrayTuple(HalconTuple &tuple, const QVector<double> &values)
 {
@@ -946,21 +861,6 @@ double regionArea(HalconCApi *api, const Hobject region, const QString &stage)
     checkStatus(api, api->areaCenter(region, area.ptr(), row.ptr(), column.ptr()),
                 stage + QStringLiteral(".area_center"));
     return area.size() > 0 ? area.doubleAt(0) : 0.0;
-}
-
-PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
-        const HalconCApi &api)
-{
-    PositionCorrectionHalconRegionApi transformApi;
-    transformApi.createTuple = api.createTuple;
-    transformApi.setDouble = api.setDouble;
-    transformApi.setString = api.setString;
-    transformApi.destroyTuple = api.destroyTuple;
-    transformApi.getDouble = api.getDouble;
-    transformApi.affineTransRegion = api.affineTransRegion;
-    transformApi.clipRegion = api.clipRegion;
-    transformApi.areaCenter = api.areaCenter;
-    return transformApi;
 }
 
 // 使用 HALCON tuple_min2 + tuple_sum 计算直方图交集相似度。
@@ -1000,22 +900,10 @@ struct ColorDecisionResult
     QString matchedSampleLabel;
     double rating = 0.0;
     double score = 0.0;
-    double secondClassScore = 0.0;
-    double classMargin = 0.0;
-    bool classificationAmbiguous = false;
-    int topNSampleCount = 0;
-    QVector<double> topNSimilarities;
+    double dominantColorRatio = 0.0;
+    QVector<QPair<QString, double>> labelAreaRatios;
     QVector<QPair<QString, double>> classSimilarities;
-    QJsonArray classDiagnostics;
 };
-
-QJsonArray doubleArray(const QVector<double> &values, double scale = 1.0)
-{
-    QJsonArray result;
-    for (double value : values)
-        result.append(value * scale);
-    return result;
-}
 
 // 根据 classId 在 labels 中查找显示名，找不到时回退到样本标签或 classId 文案。
 QString labelNameForClass(const QVector<ColorRecognitionHalconLabel> &labels,
@@ -1074,16 +962,15 @@ ColorDecisionResult decideByHistogramIntersection(HalconCApi *api,
     return decision;
 }
 
-// 对每个类别取最佳模板的 HALCON 直方图交集，输出类别相似度而非像素面积占比。
+// 使用 HALCON 直方图交集覆盖量估算各类别在 ROI 中的主颜色占比。
 ColorDecisionResult decideByDominantRatio(HalconCApi *api,
                                           const ColorRecognitionHalconConfig &config,
                                           const QVector<ColorRecognitionHalconSample> &usableSamples,
                                           const QVector<double> &queryFeature)
 {
     ColorDecisionResult decision;
-    // dominant_ratio 只作为旧配置输入保留；结果使用真实业务语义名称。
-    decision.mode = QStringLiteral("category_similarity");
-    decision.comparisonMethod = QStringLiteral("category_best_sample_histogram_intersection");
+    decision.mode = QStringLiteral("dominant_ratio");
+    decision.comparisonMethod = QStringLiteral("dominant_color_ratio");
 
     QVector<int> classIds;
     QVector<double> classCoverage;
@@ -1107,20 +994,25 @@ ColorDecisionResult decideByDominantRatio(HalconCApi *api,
         }
     }
 
-    if (classCoverage.isEmpty()) {
+    double coverageSum = 0.0;
+    for (const double coverage : classCoverage)
+        coverageSum += qMax(0.0, coverage);
+    if (coverageSum <= 0.0) {
         throw std::pair<QString, QString>(
                 QStringLiteral("empty_similarity"),
-                QStringLiteral("Category similarity returned no comparable class."));
+                QStringLiteral("Dominant color ratio returned no comparable class."));
     }
 
     int bestClassIndex = -1;
-    double bestSimilarity = -1.0;
+    double bestRatio = -1.0;
     for (int i = 0; i < classIds.size(); ++i) {
         const QString label = labelNameForClass(config.labels, usableSamples, classIds.at(i), QString());
         const double similarity = qBound(0.0, classCoverage.at(i), 1.0);
+        const double ratio = qBound(0.0, similarity / coverageSum, 1.0);
         decision.classSimilarities.append(qMakePair(label, similarity));
-        if (similarity > bestSimilarity) {
-            bestSimilarity = similarity;
+        decision.labelAreaRatios.append(qMakePair(label, ratio));
+        if (ratio > bestRatio) {
+            bestRatio = ratio;
             bestClassIndex = i;
         }
     }
@@ -1128,12 +1020,12 @@ ColorDecisionResult decideByDominantRatio(HalconCApi *api,
     if (bestClassIndex < 0) {
         throw std::pair<QString, QString>(
                 QStringLiteral("empty_similarity"),
-                QStringLiteral("Category similarity returned no predicted class."));
+                QStringLiteral("Dominant color ratio returned no dominant class."));
     }
 
     const int bestSampleIndex = classBestSampleIndex.at(bestClassIndex);
     const ColorRecognitionHalconSample &bestSample = usableSamples.at(bestSampleIndex);
-    const double selectedSimilarity = qBound(0.0, classBestSimilarity.at(bestClassIndex), 1.0);
+    const double bestSimilarity = qBound(0.0, classBestSimilarity.at(bestClassIndex), 1.0);
     decision.predictedClassId = classIds.at(bestClassIndex);
     decision.predictedLabel = labelNameForClass(config.labels,
                                                 usableSamples,
@@ -1141,134 +1033,9 @@ ColorDecisionResult decideByDominantRatio(HalconCApi *api,
                                                 bestSample.label);
     decision.matchedSampleIndex = bestSampleIndex;
     decision.matchedSampleLabel = bestSample.label;
-    decision.rating = selectedSimilarity;
+    decision.dominantColorRatio = qBound(0.0, bestRatio, 1.0);
+    decision.rating = bestSimilarity;
     decision.score = qBound(0.0, decision.rating * 100.0, 100.0);
-    return decision;
-}
-
-struct HsvClassScore
-{
-    int classId = -1;
-    QString label;
-    int declaredOrder = 0;
-    int sampleCount = 0;
-    int bestSampleIndex = -1;
-    double score = 0.0;
-    double bestSimilarity = 0.0;
-    double worstTopNSimilarity = 0.0;
-    QVector<double> topNSimilarities;
-};
-
-// 每类取最多三个最相似 ROI 的均值；类别之间独立聚合，避免全局 KNN 的样本数偏置。
-ColorDecisionResult decideByClassTopNIntersection(
-        HalconCApi *api,
-        const ColorRecognitionHalconConfig &config,
-        const QVector<ColorRecognitionHalconSample> &usableSamples,
-        const QVector<double> &queryFeature)
-{
-    QHash<int, QVector<QPair<double, int>>> similaritiesByClass;
-    QVector<int> classOrder;
-    QHash<int, QString> labelByClass;
-    for (const ColorRecognitionHalconLabel &label : config.labels) {
-        if (!classOrder.contains(label.classId)) {
-            classOrder.append(label.classId);
-            labelByClass.insert(label.classId, label.name.trimmed());
-        }
-    }
-    for (int sampleIndex = 0; sampleIndex < usableSamples.size(); ++sampleIndex) {
-        const ColorRecognitionHalconSample &sample = usableSamples.at(sampleIndex);
-        if (!classOrder.contains(sample.classId))
-            classOrder.append(sample.classId);
-        if (!labelByClass.contains(sample.classId))
-            labelByClass.insert(sample.classId, sample.label.trimmed());
-        similaritiesByClass[sample.classId].append(qMakePair(
-                histogramIntersectionSimilarity(api, queryFeature, sample.feature), sampleIndex));
-    }
-
-    QVector<HsvClassScore> classes;
-    for (int order = 0; order < classOrder.size(); ++order) {
-        const int classId = classOrder.at(order);
-        QVector<QPair<double, int>> similarities = similaritiesByClass.value(classId);
-        if (similarities.isEmpty())
-            continue;
-        std::stable_sort(similarities.begin(), similarities.end(),
-                         [](const QPair<double, int> &left,
-                            const QPair<double, int> &right) {
-            if (std::abs(left.first - right.first) > 1e-12)
-                return left.first > right.first;
-            return left.second < right.second;
-        });
-
-        HsvClassScore item;
-        item.classId = classId;
-        item.label = labelNameForClass(config.labels, usableSamples, classId,
-                                       labelByClass.value(classId));
-        item.declaredOrder = order;
-        item.sampleCount = similarities.size();
-        item.bestSampleIndex = similarities.first().second;
-        item.bestSimilarity = similarities.first().first;
-        const int topN = qMin(kHsvClassTopN, similarities.size());
-        double sum = 0.0;
-        for (int index = 0; index < topN; ++index) {
-            const double similarity = qBound(0.0, similarities.at(index).first, 1.0);
-            item.topNSimilarities.append(similarity);
-            sum += similarity;
-        }
-        item.score = topN > 0 ? sum / topN : 0.0;
-        item.worstTopNSimilarity = item.topNSimilarities.isEmpty()
-                ? 0.0 : item.topNSimilarities.last();
-        classes.append(item);
-    }
-    if (classes.isEmpty()) {
-        throw std::pair<QString, QString>(
-                QStringLiteral("empty_similarity"),
-                QStringLiteral("Top-N category similarity returned no comparable class."));
-    }
-
-    std::stable_sort(classes.begin(), classes.end(),
-                     [](const HsvClassScore &left, const HsvClassScore &right) {
-        if (std::abs(left.score - right.score) > 1e-12)
-            return left.score > right.score;
-        if (std::abs(left.worstTopNSimilarity - right.worstTopNSimilarity) > 1e-12)
-            return left.worstTopNSimilarity > right.worstTopNSimilarity;
-        if (std::abs(left.bestSimilarity - right.bestSimilarity) > 1e-12)
-            return left.bestSimilarity > right.bestSimilarity;
-        return left.declaredOrder < right.declaredOrder;
-    });
-
-    ColorDecisionResult decision;
-    decision.mode = QStringLiteral("category_similarity");
-    decision.comparisonMethod = QStringLiteral("class_top_n_mean_histogram_intersection");
-    const HsvClassScore &best = classes.first();
-    decision.predictedClassId = best.classId;
-    decision.predictedLabel = best.label;
-    decision.matchedSampleIndex = best.bestSampleIndex;
-    decision.matchedSampleLabel = usableSamples.at(best.bestSampleIndex).label;
-    decision.rating = qBound(0.0, best.score, 1.0);
-    decision.score = decision.rating * 100.0;
-    decision.topNSampleCount = best.topNSimilarities.size();
-    decision.topNSimilarities = best.topNSimilarities;
-    decision.secondClassScore = classes.size() > 1 ? classes.at(1).score * 100.0 : 0.0;
-    decision.classMargin = classes.size() > 1
-            ? qMax(0.0, decision.score - decision.secondClassScore) : decision.score;
-    decision.classificationAmbiguous = classes.size() > 1 && decision.classMargin <= 1e-9;
-
-    for (const HsvClassScore &item : std::as_const(classes)) {
-        decision.classSimilarities.append(qMakePair(item.label, item.score));
-        QJsonObject diagnostics;
-        diagnostics.insert(QStringLiteral("classId"), item.classId);
-        diagnostics.insert(QStringLiteral("label"), item.label);
-        diagnostics.insert(QStringLiteral("sampleCount"), item.sampleCount);
-        diagnostics.insert(QStringLiteral("topNSampleCount"), item.topNSimilarities.size());
-        diagnostics.insert(QStringLiteral("topNSimilarities"),
-                           doubleArray(item.topNSimilarities, 100.0));
-        diagnostics.insert(QStringLiteral("topNMeanSimilarity"), item.score * 100.0);
-        diagnostics.insert(QStringLiteral("bestSampleSimilarity"), item.bestSimilarity * 100.0);
-        diagnostics.insert(QStringLiteral("worstTopNSimilarity"),
-                           item.worstTopNSimilarity * 100.0);
-        diagnostics.insert(QStringLiteral("bestSampleIndex"), item.bestSampleIndex);
-        decision.classDiagnostics.append(diagnostics);
-    }
     return decision;
 }
 
@@ -1371,7 +1138,7 @@ QVector<double> normalizeHistogramVector(const QVector<double> &histogram)
     return normalized;
 }
 
-// 对 H/S 二维联合直方图做各向异性 3x3 平滑：H 循环，S 不循环。
+// 对 H/S 二维联合直方图做轻量邻域平滑，降低 bin 边界抖动。
 QVector<double> softenHsJointHistogram(const QVector<double> &histogram, int bins)
 {
     QVector<double> softened(bins * bins, 0.0);
@@ -1379,31 +1146,21 @@ QVector<double> softenHsJointHistogram(const QVector<double> &histogram, int bin
         return normalizeHistogramVector(histogram);
 
     constexpr double kHueWeights[3] = {0.25, 0.50, 0.25};
-    constexpr double kSatWeights[3] = {0.15, 0.70, 0.15};
-    for (int hueBin = 0; hueBin < bins; ++hueBin) {
-        for (int saturationBin = 0; saturationBin < bins; ++saturationBin) {
-            const double value = qMax(0.0, histogram.at(hueBin * bins + saturationBin));
+    constexpr double kSatWeights[3] = {0.25, 0.50, 0.25};
+    for (int saturationBin = 0; saturationBin < bins; ++saturationBin) {
+        for (int hueBin = 0; hueBin < bins; ++hueBin) {
+            const double value = qMax(0.0, histogram.at(saturationBin * bins + hueBin));
             if (value <= 0.0)
                 continue;
 
-            for (int hueOffset = -1; hueOffset <= 1; ++hueOffset) {
-                const int targetHue = (hueBin + hueOffset + bins) % bins;
-                const double hueWeight = kHueWeights[hueOffset + 1];
-
-                double validSaturationWeight = 0.0;
-                for (int satOffset = -1; satOffset <= 1; ++satOffset) {
-                    const int targetSaturation = saturationBin + satOffset;
-                    if (targetSaturation >= 0 && targetSaturation < bins)
-                        validSaturationWeight += kSatWeights[satOffset + 1];
-                }
-                for (int satOffset = -1; satOffset <= 1; ++satOffset) {
-                    const int targetSaturation = saturationBin + satOffset;
-                    if (targetSaturation < 0 || targetSaturation >= bins)
-                        continue;
-                    const double saturationWeight =
-                            kSatWeights[satOffset + 1] / validSaturationWeight;
-                    softened[targetHue * bins + targetSaturation] +=
-                            value * hueWeight * saturationWeight;
+            for (int satOffset = -1; satOffset <= 1; ++satOffset) {
+                const int targetSaturation = qBound(0, saturationBin + satOffset, bins - 1);
+                const double saturationWeight = kSatWeights[satOffset + 1];
+                for (int hueOffset = -1; hueOffset <= 1; ++hueOffset) {
+                    const int targetHue = (hueBin + hueOffset + bins) % bins;
+                    const double hueWeight = kHueWeights[hueOffset + 1];
+                    softened[targetSaturation * bins + targetHue] +=
+                            value * saturationWeight * hueWeight;
                 }
             }
         }
@@ -1451,11 +1208,11 @@ QVector<double> histogram2DimHsFeature(HalconCApi *api,
 
         QVector<double> jointHistogram(bins * bins, 0.0);
         for (int row = 0; row < 256; ++row) {
-            const int hueBin = qBound(0, row * bins / 256, bins - 1);
+            const int saturationBin = qBound(0, row * bins / 256, bins - 1);
             for (int column = 0; column < 256; ++column) {
-                const int saturationBin = qBound(0, column * bins / 256, bins - 1);
+                const int hueBin = qBound(0, column * bins / 256, bins - 1);
                 const int index = row * 256 + column;
-                jointHistogram[hueBin * bins + saturationBin] +=
+                jointHistogram[saturationBin * bins + hueBin] +=
                         qMax(0.0, grayValues.doubleAt(index));
             }
         }
@@ -1466,6 +1223,147 @@ QVector<double> histogram2DimHsFeature(HalconCApi *api,
         cleanup();
         throw;
     }
+}
+
+// 判断 H/S 与 H/S/V 两种旧新特征长度是否可按前缀兼容。
+bool areHsHsvCompatibleFeatureLengths(const int lhsSize, const int rhsSize)
+{
+    if (lhsSize <= 0 || rhsSize <= 0 || lhsSize == rhsSize)
+        return false;
+
+    const int minSize = qMin(lhsSize, rhsSize);
+    const int maxSize = qMax(lhsSize, rhsSize);
+    return minSize % 2 == 0 && maxSize == (minSize / 2) * 3;
+}
+
+// 判断一维直方图 bin 数是否属于本工具支持的灵敏度档位。
+bool isSupportedLinearHistogramBins(const int bins)
+{
+    return bins == 8 || bins == 16 || bins == 32;
+}
+
+struct LinearHistogramShape
+{
+    int channels = 0;
+    int bins = 0;
+};
+
+// 从一维直方图特征长度推断通道数和每通道 bin 数。
+LinearHistogramShape inferLinearHistogramShape(const int featureSize)
+{
+    LinearHistogramShape shape;
+    if (featureSize <= 0)
+        return shape;
+
+    if (featureSize % 3 == 0) {
+        const int bins = featureSize / 3;
+        if (isSupportedLinearHistogramBins(bins)) {
+            shape.channels = 3;
+            shape.bins = bins;
+            return shape;
+        }
+    }
+    if (featureSize % 2 == 0) {
+        const int bins = featureSize / 2;
+        if (isSupportedLinearHistogramBins(bins)) {
+            shape.channels = 2;
+            shape.bins = bins;
+        }
+    }
+    return shape;
+}
+
+// 判断两组一维直方图形状是否可通过降采样对齐。
+bool compatibleLinearHistogramShapes(const LinearHistogramShape &lhs,
+                                     const LinearHistogramShape &rhs)
+{
+    if (lhs.channels <= 0 || rhs.channels <= 0 || lhs.bins <= 0 || rhs.bins <= 0)
+        return false;
+    if (lhs.channels < 2 || rhs.channels < 2)
+        return false;
+    const int minBins = qMin(lhs.bins, rhs.bins);
+    const int maxBins = qMax(lhs.bins, rhs.bins);
+    return maxBins % minBins == 0;
+}
+
+// 计算查询特征与样本特征可共同比较的目标长度。
+int comparisonFeatureSizeForPair(const int queryFeatureSize, const int sampleFeatureSize)
+{
+    if (queryFeatureSize <= 0 || sampleFeatureSize <= 0)
+        return 0;
+    if (queryFeatureSize == sampleFeatureSize)
+        return queryFeatureSize;
+    if (areHsHsvCompatibleFeatureLengths(queryFeatureSize, sampleFeatureSize))
+        return qMin(queryFeatureSize, sampleFeatureSize);
+    const LinearHistogramShape queryShape = inferLinearHistogramShape(queryFeatureSize);
+    const LinearHistogramShape sampleShape = inferLinearHistogramShape(sampleFeatureSize);
+    if (compatibleLinearHistogramShapes(queryShape, sampleShape))
+        return qMin(queryShape.channels, sampleShape.channels) * qMin(queryShape.bins, sampleShape.bins);
+    return 0;
+}
+
+// 将一维 H/S(/V) 特征按通道和 bin 数降采样到目标形状。
+QVector<double> downsampleLinearHistogramFeature(const QVector<double> &feature,
+                                                 const LinearHistogramShape &sourceShape,
+                                                 const int targetChannels,
+                                                 const int targetBins)
+{
+    if (targetChannels <= 0 || targetBins <= 0 ||
+        sourceShape.channels < targetChannels || sourceShape.bins < targetBins ||
+        sourceShape.bins % targetBins != 0 ||
+        feature.size() != sourceShape.channels * sourceShape.bins) {
+        return QVector<double>();
+    }
+
+    const int binGroupSize = sourceShape.bins / targetBins;
+    QVector<double> aligned;
+    aligned.reserve(targetChannels * targetBins);
+    for (int channel = 0; channel < targetChannels; ++channel) {
+        const int channelStart = channel * sourceShape.bins;
+        for (int targetBin = 0; targetBin < targetBins; ++targetBin) {
+            double sum = 0.0;
+            const int sourceStart = channelStart + targetBin * binGroupSize;
+            for (int offset = 0; offset < binGroupSize; ++offset)
+                sum += qMax(0.0, feature.at(sourceStart + offset));
+            aligned.append(sum);
+        }
+    }
+    return aligned;
+}
+
+// 将亮度开关造成的 H/S 与 H/S/V 特征差异统一对齐到 H/S 前缀，兼容旧模板样本。
+QVector<double> alignedFeatureToComparisonSize(const QVector<double> &feature,
+                                               const int comparisonFeatureSize,
+                                               bool *aligned)
+{
+    if (aligned)
+        *aligned = false;
+    if (feature.size() == comparisonFeatureSize)
+        return feature;
+    if (comparisonFeatureSize > 0 &&
+        comparisonFeatureSize < feature.size() &&
+        areHsHsvCompatibleFeatureLengths(feature.size(), comparisonFeatureSize)) {
+        if (aligned)
+            *aligned = true;
+        return feature.mid(0, comparisonFeatureSize);
+    }
+    const LinearHistogramShape sourceShape = inferLinearHistogramShape(feature.size());
+    const LinearHistogramShape targetShape = inferLinearHistogramShape(comparisonFeatureSize);
+    if (compatibleLinearHistogramShapes(sourceShape, targetShape) &&
+        sourceShape.channels >= targetShape.channels &&
+        sourceShape.bins >= targetShape.bins) {
+        QVector<double> downsampled =
+                downsampleLinearHistogramFeature(feature,
+                                                 sourceShape,
+                                                 targetShape.channels,
+                                                 targetShape.bins);
+        if (!downsampled.isEmpty()) {
+            if (aligned)
+                *aligned = true;
+            return downsampled;
+        }
+    }
+    return QVector<double>();
 }
 
 struct HistogramExtractionResult
@@ -1487,36 +1385,21 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
     Hobject red = NO_OBJECTS;
     Hobject green = NO_OBJECTS;
     Hobject blue = NO_OBJECTS;
-    Hobject scaledRed = NO_OBJECTS;
-    Hobject scaledGreen = NO_OBJECTS;
-    Hobject scaledBlue = NO_OBJECTS;
-    Hobject byteRed = NO_OBJECTS;
-    Hobject byteGreen = NO_OBJECTS;
-    Hobject byteBlue = NO_OBJECTS;
     Hobject hue = NO_OBJECTS;
     Hobject saturation = NO_OBJECTS;
     Hobject value = NO_OBJECTS;
     Hobject roiRegion = NO_OBJECTS;
     Hobject maskRegion = NO_OBJECTS;
     Hobject effectiveRegion = NO_OBJECTS;
-    Hobject transformedRegion = NO_OBJECTS;
-    Hobject clippedRegion = NO_OBJECTS;
 
     auto cleanup = [&]() {
         if (effectiveRegion != roiRegion)
             clearObject(api, effectiveRegion);
-        clearObject(api, transformedRegion);
         clearObject(api, maskRegion);
         clearObject(api, roiRegion);
         clearObject(api, value);
         clearObject(api, saturation);
         clearObject(api, hue);
-        clearObject(api, byteBlue);
-        clearObject(api, byteGreen);
-        clearObject(api, byteRed);
-        clearObject(api, scaledBlue);
-        clearObject(api, scaledGreen);
-        clearObject(api, scaledRed);
         clearObject(api, blue);
         clearObject(api, green);
         clearObject(api, red);
@@ -1524,49 +1407,23 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
     };
 
     try {
-        const bool input16 = bgr.depth() == CV_16U;
-        const int validBits = resolvedValidBits(config, bgr);
-        const int bitShift = resolvedBitShift(config, bgr);
         checkStatus(api, api->genImageInterleaved(&image,
                                                   reinterpret_cast<Hlong>(bgr.data),
-                                                  input16 ? "bgr48" : "bgr",
+                                                  "bgr",
                                                   bgr.cols,
                                                   bgr.rows,
                                                   0,
-                                                  input16 ? "uint2" : "byte",
+                                                  "byte",
                                                   0,
                                                   0,
                                                   0,
                                                   0,
-                                                  validBits,
-                                                  bitShift),
+                                                  8,
+                                                  0),
                     QStringLiteral("gen_image_interleaved"));
         checkStatus(api, api->decompose3(image, &red, &green, &blue),
                     QStringLiteral("decompose3"));
-        Hobject hsvRed = red;
-        Hobject hsvGreen = green;
-        Hobject hsvBlue = blue;
-        if (input16) {
-            const double maxCode = static_cast<double>((quint64(1) << validBits) - 1U);
-            const double multiplier = 255.0 / maxCode;
-            checkStatus(api, api->scaleImage(red, &scaledRed, multiplier, 0.0),
-                        QStringLiteral("scale_image.red"));
-            checkStatus(api, api->scaleImage(green, &scaledGreen, multiplier, 0.0),
-                        QStringLiteral("scale_image.green"));
-            checkStatus(api, api->scaleImage(blue, &scaledBlue, multiplier, 0.0),
-                        QStringLiteral("scale_image.blue"));
-            checkStatus(api, api->convertImageType(scaledRed, &byteRed, "byte"),
-                        QStringLiteral("convert_image_type.red"));
-            checkStatus(api, api->convertImageType(scaledGreen, &byteGreen, "byte"),
-                        QStringLiteral("convert_image_type.green"));
-            checkStatus(api, api->convertImageType(scaledBlue, &byteBlue, "byte"),
-                        QStringLiteral("convert_image_type.blue"));
-            hsvRed = byteRed;
-            hsvGreen = byteGreen;
-            hsvBlue = byteBlue;
-        }
-        checkStatus(api, api->transFromRgb(hsvRed, hsvGreen, hsvBlue,
-                                           &hue, &saturation, &value, "hsv"),
+        checkStatus(api, api->transFromRgb(red, green, blue, &hue, &saturation, &value, "hsv"),
                     QStringLiteral("trans_from_rgb"));
         HistogramExtractionResult result;
 
@@ -1629,36 +1486,6 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
             result.detectMaskApplied = true;
         }
 
-        if (config.positionCorrection.applied) {
-            const PositionCorrectionHalconTransformResult transformed =
-                    PositionCorrectionHalconTransform::transformAndClipRegion(
-                        positionCorrectionRegionApi(*api),
-                        effectiveRegion,
-                        &transformedRegion,
-                        &clippedRegion,
-                        config.positionCorrection.referenceToRunHomMat2D,
-                        bgr.cols,
-                        bgr.rows);
-            if (!transformed.success) {
-                if (transformed.halconStatus != H_MSG_OK) {
-                    checkStatus(api,
-                                transformed.halconStatus,
-                                QStringLiteral("position_correction.%1")
-                                .arg(transformed.operation));
-                }
-                throw std::pair<QString, QString>(
-                        transformed.status,
-                        QStringLiteral("Position-corrected color ROI is invalid (%1).")
-                        .arg(transformed.operation));
-            }
-            effectiveRegion = clippedRegion;
-            if (transformed.area <= 0.0) {
-                throw std::pair<QString, QString>(
-                        QStringLiteral("corrected_roi_out_of_image"),
-                        QStringLiteral("Position-corrected color ROI is outside the image."));
-            }
-        }
-
         result.effectiveRoiArea = regionArea(api, effectiveRegion, QStringLiteral("effective_roi"));
         if (result.effectiveRoiArea <= 0.0) {
             result.detectMaskFullyCoversRoi = result.detectMaskApplied;
@@ -1672,11 +1499,10 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
         if (isHisto2DimFeatureType(config.featureType)) {
             result.feature = histogram2DimHsFeature(api, effectiveRegion, hue, saturation, bins);
         } else {
-            const bool includeValue = effectiveBrightnessEnabled(config);
-            result.feature.reserve(includeValue ? bins * 3 : bins * 2);
+            result.feature.reserve(config.brightnessEnabled ? bins * 3 : bins * 2);
             result.feature += histogramForChannel(api, effectiveRegion, hue, bins, QStringLiteral("hue"));
             result.feature += histogramForChannel(api, effectiveRegion, saturation, bins, QStringLiteral("saturation"));
-            if (includeValue)
+            if (config.brightnessEnabled)
                 result.feature += histogramForChannel(api, effectiveRegion, value, bins, QStringLiteral("value"));
         }
 
@@ -1689,44 +1515,6 @@ HistogramExtractionResult extractHistogramFeature(const cv::Mat &bgr,
 }
 
 } // namespace
-
-QString colorRecognitionHsvCurrentClassifierVersion()
-{
-    return QString::fromLatin1(kCurrentHsvClassifierVersion);
-}
-
-QString colorRecognitionHsvLegacyClassifierVersion()
-{
-    return QString::fromLatin1(kLegacyHsvClassifierVersion);
-}
-
-QString colorRecognitionHsvClassifierParamsHash(const QString &classifierVersion)
-{
-    const QString version = classifierVersion.trimmed();
-    QJsonObject contract;
-    contract.insert(QStringLiteral("classifierVersion"), version);
-    contract.insert(QStringLiteral("similarityMetric"),
-                    QStringLiteral("halcon_histogram_intersection"));
-    if (version == QString::fromLatin1(kCurrentHsvClassifierVersion)) {
-        contract.insert(QStringLiteral("aggregation"), QStringLiteral("class_top_n_mean"));
-        contract.insert(QStringLiteral("topN"), kHsvClassTopN);
-        contract.insert(QStringLiteral("weights"), QStringLiteral("uniform"));
-        contract.insert(QStringLiteral("tieBreak"),
-                        QStringLiteral("mean_worst_best_declared_order"));
-    } else if (version == QString::fromLatin1(kLegacyHsvClassifierVersion)) {
-        contract.insert(QStringLiteral("aggregation"), QStringLiteral("best_sample_per_class"));
-        contract.insert(QStringLiteral("topN"), 1);
-        contract.insert(QStringLiteral("weights"), QStringLiteral("not_applicable"));
-        contract.insert(QStringLiteral("tieBreak"), QStringLiteral("sample_order"));
-    } else {
-        return QString();
-    }
-
-    const QByteArray digest = QCryptographicHash::hash(
-                QJsonDocument(contract).toJson(QJsonDocument::Compact),
-                QCryptographicHash::Sha256).toHex();
-    return QStringLiteral("sha256:") + QString::fromLatin1(digest);
-}
 
 // 从输入图像中提取颜色识别特征，负责 HALCON runtime 校验、ROI 校验和诊断 payload。
 ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature(
@@ -1753,19 +1541,10 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
                                 timer.elapsed());
         }
 
-        QString inputStatus;
-        QString inputMessage;
-        if (!validInputBitContract(image, config, &inputStatus, &inputMessage)) {
-            return featureError(inputStatus,
-                                inputMessage,
-                                config,
-                                image,
-                                timer.elapsed());
-        }
-        const cv::Mat bgr = toBgrPreservingDepth(image);
+        const cv::Mat bgr = toBgr8(image);
         if (bgr.empty()) {
-            return featureError(QStringLiteral("unsupported_image_format"),
-                                QStringLiteral("Input image cannot be bridged to HALCON BGR."),
+            return featureError(QStringLiteral("image_empty"),
+                                QStringLiteral("Input image is empty or unsupported."),
                                 config,
                                 image,
                                 timer.elapsed());
@@ -1792,11 +1571,10 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
                                 timer.elapsed());
         }
 
+        HalconLibrary library;
         QString loadMessage;
         bool symbolMissing = false;
-        const std::shared_ptr<HalconLibrary> library =
-                acquireHalconLibrary(config.halconSoPath, loadMessage, symbolMissing);
-        if (!library) {
+        if (!library.load(config.halconSoPath, loadMessage, symbolMissing)) {
             return featureError(symbolMissing ? QStringLiteral("halcon_symbol_missing")
                                               : QStringLiteral("halcon_load_failed"),
                                 loadMessage,
@@ -1806,31 +1584,26 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
         }
 
         const HistogramExtractionResult histogramResult =
-                extractHistogramFeature(bgr, roiPixels, config, &library->api);
+                extractHistogramFeature(bgr, roiPixels, config, &library.api);
         ColorRecognitionHalconFeatureResult result;
         result.feature = histogramResult.feature;
         result.success = true;
         result.status = QStringLiteral("ok");
         result.message = QStringLiteral("feature extracted");
         result.elapsedMs = timer.elapsed();
-        result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_hsv_histogram_transition"));
-        result.payload.insert(QStringLiteral("algorithmVersion"), QString::fromLatin1(kAlgorithmVersion));
-        result.payload.insert(QStringLiteral("featureType"), actualFeatureType(config));
-        result.payload.insert(QStringLiteral("featureSchemaVersion"), featureSchemaVersion(config));
-        result.payload.insert(QStringLiteral("featureSignature"), featureSignature(config, image));
-        result.payload.insert(QStringLiteral("requestedFeatureType"), config.featureType);
+        result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_feature"));
+        result.payload.insert(QStringLiteral("featureType"),
+                              isHisto2DimFeatureType(config.featureType)
+                              ? QStringLiteral("histogram_2dim_hs")
+                              : QStringLiteral("histogram"));
         result.payload.insert(QStringLiteral("featureLength"), result.feature.size());
         result.payload.insert(QStringLiteral("histogramBins"), histogramBinsForSensitivity(config.sensitivity));
-        result.payload.insert(QStringLiteral("brightnessEnabled"), effectiveBrightnessEnabled(config));
-        result.payload.insert(QStringLiteral("requestedBrightnessEnabled"), config.brightnessEnabled);
-        result.payload.insert(QStringLiteral("pixelFormat"), inferredPixelFormat(config, image));
-        result.payload.insert(QStringLiteral("validBits"), resolvedValidBits(config, image));
-        result.payload.insert(QStringLiteral("bitShift"), resolvedBitShift(config, image));
+        result.payload.insert(QStringLiteral("brightnessEnabled"), config.brightnessEnabled);
         result.payload.insert(QStringLiteral("lightingNormalizationMode"),
                               isHisto2DimFeatureType(config.featureType)
                               ? QStringLiteral("hue_saturation_2dim_soft_kernel")
                               :
-                              effectiveBrightnessEnabled(config)
+                              config.brightnessEnabled
                               ? QStringLiteral("include_value_channel")
                               : QStringLiteral("hue_saturation_priority"));
         result.payload.insert(QStringLiteral("roiPixelsRect"), rectToJson(QRectF(roiPixels)));
@@ -1850,7 +1623,6 @@ ColorRecognitionHalconFeatureResult ColorRecognitionHalconRunner::extractFeature
         result.payload.insert(QStringLiteral("detectMaskFullyCoversRoi"), false);
         result.payload.insert(QStringLiteral("effectiveRoiArea"), histogramResult.effectiveRoiArea);
         result.payload.insert(QStringLiteral("detectMaskPolygon"), pointsToJson(config.detectMaskPolygonNormalized));
-        result.payload.insert(QStringLiteral("positionCorrectionSourceId"), config.positionCorrectionSourceId);
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
         return result;
     } catch (const std::pair<QString, QString> &error) {
@@ -1907,11 +1679,10 @@ ColorRecognitionHalconRunner::compareHistogramBhattacharyya(
             return result;
         }
 
+        HalconLibrary library;
         QString loadMessage;
         bool symbolMissing = false;
-        const std::shared_ptr<HalconLibrary> library =
-                acquireHalconLibrary(config.halconSoPath, loadMessage, symbolMissing);
-        if (!library) {
+        if (!library.load(config.halconSoPath, loadMessage, symbolMissing)) {
             result.status = symbolMissing ? QStringLiteral("halcon_symbol_missing")
                                           : QStringLiteral("halcon_load_failed");
             result.message = loadMessage;
@@ -1919,12 +1690,12 @@ ColorRecognitionHalconRunner::compareHistogramBhattacharyya(
             return result;
         }
 
-        HalconTuple referenceTuple = featureToTuple(&library->api, referenceHistogram);
-        HalconTuple testTuple = featureToTuple(&library->api, testHistogram);
-        const double referenceSum = tupleSumValue(&library->api,
+        HalconTuple referenceTuple = featureToTuple(&library.api, referenceHistogram);
+        HalconTuple testTuple = featureToTuple(&library.api, testHistogram);
+        const double referenceSum = tupleSumValue(&library.api,
                                                   referenceTuple,
                                                   QStringLiteral("bhattacharyya.reference"));
-        const double testSum = tupleSumValue(&library->api,
+        const double testSum = tupleSumValue(&library.api,
                                              testTuple,
                                              QStringLiteral("bhattacharyya.test"));
         if (referenceSum <= 0.0 || testSum <= 0.0) {
@@ -1934,19 +1705,19 @@ ColorRecognitionHalconRunner::compareHistogramBhattacharyya(
             return result;
         }
 
-        HalconTuple multipliedTuple(&library->api);
-        checkStatus(&library->api,
-                    library->api.tupleMult(referenceTuple.value(),
+        HalconTuple multipliedTuple(&library.api);
+        checkStatus(&library.api,
+                    library.api.tupleMult(referenceTuple.value(),
                                           testTuple.value(),
                                           multipliedTuple.ptr()),
                     QStringLiteral("bhattacharyya.tuple_mult"));
 
-        HalconTuple coefficientTerms(&library->api);
-        checkStatus(&library->api,
-                    library->api.tupleSqrt(multipliedTuple.value(), coefficientTerms.ptr()),
+        HalconTuple coefficientTerms(&library.api);
+        checkStatus(&library.api,
+                    library.api.tupleSqrt(multipliedTuple.value(), coefficientTerms.ptr()),
                     QStringLiteral("bhattacharyya.tuple_sqrt"));
 
-        const double coefficientRaw = tupleSumValue(&library->api,
+        const double coefficientRaw = tupleSumValue(&library.api,
                                                     coefficientTerms,
                                                     QStringLiteral("bhattacharyya.coefficient"));
         const double coefficient = qBound(0.0,
@@ -1954,6 +1725,48 @@ ColorRecognitionHalconRunner::compareHistogramBhattacharyya(
                                           1.0);
         const double safeCoefficient = qMax(coefficient, std::numeric_limits<double>::min());
         const double distance = -std::log(safeCoefficient);
+        const double openCvDistance = openCvBhattacharyyaDebugDistance(referenceHistogram,
+                                                                       testHistogram);
+        const int bins = histogramBinsForSensitivity(config.sensitivity);
+        const bool histo2Dim = isHisto2DimFeatureType(config.featureType);
+        const int expectedLength = histo2Dim
+                ? bins * bins
+                : bins * (config.brightnessEnabled ? 3 : 2);
+        qInfo().noquote()
+                << QStringLiteral("[ColorComparison][Bhattacharyya debug] HALCON(tuple -ln(BC)) distance=%1, BC=%2 | OpenCV(compareHist HISTCMP_BHATTACHARYYA) distance=%3 | absDiff=%4")
+                   .arg(QString::number(distance, 'f', 9),
+                        QString::number(coefficient, 'f', 9),
+                        QString::number(openCvDistance, 'f', 9),
+                        QString::number(std::abs(distance - openCvDistance), 'f', 9));
+        qInfo().noquote()
+                << QStringLiteral("[ColorComparison][Bhattacharyya debug][config] colorSpace=HSV histogramSource=%1 featureType=%2 sensitivity=%3 bins=%4 brightnessEnabled=%5 channels=%6 expectedLength=%7 templateLength=%8 detectLength=%9 dimensionsMatch=%10")
+                   .arg(histo2Dim
+                        ? QStringLiteral("HALCON:T_histo_2dim")
+                        : QStringLiteral("HALCON:T_gray_histo_range"),
+                        histo2Dim
+                        ? QStringLiteral("histogram_2dim_hs_soft")
+                        : QStringLiteral("histogram_1d"),
+                        config.sensitivity,
+                        QString::number(bins),
+                        config.brightnessEnabled ? QStringLiteral("true") : QStringLiteral("false"),
+                        histo2Dim
+                        ? QStringLiteral("H,S joint")
+                        : (config.brightnessEnabled ? QStringLiteral("H,S,V") : QStringLiteral("H,S")),
+                        QString::number(expectedLength),
+                        QString::number(referenceHistogram.size()),
+                        QString::number(testHistogram.size()),
+                        (referenceHistogram.size() == testHistogram.size() &&
+                         referenceHistogram.size() == expectedLength)
+                        ? QStringLiteral("true")
+                        : QStringLiteral("false"));
+        if (histo2Dim) {
+            logHistogram2DimDebug(QStringLiteral("template"), referenceHistogram, bins);
+            logHistogram2DimDebug(QStringLiteral("detect"), testHistogram, bins);
+        } else {
+            logHistogramDebugChannels(QStringLiteral("template"), referenceHistogram, bins, config.brightnessEnabled);
+            logHistogramDebugChannels(QStringLiteral("detect"), testHistogram, bins, config.brightnessEnabled);
+        }
+
         result.success = true;
         result.status = QStringLiteral("ok");
         result.distance = qMax(0.0, distance);
@@ -2027,28 +1840,36 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                         timer.elapsed());
     }
 
-    const QVector<double> comparisonFeature = featureResult.feature;
-    const QString queryFeatureSignature = featureResult.payload
-            .value(QStringLiteral("featureSignature")).toString();
+    int comparisonFeatureSize = featureResult.feature.size();
+    for (const ColorRecognitionHalconSample &sample : config.samples) {//检测特征与模板特征进行比对
+        const int candidateSize =
+                comparisonFeatureSizeForPair(featureResult.feature.size(), sample.feature.size());
+        if (candidateSize > 0)
+            comparisonFeatureSize = qMin(comparisonFeatureSize, candidateSize);
+    }
+
+    QVector<double> comparisonFeature = featureResult.feature;
+    bool featureAlignmentApplied = false;
+    if (comparisonFeatureSize > 0 && comparisonFeatureSize < comparisonFeature.size()) {
+        bool queryAligned = false;
+        comparisonFeature = alignedFeatureToComparisonSize(comparisonFeature,
+                                                           comparisonFeatureSize,
+                                                           &queryAligned);
+        featureAlignmentApplied = featureAlignmentApplied || queryAligned;
+    }
+
     QVector<ColorRecognitionHalconSample> usableSamples;
     usableSamples.reserve(config.samples.size());
     for (const ColorRecognitionHalconSample &sample : config.samples) {
-        if (sample.featureSignature.trimmed().isEmpty() ||
-            sample.featureSignature != queryFeatureSignature ||
-            sample.feature.size() != comparisonFeature.size()) {
-            ColorRecognitionHalconResult error = runError(
-                        QStringLiteral("model_stale_needs_resample"),
-                        QStringLiteral("Color model feature signature does not match current parameters; resample the template."),
-                        config,
-                        image,
-                        timer.elapsed());
-            error.payload.insert(QStringLiteral("expectedFeatureSignature"), queryFeatureSignature);
-            error.payload.insert(QStringLiteral("sampleFeatureSignature"), sample.featureSignature);
-            error.payload.insert(QStringLiteral("expectedFeatureLength"), comparisonFeature.size());
-            error.payload.insert(QStringLiteral("sampleFeatureLength"), sample.feature.size());
-            return error;
+        bool sampleAligned = false;
+        QVector<double> alignedFeature =
+                alignedFeatureToComparisonSize(sample.feature, comparisonFeature.size(), &sampleAligned);
+        if (!alignedFeature.isEmpty()) {
+            ColorRecognitionHalconSample usableSample = sample;
+            usableSample.feature = alignedFeature;
+            usableSamples.append(usableSample);
+            featureAlignmentApplied = featureAlignmentApplied || sampleAligned;
         }
-        usableSamples.append(sample);
     }
     if (usableSamples.isEmpty()) {
         return runError(QStringLiteral("invalid_model_samples"),
@@ -2058,34 +1879,10 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                         timer.elapsed());
     }
 
-    const QString classifierVersion = config.classifierVersion.trimmed();
-    const QString expectedClassifierHash =
-            colorRecognitionHsvClassifierParamsHash(classifierVersion);
-    if (expectedClassifierHash.isEmpty()) {
-        ColorRecognitionHalconResult error = runError(
-                    QStringLiteral("unsupported_hsv_classifier"),
-                    QStringLiteral("HSV classifier version is unknown; rebuild or migrate the template."),
-                    config, image, timer.elapsed());
-        error.payload.insert(QStringLiteral("classifierVersion"), classifierVersion);
-        return error;
-    }
-    if (config.classifierParamsHash.trimmed() != expectedClassifierHash) {
-        ColorRecognitionHalconResult error = runError(
-                    QStringLiteral("hsv_classifier_signature_mismatch"),
-                    QStringLiteral("HSV classifier parameters do not match the persisted classifier signature."),
-                    config, image, timer.elapsed());
-        error.payload.insert(QStringLiteral("classifierVersion"), classifierVersion);
-        error.payload.insert(QStringLiteral("expectedClassifierParamsHash"), expectedClassifierHash);
-        error.payload.insert(QStringLiteral("classifierParamsHash"),
-                             config.classifierParamsHash.trimmed());
-        return error;
-    }
-
+    HalconLibrary library;
     QString loadMessage;
     bool symbolMissing = false;
-    const std::shared_ptr<HalconLibrary> library =
-            acquireHalconLibrary(config.halconSoPath, loadMessage, symbolMissing);
-    if (!library) {
+    if (!library.load(config.halconSoPath, loadMessage, symbolMissing)) {
         return runError(symbolMissing ? QStringLiteral("halcon_symbol_missing")
                                       : QStringLiteral("halcon_load_failed"),
                         loadMessage,
@@ -2094,35 +1891,29 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                         timer.elapsed());
     }
 
-    HalconCApi *api = &library->api;
+    HalconCApi *api = &library.api;
 
     try {
         const QString decisionMode = normalizedColorDecisionMode(config.colorDecisionMode);
-        const bool useCurrentClassifier =
-                classifierVersion == colorRecognitionHsvCurrentClassifierVersion();
         const ColorDecisionResult decision =
                 decisionMode == QStringLiteral("histogram_intersection")
                 ? decideByHistogramIntersection(api, config, usableSamples, comparisonFeature)
                 : decisionMode == QStringLiteral("halcon_color_segmentation")
                   ? decideByHalconColorSegmentationReserved(api, config, usableSamples, comparisonFeature)
-                : useCurrentClassifier
-                  ? decideByClassTopNIntersection(api, config, usableSamples, comparisonFeature)
-                  : decideByDominantRatio(api, config, usableSamples, comparisonFeature);
+                : decideByDominantRatio(api, config, usableSamples, comparisonFeature);
 
         bool ok = false;
         QString judgeMode = config.judgeMode.trimmed().toLower();
-        const double minimumScore = static_cast<double>(qBound(0, config.minScore, 100));
         if (judgeMode == QStringLiteral("category")) {
             if (config.expectedLabel.trimmed().isEmpty()) {
                 throw std::pair<QString, QString>(
                         QStringLiteral("invalid_expected_label"),
                         QStringLiteral("Expected label is empty for category judgement."));
             }
-            // 类别正确但置信度不足仍应判 NG，避免低相似度样本被“硬分类”为 OK。
-            ok = decision.predictedLabel == config.expectedLabel && decision.score >= minimumScore;
+            ok = decision.predictedLabel == config.expectedLabel;
         } else {
             judgeMode = QStringLiteral("min_score");
-            ok = decision.score >= minimumScore;
+            ok = decision.score >= static_cast<double>(qBound(0, config.minScore, 100));
         }
 
         ColorRecognitionHalconResult result;
@@ -2144,55 +1935,20 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         const QRect roiPixels = normalizedRoiToPixels(config.roiNormalized,
                                                       image.empty() ? 0 : image.cols,
                                                       image.empty() ? 0 : image.rows);
-        ToolOverlay detectOverlay;
         if (isCircleRegionType(config.detectRegionType) &&
             config.detectCircleRadiusNormalized > 0.0 &&
             !image.empty()) {
             const double radiusPixels = config.detectCircleRadiusNormalized *
                     static_cast<double>(qMax(image.cols, image.rows));
-            detectOverlay = circleOverlay(
-                        QPointF(config.detectCircleCenterNormalized.x() * image.cols,
-                                config.detectCircleCenterNormalized.y() * image.rows),
-                        radiusPixels,
-                        QStringLiteral("ROI"),
-                        decision.score);
+            result.overlays.append(circleOverlay(QPointF(config.detectCircleCenterNormalized.x() * image.cols,
+                                                         config.detectCircleCenterNormalized.y() * image.rows),
+                                                radiusPixels,
+                                                QStringLiteral("ROI"),
+                                                decision.score));
         } else {
-            detectOverlay = rectOverlay(
-                        QRectF(roiPixels), QStringLiteral("ROI"), decision.score);
+            result.overlays.append(rectOverlay(QRectF(roiPixels), QStringLiteral("ROI"), decision.score));
         }
-        if (config.positionCorrection.applied) {
-            detectOverlay = PositionCorrectionTransform::transformOverlay(
-                        detectOverlay,
-                        config.positionCorrection.referenceToRunHomMat2D);
-            detectOverlay.extra.insert(
-                        QStringLiteral("positionCorrectionSourceId"),
-                        config.positionCorrection.sourceId);
-        }
-        detectOverlay.extra.insert(QStringLiteral("role"),
-                                   QStringLiteral("detect_roi"));
-        detectOverlay.extra.insert(QStringLiteral("positionCorrectionApplied"),
-                                   config.positionCorrection.applied);
-        result.overlays.append(detectOverlay);
-        if (config.positionCorrection.applied
-                && config.positionCorrection.showMatchContour) {
-            result.overlays += PositionCorrectionTransform::matchContourOverlays(
-                        config.positionCorrection.matchContours,
-                        config.positionCorrection.sourceId);
-        }
-        if (config.positionCorrection.applied) {
-            result.overlays += PositionCorrectionTransform::matchOriginOverlays(
-                        config.positionCorrection.matchOrigins,
-                        config.positionCorrection.sourceId);
-        }
-        const QRectF anchorRect = detectOverlay.type == ToolOverlayType::Polygon
-                ? QPolygonF(detectOverlay.points).boundingRect()
-                : (detectOverlay.type == ToolOverlayType::Circle
-                   ? QRectF(detectOverlay.center.x() - detectOverlay.radius,
-                            detectOverlay.center.y() - detectOverlay.radius,
-                            detectOverlay.radius * 2.0,
-                            detectOverlay.radius * 2.0)
-                   : detectOverlay.rect);
-        ToolOverlay statusText = textOverlay(anchorRect.topLeft(),
+        ToolOverlay statusText = textOverlay(QPointF(roiPixels.x(), roiPixels.y()),
                                              QStringLiteral("%1 %2 %3")
                                              .arg(result.ok ? QStringLiteral("OK") : QStringLiteral("NG"),
                                                   decision.predictedLabel,
@@ -2200,17 +1956,11 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
                                              decision.score,
                                              QStringLiteral("color_result_text"));
         statusText.extra.insert(QStringLiteral("status"), result.ok ? QStringLiteral("OK") : QStringLiteral("NG"));
-        statusText.extra.insert(QStringLiteral("anchorRect"), rectToJsonObject(anchorRect));
+        statusText.extra.insert(QStringLiteral("anchorRect"), rectToJsonObject(QRectF(roiPixels)));
         result.overlays.append(statusText);
 
-        result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_hsv_histogram_transition"));
-        result.payload.insert(QStringLiteral("algorithmVersion"), QString::fromLatin1(kAlgorithmVersion));
-        result.payload.insert(QStringLiteral("featureType"), actualFeatureType(config));
-        result.payload.insert(QStringLiteral("featureSchemaVersion"), featureSchemaVersion(config));
-        result.payload.insert(QStringLiteral("featureSignature"), queryFeatureSignature);
-        result.payload.insert(QStringLiteral("classifierVersion"), classifierVersion);
-        result.payload.insert(QStringLiteral("classifierParamsHash"), expectedClassifierHash);
-        result.payload.insert(QStringLiteral("requestedFeatureType"), config.featureType);
+        result.payload.insert(QStringLiteral("algorithm"), QStringLiteral("halcon_histogram_intersection_color_recognition"));
+        result.payload.insert(QStringLiteral("featureType"), QStringLiteral("histogram"));
         result.payload.insert(QStringLiteral("colorDecisionMode"), decision.mode);
         result.payload.insert(QStringLiteral("predictedLabel"), decision.predictedLabel);
         result.payload.insert(QStringLiteral("predictedClassId"), decision.predictedClassId);
@@ -2219,37 +1969,23 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         result.payload.insert(QStringLiteral("score"), decision.score);
         result.payload.insert(QStringLiteral("rating"), decision.rating);
         result.payload.insert(QStringLiteral("similarity"), decision.rating);
-        result.payload.insert(QStringLiteral("categorySimilarity"), decision.rating);
+        result.payload.insert(QStringLiteral("dominantColorRatio"), decision.dominantColorRatio);
+        result.payload.insert(QStringLiteral("labelAreaRatios"), ratiosToJson(decision.labelAreaRatios));
         result.payload.insert(QStringLiteral("classSimilarities"), ratiosToJson(decision.classSimilarities));
-        result.payload.insert(QStringLiteral("scoreMeaning"),
-                              useCurrentClassifier &&
-                              decision.mode == QStringLiteral("category_similarity")
-                              ? QStringLiteral("class_top_n_mean_histogram_intersection_similarity")
-                              : QStringLiteral("best_class_histogram_intersection_similarity"));
         result.payload.insert(QStringLiteral("scoreDirection"), QStringLiteral("higher_is_better"));
         result.payload.insert(QStringLiteral("scoreFormula"),
-                              decision.mode == QStringLiteral("category_similarity")
-                              ? (useCurrentClassifier
-                                 ? QStringLiteral("class_top_n_mean_histogram_intersection_similarity_x100")
-                                 : QStringLiteral("best_class_histogram_intersection_similarity_x100"))
+                              decision.mode == QStringLiteral("dominant_ratio")
+                              ? QStringLiteral("dominant_class_similarity_x100")
                               : QStringLiteral("histogram_intersection_similarity_x100"));
         result.payload.insert(QStringLiteral("ratingMode"),
-                              decision.mode == QStringLiteral("category_similarity")
-                              ? QStringLiteral("category_similarity")
+                              decision.mode == QStringLiteral("dominant_ratio")
+                              ? QStringLiteral("dominant_class_similarity")
                               : QStringLiteral("histogram_intersection_similarity"));
         result.payload.insert(QStringLiteral("comparisonMethod"), decision.comparisonMethod);
-        result.payload.insert(QStringLiteral("secondClassScore"), decision.secondClassScore);
-        result.payload.insert(QStringLiteral("classMargin"), decision.classMargin);
-        result.payload.insert(QStringLiteral("classificationAmbiguous"),
-                              decision.classificationAmbiguous);
-        result.payload.insert(QStringLiteral("topNSampleCount"), decision.topNSampleCount);
-        result.payload.insert(QStringLiteral("topNSimilarities"),
-                              doubleArray(decision.topNSimilarities, 100.0));
-        result.payload.insert(QStringLiteral("classDiagnostics"), decision.classDiagnostics);
         result.payload.insert(QStringLiteral("sampleCount"), result.sampleCount);
         result.payload.insert(QStringLiteral("featureLength"), featureResult.feature.size());
         result.payload.insert(QStringLiteral("comparisonFeatureLength"), comparisonFeature.size());
-        result.payload.insert(QStringLiteral("featureAlignmentApplied"), false);
+        result.payload.insert(QStringLiteral("featureAlignmentApplied"), featureAlignmentApplied);
         result.payload.insert(QStringLiteral("queryFeature"), vectorToJson(comparisonFeature));
         result.payload.insert(QStringLiteral("roiPixelsRect"), rectToJson(QRectF(roiPixels)));
         result.payload.insert(QStringLiteral("detectRegionType"),
@@ -2272,13 +2008,15 @@ ColorRecognitionHalconResult ColorRecognitionHalconRunner::run(
         result.payload.insert(QStringLiteral("judgeMode"), judgeMode);
         result.payload.insert(QStringLiteral("minScore"), qBound(0, config.minScore, 100));
         result.payload.insert(QStringLiteral("expectedLabel"), config.expectedLabel);
+        result.payload.insert(QStringLiteral("knnDistanceApplied"), QStringLiteral("not_used_histogram_intersection"));
         result.payload.insert(QStringLiteral("histogramBins"), histogramBinsForSensitivity(config.sensitivity));
-        result.payload.insert(QStringLiteral("brightnessEnabled"),
-                              featureResult.payload.value(QStringLiteral("brightnessEnabled")).toBool(false));
-        result.payload.insert(QStringLiteral("requestedBrightnessEnabled"), config.brightnessEnabled);
+        result.payload.insert(QStringLiteral("brightnessEnabled"), config.brightnessEnabled);
         result.payload.insert(QStringLiteral("lightingNormalizationMode"),
                               featureResult.payload.value(QStringLiteral("lightingNormalizationMode")).toString());
-        writePositionCorrectionPayload(config, &result.payload);
+        result.payload.insert(QStringLiteral("enablePositionCorrection"), config.enablePositionCorrection);
+        result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
+        result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+        result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
 
         return result;

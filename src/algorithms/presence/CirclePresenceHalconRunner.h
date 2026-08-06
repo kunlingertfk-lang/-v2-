@@ -1,7 +1,6 @@
 #ifndef ALGORITHMS_PRESENCE_CIRCLEPRESENCEHALCONRUNNER_H
 #define ALGORITHMS_PRESENCE_CIRCLEPRESENCEHALCONRUNNER_H
 
-#include "toolcore/PositionCorrectionConsumer.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -32,7 +31,6 @@ struct CirclePresenceHalconConfig
     int timeoutMs = 1000;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
-    PositionCorrectionContext positionCorrection;
 };
 
 struct CirclePresenceHalconResult

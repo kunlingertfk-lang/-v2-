@@ -4,18 +4,15 @@
 #include <QByteArray>
 #include <QDebug>
 #include <QDialog>
-#include <QGraphicsView>
 #include <QLayout>
 #include <QList>
 #include <QMainWindow>
-#include <QMetaObject>
 #include <QPoint>
 #include <QPointer>
 #include <QRect>
 #include <QScreen>
 #include <QSize>
 #include <QSizePolicy>
-#include <QStyle>
 #include <QTimer>
 #include <QToolButton>
 #include <QVariant>
@@ -71,35 +68,11 @@ bool isSetupWindow(QWidget *window)
     if (!window)
         return false;
 
-    if (window->property("schemeSetupHost").toBool())
-        return true;
-
     const QString objectName = window->objectName();
-    return objectName == QLatin1String("SchemeSetupWindow")
-            || objectName == QLatin1String("CameraParamsDialog")
+    return objectName == QLatin1String("CameraParamsDialog")
             || objectName == QLatin1String("ReferenceImageDialog")
             || objectName == QLatin1String("ToolsDialog")
             || objectName == QLatin1String("OutputDialog");
-}
-
-QWidget *findSchemeSetupHost(QWidget *source)
-{
-    QWidget *widget = source;
-    while (widget) {
-        if (widget->property("schemeSetupHost").toBool())
-            return widget;
-        widget = widget->parentWidget();
-    }
-    return nullptr;
-}
-
-bool isEmbeddedSetupPage(QWidget *window)
-{
-    if (!window || !isSetupWindow(window)
-            || window->property("schemeSetupHost").toBool()) {
-        return false;
-    }
-    return findSchemeSetupHost(window->parentWidget());
 }
 
 bool isLargeSetupWindow(QWidget *window)
@@ -150,76 +123,6 @@ void applyStandardSetupPageLayout(QWidget *window)
     setToolButtonMinimum(window, "referenceStepButton", stepMinimum, stepIcon);
     setToolButtonMinimum(window, "toolsStepButton", stepMinimum, stepIcon);
     setToolButtonMinimum(window, "outputStepButton", stepMinimum, stepIcon);
-}
-
-void applyStandardToolPageLayout(QWidget *window)
-{
-    if (!window || !window->property("toolLevelStyle").toBool())
-        return;
-
-    const QRect available = safeAvailableGeometry(window, window->parentWidget(), 0);
-    const int parameterPanelWidth = qBound(
-                520,
-                qRound(static_cast<qreal>(available.width()) * 0.32),
-                610);
-
-    static const char *const parameterPanels[] = {
-        "setupEditorPanel",
-        "leftPanel",
-        "parameterPanel",
-        "colorComparisonLeftPanel",
-        "calibrationTransformConfigScroll",
-        "configScrollArea",
-        "colorTemplateLeftScrollArea"
-    };
-    for (const char *name : parameterPanels)
-        setWidgetWidth(window, name, parameterPanelWidth, parameterPanelWidth);
-
-    static const char *const viewerPanels[] = {
-        "setupViewerFrame",
-        "previewPanel",
-        "colorComparisonRightPanel",
-        "resultFrame"
-    };
-    for (const char *name : viewerPanels) {
-        QWidget *viewer = window->findChild<QWidget *>(QLatin1String(name));
-        if (!viewer)
-            continue;
-        viewer->setMinimumWidth(0);
-        viewer->setMaximumWidth(QWIDGETSIZE_MAX);
-        viewer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    }
-
-    const QList<QGraphicsView *> graphicsViews = window->findChildren<QGraphicsView *>();
-    for (QGraphicsView *view : graphicsViews) {
-        view->setMinimumSize(0, 0);
-        view->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-        view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    }
-
-    static const char *const titleBars[] = {
-        "setupTopBar",
-        "titleBar",
-        "headerFrame",
-        "colorComparisonHeader",
-        "calibrationTransformHeader"
-    };
-    for (const char *name : titleBars) {
-        QWidget *titleBar = window->findChild<QWidget *>(QLatin1String(name));
-        if (!titleBar)
-            continue;
-        titleBar->setMinimumHeight(54);
-        titleBar->setMaximumHeight(54);
-    }
-}
-
-void refreshWidgetStyle(QWidget *widget)
-{
-    if (!widget)
-        return;
-    widget->style()->unpolish(widget);
-    widget->style()->polish(widget);
-    widget->update();
 }
 
 void copySessionInfo(QWidget *source, QWidget *target)
@@ -355,19 +258,6 @@ void PlanDialogUtils::applyLargeWindow(QWidget *window)
     window->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
     window->setGeometry(safe);
     window->setWindowState((window->windowState() & ~Qt::WindowMinimized) | Qt::WindowMaximized);
-}
-
-void PlanDialogUtils::applyToolLevelStyle(QWidget *window)
-{
-    if (!window)
-        return;
-
-    window->setProperty("toolLevelStyle", true);
-    applyStandardToolPageLayout(window);
-    refreshWidgetStyle(window);
-    const QList<QWidget *> children = window->findChildren<QWidget *>();
-    for (QWidget *child : children)
-        refreshWidgetStyle(child);
 }
 
 bool PlanDialogUtils::isLargeWindow(QWidget *window)
@@ -522,39 +412,11 @@ void PlanDialogUtils::configureDialogWindow(QDialog *dialog, const QString &titl
     }
 
     dialog->setWindowTitle(title);
-    // Ownership is decided by the caller. Modal configuration dialogs are
-    // commonly stack allocated and opened with exec(); enabling
-    // WA_DeleteOnClose here would delete a stack object when accept()/reject()
-    // closes it. Heap-allocated setup pages opt in from showDialogFromWidget().
-    dialog->setAttribute(Qt::WA_DeleteOnClose, false);
-
-    if (isEmbeddedSetupPage(dialog)) {
-        dialog->setWindowFlags(Qt::Widget);
-        dialog->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        applyStandardSetupPageLayout(dialog);
-        return;
-    }
-
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowFlag(Qt::Window, true);
     PlanDialogUtils::applyLargeWindow(dialog);
     scheduleSetupDialogSizeLog(dialog);
 
-}
-
-bool PlanDialogUtils::switchEmbeddedSetupPage(QWidget *current, const QString &pageId)
-{
-    QWidget *host = findSchemeSetupHost(current);
-    if (!host)
-        return false;
-
-    bool switched = false;
-    const bool invoked = QMetaObject::invokeMethod(
-                host,
-                "showSetupPage",
-                Qt::DirectConnection,
-                Q_RETURN_ARG(bool, switched),
-                Q_ARG(QString, pageId));
-    return invoked && switched;
 }
 
 void PlanDialogUtils::connectWindowButtons(QWidget *window,
@@ -588,11 +450,6 @@ void PlanDialogUtils::showWindowFromWidget(QWidget *source, QWidget *target)
     copySessionInfo(source, target);
     PlanDialogUtils::fitWindowToScreen(target, 0);
 
-    if (isSetupWindow(target)) {
-        if (MainWindow *mainWindow = findParentMainWindow(target))
-            mainWindow->registerActiveSetupWindow(target);
-    }
-
     if (PlanDialogUtils::isLargeWindow(target)
             || target->windowState().testFlag(Qt::WindowMaximized)) {
         target->showMaximized();
@@ -608,10 +465,6 @@ void PlanDialogUtils::showWindowFromWidget(QWidget *source, QWidget *target)
 
 void PlanDialogUtils::showDialogFromWidget(QWidget *source, QDialog *dialog)
 {
-    if (dialog) {
-        const bool persistentSetupHost = dialog->property("schemeSetupHost").toBool();
-        dialog->setAttribute(Qt::WA_DeleteOnClose, !persistentSetupHost);
-    }
     showWindowFromWidget(source, dialog);
 }
 
@@ -661,14 +514,10 @@ void PlanDialogUtils::returnToMainWindow(QWidget *source)
              << "mainWindow=" << mainWindow
              << "reuseExisting=" << true;
 
-    QWidget *windowToClose = findSchemeSetupHost(source);
-    if (!windowToClose)
-        windowToClose = source;
-
     showWindowFromWidget(source, mainWindow);
 
-    if (windowToClose) {
-        windowToClose->close();
+    if (source) {
+        source->close();
     }
 
     qDebug() << "[PlanDialogUtils] returnToMainWindow reused existing MainWindow";

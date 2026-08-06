@@ -1,7 +1,6 @@
 #ifndef ALGORITHMS_PRESENCE_EDGEPRESENCEHALCONRUNNER_H
 #define ALGORITHMS_PRESENCE_EDGEPRESENCEHALCONRUNNER_H
 
-#include "toolcore/PositionCorrectionConsumer.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -27,7 +26,6 @@ struct EdgePresenceHalconConfig
     bool existOk = true;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
-    PositionCorrectionContext positionCorrection;
     int timeoutMsInternalDefault = 1000;
 };
 

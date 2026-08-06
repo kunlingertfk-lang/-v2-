@@ -9,9 +9,6 @@
 
 #include "frame/FrameViewHelper.h"
 #include "tooladapters/BlobPresenceAdapter.h"
-#include "tooladapters/PositionCorrectionAdapter.h"
-#include "tooladapters/TemplateLocationAdapter.h"
-#include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolEngine.h"
 #include "toolcore/ToolPreviewSnapshot.h"
@@ -20,7 +17,6 @@
 #include <opencv2/core.hpp>
 
 class QButtonGroup;
-class QPushButton;
 class QResizeEvent;
 class FrameViewHelper;
 
@@ -37,8 +33,6 @@ struct BlobPresenceConfig
     CircleRoi detectCircleNormalized;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
-    QString positionCorrectionSourceId;
-    bool showPositionCorrectionMatchContour = true;
     int grayMin = 0;
     int grayMax = 255;
     bool invertRange = false;
@@ -63,11 +57,6 @@ public:
     ToolConfig toolConfig() const;
     ToolPreviewSnapshot referencePreviewSnapshot() const;
     void loadFromConfig(const ToolConfig &config);
-    void setToolChainTestContext(
-            const QVector<ToolConfig> &toolConfigs,
-            int currentToolIndex,
-            ToolEngine *sharedToolEngine,
-            const ReferencePositionCorrectionConfig &referencePositionCorrection);
     QString summaryText() const;
 
 protected:
@@ -77,8 +66,6 @@ private slots:
     void finishConfiguration();
     void runReferenceTest();
     void runCameraTest();
-    void importTestImageFromPc();
-    void exitTestMode();
 
 private:
     void setupUiState();
@@ -99,8 +86,6 @@ private:
     void handleCircleSelectionRejected();
     void handleRoiSelectionRejected();
     void refreshDisplayedRoiOverlay();
-    void updateBottomButtons();
-    void rerunImportedTest();
     void runBlobPresenceOnFrame(const cv::Mat &frame,
                                 const cv::Mat &referenceImage,
                                 const QString &imageTitle,
@@ -121,26 +106,14 @@ private:
     QButtonGroup *m_basicResultPresenceGroup;
     QButtonGroup *m_resultPresenceGroup;
     FrameViewHelper *m_previewHelper = nullptr;
-    QPushButton *m_exitTestButton = nullptr;
-    TemplateLocationAdapter m_testTemplateLocationAdapter;
-    PositionCorrectionAdapter m_testPositionCorrectionAdapter;
     BlobPresenceAdapter m_testBlobPresenceAdapter;
     ToolEngine m_testToolEngine;
-    ToolEngine *m_sharedToolEngine = nullptr;
-    QVector<ToolConfig> m_toolChainTestConfigs;
-    int m_toolChainTestIndex = -1;
-    ReferencePositionCorrectionConfig m_referencePositionCorrection;
-    QString m_loadedPositionCorrectionSourceId;
-    bool m_showPositionCorrectionMatchContour = true;
     QString m_toolId;
     bool m_enabled = true;
     ToolPreviewSnapshot m_referencePreviewSnapshot;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QVector<QPointF> m_detectPolygonNormalized;
     CircleRoi m_detectCircleNormalized;
-    cv::Mat m_importedTestFrame;
-    QString m_importedTestImageTitle;
-    bool m_importedTestActive = false;
     bool m_blobPresenceRunning = false;
 };
 

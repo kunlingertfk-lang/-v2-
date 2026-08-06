@@ -621,42 +621,14 @@ AiDetectionFilterResult AiDetectionRunner::applyFilters(const QVector<AiDetectio
         result.detections = filtered;
     }
 
-    const QString sortMode = config.sortMode.trimmed();
-    if (!sortMode.isEmpty()) {
-        const bool ascending = sortMode.contains(QStringLiteral("从小到大"));
-        const bool descending = sortMode.contains(QStringLiteral("从大到小"));
-        enum class SortField { X, Y, Score, Unsupported };
-        SortField field = SortField::Unsupported;
-        if (sortMode.contains(QStringLiteral("X坐标"), Qt::CaseInsensitive))
-            field = SortField::X;
-        else if (sortMode.contains(QStringLiteral("Y坐标"), Qt::CaseInsensitive))
-            field = SortField::Y;
-        else if (sortMode.contains(QStringLiteral("得分")))
-            field = SortField::Score;
+    if (config.angleFilterEnabled)
+        result.warnings << QStringLiteral("angleFilterEnabled 已读取，但 RK 输出没有 angle，桥接版暂未应用角度过滤。");
 
-        if (field != SortField::Unsupported && (ascending || descending)) {
-            std::stable_sort(result.detections.begin(),
-                             result.detections.end(),
-                             [field, ascending](const AiDetectionDetection &left,
-                                                const AiDetectionDetection &right) {
-                double leftValue = 0.0;
-                double rightValue = 0.0;
-                if (field == SortField::X) {
-                    leftValue = left.bboxPixel.center().x();
-                    rightValue = right.bboxPixel.center().x();
-                } else if (field == SortField::Y) {
-                    leftValue = left.bboxPixel.center().y();
-                    rightValue = right.bboxPixel.center().y();
-                } else {
-                    leftValue = left.score;
-                    rightValue = right.score;
-                }
-                return ascending ? leftValue < rightValue : leftValue > rightValue;
-            });
-        } else {
-            result.warnings << QStringLiteral("unsupported_sort_mode:%1").arg(sortMode);
-        }
-    }
+    if (config.boundaryFilterEnabled)
+        result.warnings << QStringLiteral("boundaryFilterEnabled 已读取，但桥接版暂未完整实现出界过滤。");
+
+    if (!config.sortMode.trimmed().isEmpty())
+        result.warnings << QStringLiteral("sortMode 已读取，但桥接版暂未应用排序策略。");
 
     if (config.maxDetections > 0 && result.detections.size() > config.maxDetections)
         result.detections.resize(config.maxDetections);
@@ -738,64 +710,6 @@ AiDetectionRunnerResult AiDetectionRunner::run(const cv::Mat &image, const AiDet
     QRect roiPixels;
     int scriptReportedCount = 0;
 
-    const auto unsupported = [&](const QString &status,
-                                 const QString &message) {
-        result.success = false;
-        result.ok = false;
-        result.status = status;
-        result.message = message;
-        result.elapsedMs = timer.elapsed();
-        fillCommonPayload(&result.payload,
-                          config,
-                          result,
-                          warnings,
-                          false,
-                          QRect(),
-                          scriptReportedCount);
-        return result;
-    };
-    const QString regionType = config.detectRegionType.trimmed().toLower();
-    if (!regionType.isEmpty()
-            && regionType != QStringLiteral("rectangle")
-            && regionType != QStringLiteral("rect")) {
-        return unsupported(QStringLiteral("unsupported_detect_roi"),
-                           QStringLiteral("目标检测当前仅支持矩形检测区域，未执行降级。"));
-    }
-    if (config.angleFilterEnabled) {
-        return unsupported(QStringLiteral("unsupported_angle_filter"),
-                           QStringLiteral("RK 检测结果不包含角度，无法应用角度过滤。"));
-    }
-    if (config.boundaryFilterEnabled) {
-        return unsupported(QStringLiteral("unsupported_boundary_filter"),
-                           QStringLiteral("当前桥接协议不支持边界过滤。"));
-    }
-    const QString sortMode = config.sortMode.trimmed();
-    if (sortMode.contains(QStringLiteral("角度"))) {
-        return unsupported(QStringLiteral("unsupported_sort_mode"),
-                           QStringLiteral("RK 检测结果不包含角度，无法按角度排序。"));
-    }
-    if (!sortMode.isEmpty()
-            && !sortMode.contains(QStringLiteral("X坐标"), Qt::CaseInsensitive)
-            && !sortMode.contains(QStringLiteral("Y坐标"), Qt::CaseInsensitive)
-            && !sortMode.contains(QStringLiteral("得分"))) {
-        return unsupported(QStringLiteral("unsupported_sort_mode"),
-                           QStringLiteral("不支持的目标排序方式：%1").arg(sortMode));
-    }
-    if (config.classFilterEnabled
-            && config.classFilterText.trimmed().isEmpty()) {
-        return unsupported(QStringLiteral("invalid_class_filter"),
-                           QStringLiteral("已启用类别过滤，但类别列表为空。"));
-    }
-    const QRectF sourceRoi = config.roiNormalized.normalized();
-    if (!isFiniteRect(config.roiNormalized)
-            || sourceRoi.left() < 0.0
-            || sourceRoi.top() < 0.0
-            || sourceRoi.right() > 1.0
-            || sourceRoi.bottom() > 1.0) {
-        return unsupported(QStringLiteral("invalid_detect_roi"),
-                           QStringLiteral("检测区域必须是 [0,1] 范围内的有效矩形，未回退到全图。"));
-    }
-
     if (image.empty()) {
         result.success = false;
         result.ok = false;
@@ -823,6 +737,11 @@ AiDetectionRunnerResult AiDetectionRunner::run(const cv::Mat &image, const AiDet
         }
     } else {
         roiPixels = QRect(0, 0, image.cols, image.rows);
+    }
+
+    if (config.detectRegionType.trimmed().toLower() != QStringLiteral("rectangle") &&
+        config.detectRegionType.trimmed().toLower() != QStringLiteral("rect")) {
+        warnings << QStringLiteral("detectRegionType 已读取，但桥接版仅支持矩形 ROI，自由 ROI 暂未生效。");
     }
 
     const QString requestId = QString::number(QDateTime::currentMSecsSinceEpoch());

@@ -1,7 +1,5 @@
 #include "ToolsDialog.h"
 
-#include <algorithm>
-
 #include <QDebug>
 #include <QColor>
 #include <QComboBox>
@@ -11,7 +9,6 @@
 #include <QIcon>
 #include <QImage>
 #include <QInputDialog>
-#include <QJsonArray>
 #include <QLabel>
 #include <QLayoutItem>
 #include <QLineEdit>
@@ -24,7 +21,6 @@
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
-#include <QUuid>
 #include <QVariant>
 #include <QVBoxLayout>
 
@@ -33,7 +29,6 @@
 #include "CharacterRecognitionDialog.h"
 #include "BlobPresenceDialog.h"
 #include "CameraParamsDialog.h"
-#include "CalibrationTransformDialog.h"
 #include "ColorComparisonDialog.h"
 #include "ColorRecognitionDialog.h"
 #include "ClassificationDialog.h"
@@ -46,10 +41,8 @@
 #include "OutputDialog.h"
 #include "PatternPresenceDialog.h"
 #include "PositionCorrectionDialog.h"
-#include "TemplateLocationDialog.h"
 #include "PlanDialogUtils.h"
 #include "ReferenceImageDialog.h"
-#include "QuickCalibrationWizard.h"
 #include "RegisteredClassificationDialog.h"
 #include "RegisteredClassificationDetectionDialog.h"
 #include "SchemeStore.h"
@@ -114,39 +107,6 @@ QJsonObject writeSourceId(QJsonObject object,
             it.value() = writeSourceId(it.value().toObject(), sourceId, sourceText);
     }
     return object;
-}
-
-bool containsToolReference(const QJsonValue &value, const QString &toolId)
-{
-    if (value.isArray()) {
-        const QJsonArray array = value.toArray();
-        for (const QJsonValue &entry : array) {
-            if (containsToolReference(entry, toolId))
-                return true;
-        }
-        return false;
-    }
-
-    if (!value.isObject())
-        return false;
-
-    const QJsonObject object = value.toObject();
-    static const QStringList referenceKeys = {
-        QStringLiteral("positionCorrectionSourceId"),
-        QStringLiteral("producerId"),
-        QStringLiteral("referencePoseSourceId")
-    };
-    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
-        if (referenceKeys.contains(it.key())
-                && it.value().toString().trimmed() == toolId) {
-            return true;
-        }
-        if ((it.value().isObject() || it.value().isArray())
-                && containsToolReference(it.value(), toolId)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 void configurePositionSourceCombos(QWidget *dialog,
@@ -215,10 +175,8 @@ QString toolIconForType(ToolType type)
     case ToolType::EdgePresence:
     case ToolType::LinePresence:
     case ToolType::ContourPresence:
-        return QStringLiteral(":/icons/eye.svg");
     case ToolType::PositionCorrection:
-    case ToolType::CalibrationTransform:
-        return QStringLiteral(":/icons/fit.svg");
+        return QStringLiteral(":/icons/eye.svg");
     default:
         return QStringLiteral(":/icons/tool.svg");
     }
@@ -242,146 +200,7 @@ void configureProducerContext(PositionCorrectionDialog *dialog,
             }
         }
     }
-    QVector<PositionReferencePoseProducer> referenceProducers;
-    const ReferencePositionCorrectionConfig &reference =
-            SchemeStore::instance().currentScheme().referencePositionCorrection;
-    if (reference.enabled && reference.referenceCreated
-            && !reference.referencePose.isEmpty()) {
-        referenceProducers.append(PositionReferencePoseProducer{
-                                      PositionCorrection::defaultSourceId(),
-                                      QStringLiteral("0 基准图"),
-                                      reference.referencePose,
-                                      PositionCorrection::referenceToJson(reference)});
-    }
-    dialog->setAvailableProducers(toolsDialog->toolConfigs(), index,
-                                  referenceProducers);
-}
-
-void configureProducerContext(CalibrationTransformDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    int index = toolsDialog->toolConfigs().size();
-    if (initialConfig) {
-        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
-            if (toolsDialog->toolConfigs().at(i).toolId == initialConfig->toolId) {
-                index = i;
-                break;
-            }
-        }
-    }
-    dialog->setProducerTools(toolsDialog->toolConfigs(), index,
-                             toolsDialog->referencePreviewSnapshots());
-}
-
-void configureProducerContext(BlobPresenceDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    int index = toolsDialog->toolConfigs().size();
-    if (initialConfig) {
-        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
-            if (toolsDialog->toolConfigs().at(i).toolId
-                    == initialConfig->toolId) {
-                index = i;
-                break;
-            }
-        }
-    }
-    dialog->setToolChainTestContext(
-                toolsDialog->toolConfigs(),
-                index,
-                toolsDialog->toolEngineForTesting(),
-                SchemeStore::instance().currentScheme()
-                .referencePositionCorrection);
-}
-
-void configureProducerContext(CirclePresenceDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    int index = toolsDialog->toolConfigs().size();
-
-    if (initialConfig) {
-        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
-            if (toolsDialog->toolConfigs().at(i).toolId
-                    == initialConfig->toolId) {
-                index = i;
-                break;
-            }
-        }
-    }
-
-    dialog->setToolChainTestContext(
-                toolsDialog->toolConfigs(),
-                index,
-                toolsDialog->toolEngineForTesting(),
-                SchemeStore::instance().currentScheme()
-                .referencePositionCorrection);
-}
-
-template <typename Dialog>
-void configurePositionConsumerContext(Dialog *dialog,
-                                      ToolsDialog *toolsDialog,
-                                      const ToolConfig *initialConfig)
-{
-    int index = toolsDialog->toolConfigs().size();
-    if (initialConfig) {
-        for (int i = 0; i < toolsDialog->toolConfigs().size(); ++i) {
-            if (toolsDialog->toolConfigs().at(i).toolId
-                    == initialConfig->toolId) {
-                index = i;
-                break;
-            }
-        }
-    }
-    dialog->setToolChainTestContext(
-                toolsDialog->toolConfigs(),
-                index,
-                SchemeStore::instance().currentScheme()
-                .referencePositionCorrection);
-}
-
-void configureProducerContext(PatternPresenceDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
-}
-
-void configureProducerContext(EdgePresenceDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
-}
-
-void configureProducerContext(LinePresenceDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
-}
-
-void configureProducerContext(ContourPresenceDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
-}
-
-void configureProducerContext(CharacterRecognitionDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
-}
-
-void configureProducerContext(RegisteredClassificationDialog *dialog,
-                              ToolsDialog *toolsDialog,
-                              const ToolConfig *initialConfig)
-{
-    configurePositionConsumerContext(dialog, toolsDialog, initialConfig);
+    dialog->setAvailableProducers(toolsDialog->toolConfigs(), index);
 }
 
 template <typename Dialog>
@@ -391,7 +210,6 @@ bool runToolConfigDialog(QWidget *parent,
                          ToolPreviewSnapshot *snapshot)
 {
     Dialog configDialog(parent);
-    PlanDialogUtils::applyToolLevelStyle(&configDialog);
     configDialog.setWindowModality(Qt::WindowModal);
     configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     PlanDialogUtils::applyLargeWindow(&configDialog);
@@ -434,7 +252,6 @@ ToolsDialog::ToolsDialog(QWidget *parent)
 {
     ui->setupUi(this);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
-    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     connectNavigation();
     connect(&ReferenceImageProvider::instance(),
@@ -455,19 +272,6 @@ ToolsDialog::ToolsDialog(QWidget *parent)
 ToolsDialog::~ToolsDialog()
 {
     delete ui;
-}
-
-void ToolsDialog::prepareForDisplay()
-{
-    QString error;
-    if (SchemeStore::instance().ensureLoaded(&error)) {
-        const SchemeState &scheme = SchemeStore::instance().currentScheme();
-        setInitialToolState(scheme.toolConfigs, scheme.referencePreviewSnapshots);
-    } else {
-        qWarning() << "[ToolsDialog] 页面刷新失败:" << error;
-    }
-    refreshSchemeHeader();
-    refreshReferencePreview();
 }
 
 const QVector<ToolConfig> &ToolsDialog::toolConfigs() const
@@ -506,16 +310,6 @@ void ToolsDialog::setInitialToolState(const QVector<ToolConfig> &configs,
 bool ToolsDialog::openedOutputDialog() const
 {
     return m_openedOutputDialog;
-}
-
-void ToolsDialog::setToolEngineForTesting(ToolEngine *engine)
-{
-    m_toolEngineForTesting = engine;
-}
-
-ToolEngine *ToolsDialog::toolEngineForTesting() const
-{
-    return m_toolEngineForTesting;
 }
 
 QVector<PositionCorrectionSource> ToolsDialog::positionCorrectionSourcesFor(
@@ -567,9 +361,6 @@ void ToolsDialog::setupUiState()
     ui->referenceStepButton->setChecked(false);
     ui->toolsStepButton->setChecked(true);
     ui->outputStepButton->setChecked(false);
-    ui->setupQuickCalibrateButton->setEnabled(true);
-    ui->setupQuickCalibrateButton->setProperty(
-                "quickCalibrationState", QStringLiteral("available"));
 
     ui->verticalLayout_toolsList->setSpacing(kToolListSpacing);
     ui->verticalLayout_toolsList->setContentsMargins(kToolListMargin,
@@ -585,9 +376,6 @@ void ToolsDialog::setupUiState()
 void ToolsDialog::connectNavigation()
 {
     connect(ui->addToolButton, &QToolButton::clicked, this, &ToolsDialog::openToolLibrary);
-    connect(ui->copyToolButton, &QToolButton::clicked, this, &ToolsDialog::copySelectedTool);
-    connect(ui->deleteToolButton, &QToolButton::clicked, this, &ToolsDialog::deleteSelectedTool);
-    connect(ui->deleteAllToolsButton, &QToolButton::clicked, this, &ToolsDialog::deleteAllTools);
     connect(ui->cameraStepButton, &QToolButton::clicked, this, &ToolsDialog::openCameraParamsDialog);
     connect(ui->referenceStepButton, &QToolButton::clicked, this, &ToolsDialog::openReferenceImageDialog);
     connect(ui->outputStepButton, &QToolButton::clicked, this, &ToolsDialog::openOutputDialog);
@@ -596,26 +384,6 @@ void ToolsDialog::connectNavigation()
     connect(ui->setupExternalEditButton, &QToolButton::clicked, this, &ToolsDialog::editCurrentSchemeName);
     connect(ui->setupSaveButton, &QToolButton::clicked, this, &ToolsDialog::saveCurrentScheme);
     connect(ui->setupSaveAsButton, &QToolButton::clicked, this, &ToolsDialog::saveCurrentSchemeAs);
-    connect(ui->setupQuickCalibrateButton, &QToolButton::clicked,
-            this, &ToolsDialog::openQuickCalibration);
-}
-
-void ToolsDialog::openQuickCalibration()
-{
-    if (!commitToolStateToScheme(true))
-        return;
-    QuickCalibrationWizard wizard(this);
-    wizard.setProducerTools(m_toolConfigs, m_toolPreviewSnapshots);
-    wizard.setPreviewImage(currentReferenceImage());
-    PlanDialogUtils::fitDialogToScreen(&wizard, this, 24);
-    PlanDialogUtils::centerWindowOnScreen(&wizard, this, 24);
-    wizard.exec();
-    if (!wizard.generatedFilePath().isEmpty()) {
-        QMessageBox::information(this,
-                                 tr("快速标定"),
-                                 tr("标定文件已生成，并已进入当前方案的标定资产列表：\n%1")
-                                 .arg(wizard.generatedFilePath()));
-    }
 }
 
 void ToolsDialog::refreshSchemeHeader()
@@ -638,142 +406,9 @@ bool ToolsDialog::commitToolStateToScheme(bool saveToDisk)
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
         return false;
     }
-    if (saveToDisk) {
-        if (MainWindow *mainWindow = qobject_cast<MainWindow *>(parentWidget())) {
-            mainWindow->applySavedSchemeTools(m_toolConfigs,
-                                              m_toolPreviewSnapshots);
-        }
-        emit toolStateCommitted(m_toolConfigs, m_toolPreviewSnapshots);
-    }
 
     refreshSchemeHeader();
     return true;
-}
-
-void ToolsDialog::restoreToolState(
-        const QVector<ToolConfig> &configs,
-        const QMap<QString, ToolPreviewSnapshot> &snapshots,
-        int selectedIndex)
-{
-    m_toolConfigs = configs;
-    m_toolPreviewSnapshots = snapshots;
-    m_selectedToolIndex = selectedIndex;
-    SchemeStore::instance().setToolConfigs(m_toolConfigs, m_toolPreviewSnapshots);
-    refreshToolList();
-    if (m_selectedToolIndex >= 0 && m_selectedToolIndex < m_toolConfigs.size())
-        selectTool(m_selectedToolIndex);
-    else
-        refreshReferencePreview();
-}
-
-void ToolsDialog::copySelectedTool()
-{
-    if (m_selectedToolIndex < 0 || m_selectedToolIndex >= m_toolConfigs.size())
-        return;
-
-    const QVector<ToolConfig> configsBefore = m_toolConfigs;
-    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore = m_toolPreviewSnapshots;
-    const int selectedIndexBefore = m_selectedToolIndex;
-    const ToolConfig &sourceConfig = m_toolConfigs.at(m_selectedToolIndex);
-
-    ToolConfig copiedConfig = sourceConfig;
-    do {
-        copiedConfig.toolId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    } while (std::any_of(m_toolConfigs.cbegin(), m_toolConfigs.cend(),
-                         [&copiedConfig](const ToolConfig &config) {
-        return config.toolId == copiedConfig.toolId;
-    }));
-
-    const int copiedIndex = m_selectedToolIndex + 1;
-    m_toolConfigs.insert(copiedIndex, copiedConfig);
-    const ToolPreviewSnapshot sourceSnapshot =
-            m_toolPreviewSnapshots.value(sourceConfig.toolId);
-    if (sourceSnapshot.valid) {
-        ToolPreviewSnapshot copiedSnapshot = sourceSnapshot;
-        copiedSnapshot.toolId = copiedConfig.toolId;
-        copiedSnapshot.toolType = copiedConfig.toolType;
-        copiedSnapshot.result.toolId = copiedConfig.toolId;
-        m_toolPreviewSnapshots.insert(copiedConfig.toolId, copiedSnapshot);
-    }
-
-    m_selectedToolIndex = copiedIndex;
-    refreshToolList();
-    selectTool(copiedIndex);
-    if (!commitToolStateToScheme(true))
-        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
-}
-
-void ToolsDialog::deleteSelectedTool()
-{
-    if (m_selectedToolIndex < 0 || m_selectedToolIndex >= m_toolConfigs.size())
-        return;
-
-    const QStringList dependents = dependentToolsFor(m_selectedToolIndex);
-    if (!dependents.isEmpty()) {
-        QMessageBox::warning(this,
-                             tr("无法删除工具"),
-                             tr("当前工具正被以下后续工具引用：\n%1\n\n"
-                                "请先修改这些工具的位置修正或输入绑定。")
-                             .arg(dependents.join(QLatin1Char('\n'))));
-        return;
-    }
-
-    const ToolConfig selectedConfig = m_toolConfigs.at(m_selectedToolIndex);
-    const QString selectedName = toolDisplayName(selectedConfig).trimmed().isEmpty()
-            ? tr("未命名工具") : toolDisplayName(selectedConfig);
-    const QMessageBox::StandardButton answer = QMessageBox::question(
-                this,
-                tr("删除工具"),
-                tr("确认删除选中的“%1”工具？\n删除后将立即保存到当前方案。")
-                .arg(selectedName),
-                QMessageBox::Yes | QMessageBox::No,
-                QMessageBox::No);
-    if (answer != QMessageBox::Yes)
-        return;
-
-    const QVector<ToolConfig> configsBefore = m_toolConfigs;
-    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore = m_toolPreviewSnapshots;
-    const int selectedIndexBefore = m_selectedToolIndex;
-    const int removedIndex = m_selectedToolIndex;
-    m_toolConfigs.removeAt(removedIndex);
-    m_toolPreviewSnapshots.remove(selectedConfig.toolId);
-    m_selectedToolIndex = m_toolConfigs.isEmpty()
-            ? -1 : qMin(removedIndex, m_toolConfigs.size() - 1);
-    refreshToolList();
-    if (m_selectedToolIndex >= 0)
-        selectTool(m_selectedToolIndex);
-    else
-        refreshReferencePreview();
-    if (!commitToolStateToScheme(true))
-        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
-}
-
-void ToolsDialog::deleteAllTools()
-{
-    if (m_toolConfigs.isEmpty())
-        return;
-
-    const QMessageBox::StandardButton answer = QMessageBox::question(
-                this,
-                tr("删除所有工具"),
-                tr("确认删除当前方案中的全部 %1 个工具？\n"
-                   "删除后将立即保存且无法撤销。")
-                .arg(m_toolConfigs.size()),
-                QMessageBox::Yes | QMessageBox::No,
-                QMessageBox::No);
-    if (answer != QMessageBox::Yes)
-        return;
-
-    const QVector<ToolConfig> configsBefore = m_toolConfigs;
-    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore = m_toolPreviewSnapshots;
-    const int selectedIndexBefore = m_selectedToolIndex;
-    m_toolConfigs.clear();
-    m_toolPreviewSnapshots.clear();
-    m_selectedToolIndex = -1;
-    refreshToolList();
-    refreshReferencePreview();
-    if (!commitToolStateToScheme(true))
-        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
 }
 
 void ToolsDialog::editCurrentSchemeName()
@@ -806,8 +441,7 @@ void ToolsDialog::saveCurrentScheme()
 
 void ToolsDialog::saveCurrentSchemeAs()
 {
-    if (!commitToolStateToScheme(false))
-        return;
+    commitToolStateToScheme(false);
 
     bool ok = false;
     const QString name = QInputDialog::getText(this,
@@ -884,26 +518,27 @@ void ToolsDialog::openCameraParamsDialog()
 {
     if (!commitToolStateToScheme(true))
         return;
-    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("camera")))
-        qWarning() << "[ToolsDialog] 未找到方案编辑宿主窗口";
+    PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
 }
 
 void ToolsDialog::openReferenceImageDialog()
 {
     if (!commitToolStateToScheme(true))
         return;
-    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("reference")))
-        qWarning() << "[ToolsDialog] 未找到方案编辑宿主窗口";
+    PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
 }
 
 void ToolsDialog::openOutputDialog()
 {
+    m_openedOutputDialog = true;
     if (!commitToolStateToScheme(true))
         return;
-    m_openedOutputDialog = true;
 
-    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("output")))
-        qWarning() << "[ToolsDialog] 未找到方案编辑宿主窗口";
+    MainWindow *mainWindow = qobject_cast<MainWindow *>(parentWidget());
+    OutputDialog *dialog = new OutputDialog(mainWindow);
+    dialog->setSchemeTools(m_toolConfigs, m_toolPreviewSnapshots);
+    PlanDialogUtils::showDialogFromWidget(this, dialog);
+    close();
 }
 
 void ToolsDialog::addConfiguredTool(const ToolConfig &config, const ToolPreviewSnapshot &snapshot)
@@ -965,12 +600,9 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     case ToolType::PositionCorrection:
         accepted = runToolConfigDialog<PositionCorrectionDialog>(this, nullptr, &config, &snapshot);
         break;
-    case ToolType::CalibrationTransform:
-        accepted = runToolConfigDialog<CalibrationTransformDialog>(this, nullptr, &config, &snapshot);
-        break;
 /*============================tfk add=================================*/
     case ToolType::TemplateLocation:
-        accepted = runToolConfigDialog<TemplateLocationDialog>(this, nullptr, &config, &snapshot);
+        qDebug() << "[ToolsDialog] TemplateLocation dialog is not implemented yet.";
         break;
 
 /*============================tfk end=================================*/
@@ -982,16 +614,9 @@ bool ToolsDialog::openToolConfigDialogForAdd(ToolType type)
     if (!accepted)
         return false;
 
-    const QVector<ToolConfig> configsBefore = m_toolConfigs;
-    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore =
-            m_toolPreviewSnapshots;
-    const int selectedIndexBefore = m_selectedToolIndex;
     m_toolConfigs.append(config);
     addConfiguredTool(config, snapshot);
-    if (!commitToolStateToScheme(true)) {
-        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
-        return false;
-    }
+    commitToolStateToScheme(true);
     raise();
     activateWindow();
     return true;
@@ -1050,12 +675,6 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
     case ToolType::PositionCorrection:
         accepted = runToolConfigDialog<PositionCorrectionDialog>(this, &originalConfig, &editedConfig, &snapshot);
         break;
-    case ToolType::CalibrationTransform:
-        accepted = runToolConfigDialog<CalibrationTransformDialog>(this, &originalConfig, &editedConfig, &snapshot);
-        break;
-    case ToolType::TemplateLocation:
-        accepted = runToolConfigDialog<TemplateLocationDialog>(this, &originalConfig, &editedConfig, &snapshot);
-        break;
     default:
         qDebug() << "[ToolsDialog] Unsupported tool edit type:" << toolTypeToString(originalConfig.toolType);
         break;
@@ -1064,10 +683,6 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
     if (!accepted)
         return false;
 
-    const QVector<ToolConfig> configsBefore = m_toolConfigs;
-    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore =
-            m_toolPreviewSnapshots;
-    const int selectedIndexBefore = m_selectedToolIndex;
     editedConfig.toolId = originalConfig.toolId;
     editedConfig.toolType = originalConfig.toolType;
     editedConfig.category = originalConfig.category;
@@ -1076,10 +691,7 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
     storePreviewSnapshot(editedConfig, snapshot, true);
     refreshToolList();
     selectTool(index);
-    if (!commitToolStateToScheme(true)) {
-        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
-        return false;
-    }
+    commitToolStateToScheme(true);
     raise();
     activateWindow();
     return true;
@@ -1124,7 +736,6 @@ void ToolsDialog::refreshToolList()
     ui->verticalLayout_toolsList->addStretch(1);
     updateToolCardSelection();
     m_toolSerial = m_toolConfigs.size();
-    updateToolbarActionState();
 }
 
 void ToolsDialog::clearToolList()
@@ -1135,36 +746,6 @@ void ToolsDialog::clearToolList()
         delete item;
     }
     m_toolCards.clear();
-}
-
-void ToolsDialog::updateToolbarActionState()
-{
-    const bool hasSelection = m_selectedToolIndex >= 0
-            && m_selectedToolIndex < m_toolConfigs.size();
-    ui->copyToolButton->setEnabled(hasSelection);
-    ui->deleteToolButton->setEnabled(hasSelection);
-    ui->deleteAllToolsButton->setEnabled(!m_toolConfigs.isEmpty());
-}
-
-QStringList ToolsDialog::dependentToolsFor(int producerIndex) const
-{
-    QStringList dependents;
-    if (producerIndex < 0 || producerIndex >= m_toolConfigs.size())
-        return dependents;
-
-    const QString producerId = m_toolConfigs.at(producerIndex).toolId.trimmed();
-    if (producerId.isEmpty())
-        return dependents;
-
-    for (int index = producerIndex + 1; index < m_toolConfigs.size(); ++index) {
-        const ToolConfig &candidate = m_toolConfigs.at(index);
-        if (!containsToolReference(candidate.params, producerId))
-            continue;
-        const QString name = toolDisplayName(candidate).trimmed().isEmpty()
-                ? tr("未命名工具") : toolDisplayName(candidate);
-        dependents.append(tr("#%1 %2").arg(index + 1).arg(name));
-    }
-    return dependents;
 }
 
 QFrame *ToolsDialog::createToolCard(const ToolConfig &config, int index)
@@ -1227,7 +808,7 @@ QFrame *ToolsDialog::createToolCard(const ToolConfig &config, int index)
     QToolButton *gearButton = new QToolButton(card);
     gearButton->setObjectName(QStringLiteral("toolGearButton"));
     gearButton->setProperty("role", QStringLiteral("toolGear"));
-    gearButton->setIcon(QIcon(QStringLiteral(":/icons/settings-dark.svg")));
+    gearButton->setIcon(QIcon(QStringLiteral(":/icons/settings.svg")));
     gearButton->setIconSize(QSize(22, 22));
     gearButton->setToolTip(tr("编辑工具参数"));
     rowLayout->addWidget(gearButton);
@@ -1339,10 +920,6 @@ QString ToolsDialog::toolDisplayName(const ToolConfig &config) const
         return tr("分类");
     case ToolType::PositionCorrection:
         return tr("位置修正");
-    case ToolType::CalibrationTransform:
-        return tr("标定转换");
-    case ToolType::TemplateLocation:
-        return tr("模板定位");
     default:
         return toolTypeToString(config.toolType);
     }

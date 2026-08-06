@@ -9,12 +9,9 @@
 #include <QVector>
 
 #include "tooladapters/PatternPresenceAdapter.h"
-#include "tooladapters/PositionCorrectionAdapter.h"
-#include "tooladapters/TemplateLocationAdapter.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolEngine.h"
 #include "toolcore/ToolPreviewSnapshot.h"
-#include "PositionCorrectionDialogTestHelper.h"
 #include "toolcore/ToolResult.h"
 
 #include <opencv2/core.hpp>
@@ -46,8 +43,6 @@ struct PatternPresenceConfig
     QString detectRegionType = QStringLiteral("rectangle");
     bool enablePositionCorrection = true;
     QString positionCorrectionSource;
-    QString positionCorrectionSourceId;
-    bool showPositionCorrectionMatchContour = true;
     int minScore = 50;
     QString polarity;
     int scaleMin = 100;
@@ -75,10 +70,6 @@ public:
     ToolConfig toolConfig() const;
     ToolPreviewSnapshot referencePreviewSnapshot() const;
     void loadFromConfig(const ToolConfig &config);
-    void setToolChainTestContext(
-            const QVector<ToolConfig> &toolConfigs,
-            int currentToolIndex,
-            const ReferencePositionCorrectionConfig &referencePositionCorrection);
     QString summaryText() const;
 
 protected:
@@ -92,7 +83,6 @@ private slots:
     void enterTestMode();
     void exitTestMode();
     void runOnceInTestMode();
-    void importTestImageFromPc();
 
 private:
     enum class PresenceUiMode {
@@ -120,7 +110,6 @@ private:
     void startContinuousRun();
     void stopContinuousRun();
     void runContinuousTick();
-    void rerunImportedTest();
     void runReferenceTest();
     void runPatternPresenceOnFrame(const cv::Mat &frame,
                                    const QString &imageTitle,
@@ -154,13 +143,9 @@ private:
     QButtonGroup *m_resultPresenceGroup;
     FrameViewHelper *m_previewHelper = nullptr;
     QPushButton *m_exitTestButton = nullptr;
-    QPushButton *m_pcImportButton = nullptr;
     QTimer *m_continuousTimer = nullptr;
     PatternPresenceAdapter m_testPatternPresenceAdapter;
-    TemplateLocationAdapter m_testTemplateLocationAdapter;
-    PositionCorrectionAdapter m_testPositionCorrectionAdapter;
     ToolEngine m_testToolEngine;
-    PositionCorrectionDialogTestContext m_toolChainTestContext;
     QMetaObject::Connection m_frameUpdatedConnection;
     QString m_toolId;
     bool m_enabled = true;
@@ -169,9 +154,6 @@ private:
     QRectF m_templateRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QVector<QPointF> m_templatePolygonNormalized;
     QString m_modelCacheKey;
-    cv::Mat m_importedTestFrame;
-    QString m_importedTestImageTitle;
-    bool m_importedTestActive = false;
     PresenceUiMode m_uiMode = PresenceUiMode::Edit;
     RoiEditTarget m_roiEditTarget = RoiEditTarget::None;
     bool m_editingTemplateRoi = false;

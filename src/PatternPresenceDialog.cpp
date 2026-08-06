@@ -2,21 +2,14 @@
 #include "ui_PatternPresenceDialog.h"
 
 #include "PlanDialogUtils.h"
-#include "PositionCorrectionDialogTestHelper.h"
 
 #include <QButtonGroup>
-#include <QCheckBox>
 #include <QComboBox>
-#include <QCoreApplication>
 #include <QDebug>
-#include <QEventLoop>
 #include <QFontMetrics>
-#include <QFileDialog>
-#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSize>
@@ -31,14 +24,12 @@
 #include <exception>
 
 #include <opencv2/imgproc.hpp>
-#include <opencv2/imgcodecs.hpp>
 
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
-#include "toolcore/PositionCorrection.h"
 
 namespace {
 
@@ -230,14 +221,11 @@ PatternPresenceDialog::PatternPresenceDialog(QWidget *parent)
     ui->setupUi(this);
     m_toolId = QStringLiteral("pattern_presence_%1")
             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
-    m_testToolEngine.registerAdapter(&m_testTemplateLocationAdapter);
-    m_testToolEngine.registerAdapter(&m_testPositionCorrectionAdapter);
     m_testToolEngine.registerAdapter(&m_testPatternPresenceAdapter);
     m_continuousTimer = new QTimer(this);
     m_continuousTimer->setInterval(500);
     connect(m_continuousTimer, &QTimer::timeout, this, &PatternPresenceDialog::runContinuousTick);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
-    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     connectControls();
     setUiMode(PresenceUiMode::Edit);
@@ -290,9 +278,6 @@ PatternPresenceConfig PatternPresenceDialog::configuration() const
     config.positionCorrectionSource = basicMode
             ? ui->basicPositionCorrectionComboBox->currentText()
             : ui->positionCorrectionComboBox->currentText();
-    config.positionCorrectionSourceId = basicMode
-            ? ui->basicPositionCorrectionComboBox->currentData().toString().trimmed()
-            : ui->positionCorrectionComboBox->currentData().toString().trimmed();
     config.minScore = ui->minScoreSpinBox->value();
     config.polarity = ui->matchPolarityComboBox->currentText();
     config.scaleMin = ui->minScaleSpinBox->value();
@@ -341,13 +326,8 @@ ToolConfig PatternPresenceDialog::toToolConfig() const
     params.insert(QStringLiteral("templateSensitivityMode"), presenceConfig.templateSensitivityMode);
     params.insert(QStringLiteral("templateSensitivity"), presenceConfig.templateSensitivity);
     params.insert(QStringLiteral("detectRegionType"), presenceConfig.detectRegionType);
-    PositionCorrectionConfig correction;
-    correction.enabled = presenceConfig.enablePositionCorrection;
-    correction.source = presenceConfig.positionCorrectionSource;
-    correction.sourceId = presenceConfig.positionCorrectionSourceId;
-    PositionCorrection::writeParams(correction, &params);
-    params.insert(QStringLiteral("showPositionCorrectionMatchContour"),
-                  presenceConfig.showPositionCorrectionMatchContour);
+    params.insert(QStringLiteral("enablePositionCorrection"), presenceConfig.enablePositionCorrection);
+    params.insert(QStringLiteral("positionCorrectionSource"), presenceConfig.positionCorrectionSource);
     params.insert(QStringLiteral("minScore"), presenceConfig.minScore);
     params.insert(QStringLiteral("polarity"), presenceConfig.polarity);
     params.insert(QStringLiteral("scaleMin"), presenceConfig.scaleMin);
@@ -395,10 +375,6 @@ ToolPreviewSnapshot PatternPresenceDialog::referencePreviewSnapshot() const
 
 void PatternPresenceDialog::loadFromConfig(const ToolConfig &config)
 {
-    m_importedTestActive = false;
-    m_importedTestFrame.release();
-    m_importedTestImageTitle.clear();
-    updateBottomButtons();
     if (!config.toolId.trimmed().isEmpty())
         m_toolId = config.toolId;
     m_enabled = config.enabled;
@@ -422,13 +398,11 @@ void PatternPresenceDialog::loadFromConfig(const ToolConfig &config)
     ui->allSegmentButton->setChecked(allMode);
     ui->patternParamsStackedWidget->setCurrentWidget(allMode ? ui->allParamsPage : ui->basicParamsPage);
 
-    const PositionCorrectionConfig correction = PositionCorrection::fromParams(
-                params, ui->basicPositionCorrectionSwitch->isChecked());
-    const bool positionCorrection = correction.enabled;
+    const bool positionCorrection = params.value(QStringLiteral("enablePositionCorrection")).toBool(ui->basicPositionCorrectionSwitch->isChecked());
     ui->basicPositionCorrectionSwitch->setChecked(positionCorrection);
     ui->positionCorrectionSwitch->setChecked(positionCorrection);
-    setComboBoxValue(ui->basicPositionCorrectionComboBox, correction.source);
-    setComboBoxValue(ui->positionCorrectionComboBox, correction.source);
+    setComboBoxValue(ui->basicPositionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
+    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrectionSource")).toString());
     const int sensitivity = params.value(QStringLiteral("templateSensitivity")).toInt(ui->basicSensitivitySpinBox->value());
     ui->basicSensitivitySpinBox->setValue(sensitivity);
     ui->sensitivitySpinBox->setValue(sensitivity);
@@ -481,18 +455,6 @@ void PatternPresenceDialog::loadFromConfig(const ToolConfig &config)
     setViewerStatusText(roiText, roiText);
 }
 
-void PatternPresenceDialog::setToolChainTestContext(
-        const QVector<ToolConfig> &toolConfigs,
-        int currentToolIndex,
-        const ReferencePositionCorrectionConfig &referencePositionCorrection)
-{
-    m_toolChainTestContext.toolConfigs = toolConfigs;
-    m_toolChainTestContext.currentToolIndex = currentToolIndex;
-    m_toolChainTestContext.referencePositionCorrection =
-            referencePositionCorrection;
-    m_toolChainTestContext.valid = true;
-}
-
 QString PatternPresenceDialog::summaryText() const
 {
     const PatternPresenceConfig config = configuration();
@@ -533,10 +495,6 @@ void PatternPresenceDialog::setupUiState()
     m_exitTestButton->setMinimumSize(120, 48);
     m_exitTestButton->setProperty("actionRole", QStringLiteral("secondary"));
     ui->horizontalLayout_actions->addWidget(m_exitTestButton);
-    m_pcImportButton = new QPushButton(tr("PC导入图片"), this);
-    m_pcImportButton->setObjectName(QStringLiteral("patternPcImportButton"));
-    m_pcImportButton->setMinimumHeight(38);
-    ui->horizontalLayout_editorHeader->insertWidget(2, m_pcImportButton);
 
     ui->patternParamsStackedWidget->setCurrentWidget(ui->basicParamsPage);
     ui->basicSegmentButton->setChecked(true);
@@ -574,34 +532,9 @@ void PatternPresenceDialog::setupUiState()
 
 void PatternPresenceDialog::connectControls()
 {
-    connect(ui->basicPositionCorrectionSwitch, &QCheckBox::toggled,
-            ui->positionCorrectionSwitch, &QCheckBox::setChecked);
-    connect(ui->positionCorrectionSwitch, &QCheckBox::toggled,
-            ui->basicPositionCorrectionSwitch, &QCheckBox::setChecked);
-    const auto syncCorrectionSource = [](QComboBox *source, QComboBox *target, int index) {
-        if (!source || !target || index < 0)
-            return;
-        const int targetIndex = target->findData(source->itemData(index));
-        if (targetIndex >= 0 && targetIndex != target->currentIndex())
-            target->setCurrentIndex(targetIndex);
-    };
-    connect(ui->basicPositionCorrectionComboBox,
-            QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this, syncCorrectionSource](int index) {
-        syncCorrectionSource(ui->basicPositionCorrectionComboBox,
-                             ui->positionCorrectionComboBox, index);
-    });
-    connect(ui->positionCorrectionComboBox,
-            QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this, syncCorrectionSource](int index) {
-        syncCorrectionSource(ui->positionCorrectionComboBox,
-                             ui->basicPositionCorrectionComboBox, index);
-    });
     connect(ui->headerCloseButton, &QToolButton::clicked, this, &PatternPresenceDialog::reject);
     connect(ui->referenceTestButton, &QPushButton::clicked, this, &PatternPresenceDialog::runReferenceTest);
     connect(ui->testRunButton, &QPushButton::clicked, this, &PatternPresenceDialog::handleTestRunButton);
-    connect(m_pcImportButton, &QPushButton::clicked,
-            this, &PatternPresenceDialog::importTestImageFromPc);
     connect(ui->finishButton, &QPushButton::clicked, this, &PatternPresenceDialog::handleFinishButton);
     connect(m_exitTestButton, &QPushButton::clicked, this, &PatternPresenceDialog::exitTestMode);
 
@@ -788,10 +721,6 @@ void PatternPresenceDialog::finishConfiguration()
         return;
     }
 
-    if (m_importedTestActive) {
-        rerunImportedTest();
-        return;
-    }
     accept();
 }
 
@@ -802,10 +731,6 @@ void PatternPresenceDialog::showProviderImage(const QImage &image)
 
 void PatternPresenceDialog::handleTestRunButton()
 {
-    if (m_importedTestActive) {
-        rerunImportedTest();
-        return;
-    }
     if (m_uiMode == PresenceUiMode::Edit) {
         if (!ensureTemplatePolygonReadyForTest())
             return;
@@ -820,10 +745,6 @@ void PatternPresenceDialog::handleTestRunButton()
 
 void PatternPresenceDialog::handleFinishButton()
 {
-    if (m_importedTestActive) {
-        rerunImportedTest();
-        return;
-    }
     if (m_uiMode == PresenceUiMode::Edit) {
         finishConfiguration();
         return;
@@ -840,18 +761,11 @@ void PatternPresenceDialog::enterTestMode()
 void PatternPresenceDialog::exitTestMode()
 {
     stopContinuousRun();
-    m_importedTestActive = false;
-    m_importedTestFrame.release();
-    m_importedTestImageTitle.clear();
     setUiMode(PresenceUiMode::Edit);
 }
 
 void PatternPresenceDialog::runOnceInTestMode()
 {
-    if (m_importedTestActive) {
-        rerunImportedTest();
-        return;
-    }
     stopContinuousRun();
     setUiMode(PresenceUiMode::SingleShot);
 }
@@ -1077,7 +991,6 @@ void PatternPresenceDialog::handleRoiChanged(const QRectF &roi)
         const QString text = templateRoiStatusText();
         setViewerStatusText(text, text);
         qDebug() << "[PatternPresenceDialog] Template ROI normalized:" << m_templateRoiNormalized;
-        rerunImportedTest();
         return;
     }
 
@@ -1087,7 +1000,6 @@ void PatternPresenceDialog::handleRoiChanged(const QRectF &roi)
     const QString roiText = detectRoiStatusText();
     setViewerStatusText(roiText, roiText);
     qDebug() << "[PatternPresenceDialog] ROI normalized:" << m_roiNormalized;
-    rerunImportedTest();
 }
 
 void PatternPresenceDialog::handleTemplatePolygonChanged(const QVector<QPointF> &points)
@@ -1107,7 +1019,6 @@ void PatternPresenceDialog::handleTemplatePolygonChanged(const QVector<QPointF> 
     setViewerStatusText(text, text);
     qDebug() << "[PatternPresenceDialog] Template polygon normalized points:" << m_templatePolygonNormalized.size()
              << "bounding:" << m_templateRoiNormalized;
-    rerunImportedTest();
 }
 
 void PatternPresenceDialog::handlePolygonSelectionRejected(int pointCount)
@@ -1197,9 +1108,7 @@ void PatternPresenceDialog::showReferenceImage()
     if (!m_previewHelper)
         return;
 
-    const QImage image = m_importedTestActive && !m_importedTestFrame.empty()
-            ? imageFromFrame(m_importedTestFrame)
-            : ReferenceImageProvider::instance().referenceImage();
+    const QImage image = ReferenceImageProvider::instance().referenceImage();
     if (image.isNull()) {
         m_previewHelper->setRoiDrawingEnabled(false);
         m_previewHelper->clear();
@@ -1207,13 +1116,8 @@ void PatternPresenceDialog::showReferenceImage()
         return;
     }
 
-    ui->viewerTitleLabel->setText(
-                m_importedTestActive
-                ? (m_importedTestImageTitle.isEmpty()
-                   ? tr("PC导入图片") : m_importedTestImageTitle)
-                : tr("基准图"));
+    ui->viewerTitleLabel->setText(tr("基准图"));
     m_previewHelper->setImage(image);
-    m_previewHelper->clearToolOverlays();
     refreshDisplayedRoiOverlay();
 }
 
@@ -1238,10 +1142,6 @@ void PatternPresenceDialog::showSingleShotImage()
     if (!m_previewHelper)
         return;
 
-    if (m_importedTestActive) {
-        rerunImportedTest();
-        return;
-    }
     const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
     if (frame.empty()) {
         runPatternPresenceOnFrame(frame, tr("当前帧为空"));
@@ -1261,10 +1161,6 @@ void PatternPresenceDialog::showSingleShotImage()
 
 void PatternPresenceDialog::startContinuousRun()
 {
-    if (m_importedTestActive) {
-        rerunImportedTest();
-        return;
-    }
     setUiMode(PresenceUiMode::Continuous);
     if (m_continuousTimer && !m_continuousTimer->isActive())
         m_continuousTimer->start();
@@ -1342,12 +1238,7 @@ void PatternPresenceDialog::runReferenceTest()
 
     ToolResult result;
     try {
-        result = runPositionCorrectionAwareDialogTest(
-                    m_testToolEngine,
-                    request.config,
-                    request.image,
-                    request.referenceImage,
-                    &m_toolChainTestContext);
+        result = m_testToolEngine.runTool(request);
     } catch (const std::exception &error) {
         m_presenceRunning = false;
         displayPatternPresenceError(QStringLiteral("PatternPresence HALCON error"),
@@ -1390,12 +1281,7 @@ void PatternPresenceDialog::runPatternPresenceOnFrame(const cv::Mat &frame,
 
     ToolResult result;
     try {
-        result = runPositionCorrectionAwareDialogTest(
-                    m_testToolEngine,
-                    request.config,
-                    request.image,
-                    request.referenceImage,
-                    &m_toolChainTestContext);
+        result = m_testToolEngine.runTool(request);
     } catch (const std::exception &error) {
         m_presenceRunning = false;
         displayPatternPresenceError(QStringLiteral("PatternPresence HALCON error"),
@@ -1437,21 +1323,7 @@ void PatternPresenceDialog::displayPatternPresenceResult(const ToolResult &resul
     setViewerStatusText(displayText, makePresenceStatusTooltipText(result));
 
     if (m_previewHelper) {
-        bool hasRuntimeDetectRoi = false;
-        for (const ToolOverlay &overlay : result.overlays) {
-            if (overlay.extra.value(QStringLiteral("role")).toString()
-                    == QStringLiteral("detect_roi")) {
-                hasRuntimeDetectRoi = true;
-                break;
-            }
-        }
-        if (hasRuntimeDetectRoi) {
-            m_previewHelper->clearRoi();
-            m_previewHelper->clearPolygonRoi();
-            m_previewHelper->clearCircleRoi();
-        } else {
-            refreshDisplayedRoiOverlay();
-        }
+        m_previewHelper->setRoiRectNormalized(m_roiNormalized);
         m_previewHelper->setToolOverlays(result.overlays);
     }
 }
@@ -1511,14 +1383,6 @@ void PatternPresenceDialog::updateBottomButtons()
     if (!m_exitTestButton)
         return;
 
-    if (m_importedTestActive && !m_importedTestFrame.empty()) {
-        ui->referenceTestButton->hide();
-        ui->testRunButton->setText(tr("测试运行（导入图）"));
-        ui->finishButton->setText(tr("运行一次"));
-        m_exitTestButton->show();
-        return;
-    }
-
     if (m_uiMode != PresenceUiMode::Edit) {
         ui->referenceTestButton->hide();
         ui->testRunButton->setText(tr("连续运行"));
@@ -1531,46 +1395,6 @@ void PatternPresenceDialog::updateBottomButtons()
     ui->testRunButton->setText(tr("测试运行"));
     ui->finishButton->setText(tr("完成"));
     m_exitTestButton->hide();
-}
-
-void PatternPresenceDialog::importTestImageFromPc()
-{
-    const QString fileName = QFileDialog::getOpenFileName(
-                this, tr("PC导入测试图片"), QString(),
-                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
-    if (fileName.trimmed().isEmpty())
-        return;
-
-    const cv::Mat frame = cv::imread(fileName.toLocal8Bit().constData(),
-                                     cv::IMREAD_UNCHANGED);
-    if (frame.empty()) {
-        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
-        return;
-    }
-
-    stopContinuousRun();
-    m_importedTestFrame = frame.clone();
-    m_importedTestImageTitle = QFileInfo(fileName).fileName();
-    m_importedTestActive = true;
-    m_uiMode = PresenceUiMode::TestReady;
-    updateBottomButtons();
-    rerunImportedTest();
-}
-
-void PatternPresenceDialog::rerunImportedTest()
-{
-    if (!m_importedTestActive || m_importedTestFrame.empty() || m_presenceRunning)
-        return;
-    if (!ensureTemplatePolygonReadyForTest())
-        return;
-
-    showReferenceImage();
-    setViewerStatusText(tr("正在重新执行模板定位、位置修正和图案检测…"));
-    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-    runPatternPresenceOnFrame(
-                m_importedTestFrame.clone(),
-                m_importedTestImageTitle.isEmpty()
-                ? tr("PC导入图片") : m_importedTestImageTitle);
 }
 
 void PatternPresenceDialog::fitPreview()

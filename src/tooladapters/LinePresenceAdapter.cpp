@@ -1,8 +1,6 @@
 #include "tooladapters/LinePresenceAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
-#include "toolcore/PositionCorrection.h"
-#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonObject>
 #include <QJsonValue>
@@ -181,21 +179,7 @@ ToolResult LinePresenceAdapter::run(const ToolRequest &request)
                                      QStringLiteral("LinePresenceAdapter only supports ToolType::LinePresence."));
     }
 
-    LinePresenceHalconConfig halconConfig = toHalconConfig(config);
-    const PositionCorrectionConfig savedCorrection =
-            PositionCorrection::fromParams(config.params);
-    PositionCorrectionConsumerOptions correctionOptions;
-    correctionOptions.requested = savedCorrection.enabled;
-    correctionOptions.sourceId = savedCorrection.sourceId;
-    correctionOptions.showMatchContour = boolParam(
-                config.params, QStringLiteral("showPositionCorrectionMatchContour"), true);
-    const PositionCorrectionResolveResult correction =
-            PositionCorrectionConsumer::resolve(request, correctionOptions);
-    if (!correction.success)
-        return makeLinePresenceError(config, correction.status, correction.message);
-    halconConfig.enablePositionCorrection = savedCorrection.enabled;
-    halconConfig.positionCorrectionSource = savedCorrection.source;
-    halconConfig.positionCorrection = correction.context;
+    const LinePresenceHalconConfig halconConfig = toHalconConfig(config);
     const LinePresenceHalconResult runnerResult = m_runner.run(request.image, halconConfig);
 
     ToolResult result;

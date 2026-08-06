@@ -25,18 +25,20 @@ void ReferenceImageProvider::setReferenceFrame(const cv::Mat &frame,
         return;
     }
 
+    FrameInputMetadata resolvedMetadata = metadata;
+    if (resolvedMetadata.colorMode == QStringLiteral("unknown")
+            && resolvedMetadata.pixelFormat.isEmpty()
+            && resolvedMetadata.originalChannels == 0
+            && resolvedMetadata.originalDepth < 0
+            && resolvedMetadata.source.isEmpty()) {
+        resolvedMetadata = FrameInputMetadata::fromMat(frame, QStringLiteral("reference"));
+    }
+
     const cv::Mat normalized = normalizeFrame(frame);
     if (normalized.empty()) {
         clearReferenceFrame();
         return;
     }
-
-    // ReferenceImageProvider stores the normalized Mat. Runtime metadata must describe
-    // that Mat rather than the camera/file representation that existed before conversion.
-    const QString source = metadata.source.trimmed().isEmpty()
-            ? QStringLiteral("reference") : metadata.source;
-    const FrameInputMetadata resolvedMetadata =
-            FrameInputMetadata::fromMat(normalized, source);
 
     {
         QMutexLocker locker(&m_mutex);
@@ -96,11 +98,6 @@ void ReferenceImageProvider::clearReferenceFrame()
     emit referenceFrameChanged(QImage());
 }
 
-cv::Mat ReferenceImageProvider::normalizeReferenceFrame(const cv::Mat &frame)
-{
-    return normalizeFrame(frame);
-}
-
 QImage ReferenceImageProvider::matToImage(const cv::Mat &frame)
 {
     return MatImageConverter::matToDisplayImage(frame, QStringLiteral("ReferenceImageProvider"));
@@ -111,16 +108,16 @@ cv::Mat ReferenceImageProvider::normalizeFrame(const cv::Mat &frame)
     if (frame.empty())
         return cv::Mat();
 
-    cv::Mat normalized;
-    if ((frame.depth() == CV_8U || frame.depth() == CV_16U) && frame.channels() == 3)
+    if (frame.type() == CV_8UC3)
         return frame.clone();
 
-    if ((frame.depth() == CV_8U || frame.depth() == CV_16U) && frame.channels() == 1) {
+    cv::Mat normalized;
+    if (frame.type() == CV_8UC1) {
         cv::cvtColor(frame, normalized, cv::COLOR_GRAY2BGR);
         return normalized;
     }
 
-    if ((frame.depth() == CV_8U || frame.depth() == CV_16U) && frame.channels() == 4) {
+    if (frame.type() == CV_8UC4) {
         cv::cvtColor(frame, normalized, cv::COLOR_BGRA2BGR);
         return normalized;
     }

@@ -42,7 +42,6 @@ public:
         EdgeLocationButton,     //边缘定位
         CircleLocationButton,   //圆定位
         PositionCorrectionTool,
-        CalibrationTransformTool,
 
         //识别工具
         ColorRecognition,       //颜色识别

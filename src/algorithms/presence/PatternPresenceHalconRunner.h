@@ -1,7 +1,6 @@
 #ifndef ALGORITHMS_PRESENCE_PATTERNPRESENCEHALCONRUNNER_H
 #define ALGORITHMS_PRESENCE_PATTERNPRESENCEHALCONRUNNER_H
 
-#include "toolcore/PositionCorrectionConsumer.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -33,7 +32,6 @@ struct PatternPresenceHalconConfig
     QVector<QPointF> detectPolygonNormalized;
     bool enablePositionCorrection = true;
     QString positionCorrectionSource;
-    PositionCorrectionContext positionCorrection;
     int minScore = 50;
     QString polarity = QStringLiteral("consider");
     int scaleMin = 100;
@@ -41,12 +39,6 @@ struct PatternPresenceHalconConfig
     int angleStart = -45;
     int angleExtent = 90;
     int timeoutMs = 2000;
-    QString contrastMode = QStringLiteral("mapped");
-    int contrast = 40;
-    int minContrast = 10;
-    int numLevels = 0;
-    QString subPixel = QStringLiteral("least_squares");
-    double greediness = 0.5;
     bool showContourPoints = false;
     bool debugPolygonLog = false;
     QString sortMode;

@@ -1,7 +1,7 @@
 #ifndef ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONHALCONRUNNER_H
 #define ALGORITHMS_RECOGNITION_REGISTEREDCLASSIFICATIONHALCONRUNNER_H
 
-#include "toolcore/PositionCorrectionConsumer.h"
+#include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -20,9 +20,7 @@ struct RegisteredClassificationHalconConfig
     QString modelType = QStringLiteral("halcon_knn_registered_classification");
     QString detectRegionType = QStringLiteral("full");
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
-    bool enablePositionCorrection = false;
-    QString positionCorrectionSource;
-    PositionCorrectionContext positionCorrection;
+    PositionCorrectionConfig positionCorrection;
     int topK = 1;
     QString judgeMode = QStringLiteral("class_match");
     QString expectedLabel;

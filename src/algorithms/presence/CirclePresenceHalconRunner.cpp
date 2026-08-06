@@ -1,8 +1,5 @@
 #include "algorithms/presence/CirclePresenceHalconRunner.h"
 
-#include "algorithms/location/PositionCorrectionHalconTransform.h"
-#include "toolcore/PositionCorrectionTransform.h"
-
 #include <HalconC.h>
 
 #include <QElapsedTimer>
@@ -59,14 +56,6 @@ QJsonArray pointsToJson(const QVector<QPointF> &points)
     QJsonArray array;
     for (const QPointF &point : points)
         array.append(pointToJson(point));
-    return array;
-}
-
-QJsonArray doublesToJson(const QVector<double> &values)
-{
-    QJsonArray array;
-    for (const double value : values)
-        array.append(value);
     return array;
 }
 
@@ -361,27 +350,8 @@ void fillPayload(CirclePresenceHalconResult &result,
     result.payload.insert(QStringLiteral("countMinUsed"), 1);
     result.payload.insert(QStringLiteral("countMaxUsed"), std::numeric_limits<int>::max());
     result.payload.insert(QStringLiteral("countRangeSource"), QStringLiteral("internal_default"));
-    result.payload.insert(QStringLiteral("positionCorrectionRequested"),
-                      config.positionCorrection.requested);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"),
-                    config.positionCorrection.applied);
-    result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
-                    config.positionCorrection.sourceId);
-    result.payload.insert(QStringLiteral("positionCorrectionReason"),
-                    config.positionCorrection.applied
-                    ? QStringLiteral("applied")
-                    : QStringLiteral("not_requested"));
-    result.payload.insert(QStringLiteral("referenceToRunHomMat2D"),
-                    doublesToJson(
-                        config.positionCorrection.referenceToRunHomMat2D));
-    result.payload.insert(QStringLiteral("referenceScale"),
-                    config.positionCorrection.referenceScale);
-    result.payload.insert(QStringLiteral("runScale"),
-                    config.positionCorrection.runScale);
-    result.payload.insert(QStringLiteral("scaleRatio"),
-                    config.positionCorrection.scaleRatio);
-    result.payload.insert(QStringLiteral("showPositionCorrectionMatchContour"),
-                    config.positionCorrection.showMatchContour);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
     result.payload.insert(QStringLiteral("maskApplied"), false);
     result.payload.insert(QStringLiteral("detectMaskApplied"), false);
     result.payload.insert(QStringLiteral("polygonDetectRoiApplied"), false);
@@ -412,7 +382,6 @@ struct HalconCApi
     using GetErrorTextFn = Herror (*)(Hlong, char *);
     using CreateTupleFn = void (*)(Htuple *, Hlong);
     using SetDoubleFn = void (*)(Htuple *, double, Hlong);
-    using SetStringFn = void (*)(Htuple *, const char *, Hlong);
     using DestroyTupleFn = void (*)(Htuple *);
     using GetDoubleFn = double (*)(const Htuple *, Hlong);
     using GenImage1Fn = Herror (*)(Hobject *, const char *, Hlong, Hlong, Hlong);
@@ -421,11 +390,8 @@ struct HalconCApi
     using Rgb1ToGrayFn = Herror (*)(const Hobject, Hobject *);
     using BinaryThresholdFn = Herror (*)(const Hobject, Hobject *, const char *, const char *, Hlong *);
     using ThresholdFn = Herror (*)(const Hobject, Hobject *, double, double);
-    using GenRegionPolygonFilledFn = Herror (*)(Hobject *, const Htuple, const Htuple);
+    using GenRegionPolygonFn = Herror (*)(Hobject *, const Htuple, const Htuple);
     using GenCircleFn = Herror (*)(Hobject *, double, double, double);
-    using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
-    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *,const Htuple, const Htuple);
-    using ClipRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple, const Htuple, const Htuple, const Htuple);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using ConnectionFn = Herror (*)(const Hobject, Hobject *);
     using SelectShapeFn = Herror (*)(const Hobject, Hobject *, const char *, const char *, double, double);
@@ -439,7 +405,6 @@ struct HalconCApi
     GetErrorTextFn getErrorText = nullptr;
     CreateTupleFn createTuple = nullptr;
     SetDoubleFn setDouble = nullptr;
-    SetStringFn setString = nullptr;
     DestroyTupleFn destroyTuple = nullptr;
     GetDoubleFn getDouble = nullptr;
     GenImage1Fn genImage1 = nullptr;
@@ -447,11 +412,8 @@ struct HalconCApi
     Rgb1ToGrayFn rgb1ToGray = nullptr;
     BinaryThresholdFn binaryThreshold = nullptr;
     ThresholdFn threshold = nullptr;
-    GenRegionPolygonFilledFn genRegionPolygonFilled = nullptr;
+    GenRegionPolygonFn genRegionPolygon = nullptr;
     GenCircleFn genCircle = nullptr;
-    GenRectangle1Fn genRectangle1 = nullptr;
-    AffineTransRegionFn affineTransRegion = nullptr;
-    ClipRegionFn clipRegion = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
     ConnectionFn connection = nullptr;
     SelectShapeFn selectShape = nullptr;
@@ -513,14 +475,10 @@ public:
         resolveOptional(m_handle, api.setUtf8, "SetHcInterfaceStringEncodingIsUtf8");
         resolveOptional(m_handle, api.createTuple, "F_create_tuple");
         resolveOptional(m_handle, api.setDouble, "F_set_d");
-        resolveOptional(m_handle, api.setString, "F_set_s");
-        resolveOptional(m_handle,
-                        api.genRegionPolygonFilled,
-                        "T_gen_region_polygon_filled");
+        resolveOptional(m_handle, api.genRegionPolygon, "T_gen_region_polygon");
+        if (!api.genRegionPolygon)
+            resolveOptional(m_handle, api.genRegionPolygon, "gen_region_polygon");
         resolveOptional(m_handle, api.genCircle, "gen_circle");
-        resolveOptional(m_handle, api.genRectangle1, "gen_rectangle1");
-        resolveOptional(m_handle, api.affineTransRegion, "T_affine_trans_region");
-        resolveOptional(m_handle, api.clipRegion, "T_clip_region");
         resolveOptional(m_handle, api.reduceDomain, "reduce_domain");
 
         if (!resolveRequired(m_handle, api.getErrorText, "get_error_text", errorMessage) ||
@@ -555,21 +513,6 @@ public:
 private:
     void *m_handle = nullptr;
 };
-
-PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
-        const HalconCApi &api)
-{
-    PositionCorrectionHalconRegionApi transformApi;
-    transformApi.createTuple = api.createTuple;
-    transformApi.setDouble = api.setDouble;
-    transformApi.setString = api.setString;
-    transformApi.destroyTuple = api.destroyTuple;
-    transformApi.getDouble = api.getDouble;
-    transformApi.affineTransRegion = api.affineTransRegion;
-    transformApi.clipRegion = api.clipRegion;
-    transformApi.areaCenter = api.areaCenter;
-    return transformApi;
-}
 
 struct GrayHalconImage
 {
@@ -735,13 +678,10 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
     const QString edgeTypeRequested = normalizedEdgeType(config.edgeType);
     const bool manualEdgeTypeUnsupported = edgeTypeRequested == QStringLiteral("manual");
     const QString edgeTypeUsed = manualEdgeTypeUnsupported ? QStringLiteral("strongest") : edgeTypeRequested;
-    const bool correctionApplied = config.positionCorrection.applied;
-    const double correctionScale = correctionApplied ? config.positionCorrection.scaleRatio : 1.0;
     const double radiusMinUsed = 3.0;
     const double radiusMaxUsed = qMax(radiusMinUsed,
-            static_cast<double>(
-                qMin(detectRoiPixels.width(),detectRoiPixels.height()))
-                / 2.0 * correctionScale);
+                                      static_cast<double>(qMin(detectRoiPixels.width(),
+                                                               detectRoiPixels.height())) / 2.0);
     const double areaMinUsed = kPi * radiusMinUsed * radiusMinUsed;
     const double areaMaxUsed = kPi * radiusMaxUsed * radiusMaxUsed;
     const int countMinUsed = 1;
@@ -794,49 +734,19 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
     result.payload.insert(QStringLiteral("edgeTypeUsed"), edgeTypeUsed);
     result.payload.insert(QStringLiteral("edgeTypeApplied"), true);
     result.payload.insert(QStringLiteral("manualUnsupported"), manualEdgeTypeUnsupported);
-    ToolOverlay detectOverlay;
-    if (polygonDetectRoi && detectPolygonPixels.size() >= 3) {
-        detectOverlay = polygonOverlay(detectPolygonPixels,
-                                    QStringLiteral("detect_roi"));
-    } else if (circleDetectRoi && detectCircleRadiusPixels > 0.0) {
-        detectOverlay = circleOverlay(detectCircleCenterPixels,
-                                    detectCircleRadiusPixels,
-                                    QStringLiteral("detect_roi"));
-    } else {
-        detectOverlay = rectOverlay(QRectF(detectRoiPixels),
-                                    QStringLiteral("detect_roi"));
-    }
+    if (polygonDetectRoi && detectPolygonPixels.size() >= 3)
+        result.overlays.append(polygonOverlay(detectPolygonPixels, QStringLiteral("detect_roi")));
+    else if (circleDetectRoi && detectCircleRadiusPixels > 0.0)
+        result.overlays.append(circleOverlay(detectCircleCenterPixels,
+                                             detectCircleRadiusPixels,
+                                             QStringLiteral("detect_roi")));
+    else
+        result.overlays.append(rectOverlay(QRectF(detectRoiPixels), QStringLiteral("detect_roi")));
 
-    if (correctionApplied) {
-        detectOverlay = PositionCorrectionTransform::transformOverlay(
-                    detectOverlay,
-                    config.positionCorrection.referenceToRunHomMat2D);
-        detectOverlay.extra.insert(
-                    QStringLiteral("positionCorrectionSourceId"),
-                    config.positionCorrection.sourceId);
-    }
-
-    detectOverlay.extra.insert(QStringLiteral("role"),
-                            QStringLiteral("detect_roi"));
-    result.overlays.append(detectOverlay);
-
-    if (correctionApplied && config.positionCorrection.showMatchContour) {
-        result.overlays += PositionCorrectionTransform::matchContourOverlays(
-                    config.positionCorrection.matchContours,
-                    config.positionCorrection.sourceId);
-    }
-
-    if (correctionApplied) {
-        result.overlays += PositionCorrectionTransform::matchOriginOverlays(
-                    config.positionCorrection.matchOrigins,
-                    config.positionCorrection.sourceId);
-    }
-    cv::Mat detectMat = correctionApplied
-                        ? image.clone()
-                        : image(cv::Rect(detectRoiPixels.x(),
-                                        detectRoiPixels.y(),
-                                        detectRoiPixels.width(),
-                                        detectRoiPixels.height())).clone();
+    cv::Mat detectMat = image(cv::Rect(detectRoiPixels.x(),
+                                       detectRoiPixels.y(),
+                                       detectRoiPixels.width(),
+                                       detectRoiPixels.height())).clone();
     if (detectMat.empty()) {
         CirclePresenceHalconResult errorResult = makeParameterError(QStringLiteral("invalid_detect_roi"),
                                                                     QStringLiteral("detect ROI is invalid"),
@@ -869,8 +779,6 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
     HalconCApi *api = &library.api;
     GrayHalconImage detectImage;
     Hobject detectRoiRegion = NO_OBJECTS;
-    Hobject transformedDetectRoiRegion = NO_OBJECTS;
-    Hobject clippedDetectRoiRegion = NO_OBJECTS;
     Hobject detectReducedImage = NO_OBJECTS;
     Htuple polygonRowsTuple = HTUPLE_INITIALIZER;
     Htuple polygonColumnsTuple = HTUPLE_INITIALIZER;
@@ -901,8 +809,6 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
         destroyTuple(polygonColumnsTuple);
         destroyTuple(polygonRowsTuple);
         clearObject(detectReducedImage);
-        clearObject(clippedDetectRoiRegion);
-        clearObject(transformedDetectRoiRegion);
         clearObject(detectRoiRegion);
         clearObject(detectImage.grayImage);
         clearObject(detectImage.inputImage);
@@ -1091,10 +997,8 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
                     if (radius < radiusMinUsed || radius > radiusMaxUsed)
                         continue;
 
-                    const double coordinateOffsetX = correctionApplied ? 0.0 : detectRoiPixels.x();
-                    const double coordinateOffsetY = correctionApplied ? 0.0 : detectRoiPixels.y();
-                    const QPointF center(localCol + coordinateOffsetX,
-                                            localRow + coordinateOffsetY);
+                    const QPointF center(localCol + detectRoiPixels.x(),
+                                         localRow + detectRoiPixels.y());
                     if (isDuplicateCircle(detectedCircles, center, radius))
                         continue;
 
@@ -1135,134 +1039,12 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
         generateGrayImage(detectMat, detectImage, QStringLiteral("detect"));
         thresholdSource = detectImage.graySource;
 
-        if (correctionApplied) {
-            if (!api->reduceDomain
-                    || !api->affineTransRegion
-                    || !api->clipRegion
-                    || !api->setString) {
-                throw std::pair<QString, QString>(
-                        QStringLiteral("CirclePresence HALCON error"),
-                        QStringLiteral(
-                            "HALCON position-correction ROI symbols are unavailable"));
-            }
-            if (polygonDetectRoi) {
-                if (detectPolygonPixels.size() < 3
-                        || !api->genRegionPolygonFilled) {
-                    throw std::pair<QString, QString>(
-                            QStringLiteral("CirclePresence HALCON error"),
-                            QStringLiteral(
-                                "polygon detect ROI requires HALCON polygon support"));
-                }
-
-                QVector<double> rows;
-                QVector<double> columns;
-                rows.reserve(detectPolygonPixels.size());
-                columns.reserve(detectPolygonPixels.size());
-
-                for (const QPointF &point : detectPolygonPixels) {
-                    rows.append(point.y());
-                    columns.append(point.x());
-                }
-                if (!rows.isEmpty()
-                        && (rows.first() != rows.last()
-                            || columns.first() != columns.last())) {
-                    rows.append(rows.first());
-                    columns.append(columns.first());
-                }
-
-                createDoubleArrayTuple(polygonRowsTuple, rows);
-                createDoubleArrayTuple(polygonColumnsTuple, columns);
-                checkStatus(api->genRegionPolygonFilled(
-                                &detectRoiRegion,
-                                polygonRowsTuple,
-                                polygonColumnsTuple),
-                            QStringLiteral(
-                                "gen_region_polygon_filled.reference_roi"));
-            } else if (circleDetectRoi) {
-                if (detectCircleRadiusPixels <= 0.0 || !api->genCircle) {
-                    throw std::pair<QString, QString>(
-                            QStringLiteral("CirclePresence HALCON error"),
-                            QStringLiteral(
-                                "circle detect ROI requires HALCON circle support"));
-                }
-
-                checkStatus(api->genCircle(
-                                &detectRoiRegion,
-                                detectCircleCenterPixels.y(),
-                                detectCircleCenterPixels.x(),
-                                detectCircleRadiusPixels),
-                            QStringLiteral("gen_circle.reference_roi"));
-            } else {
-                if (!api->genRectangle1) {
-                    throw std::pair<QString, QString>(
-                            QStringLiteral("CirclePresence HALCON error"),
-                            QStringLiteral(
-                                "HALCON rectangle ROI symbol is unavailable"));
-                }
-
-                checkStatus(api->genRectangle1(
-                                &detectRoiRegion,
-                                detectRoiPixels.top(),
-                                detectRoiPixels.left(),
-                                detectRoiPixels.bottom(),
-                                detectRoiPixels.right()),
-                            QStringLiteral("gen_rectangle1.reference_roi"));
-            }
-            const PositionCorrectionHalconTransformResult transformed =
-                PositionCorrectionHalconTransform::transformAndClipRegion(
-                positionCorrectionRegionApi(*api),
-                detectRoiRegion,
-                &transformedDetectRoiRegion,
-                &clippedDetectRoiRegion,
-                config.positionCorrection.referenceToRunHomMat2D,
-                image.cols,
-                image.rows);
-
-            if (!transformed.success) {
-                if (transformed.halconStatus != H_MSG_OK) {
-                    checkStatus(
-                                transformed.halconStatus,
-                                QStringLiteral("position_correction.%1")
-                                .arg(transformed.operation));
-                }
-
-                throw std::pair<QString, QString>(
-                        transformed.status,
-                        QStringLiteral(
-                            "Position-corrected Circle ROI is invalid (%1)")
-                        .arg(transformed.operation));
-            }
-
-            if (transformed.area <= 0.0) {
-                throw std::pair<QString, QString>(
-                        QStringLiteral("corrected_roi_out_of_image"),
-                        QStringLiteral(
-                            "Position-corrected Circle ROI is outside the image"));
-            }
-
-            checkStatus(api->reduceDomain(
-                            detectImage.graySource,
-                            clippedDetectRoiRegion,
-                            &detectReducedImage),
-                        QStringLiteral("reduce_domain.corrected_roi"));
-
-            thresholdSource = detectReducedImage;
-
-            result.payload.insert(QStringLiteral("correctedRoiArea"),
-                                transformed.area);
-            result.payload.insert(QStringLiteral("detectMaskApplied"), true);
-            result.payload.insert(QStringLiteral("detectRoiRegionApplied"), true);
-
-            if (polygonDetectRoi)
-                result.payload.insert(QStringLiteral("polygonDetectRoiApplied"), true);
-            else if (circleDetectRoi)
-                result.payload.insert(QStringLiteral("circleDetectRoiApplied"), true);
-        } else if (polygonDetectRoi) {
+        if (polygonDetectRoi) {
             if (detectPolygonPixels.size() < 3)
                 throw std::pair<QString, QString>(
                         QStringLiteral("CirclePresence HALCON error"),
                         QStringLiteral("polygon detect ROI requires at least 3 points"));
-            if (!api->genRegionPolygonFilled || !api->reduceDomain)
+            if (!api->genRegionPolygon || !api->reduceDomain)
                 throw std::pair<QString, QString>(
                         QStringLiteral("CirclePresence HALCON error"),
                         QStringLiteral("HALCON polygon ROI symbols are unavailable"));
@@ -1279,21 +1061,13 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
                                       point.x() - static_cast<double>(detectRoiPixels.x()),
                                       static_cast<double>(detectMat.cols - 1)));
             }
-            if (!rows.isEmpty()
-                    && (rows.first() != rows.last()
-                        || columns.first() != columns.last())) {
-                rows.append(rows.first());
-                columns.append(columns.first());
-            }
 
             createDoubleArrayTuple(polygonRowsTuple, rows);
             createDoubleArrayTuple(polygonColumnsTuple, columns);
-            checkStatus(api->genRegionPolygonFilled(
-                            &detectRoiRegion,
-                            polygonRowsTuple,
-                            polygonColumnsTuple),
-                        QStringLiteral(
-                            "gen_region_polygon_filled.detect_roi"));
+            checkStatus(api->genRegionPolygon(&detectRoiRegion,
+                                              polygonRowsTuple,
+                                              polygonColumnsTuple),
+                        QStringLiteral("gen_region_polygon.detect_roi"));
             checkStatus(api->reduceDomain(detectImage.graySource,
                                           detectRoiRegion,
                                           &detectReducedImage),
@@ -1498,19 +1272,14 @@ CirclePresenceHalconResult CirclePresenceHalconRunner::run(
         result.payload.insert(QStringLiteral("mode"), QStringLiteral("region"));
         result.payload.insert(QStringLiteral("caliperModeAvailable"), false);
         result.payload.insert(QStringLiteral("caliperModeApplied"), false);
+        result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+        result.payload.insert(QStringLiteral("positionCorrectionReason"), QStringLiteral("not implemented"));
         result.payload.insert(QStringLiteral("maskApplied"), false);
         result.payload.insert(QStringLiteral("okNgReason"), okNgReason);
         result.payload.insert(QStringLiteral("text"), result.text);
 
-        QPointF countPosition = countOverlayPosition(
-                        detectRoiPixels,
-                        QSize(image.cols, image.rows));
-
-        if (correctionApplied) {
-            countPosition = PositionCorrectionTransform::transformPoint(
-                        countPosition,
-                        config.positionCorrection.referenceToRunHomMat2D);
-        }
+        const QPointF countPosition = countOverlayPosition(detectRoiPixels,
+                                                           QSize(image.cols, image.rows));
         result.overlays.append(textOverlay(countPosition,
                                            QStringLiteral("count=%1").arg(circleCount),
                                            QStringLiteral("circle_count_text"),
