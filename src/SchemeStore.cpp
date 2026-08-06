@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -46,55 +47,172 @@ QVector<ToolConfig> toolConfigsFromJson(const QJsonArray &array)
     return configs;
 }
 
-bool copyCalibrationAssetsForScheme(const QString &sourceSchemeDir,
-                                    SchemeState *targetScheme,
-                                    QString *errorMessage)
+class SaveFileRollback
 {
-    if (!targetScheme)
+public:
+    ~SaveFileRollback()
+    {
+        if (m_committed)
+            return;
+        for (auto it = m_files.crbegin(); it != m_files.crend(); ++it)
+            QFile::remove(*it);
+        for (auto it = m_directories.crbegin(); it != m_directories.crend(); ++it)
+            QDir().rmdir(*it);
+    }
+
+    void trackFile(const QString &path) { m_files.append(path); }
+    void trackDirectory(const QString &path) { m_directories.append(path); }
+    void commit() { m_committed = true; }
+
+private:
+    QStringList m_files;
+    QStringList m_directories;
+    bool m_committed = false;
+};
+
+bool materializeCalibrationAssetsForScheme(SchemeState *scheme,
+                                           SaveFileRollback *rollback,
+                                           QString *errorMessage)
+{
+    if (!scheme || !rollback)
         return false;
-    const QString sourceRoot = QDir(sourceSchemeDir).absolutePath() + QDir::separator();
-    QDir targetAssetDir(QDir(targetScheme->schemeDir).filePath(QStringLiteral("calibrations")));
-    QMap<QString, QString> copiedPaths;
-    for (ToolConfig &tool : targetScheme->toolConfigs) {
+
+    const QString assetDirectoryPath = QDir(scheme->schemeDir)
+            .filePath(QStringLiteral("calibrations"));
+    QDir targetAssetDir(assetDirectoryPath);
+    const QString targetAssetRoot = QDir::cleanPath(
+                QFileInfo(assetDirectoryPath).absoluteFilePath()) + QDir::separator();
+    QMap<QString, QString> materializedPaths;
+
+    auto materialize = [&](const QString &sourceValue, QString *targetPath) -> bool {
+        const QString trimmed = sourceValue.trimmed();
+        if (trimmed.isEmpty()) {
+            if (targetPath)
+                targetPath->clear();
+            return true;
+        }
+        const QString sourcePath = QDir::cleanPath(
+                    QFileInfo(trimmed).absoluteFilePath());
+        const QString cached = materializedPaths.value(sourcePath);
+        if (!cached.isEmpty()) {
+            if (targetPath)
+                *targetPath = cached;
+            return true;
+        }
+
+        const QFileInfo sourceInfo(sourcePath);
+        if (!sourceInfo.exists() || !sourceInfo.isFile() || !sourceInfo.isReadable()) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("标定资产不存在或不可读: %1").arg(sourcePath);
+            return false;
+        }
+        if (sourcePath.startsWith(targetAssetRoot)) {
+            materializedPaths.insert(sourcePath, sourcePath);
+            if (targetPath)
+                *targetPath = sourcePath;
+            return true;
+        }
+
+        const bool assetDirectoryExisted = targetAssetDir.exists();
+        if (!assetDirectoryExisted && !QDir().mkpath(assetDirectoryPath)) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("无法创建方案标定资产目录");
+            return false;
+        }
+        if (!assetDirectoryExisted) {
+            rollback->trackDirectory(QDir::cleanPath(
+                                         QFileInfo(assetDirectoryPath).absoluteFilePath()));
+            targetAssetDir = QDir(assetDirectoryPath);
+        }
+
+        QFile sourceFile(sourcePath);
+        if (!sourceFile.open(QIODevice::ReadOnly)) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("无法读取标定资产: %1").arg(sourcePath);
+            return false;
+        }
+        const QByteArray sourceBytes = sourceFile.readAll();
+        sourceFile.close();
+        const QByteArray digest = QCryptographicHash::hash(
+                    sourceBytes, QCryptographicHash::Sha256).toHex();
+        const QString suffix = sourceInfo.suffix().trimmed();
+        if (suffix.isEmpty()) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("标定资产缺少文件扩展名: %1").arg(sourcePath);
+            return false;
+        }
+        const QString baseName = sourceInfo.completeBaseName().trimmed().isEmpty()
+                ? QStringLiteral("calibration") : sourceInfo.completeBaseName();
+        const QString destination = targetAssetDir.filePath(
+                    QStringLiteral("%1_%2.%3")
+                    .arg(baseName, QString::fromLatin1(digest.left(12)), suffix));
+        if (QFileInfo::exists(destination)) {
+            QFile existing(destination);
+            if (!existing.open(QIODevice::ReadOnly)
+                    || QCryptographicHash::hash(existing.readAll(),
+                                                QCryptographicHash::Sha256).toHex()
+                    != digest) {
+                if (errorMessage)
+                    *errorMessage = QStringLiteral("方案内同名标定资产内容冲突: %1")
+                            .arg(destination);
+                return false;
+            }
+        } else {
+            if (!QFile::copy(sourcePath, destination)) {
+                if (errorMessage)
+                    *errorMessage = QStringLiteral("无法复制标定资产: %1").arg(sourcePath);
+                return false;
+            }
+            rollback->trackFile(destination);
+        }
+        materializedPaths.insert(sourcePath, destination);
+        if (targetPath)
+            *targetPath = destination;
+        return true;
+    };
+
+    for (ToolConfig &tool : scheme->toolConfigs) {
         if (tool.toolType != ToolType::CalibrationTransform)
             continue;
         QJsonObject transform = tool.params.value(QStringLiteral("calibrationTransform")).toObject();
         QJsonArray rewrittenFiles;
         const QJsonArray files = transform.value(QStringLiteral("calibrationFiles")).toArray();
         for (const QJsonValue &value : files) {
-            const QString sourceValue = value.toString().trimmed();
-            if (sourceValue.isEmpty())
+            QString targetPath;
+            if (!materialize(value.toString(), &targetPath))
+                return false;
+            if (targetPath.isEmpty())
                 continue;
-            const QString sourcePath = QFileInfo(sourceValue).absoluteFilePath();
-            QString targetPath = sourcePath;
-            if (sourcePath.startsWith(sourceRoot)) {
-                if (!targetAssetDir.exists() && !targetAssetDir.mkpath(QStringLiteral("."))) {
-                    if (errorMessage)
-                        *errorMessage = QStringLiteral("无法创建方案副本的标定资产目录");
-                    return false;
-                }
-                targetPath = copiedPaths.value(sourcePath);
-                if (targetPath.isEmpty()) {
-                    targetPath = targetAssetDir.filePath(QFileInfo(sourcePath).fileName());
-                    if (!QFile::copy(sourcePath, targetPath)) {
-                        if (errorMessage)
-                            *errorMessage = QStringLiteral("无法复制标定资产: %1").arg(sourcePath);
-                        return false;
-                    }
-                    copiedPaths.insert(sourcePath, targetPath);
-                }
-            }
-            rewrittenFiles.append(targetPath);
+            if (!rewrittenFiles.contains(targetPath))
+                rewrittenFiles.append(targetPath);
         }
         const QString activeValue = transform.value(
                     QStringLiteral("activeCalibrationFile")).toString().trimmed();
-        const QString activeSource = activeValue.isEmpty()
-                ? QString() : QFileInfo(activeValue).absoluteFilePath();
+        QString activeTarget;
+        if (!materialize(activeValue, &activeTarget))
+            return false;
+        if (!activeTarget.isEmpty() && !rewrittenFiles.contains(activeTarget))
+            rewrittenFiles.append(activeTarget);
         transform.insert(QStringLiteral("calibrationFiles"), rewrittenFiles);
-        transform.insert(QStringLiteral("activeCalibrationFile"),
-                         activeSource.isEmpty() ? QString()
-                                                : copiedPaths.value(activeSource, activeSource));
+        transform.insert(QStringLiteral("activeCalibrationFile"), activeTarget);
         tool.params.insert(QStringLiteral("calibrationTransform"), transform);
+
+        auto snapshotIt = scheme->referencePreviewSnapshots.find(tool.toolId);
+        if (snapshotIt != scheme->referencePreviewSnapshots.end() && snapshotIt->valid) {
+            QString previewFile = snapshotIt->result.payload
+                    .value(QStringLiteral("calibrationFile")).toString().trimmed();
+            if (!previewFile.isEmpty()) {
+                const QString previewSource = QDir::cleanPath(
+                            QFileInfo(previewFile).absoluteFilePath());
+                const QString previewTarget = materializedPaths.value(previewSource);
+                if (!previewTarget.isEmpty()) {
+                    snapshotIt->result.payload.insert(QStringLiteral("calibrationFile"),
+                                                      previewTarget);
+                    snapshotIt->payload.insert(QStringLiteral("calibrationFile"),
+                                               previewTarget);
+                }
+            }
+        }
     }
     return true;
 }
@@ -117,11 +235,31 @@ QMap<QString, ToolPreviewSnapshot> previewSnapshotsFromJson(const QJsonObject &o
         ToolPreviewSnapshot snapshot = toolPreviewSnapshotFromJson(it.value().toObject());
         if (!snapshot.valid)
             continue;
-        if (snapshot.toolId.trimmed().isEmpty())
-            snapshot.toolId = it.key();
-        snapshots.insert(snapshot.toolId, snapshot);
+        const QString storageKey = it.key().trimmed().isEmpty()
+                ? snapshot.toolId.trimmed() : it.key().trimmed();
+        if (storageKey.isEmpty())
+            continue;
+        snapshots.insert(storageKey, snapshot);
     }
     return snapshots;
+}
+
+void normalizeSnapshotsForTools(SchemeState *state)
+{
+    if (!state)
+        return;
+    QMap<QString, ToolPreviewSnapshot> normalizedSnapshots;
+    for (const ToolConfig &config : std::as_const(state->toolConfigs)) {
+        ToolPreviewSnapshot snapshot = state->referencePreviewSnapshots.value(config.toolId);
+        if (!snapshot.valid)
+            continue;
+        snapshot.toolId = config.toolId;
+        snapshot.toolType = config.toolType;
+        snapshot.result.toolId = config.toolId;
+        snapshot.result.toolType = config.toolType;
+        normalizedSnapshots.insert(config.toolId, snapshot);
+    }
+    state->referencePreviewSnapshots = normalizedSnapshots;
 }
 
 QString sanitizedSchemeId(QString id)
@@ -264,6 +402,7 @@ bool SchemeStore::ensureLoaded(QString *errorMessage)
 
     m_currentScheme = m_availableSchemes.first();
     m_loaded = true;
+    normalizeSnapshotsForCurrentTools();
     QString loadReferenceError;
     if (!loadCurrentReferenceIntoProvider(&loadReferenceError) && !m_currentScheme.referenceImagePath.isEmpty())
         qWarning() << "[SchemeStore]" << loadReferenceError;
@@ -406,9 +545,6 @@ bool SchemeStore::saveCurrentSchemeAs(const QString &schemeName, QString *errorM
         }
         copy.referenceImagePath = QString::fromLatin1(kReferenceImageSlotA);
     }
-    if (!copyCalibrationAssetsForScheme(m_currentScheme.schemeDir, &copy, errorMessage))
-        return false;
-
     SchemeState savedCopy;
     const cv::Mat *referenceFramePtr = referenceFrame.empty() ? nullptr : &referenceFrame;
     if (!saveSchemeToFile(copy, errorMessage, referenceFramePtr, &savedCopy))
@@ -751,6 +887,8 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
     if (!loaded.updatedAt.isValid())
         loaded.updatedAt = QFileInfo(schemeJsonPath).lastModified();
 
+    normalizeSnapshotsForTools(&loaded);
+
     *state = loaded;
     return true;
 }
@@ -761,6 +899,8 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
                                    SchemeState *savedState) const
 {
     SchemeState normalized = normalizedStateForSave(state);
+    normalizeSnapshotsForTools(&normalized);
+    SaveFileRollback rollback;
 
     QDir root(projectsRootPath());
     if (!root.exists() && !root.mkpath(QStringLiteral("."))) {
@@ -786,10 +926,13 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
     }
 
     QDir schemeDir(normalized.schemeDir);
-    if (!schemeDir.exists() && !schemeDir.mkpath(QStringLiteral("."))) {
+    const bool schemeDirectoryExisted = schemeDir.exists();
+    if (!schemeDirectoryExisted && !schemeDir.mkpath(QStringLiteral("."))) {
         setError(errorMessage, QStringLiteral("无法创建方案目录: %1").arg(normalized.schemeDir));
         return false;
     }
+    if (!schemeDirectoryExisted)
+        rollback.trackDirectory(normalized.schemeDir);
     if (!validateSchemeDirectory(root.absolutePath(),
                                  normalized.schemeId,
                                  normalized.schemeDir,
@@ -798,6 +941,8 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
         setError(errorMessage, pathError);
         return false;
     }
+    if (!materializeCalibrationAssetsForScheme(&normalized, &rollback, errorMessage))
+        return false;
 
     QString newlyWrittenReferencePath;
     if (referenceFrame) {
@@ -874,6 +1019,7 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
         return false;
     }
 
+    rollback.commit();
     if (savedState)
         *savedState = normalized;
     if (normalized.schemeId == m_currentScheme.schemeId)
@@ -985,16 +1131,7 @@ SchemeState SchemeStore::normalizedStateForSave(SchemeState state) const
 
 void SchemeStore::normalizeSnapshotsForCurrentTools()
 {
-    QMap<QString, ToolPreviewSnapshot> normalizedSnapshots;
-    for (const ToolConfig &config : std::as_const(m_currentScheme.toolConfigs)) {
-        ToolPreviewSnapshot snapshot = m_currentScheme.referencePreviewSnapshots.value(config.toolId);
-        if (!snapshot.valid)
-            continue;
-        snapshot.toolId = config.toolId;
-        snapshot.toolType = config.toolType;
-        normalizedSnapshots.insert(config.toolId, snapshot);
-    }
-    m_currentScheme.referencePreviewSnapshots = normalizedSnapshots;
+    normalizeSnapshotsForTools(&m_currentScheme);
 }
 
 void SchemeStore::setError(QString *errorMessage, const QString &message) const

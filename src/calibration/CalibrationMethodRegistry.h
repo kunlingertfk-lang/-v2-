@@ -55,6 +55,7 @@ public:
                                          double x,
                                          double y,
                                          double angleDeg) = 0;
+    virtual QString captureImageProducerId() const = 0;
     virtual bool captureCurrentSample(QString *errorMessage = nullptr) = 0;
 
 signals:

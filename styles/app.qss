@@ -2309,6 +2309,36 @@ QDialog#CalibrationTransformDialog QDoubleSpinBox:focus {
     border: 2px solid #ff830f;
 }
 
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo {
+    padding: 0 40px 0 10px;
+    font-size: 15px;
+    font-weight: 400;
+}
+
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::drop-down {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 36px;
+    background: transparent;
+    border: 0;
+}
+
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::drop-down:hover,
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::drop-down:on {
+    background: #f3f6f9;
+}
+
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::down-arrow {
+    image: url(:/icons/arrow-down.svg);
+    width: 14px;
+    height: 14px;
+}
+
 QDialog#QuickCalibrationWizard QPushButton[actionRole="secondary"],
 QDialog#CalibrationPointEditorDialog QPushButton[actionRole="secondary"],
 QDialog#CalibrationTransformDialog QPushButton[actionRole="secondary"] {
@@ -2365,6 +2395,28 @@ QDialog#QuickCalibrationWizard QFrame#segmentFrame QPushButton:checked,
 QDialog#CalibrationTransformDialog QPushButton[segmentRole="mode"]:checked {
     background: #ffffff;
     color: #ff7900;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QFrame#nPointCaptureModeFrame {
+    background: #eef1f5;
+    border: 1px solid #cfd5de;
+    border-radius: 3px;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QFrame#nPointCaptureModeFrame QPushButton {
+    min-height: 38px;
+    background: transparent;
+    color: #657183;
+    border: 0;
+    border-radius: 2px;
+    padding: 0 14px;
+    font-size: 15px;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QFrame#nPointCaptureModeFrame QPushButton:checked {
+    background: #ffffff;
+    color: #ff7900;
+    font-weight: 700;
 }
 
 QDialog#QuickCalibrationWizard QFrame#calibrationPreviewPanel,
@@ -2574,6 +2626,7 @@ QDialog#CalibrationTransformDialog QTextEdit#resultText {
     font-size: 15px;
 }
 
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QToolButton[actionRole="bindingLink"],
 QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"] {
     min-width: 38px;
     max-width: 38px;
@@ -2585,14 +2638,21 @@ QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"] {
     border-radius: 3px;
 }
 
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QToolButton[actionRole="bindingLink"]:hover,
 QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"]:hover {
     background: #f6f8fb;
     border-color: #ff830f;
 }
 
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QToolButton[actionRole="bindingLink"][bindingActive="true"],
 QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"][bindingActive="true"] {
     background: #fff2e6;
     border: 2px solid #ff830f;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLineEdit[bindingField="true"][bindingState="active"] {
+    border: 1px solid #ff830f;
+    color: #314968;
 }
 
 QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox::indicator {

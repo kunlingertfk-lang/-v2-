@@ -108,13 +108,80 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
                     QStringLiteral("当前版本尚未定义非零Joint1Angle的运动学补偿"),
                     timer.elapsed());
     }
-    if (inputCoordinateType != QStringLiteral("image")
-            && inputCoordinateType != QStringLiteral("physical")) {
+    if (inputCoordinateType == QStringLiteral("physical")) {
+        // 物理坐标到图像坐标的逆变换暂不对生产功能开放。模型仍保留
+        // inverse 矩阵，后续明确输入合同和 UI 后可在此扩展。
+        return fail(QStringLiteral("physical_coordinate_unsupported"),
+                    QStringLiteral("当前仅支持图像像素坐标转物理坐标"),
+                    timer.elapsed());
+    }
+    if (inputCoordinateType != QStringLiteral("image")) {
         return fail(QStringLiteral("invalid_coordinate_type"),
-                    QStringLiteral("坐标类型必须为image或physical"), timer.elapsed());
+                    QStringLiteral("坐标类型必须为image"), timer.elapsed());
+    }
+    if (model.validRegion.size() < 3) {
+        CalibrationTransformHalconResult result = fail(
+                    QStringLiteral("valid_region_missing"),
+                    QStringLiteral("标定文件缺少至少3个有效区域采样点"), timer.elapsed());
+        result.payload.insert(QStringLiteral("calibrationId"), model.calibrationId);
+        result.payload.insert(QStringLiteral("validRegionPointCount"),
+                              model.validRegion.size());
+        return result;
     }
 
     try {
+        HTuple validRows;
+        HTuple validColumns;
+        for (const QPointF &point : model.validRegion) {
+            validRows.Append(point.y());
+            validColumns.Append(point.x());
+        }
+        HObject sampleContour;
+        HObject validHullContour;
+        GenContourPolygonXld(&sampleContour, validRows, validColumns);
+        ShapeTransXld(sampleContour, &validHullContour, HTuple("convex"));
+        HTuple isInside;
+        TestXldPoint(validHullContour, HTuple(inputY), HTuple(inputX), &isInside);
+        HTuple distanceMin;
+        HTuple distanceMax;
+        DistancePc(validHullContour, HTuple(inputY), HTuple(inputX),
+                   &distanceMin, &distanceMax);
+        constexpr double kBoundaryTolerancePx = 1e-6;
+        const bool onBoundary = distanceMin.Length() > 0
+                && distanceMin[0].D() <= kBoundaryTolerancePx;
+        if ((isInside.Length() == 0 || isInside[0].I() == 0) && !onBoundary) {
+            HTuple row1;
+            HTuple column1;
+            HTuple row2;
+            HTuple column2;
+            SmallestRectangle1Xld(validHullContour,
+                                  &row1, &column1, &row2, &column2);
+            CalibrationTransformHalconResult result = fail(
+                        QStringLiteral("outside_valid_region"),
+                        QStringLiteral("输入像素坐标超出标定有效区域"), timer.elapsed());
+            result.payload.insert(QStringLiteral("calibrationId"), model.calibrationId);
+            result.payload.insert(QStringLiteral("inputPoint"), QJsonObject{
+                                      {QStringLiteral("x"), inputX},
+                                      {QStringLiteral("y"), inputY},
+                                      {QStringLiteral("angleDeg"), inputAngleDeg}});
+            result.payload.insert(QStringLiteral("validRegionPointCount"),
+                                  model.validRegion.size());
+            result.payload.insert(QStringLiteral("validRegionBoundaryTolerancePx"),
+                                  kBoundaryTolerancePx);
+            if (row1.Length() > 0 && column1.Length() > 0
+                    && row2.Length() > 0 && column2.Length() > 0) {
+                result.payload.insert(QStringLiteral("validRegionBounds"), QJsonObject{
+                                          {QStringLiteral("minColumn"), column1[0].D()},
+                                          {QStringLiteral("minRow"), row1[0].D()},
+                                          {QStringLiteral("maxColumn"), column2[0].D()},
+                                          {QStringLiteral("maxRow"), row2[0].D()}});
+                result.message += QStringLiteral(" (C:%1..%2, R:%3..%4)")
+                        .arg(column1[0].D()).arg(column2[0].D())
+                        .arg(row1[0].D()).arg(row2[0].D());
+            }
+            return result;
+        }
+
         CalibrationTransformPose effectiveCalibration = calibrationPose;
         CalibrationTransformPose effectiveRun = runPose;
         if (!effectiveCalibration.enabled)
@@ -123,7 +190,6 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
             effectiveRun = CalibrationTransformPose();
         const bool poseApplied = calibrationPose.enabled || runPose.enabled;
         const HTuple forward = tupleFor(model.forward);
-        const HTuple inverse = tupleFor(model.inverse);
         const double vx = std::cos(radians(inputAngleDeg));
         const double vy = std::sin(radians(inputAngleDeg));
 
@@ -131,27 +197,14 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
         double baseY = inputY;
         double directionX = inputX + vx;
         double directionY = inputY + vy;
-        if (inputCoordinateType == QStringLiteral("image")) {
-            transformPoint(forward, baseX, baseY, &baseX, &baseY);
-            transformPoint(forward, directionX, directionY,
-                           &directionX, &directionY);
-            if (poseApplied) {
-                const HTuple calibrationToRun = relativePose(effectiveCalibration,
-                                                             effectiveRun);
-                transformPoint(calibrationToRun, baseX, baseY, &baseX, &baseY);
-                transformPoint(calibrationToRun, directionX, directionY,
-                               &directionX, &directionY);
-            }
-        } else {
-            if (poseApplied) {
-                const HTuple runToCalibration = relativePose(effectiveRun,
-                                                             effectiveCalibration);
-                transformPoint(runToCalibration, baseX, baseY, &baseX, &baseY);
-                transformPoint(runToCalibration, directionX, directionY,
-                               &directionX, &directionY);
-            }
-            transformPoint(inverse, baseX, baseY, &baseX, &baseY);
-            transformPoint(inverse, directionX, directionY,
+        transformPoint(forward, baseX, baseY, &baseX, &baseY);
+        transformPoint(forward, directionX, directionY,
+                       &directionX, &directionY);
+        if (poseApplied) {
+            const HTuple calibrationToRun = relativePose(effectiveCalibration,
+                                                         effectiveRun);
+            transformPoint(calibrationToRun, baseX, baseY, &baseX, &baseY);
+            transformPoint(calibrationToRun, directionX, directionY,
                            &directionX, &directionY);
         }
 
@@ -183,18 +236,15 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
             {QStringLiteral("pixelAccuracyUnit"), QStringLiteral("physical_per_pixel")},
             {QStringLiteral("calibrationId"), model.calibrationId},
             {QStringLiteral("methodId"), model.methodId},
+            {QStringLiteral("validRegionPointCount"), model.validRegion.size()},
+            {QStringLiteral("validRegionBoundaryTolerancePx"), kBoundaryTolerancePx},
             {QStringLiteral("poseCompensationApplied"), poseApplied},
             {QStringLiteral("poseCompensationStatus"),
              poseApplied ? QStringLiteral("applied") : QStringLiteral("disabled")},
             {QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs)}
         };
-        if (inputCoordinateType == QStringLiteral("image")) {
-            result.payload.insert(QStringLiteral("machineX"), baseX);
-            result.payload.insert(QStringLiteral("machineY"), baseY);
-        } else {
-            result.payload.insert(QStringLiteral("column"), baseX);
-            result.payload.insert(QStringLiteral("row"), baseY);
-        }
+        result.payload.insert(QStringLiteral("machineX"), baseX);
+        result.payload.insert(QStringLiteral("machineY"), baseY);
         return result;
     } catch (const HException &exception) {
         return fail(QStringLiteral("halcon_error"),

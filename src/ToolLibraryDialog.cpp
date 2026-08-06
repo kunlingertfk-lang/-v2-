@@ -376,7 +376,7 @@ void ToolLibraryDialog::updatePreview(int id)
         break;
     case CalibrationTransformTool:
         ui->previewTitleLabel->setText(tr("标定转换"));
-        ui->previewDescriptionLabel->setText(tr("加载标定文件，在图像坐标与物理坐标之间双向转换"));
+        ui->previewDescriptionLabel->setText(tr("加载标定文件，将前序节点的图像像素坐标转换为物理坐标"));
         break;
 
 /*===========================tfk add===========================*/       

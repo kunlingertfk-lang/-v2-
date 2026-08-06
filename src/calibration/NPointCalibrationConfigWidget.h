@@ -3,12 +3,16 @@
 
 #include "calibration/CalibrationMethodRegistry.h"
 
+#include <QMap>
+
 class QComboBox;
 class QDoubleSpinBox;
+class QLineEdit;
 class QLabel;
 class QPushButton;
 class QTableWidget;
 class QSpinBox;
+class QToolButton;
 
 class NPointCalibrationConfigWidget final : public CalibrationMethodConfigWidget
 {
@@ -22,7 +26,13 @@ public:
                                  double x,
                                  double y,
                                  double angleDeg) override;
+    QString captureImageProducerId() const override;
     bool captureCurrentSample(QString *errorMessage = nullptr) override;
+
+    // Reserved online-acquisition contract. The descriptors are exposed through
+    // draft().parameters but are intentionally not consumed by the solver yet.
+    QJsonObject captureBindings() const;
+    void setCaptureBinding(const QString &fieldKey, const QJsonObject &binding);
 
 private:
     void fillDefaultGrid(int count);
@@ -30,6 +40,10 @@ private:
     void exportPoints();
     void editPoints();
     void setParameterMode(bool showAll);
+    void applyImageProducerBinding(const QString &fieldKey, int producerIndex);
+    void applyPhysicalCommunicationBinding(const QString &fieldKey, bool enabled);
+    void syncLegacyImageProducer();
+    void updateCaptureBindingUi(const QString &fieldKey);
     QVector<CalibrationSample> samplesFromTable(QString *errorMessage) const;
 
     QComboBox *m_imageProducer = nullptr;
@@ -41,12 +55,33 @@ private:
     QLabel *m_sampleStatus = nullptr;
     QPushButton *m_basicButton = nullptr;
     QPushButton *m_allButton = nullptr;
-    QWidget *m_advancedCard = nullptr;
+    QPushButton *m_triggerCaptureButton = nullptr;
+    QPushButton *m_manualCaptureButton = nullptr;
+    QWidget *m_physicalCoordinateCard = nullptr;
+    QWidget *m_runtimeParametersCard = nullptr;
+    QWidget *m_qualityCard = nullptr;
+    QDoubleSpinBox *m_referenceX = nullptr;
+    QDoubleSpinBox *m_referenceY = nullptr;
+    QDoubleSpinBox *m_offsetX = nullptr;
+    QDoubleSpinBox *m_offsetY = nullptr;
+    QComboBox *m_movePriority = nullptr;
+    QSpinBox *m_directionChangeCount = nullptr;
+    QDoubleSpinBox *m_referenceAngle = nullptr;
+    QDoubleSpinBox *m_angleOffset = nullptr;
+    QSpinBox *m_calibrationOrigin = nullptr;
+    QComboBox *m_cameraMotionMode = nullptr;
+    QComboBox *m_degreesOfFreedom = nullptr;
+    QComboBox *m_weightFunction = nullptr;
+    QSpinBox *m_weightCoefficient = nullptr;
+    QMap<QString, QLineEdit *> m_captureBindingEdits;
+    QMap<QString, QToolButton *> m_captureBindingButtons;
+    QMap<QString, QJsonObject> m_captureBindingValues;
     QVector<CalibrationProducerSnapshot> m_snapshots;
     bool m_physicalSampleValid = false;
     double m_physicalX = 0.0;
     double m_physicalY = 0.0;
     double m_physicalAngle = 0.0;
+    int m_nextCaptureRow = 0;
 };
 
 #endif // CALIBRATION_NPOINTCALIBRATIONCONFIGWIDGET_H

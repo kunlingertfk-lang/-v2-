@@ -272,6 +272,12 @@ void configureProducerContext(CalibrationTransformDialog *dialog,
     }
     dialog->setProducerTools(toolsDialog->toolConfigs(), index,
                              toolsDialog->referencePreviewSnapshots());
+    dialog->setToolChainTestContext(
+                toolsDialog->toolConfigs(),
+                index,
+                toolsDialog->toolEngineForTesting(),
+                SchemeStore::instance().currentScheme()
+                .referencePositionCorrection);
 }
 
 void configureProducerContext(BlobPresenceDialog *dialog,
@@ -639,6 +645,8 @@ bool ToolsDialog::commitToolStateToScheme(bool saveToDisk)
         return false;
     }
     if (saveToDisk) {
+        m_toolConfigs = store.currentScheme().toolConfigs;
+        m_toolPreviewSnapshots = store.currentScheme().referencePreviewSnapshots;
         if (MainWindow *mainWindow = qobject_cast<MainWindow *>(parentWidget())) {
             mainWindow->applySavedSchemeTools(m_toolConfigs,
                                               m_toolPreviewSnapshots);
@@ -1073,7 +1081,8 @@ bool ToolsDialog::openToolConfigDialogForEdit(int index)
     editedConfig.category = originalConfig.category;
     m_toolConfigs[index] = editedConfig;
     m_selectedToolIndex = index;
-    storePreviewSnapshot(editedConfig, snapshot, true);
+    storePreviewSnapshot(editedConfig, snapshot,
+                         editedConfig.toolType != ToolType::CalibrationTransform);
     refreshToolList();
     selectTool(index);
     if (!commitToolStateToScheme(true)) {
@@ -1101,6 +1110,8 @@ void ToolsDialog::storePreviewSnapshot(const ToolConfig &config,
     ToolPreviewSnapshot normalized = snapshot;
     normalized.toolId = config.toolId;
     normalized.toolType = config.toolType;
+    normalized.result.toolId = config.toolId;
+    normalized.result.toolType = config.toolType;
     m_toolPreviewSnapshots.insert(config.toolId, normalized);
 }
 
@@ -1363,6 +1374,21 @@ QString ToolsDialog::toolPreviewStatusLine(const ToolPreviewSnapshot &snapshot) 
     const QString status = snapshot.statusText.trimmed().isEmpty()
             ? snapshot.result.status
             : snapshot.statusText;
+    if (snapshot.result.success
+            && (snapshot.toolType == ToolType::CalibrationTransform
+                || snapshot.result.toolType == ToolType::CalibrationTransform)) {
+        const QJsonObject payload = snapshot.result.payload;
+        return tr("%1 | %2 | 物理X:%3 | 物理Y:%4 | 角度:%5° | %6ms")
+                .arg(status,
+                     state,
+                     QString::number(payload.value(QStringLiteral("machineX")).toDouble(),
+                                     'f', 3),
+                     QString::number(payload.value(QStringLiteral("machineY")).toDouble(),
+                                     'f', 3),
+                     QString::number(payload.value(QStringLiteral("convertedAngleDeg")).toDouble(),
+                                     'f', 3),
+                     QString::number(snapshot.result.elapsedMs));
+    }
     return tr("%1 | %2 | score:%3 | count:%4")
             .arg(status,
                  state,

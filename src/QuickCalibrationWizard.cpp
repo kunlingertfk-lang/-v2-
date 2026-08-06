@@ -2,6 +2,7 @@
 
 #include "PlanDialogUtils.h"
 #include "SchemeStore.h"
+#include "UiStyleRoles.h"
 #include "calibration/CalibrationFileLoader.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -38,6 +39,11 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <opencv2/imgproc.hpp>
+
+#include <cmath>
+#include <utility>
+
 namespace {
 
 QLabel *pageTitle(const QString &text, QWidget *parent)
@@ -55,25 +61,37 @@ QString matrixLine(const std::array<double, 6> &matrix)
             .arg(matrix[4], 0, 'g', 12).arg(matrix[5], 0, 'g', 12);
 }
 
+cv::Mat qImageToBgrMat(const QImage &image)
+{
+    if (image.isNull())
+        return cv::Mat();
+
+    const QImage rgb = image.convertToFormat(QImage::Format_RGB888);
+    cv::Mat rgbMat(rgb.height(), rgb.width(), CV_8UC3,
+                   const_cast<uchar *>(rgb.constBits()),
+                   static_cast<size_t>(rgb.bytesPerLine()));
+    cv::Mat bgr;
+    cv::cvtColor(rgbMat, bgr, cv::COLOR_RGB2BGR);
+    return bgr.clone();
+}
+
+bool finitePayloadNumber(const QJsonObject &payload, const QString &key)
+{
+    return payload.value(key).isDouble()
+            && std::isfinite(payload.value(key).toDouble());
+}
+
 } // namespace
 
 QuickCalibrationWizard::QuickCalibrationWizard(QWidget *parent)
     : QDialog(parent)
 {
     setObjectName(QStringLiteral("QuickCalibrationWizard"));
+    m_captureToolEngine.registerAdapter(&m_captureTemplateLocationAdapter);
     m_communicationSession = new CalibrationCommunicationSession(this);
     m_communicationSession->setMessageHandler(
                 [this](CalibrationCommunicationMessage *message, QString *errorMessage) {
-        if (!message || message->event != CalibrationCommunicationEvent::Capture)
-            return true;
-        if (!m_methodConfigWidget) {
-            if (errorMessage)
-                *errorMessage = tr("尚未进入标定配置页，不能执行触发采样");
-            return false;
-        }
-        m_methodConfigWidget->setLatestPhysicalSample(true, message->x,
-                                                       message->y, message->angleDeg);
-        return m_methodConfigWidget->captureCurrentSample(errorMessage);
+        return handleCommunicationMessage(message, errorMessage);
     });
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     setWindowModality(Qt::WindowModal);
@@ -260,14 +278,27 @@ QWidget *QuickCalibrationWizard::createCommunicationPage()
     deviceForm->setVerticalSpacing(10);
     deviceForm->setHorizontalSpacing(18);
     m_communicationType = new QComboBox(device);
-    m_communicationType->addItems({tr("无设备（手动输入）"), tr("TCP 客户端"),
-                                   tr("TCP 服务端"), tr("UDP")});
+    m_communicationType->setObjectName(QStringLiteral("calibrationCommunicationTypeCombo"));
+    m_communicationType->addItem(tr("无设备（手动输入）"), QStringLiteral("none"));
+    m_communicationType->addItem(tr("TCP 客户端"), QStringLiteral("tcp_client"));
+    m_communicationType->addItem(tr("TCP 服务端"), QStringLiteral("tcp_server"));
+    m_communicationType->addItem(tr("UDP"), QStringLiteral("udp"));
+    UiStyleRoles::applyLightComboBox(m_communicationType);
     deviceForm->addRow(tr("通信方式"), m_communicationType);
     m_communicationHost = new QLineEdit(QStringLiteral("127.0.0.1"), device);
+    m_communicationHost->setObjectName(QStringLiteral("calibrationCommunicationHostEdit"));
+    m_communicationHost->setProperty("transportIndex", 0);
+    m_communicationHost->setProperty("tcpClientAddress", QStringLiteral("127.0.0.1"));
+    m_communicationHost->setProperty("tcpServerAddress", QStringLiteral("0.0.0.0"));
+    m_communicationHost->setProperty("udpBindAddress", QStringLiteral("0.0.0.0"));
     m_communicationPort = new QSpinBox(device);
+    m_communicationPort->setObjectName(QStringLiteral("calibrationCommunicationPortSpin"));
     m_communicationPort->setRange(1, 65535);
     m_communicationPort->setValue(2000);
-    deviceForm->addRow(tr("主机/绑定地址"), m_communicationHost);
+    QLabel *hostLabel = new QLabel(tr("IP 地址"), device);
+    hostLabel->setObjectName(QStringLiteral("calibrationCommunicationHostLabel"));
+    hostLabel->setBuddy(m_communicationHost);
+    deviceForm->addRow(hostLabel, m_communicationHost);
     deviceForm->addRow(tr("端口"), m_communicationPort);
     root->addWidget(device);
     QGroupBox *signalGroup = new QGroupBox(tr("通信字符配置"), page);
@@ -349,11 +380,54 @@ QWidget *QuickCalibrationWizard::createCommunicationPage()
             this, &QuickCalibrationWizard::testCommunicationMessage);
     connect(m_communicationStartButton, &QPushButton::clicked,
             this, &QuickCalibrationWizard::toggleCommunicationSession);
-    const auto syncTransportFields = [this](int index) {
+    const auto addressPropertyName = [](int index) -> const char * {
+        switch (index) {
+        case 1: return "tcpClientAddress";
+        case 2: return "tcpServerAddress";
+        case 3: return "udpBindAddress";
+        default: return nullptr;
+        }
+    };
+    const auto syncTransportFields = [this, hostLabel, addressPropertyName](int index) {
+        const int previousIndex = m_communicationHost->property("transportIndex").toInt();
+        const char *previousAddressProperty = addressPropertyName(previousIndex);
+        if (previousAddressProperty && previousIndex != index) {
+            m_communicationHost->setProperty(previousAddressProperty,
+                                             m_communicationHost->text().trimmed());
+        }
+
+        const char *currentAddressProperty = addressPropertyName(index);
+        if (currentAddressProperty && previousIndex != index) {
+            m_communicationHost->setText(
+                        m_communicationHost->property(currentAddressProperty).toString());
+        }
+        m_communicationHost->setProperty("transportIndex", index);
+
         const bool hasDevice = index != 0;
         m_communicationHost->setEnabled(hasDevice);
         m_communicationPort->setEnabled(hasDevice);
         m_communicationStartButton->setText(hasDevice ? tr("启动通信") : tr("启用手动会话"));
+
+        QString labelText = tr("IP 地址");
+        QString hint = tr("选择通信方式后填写对应的 IP 地址");
+        if (index == 1) {
+            labelText = tr("服务端 IP 地址");
+            hint = tr("填写机械臂、PLC 等对端 TCP 服务端的 IP；127.0.0.1 仅用于同机联调");
+            m_communicationHost->setPlaceholderText(tr("例如：192.168.10.20（对端设备）"));
+        } else if (index == 2) {
+            labelText = tr("本机绑定 IP 地址");
+            hint = tr("填写本机网卡 IP；0.0.0.0 表示监听全部本机网卡");
+            m_communicationHost->setPlaceholderText(tr("0.0.0.0（监听全部网卡）"));
+        } else if (index == 3) {
+            labelText = tr("本机绑定 IP 地址");
+            hint = tr("UDP 当前为接收绑定模式；0.0.0.0 表示监听全部本机网卡");
+            m_communicationHost->setPlaceholderText(tr("0.0.0.0（监听全部网卡）"));
+        } else {
+            m_communicationHost->setPlaceholderText(tr("当前模式无需 IP 地址"));
+        }
+        hostLabel->setText(labelText);
+        hostLabel->setToolTip(hint);
+        m_communicationHost->setToolTip(hint);
     };
     connect(m_communicationType, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, syncTransportFields);
@@ -520,13 +594,18 @@ QWidget *QuickCalibrationWizard::createConfigurationPage()
     connect(m_clearImagesButton, &QToolButton::clicked,
             this, &QuickCalibrationWizard::clearExternalImages);
     connect(m_previousImageButton, &QToolButton::clicked, this, [this]() {
+        m_externalImageSequenceComplete = false;
         showExternalImage(m_imageThumbnailList->currentRow() - 1);
     });
     connect(m_nextImageButton, &QToolButton::clicked, this, [this]() {
+        m_externalImageSequenceComplete = false;
         showExternalImage(m_imageThumbnailList->currentRow() + 1);
     });
     connect(m_imageThumbnailList, &QListWidget::currentRowChanged,
-            this, &QuickCalibrationWizard::showExternalImage);
+            this, [this](int index) {
+        m_externalImageSequenceComplete = false;
+        showExternalImage(index);
+    });
     m_referencePreviewImage = ReferenceImageProvider::instance().referenceImage();
     updateImageModeUi();
     return page;
@@ -643,6 +722,7 @@ void QuickCalibrationWizard::addExternalImageFiles(const QStringList &filePaths)
         m_externalImages.append(image);
         m_externalImagePaths.append(absolutePath);
     }
+    m_externalImageSequenceComplete = false;
     rebuildExternalImageList(firstNewIndex < m_externalImages.size()
                              ? firstNewIndex : m_imageThumbnailList->currentRow());
     if (!failedFiles.isEmpty()) {
@@ -662,6 +742,8 @@ void QuickCalibrationWizard::showExternalImage(int index)
         QSignalBlocker blocker(m_imageThumbnailList);
         m_imageThumbnailList->setCurrentRow(index);
     }
+    if (m_previewHelper)
+        m_previewHelper->clearToolOverlays();
     updatePreviewImage(m_externalImages.at(index));
     m_imageThumbnailList->scrollToItem(m_imageThumbnailList->item(index));
     m_imageCounterLabel->setText(tr("当前：%1/%2").arg(index + 1).arg(m_externalImages.size()));
@@ -697,6 +779,7 @@ void QuickCalibrationWizard::removeCurrentExternalImage()
         return;
     m_externalImages.removeAt(index);
     m_externalImagePaths.removeAt(index);
+    m_externalImageSequenceComplete = false;
     rebuildExternalImageList(qMin(index, m_externalImages.size() - 1));
 }
 
@@ -706,6 +789,7 @@ void QuickCalibrationWizard::clearExternalImages()
         return;
     m_externalImages.clear();
     m_externalImagePaths.clear();
+    m_externalImageSequenceComplete = false;
     rebuildExternalImageList(-1);
 }
 
@@ -746,6 +830,9 @@ void QuickCalibrationWizard::updatePreviewImage(const QImage &image)
 
 void QuickCalibrationWizard::solveCalibration()
 {
+    // Every solve attempt owns a fresh result.  Early validation failures must
+    // never leave the previous successful model available to the Next action.
+    m_solveResult = CalibrationSolveResult();
     const ICalibrationMethod *method = CalibrationMethodRegistry::instance().method(m_methodId);
     if (!method) {
         QMessageBox::warning(this, tr("求解失败"), tr("标定方式不存在"));
@@ -754,10 +841,44 @@ void QuickCalibrationWizard::solveCalibration()
     QString error;
     if (!ensureMethodConfigWidget())
         return;
-    const CalibrationDraft draft = m_methodConfigWidget->draft(&error);
+    CalibrationDraft draft = m_methodConfigWidget->draft(&error);
     if (!method->validateDraft(draft, &error)) {
         QMessageBox::warning(this, tr("求解失败"), error);
         return;
+    }
+
+    QImage calibrationImage;
+    if (m_cameraModeButton && m_cameraModeButton->isChecked()) {
+        calibrationImage = CameraFrameProvider::instance().currentImage();
+    } else if (!m_externalImages.isEmpty()) {
+        const QSize expectedSize = m_externalImages.first().size();
+        for (const QImage &image : std::as_const(m_externalImages)) {
+            if (image.size() != expectedSize) {
+                QMessageBox::warning(this, tr("求解失败"),
+                                     tr("外部标定图片尺寸不一致，无法建立稳定图像空间绑定"));
+                return;
+            }
+        }
+        const int currentIndex = m_imageThumbnailList
+                ? qBound(0, m_imageThumbnailList->currentRow(), m_externalImages.size() - 1)
+                : 0;
+        calibrationImage = m_externalImages.at(currentIndex);
+    } else {
+        calibrationImage = m_referencePreviewImage;
+    }
+    if (method->capabilities().requiresImage && calibrationImage.isNull()) {
+        QMessageBox::warning(this, tr("求解失败"),
+                             tr("当前标定方式需要有效标定图像，无法建立图像空间绑定"));
+        return;
+    }
+    if (!calibrationImage.isNull()) {
+        QJsonObject imageBinding = draft.parameters
+                .value(QStringLiteral("imageBinding")).toObject();
+        imageBinding.insert(QStringLiteral("inputFingerprint"), QJsonObject{
+                                {QStringLiteral("version"), 1},
+                                {QStringLiteral("width"), calibrationImage.width()},
+                                {QStringLiteral("height"), calibrationImage.height()}});
+        draft.parameters.insert(QStringLiteral("imageBinding"), imageBinding);
     }
     m_solveResult = method->solve(draft);
     if (!m_solveResult.success) {
@@ -823,10 +944,9 @@ void QuickCalibrationWizard::showSolveResult()
 CalibrationCommunicationConfig QuickCalibrationWizard::communicationConfig() const
 {
     CalibrationCommunicationConfig config;
-    const QStringList transports{QStringLiteral("none"), QStringLiteral("tcp_client"),
-                                 QStringLiteral("tcp_server"), QStringLiteral("udp")};
-    config.transport = transports.value(m_communicationType->currentIndex(),
-                                        QStringLiteral("none"));
+    config.transport = m_communicationType->currentData().toString();
+    if (config.transport.isEmpty())
+        config.transport = QStringLiteral("none");
     config.host = m_communicationHost->text().trimmed();
     config.port = static_cast<quint16>(m_communicationPort->value());
     config.startSignal = m_startSignal->text();
@@ -891,22 +1011,230 @@ void QuickCalibrationWizard::toggleCommunicationSession()
         QMessageBox::warning(this, tr("启动通信失败"), error);
 }
 
+bool QuickCalibrationWizard::handleCommunicationMessage(
+        CalibrationCommunicationMessage *message, QString *errorMessage)
+{
+    if (!message || message->event != CalibrationCommunicationEvent::Capture)
+        return true;
+    if (errorMessage)
+        errorMessage->clear();
+    const auto showCaptureFailure = [this, errorMessage](const QString &fallback) {
+        if (!m_sampleStatus)
+            return;
+        const QString detail = errorMessage && !errorMessage->isEmpty()
+                ? *errorMessage : fallback;
+        m_sampleStatus->setText(detail);
+        m_sampleStatus->setProperty("status", QStringLiteral("error"));
+        m_sampleStatus->style()->unpolish(m_sampleStatus);
+        m_sampleStatus->style()->polish(m_sampleStatus);
+    };
+    if (m_step != 2) {
+        if (errorMessage)
+            *errorMessage = tr("当前不在标定配置页，不能执行触发采样");
+        return false;
+    }
+    if (!m_methodConfigWidget) {
+        if (errorMessage)
+            *errorMessage = tr("尚未进入标定配置页，不能执行触发采样");
+        return false;
+    }
+    if (m_imageModeButton && m_imageModeButton->isChecked()
+            && !m_externalImages.isEmpty() && m_externalImageSequenceComplete) {
+        if (errorMessage)
+            *errorMessage = tr("外部图片序列已采集完成，请重新选择起始图片或导入新图片");
+        showCaptureFailure(tr("外部图片序列已采集完成"));
+        return false;
+    }
+
+    m_methodConfigWidget->setLatestPhysicalSample(true, message->x,
+                                                   message->y, message->angleDeg);
+    if (!runCurrentImageLocation(errorMessage)) {
+        showCaptureFailure(tr("当前图片模板定位失败"));
+        return false;
+    }
+    if (!m_methodConfigWidget->captureCurrentSample(errorMessage)) {
+        showCaptureFailure(tr("当前标定点采样失败"));
+        return false;
+    }
+
+    if (m_pendingCaptureCameraFrameIndex >= 0)
+        m_lastCapturedCameraFrameIndex = m_pendingCaptureCameraFrameIndex;
+    m_pendingCaptureCameraFrameIndex = -1;
+    m_solveResult = CalibrationSolveResult();
+    advanceExternalImageAfterCapture();
+    return true;
+}
+
+bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
+{
+    m_pendingCaptureCameraFrameIndex = -1;
+    if (m_previewHelper)
+        m_previewHelper->clearToolOverlays();
+    const auto fail = [errorMessage](const QString &message) {
+        if (errorMessage)
+            *errorMessage = message;
+        return false;
+    };
+    if (!m_methodConfigWidget)
+        return fail(tr("标定配置尚未初始化"));
+
+    const QString producerId = m_methodConfigWidget->captureImageProducerId();
+    if (producerId.isEmpty()) {
+        return fail(tr("图像点 X、Y、角度必须绑定到同一个模板定位工具"));
+    }
+    const auto configIt = m_calibrationProducerConfigs.constFind(producerId);
+    if (configIt == m_calibrationProducerConfigs.constEnd())
+        return fail(tr("绑定的模板定位工具不存在或已禁用"));
+
+    cv::Mat currentFrame;
+    QString frameId;
+    int externalImageIndex = -1;
+    QString imagePath;
+    if (m_cameraModeButton && m_cameraModeButton->isChecked()) {
+        const CameraFrameSnapshot snapshot =
+                CameraFrameProvider::instance().currentFrameSnapshot();
+        currentFrame = snapshot.frame;
+        if (!currentFrame.empty()
+                && snapshot.frameIndex <= m_lastCapturedCameraFrameIndex) {
+            return fail(tr("当前相机帧已经采样，请等待新图像后再触发"));
+        }
+        m_pendingCaptureCameraFrameIndex = snapshot.frameIndex;
+        frameId = QStringLiteral("calibration-camera-%1")
+                .arg(snapshot.frameIndex);
+    } else if (!m_externalImages.isEmpty()) {
+        externalImageIndex = m_imageThumbnailList
+                ? m_imageThumbnailList->currentRow() : 0;
+        if (externalImageIndex < 0 || externalImageIndex >= m_externalImages.size())
+            externalImageIndex = 0;
+        currentFrame = qImageToBgrMat(m_externalImages.at(externalImageIndex));
+        imagePath = m_externalImagePaths.value(externalImageIndex);
+        frameId = QStringLiteral("calibration-image-%1-%2")
+                .arg(externalImageIndex + 1)
+                .arg(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
+    } else {
+        currentFrame = qImageToBgrMat(m_referencePreviewImage);
+        frameId = QStringLiteral("calibration-reference-%1")
+                .arg(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
+    }
+    if (currentFrame.empty())
+        return fail(tr("当前没有可用于模板定位的图像"));
+
+    cv::Mat referenceFrame = ReferenceImageProvider::instance().referenceFrame();
+    if (referenceFrame.empty())
+        referenceFrame = qImageToBgrMat(m_referencePreviewImage);
+    if (referenceFrame.empty())
+        return fail(tr("当前方案没有有效基准图，无法运行模板定位"));
+
+    ToolRequest request;
+    request.requestId = frameId;
+    request.frameId = frameId;
+    request.config = configIt.value();
+    request.image = currentFrame;
+    request.referenceImage = referenceFrame;
+    request.imagePath = imagePath;
+    const QString source = externalImageIndex >= 0
+            ? QStringLiteral("calibration_external_image")
+            : (m_cameraModeButton && m_cameraModeButton->isChecked()
+               ? QStringLiteral("calibration_camera")
+               : QStringLiteral("calibration_reference_image"));
+    request.runtimeContext = QJsonObject{
+        {QStringLiteral("frameId"), frameId},
+        {QStringLiteral("source"), source},
+        {QStringLiteral("imageIndex"), externalImageIndex}
+    };
+    const ToolResult result = m_captureToolEngine.runTool(request);
+    const bool validPose = result.success && result.ok
+            && finitePayloadNumber(result.payload, QStringLiteral("x"))
+            && finitePayloadNumber(result.payload, QStringLiteral("y"))
+            && finitePayloadNumber(result.payload, QStringLiteral("angle"));
+
+    bool producerUpdated = false;
+    for (CalibrationProducerSnapshot &snapshot : m_calibrationProducerSnapshots) {
+        if (snapshot.producerId != producerId)
+            continue;
+        snapshot.valid = validPose;
+        snapshot.payload = result.payload;
+        producerUpdated = true;
+        break;
+    }
+    if (!producerUpdated) {
+        CalibrationProducerSnapshot snapshot;
+        snapshot.producerId = producerId;
+        snapshot.displayName = configIt.value().displayName.trimmed().isEmpty()
+                ? tr("模板定位") : configIt.value().displayName;
+        snapshot.valid = validPose;
+        snapshot.payload = result.payload;
+        m_calibrationProducerSnapshots.append(snapshot);
+    }
+    m_methodConfigWidget->setProducerSnapshots(m_calibrationProducerSnapshots);
+    if (m_previewHelper)
+        m_previewHelper->setToolOverlays(result.overlays);
+
+    if (!result.success || !result.ok) {
+        const QString detail = result.message.trimmed().isEmpty()
+                ? result.status : result.message;
+        return fail(tr("当前图片模板定位失败：%1").arg(detail));
+    }
+    if (!validPose)
+        return fail(tr("当前图片模板定位未返回有效的 X、Y、角度"));
+    return true;
+}
+
+void QuickCalibrationWizard::advanceExternalImageAfterCapture()
+{
+    if (!m_imageModeButton || !m_imageModeButton->isChecked()
+            || !m_imageThumbnailList || m_externalImages.isEmpty()) {
+        return;
+    }
+
+    const int currentIndex = m_imageThumbnailList->currentRow();
+    if (currentIndex < 0)
+        return;
+    if (currentIndex + 1 < m_externalImages.size()) {
+        m_externalImageSequenceComplete = false;
+        showExternalImage(currentIndex + 1);
+        if (m_sampleStatus) {
+            m_sampleStatus->setText(
+                        tr("第 %1 张采样成功，已自动切换至第 %2/%3 张")
+                        .arg(currentIndex + 1)
+                        .arg(currentIndex + 2)
+                        .arg(m_externalImages.size()));
+            m_sampleStatus->setProperty("status", QStringLiteral("ok"));
+            m_sampleStatus->style()->unpolish(m_sampleStatus);
+            m_sampleStatus->style()->polish(m_sampleStatus);
+        }
+    } else {
+        m_externalImageSequenceComplete = true;
+        if (!m_sampleStatus)
+            return;
+        m_sampleStatus->setText(tr("第 %1 张采样成功，外部图片序列已完成")
+                                .arg(currentIndex + 1));
+        m_sampleStatus->setProperty("status", QStringLiteral("ok"));
+        m_sampleStatus->style()->unpolish(m_sampleStatus);
+        m_sampleStatus->style()->polish(m_sampleStatus);
+    }
+}
+
 void QuickCalibrationWizard::setProducerTools(
         const QVector<ToolConfig> &tools,
         const QMap<QString, ToolPreviewSnapshot> &snapshots)
 {
+    m_calibrationProducerConfigs.clear();
     m_calibrationProducerSnapshots.clear();
     for (const ToolConfig &tool : tools) {
         if (!tool.enabled || tool.toolId.trimmed().isEmpty()
                 || tool.toolType != ToolType::TemplateLocation)
             continue;
+        m_calibrationProducerConfigs.insert(tool.toolId, tool);
         const QString name = tool.displayName.trimmed().isEmpty()
                 ? tr("模板定位") : tool.displayName;
         const ToolPreviewSnapshot preview = snapshots.value(tool.toolId);
         CalibrationProducerSnapshot producer;
         producer.producerId = tool.toolId;
         producer.displayName = name;
-        producer.valid = preview.valid && preview.result.success;
+        producer.valid = preview.valid
+                && preview.result.success
+                && preview.result.ok;
         producer.payload = preview.result.payload;
         m_calibrationProducerSnapshots.append(producer);
     }

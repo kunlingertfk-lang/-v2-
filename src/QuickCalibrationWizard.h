@@ -11,7 +11,9 @@
 #include <QStringList>
 
 #include "toolcore/ToolConfig.h"
+#include "toolcore/ToolEngine.h"
 #include "toolcore/ToolPreviewSnapshot.h"
+#include "tooladapters/TemplateLocationAdapter.h"
 
 class QButtonGroup;
 class QCheckBox;
@@ -55,6 +57,10 @@ private:
     bool validateCommunicationPage();
     void testCommunicationMessage();
     void toggleCommunicationSession();
+    bool handleCommunicationMessage(CalibrationCommunicationMessage *message,
+                                    QString *errorMessage);
+    bool runCurrentImageLocation(QString *errorMessage);
+    void advanceExternalImageAfterCapture();
     bool ensureMethodConfigWidget();
     void updatePreviewImage(const QImage &image);
     void importExternalImages();
@@ -118,11 +124,17 @@ private:
     QLineEdit *m_filePath = nullptr;
     CalibrationSolveResult m_solveResult;
     QVector<QJsonObject> m_sessionLog;
+    QMap<QString, ToolConfig> m_calibrationProducerConfigs;
     QVector<CalibrationProducerSnapshot> m_calibrationProducerSnapshots;
+    TemplateLocationAdapter m_captureTemplateLocationAdapter;
+    ToolEngine m_captureToolEngine;
     CalibrationCommunicationMessage m_lastCommunicationMessage;
     CalibrationCommunicationSession *m_communicationSession = nullptr;
     QString m_methodId = QStringLiteral("n_point");
     QString m_generatedFilePath;
+    bool m_externalImageSequenceComplete = false;
+    qint64 m_lastCapturedCameraFrameIndex = -1;
+    qint64 m_pendingCaptureCameraFrameIndex = -1;
     int m_step = 0;
     int m_maxVisitedStep = 0;
 };

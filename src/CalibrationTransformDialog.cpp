@@ -6,20 +6,20 @@
 #include "calibration/CalibrationFileLoader.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/ReferenceImageProvider.h"
-#include "tooladapters/CalibrationTransformAdapter.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/ToolEngine.h"
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QCryptographicHash>
 #include <QDir>
 #include <QDoubleSpinBox>
-#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
 #include <QHBoxLayout>
@@ -40,6 +40,13 @@ void addConstantItem(QComboBox *combo)
     combo->clear();
     combo->addItem(QObject::tr("自定义"), QJsonObject{{QStringLiteral("mode"),
                                                        QStringLiteral("constant")}});
+}
+
+void addUnboundItem(QComboBox *combo)
+{
+    combo->clear();
+    combo->addItem(QObject::tr("未绑定"),
+                   QJsonObject{{QStringLiteral("mode"), QStringLiteral("unbound")}});
 }
 
 QJsonObject bindingItem(const QString &producerId,
@@ -86,33 +93,59 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
     connect(&ReferenceImageProvider::instance(),
             &ReferenceImageProvider::referenceFrameChanged,
             this, &CalibrationTransformDialog::updateReferenceImage);
+    m_initialConfig.toolId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     ui->coordinateTypeCombo->addItem(tr("图像坐标"), QStringLiteral("image"));
-    ui->coordinateTypeCombo->addItem(tr("物理坐标"), QStringLiteral("physical"));
-    addConstantItem(ui->inputXSourceCombo);
-    addConstantItem(ui->inputYSourceCombo);
-    addConstantItem(ui->inputAngleSourceCombo);
+    ui->coordinateTypeLabel->hide();
+    ui->coordinateTypeCombo->hide();
+    addUnboundItem(ui->inputXSourceCombo);
+    addUnboundItem(ui->inputYSourceCombo);
+    addUnboundItem(ui->inputAngleSourceCombo);
     ui->inputXSourceCombo->hide();
     ui->inputYSourceCombo->hide();
     ui->inputAngleSourceCombo->hide();
-    m_inputXLinkButton = createBindingButton(ui->inputXSourceCombo, ui->inputXSpin,
-                                             ui->inputGroup, tr("坐标 X"));
-    m_inputYLinkButton = createBindingButton(ui->inputYSourceCombo, ui->inputYSpin,
-                                             ui->inputGroup, tr("坐标 Y"));
-    m_inputAngleLinkButton = createBindingButton(ui->inputAngleSourceCombo, ui->inputAngleSpin,
-                                                 ui->inputGroup, tr("角度"));
+    m_inputXLinkButton = createInputBindingButton(ui->inputGroup, tr("坐标 X"));
+    m_inputXLinkButton->setObjectName(QStringLiteral("inputXLinkButton"));
+    m_inputYLinkButton = createInputBindingButton(ui->inputGroup, tr("坐标 Y"));
+    m_inputYLinkButton->setObjectName(QStringLiteral("inputYLinkButton"));
+    m_inputAngleLinkButton = createInputBindingButton(ui->inputGroup, tr("角度"));
+    m_inputAngleLinkButton->setObjectName(QStringLiteral("inputAngleLinkButton"));
     ui->xLayout->addWidget(m_inputXLinkButton);
     ui->yLayout->addWidget(m_inputYLinkButton);
     ui->angleLayout->addWidget(m_inputAngleLinkButton);
+    updateMainInputUi();
     setupPoseSourceUi();
     ui->basicModeButton->setChecked(true);
     ui->poseGroup->setVisible(false);
 
     connect(ui->closeButton, &QToolButton::clicked, this, &QDialog::reject);
-    connect(ui->finishButton, &QPushButton::clicked, this, &QDialog::accept);
+    connect(ui->finishButton, &QPushButton::clicked,
+            this, &CalibrationTransformDialog::finishConfiguration);
     connect(ui->importButton, &QPushButton::clicked,
             this, &CalibrationTransformDialog::importCalibrationFile);
     connect(ui->testButton, &QPushButton::clicked,
             this, &CalibrationTransformDialog::runTest);
+    connect(ui->calibrationFileCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int) { invalidatePreviewSnapshot(); });
+    connect(ui->calibrationPoseEnabled, &QCheckBox::toggled,
+            this, [this](bool) { invalidatePreviewSnapshot(); });
+    connect(ui->runPoseEnabled, &QCheckBox::toggled,
+            this, [this](bool) { invalidatePreviewSnapshot(); });
+    for (QDoubleSpinBox *spin : {ui->calXSpin, ui->calYSpin,
+                                 ui->calJ0Spin, ui->calJ1Spin,
+                                 ui->runXSpin, ui->runYSpin,
+                                 ui->runJ0Spin, ui->runJ1Spin}) {
+        connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+                this, [this](double) { invalidatePreviewSnapshot(); });
+    }
+    for (QComboBox *combo : m_calibrationPoseSources) {
+        connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, [this](int) { invalidatePreviewSnapshot(); });
+    }
+    for (QComboBox *combo : m_runPoseSources) {
+        connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, [this](int) { invalidatePreviewSnapshot(); });
+    }
     connect(ui->basicModeButton, &QPushButton::clicked, this, [this]() {
         ui->basicModeButton->setChecked(true);
         ui->allModeButton->setChecked(false);
@@ -233,6 +266,40 @@ QToolButton *CalibrationTransformDialog::createBindingButton(QComboBox *stateCom
     return button;
 }
 
+QToolButton *CalibrationTransformDialog::createInputBindingButton(
+        QWidget *parent,
+        const QString &fieldName)
+{
+    QToolButton *button = new QToolButton(parent);
+    button->setIcon(QIcon(QStringLiteral(":/icons/external-link.svg")));
+    button->setIconSize(QSize(22, 22));
+    button->setPopupMode(QToolButton::InstantPopup);
+    button->setProperty("actionRole", QStringLiteral("bindingLink"));
+    QMenu *menu = new QMenu(button);
+    button->setMenu(menu);
+    connect(menu, &QMenu::aboutToShow, this, [this, menu]() {
+        menu->clear();
+        for (int index = 0; index < m_inputProducers.size(); ++index) {
+            const InputProducerContract &producer = m_inputProducers.at(index);
+            QMenu *producerMenu = menu->addMenu(producer.displayName);
+            QAction *poseAction = producerMenu->addAction(tr("图像坐标 X / Y / Angle"));
+            poseAction->setCheckable(true);
+            const QJsonObject selected = ui->inputXSourceCombo->currentData().toJsonObject();
+            poseAction->setChecked(m_mainInputSourceAvailable
+                                   && selected.value(QStringLiteral("producerId")).toString()
+                                      == producer.producerId);
+            connect(poseAction, &QAction::triggered, this,
+                    [this, index]() { applyInputProducer(index); });
+        }
+        if (m_inputProducers.isEmpty()) {
+            QAction *empty = menu->addAction(tr("无可用前序坐标输出"));
+            empty->setEnabled(false);
+        }
+    });
+    button->setToolTip(tr("为%1选择前序图像坐标来源").arg(fieldName));
+    return button;
+}
+
 void CalibrationTransformDialog::updateBindingButton(QComboBox *stateCombo,
                                                       QDoubleSpinBox *valueSpin,
                                                       QToolButton *button,
@@ -247,6 +314,76 @@ void CalibrationTransformDialog::updateBindingButton(QComboBox *stateCombo,
     valueSpin->setEnabled(!bound);
     button->style()->unpolish(button);
     button->style()->polish(button);
+}
+
+void CalibrationTransformDialog::applyInputProducer(int producerIndex)
+{
+    if (producerIndex < 0 || producerIndex >= m_inputProducers.size())
+        return;
+    const int comboIndex = producerIndex + 1;
+    if (comboIndex >= ui->inputXSourceCombo->count()
+            || comboIndex >= ui->inputYSourceCombo->count()
+            || comboIndex >= ui->inputAngleSourceCombo->count()) {
+        return;
+    }
+    ui->inputXSourceCombo->setCurrentIndex(comboIndex);
+    ui->inputYSourceCombo->setCurrentIndex(comboIndex);
+    ui->inputAngleSourceCombo->setCurrentIndex(comboIndex);
+    m_mainInputSourceAvailable = true;
+    invalidatePreviewSnapshot();
+    updateMainInputUi();
+}
+
+void CalibrationTransformDialog::invalidatePreviewSnapshot()
+{
+    m_snapshot = ToolPreviewSnapshot();
+}
+
+void CalibrationTransformDialog::updateMainInputUi()
+{
+    const std::array<QComboBox *, 3> combos{{ui->inputXSourceCombo,
+                                             ui->inputYSourceCombo,
+                                             ui->inputAngleSourceCombo}};
+    const std::array<QLineEdit *, 3> edits{{ui->inputXEdit,
+                                            ui->inputYEdit,
+                                            ui->inputAngleEdit}};
+    const std::array<QToolButton *, 3> buttons{{m_inputXLinkButton,
+                                                m_inputYLinkButton,
+                                                m_inputAngleLinkButton}};
+    for (int index = 0; index < 3; ++index) {
+        const QJsonObject binding = combos[static_cast<size_t>(index)]
+                ->currentData().toJsonObject();
+        const bool bound = binding.value(QStringLiteral("mode")).toString()
+                == QStringLiteral("binding");
+        QString text;
+        if (!bound) {
+            text = tr("未绑定（请选择前序坐标）");
+        } else if (!m_mainInputSourceAvailable) {
+            text = tr("来源不可用：%1").arg(combos[static_cast<size_t>(index)]->currentText());
+        } else {
+            text = combos[static_cast<size_t>(index)]->currentText();
+        }
+        edits[static_cast<size_t>(index)]->setText(text);
+        edits[static_cast<size_t>(index)]->setProperty(
+                    "bindingState", bound && m_mainInputSourceAvailable
+                    ? QStringLiteral("active") : QStringLiteral("invalid"));
+        edits[static_cast<size_t>(index)]->style()->unpolish(
+                    edits[static_cast<size_t>(index)]);
+        edits[static_cast<size_t>(index)]->style()->polish(
+                    edits[static_cast<size_t>(index)]);
+        if (buttons[static_cast<size_t>(index)]) {
+            buttons[static_cast<size_t>(index)]->setProperty(
+                        "bindingActive", bound && m_mainInputSourceAvailable);
+            buttons[static_cast<size_t>(index)]->setToolTip(
+                        bound && m_mainInputSourceAvailable
+                        ? tr("已订阅：%1").arg(text)
+                        : tr("选择前序图像坐标来源"));
+            buttons[static_cast<size_t>(index)]->style()->unpolish(
+                        buttons[static_cast<size_t>(index)]);
+            buttons[static_cast<size_t>(index)]->style()->polish(
+                        buttons[static_cast<size_t>(index)]);
+        }
+    }
 }
 
 CalibrationTransformDialog::~CalibrationTransformDialog()
@@ -269,9 +406,10 @@ void CalibrationTransformDialog::updateReferenceImage(const QImage &image)
 }
 
 void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &tools,
-                                                  int consumerIndex,
-                                                  const QMap<QString, ToolPreviewSnapshot> &snapshots)
+                                                   int consumerIndex,
+                                                   const QMap<QString, ToolPreviewSnapshot> &snapshots)
 {
+    Q_UNUSED(snapshots)
     const QJsonObject savedInputX = ui->inputXSourceCombo->currentData().toJsonObject();
     const QJsonObject savedInputY = ui->inputYSourceCombo->currentData().toJsonObject();
     const QJsonObject savedInputAngle = ui->inputAngleSourceCombo->currentData().toJsonObject();
@@ -283,10 +421,10 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
         savedRunPose[static_cast<size_t>(i)] =
                 m_runPoseSources[static_cast<size_t>(i)]->currentData().toJsonObject();
     }
-    QJsonObject toolResults;
-    addConstantItem(ui->inputXSourceCombo);
-    addConstantItem(ui->inputYSourceCombo);
-    addConstantItem(ui->inputAngleSourceCombo);
+    m_inputProducers.clear();
+    addUnboundItem(ui->inputXSourceCombo);
+    addUnboundItem(ui->inputYSourceCombo);
+    addUnboundItem(ui->inputAngleSourceCombo);
     for (QComboBox *combo : m_calibrationPoseSources)
         addConstantItem(combo);
     for (QComboBox *combo : m_runPoseSources)
@@ -295,21 +433,32 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
     for (int index = 0; index < limit; ++index) {
         const ToolConfig &tool = tools.at(index);
         if (!tool.enabled || tool.toolId.trimmed().isEmpty()
-                || tool.toolType != ToolType::TemplateLocation) {
+                || (tool.toolType != ToolType::TemplateLocation
+                    && tool.toolType != ToolType::PositionCorrection)) {
             continue;
         }
         const QString title = tool.displayName.trimmed().isEmpty()
-                ? tr("%1 模板定位").arg(index + 1)
+                ? tr("%1 %2").arg(index + 1).arg(
+                      tool.toolType == ToolType::TemplateLocation
+                      ? tr("模板定位") : tr("位置修正"))
                 : tr("%1 %2").arg(index + 1).arg(tool.displayName);
-        const ToolPreviewSnapshot preview = snapshots.value(tool.toolId);
-        if (preview.valid)
-            toolResults.insert(tool.toolId, preview.result.toJson());
+        const bool templateLocation = tool.toolType == ToolType::TemplateLocation;
+        const QString xKey = templateLocation
+                ? QStringLiteral("x") : QStringLiteral("runPose.x");
+        const QString yKey = templateLocation
+                ? QStringLiteral("y") : QStringLiteral("runPose.y");
+        const QString angleKey = templateLocation
+                ? QStringLiteral("angle") : QStringLiteral("runPose.angleDeg");
+        m_inputProducers.append(InputProducerContract{tool.toolId, title,
+                                                       xKey, yKey, angleKey});
         ui->inputXSourceCombo->addItem(title + tr(".运行点X"),
-                                      bindingItem(tool.toolId, QStringLiteral("x"), title));
+                                      bindingItem(tool.toolId, xKey, title));
         ui->inputYSourceCombo->addItem(title + tr(".运行点Y"),
-                                      bindingItem(tool.toolId, QStringLiteral("y"), title));
+                                      bindingItem(tool.toolId, yKey, title));
         ui->inputAngleSourceCombo->addItem(title + tr(".运行角度"),
-                                          bindingItem(tool.toolId, QStringLiteral("angle"), title));
+                                          bindingItem(tool.toolId, angleKey, title));
+        if (!templateLocation)
+            continue;
         const QStringList outputKeys{QStringLiteral("x"), QStringLiteral("y"),
                                      QStringLiteral("angle"), QStringLiteral("angle")};
         const QStringList outputNames{tr("运行点X"), tr("运行点Y"),
@@ -322,16 +471,76 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
                         title + QStringLiteral(".") + outputNames.at(field), binding);
         }
     }
-    restoreBinding(ui->inputXSourceCombo, savedInputX);
-    restoreBinding(ui->inputYSourceCombo, savedInputY);
-    restoreBinding(ui->inputAngleSourceCombo, savedInputAngle);
+    restoreMainInputBindings(savedInputX, savedInputY, savedInputAngle);
     for (int i = 0; i < 4; ++i) {
         restoreBinding(m_calibrationPoseSources[static_cast<size_t>(i)],
                        savedCalibrationPose[static_cast<size_t>(i)]);
         restoreBinding(m_runPoseSources[static_cast<size_t>(i)],
                        savedRunPose[static_cast<size_t>(i)]);
     }
-    m_testRuntimeContext.insert(QStringLiteral("toolResultsById"), toolResults);
+}
+
+void CalibrationTransformDialog::setToolChainTestContext(
+        const QVector<ToolConfig> &tools,
+        int consumerIndex,
+        ToolEngine *sharedToolEngine,
+        const ReferencePositionCorrectionConfig &referencePositionCorrection)
+{
+    const int limit = consumerIndex < 0
+            ? tools.size() : qBound(0, consumerIndex, tools.size());
+    m_testToolPrefix = tools.mid(0, limit);
+    m_sharedToolEngine = sharedToolEngine;
+    m_referencePositionCorrection = referencePositionCorrection;
+}
+
+void CalibrationTransformDialog::restoreMainInputBindings(
+        const QJsonObject &x,
+        const QJsonObject &y,
+        const QJsonObject &angle)
+{
+    const QString producerId = x.value(QStringLiteral("producerId")).toString().trimmed();
+    const bool complete = x.value(QStringLiteral("mode")).toString()
+            == QStringLiteral("binding")
+            && y.value(QStringLiteral("mode")).toString() == QStringLiteral("binding")
+            && angle.value(QStringLiteral("mode")).toString() == QStringLiteral("binding")
+            && !producerId.isEmpty()
+            && y.value(QStringLiteral("producerId")).toString() == producerId
+            && angle.value(QStringLiteral("producerId")).toString() == producerId;
+    if (!complete) {
+        ui->inputXSourceCombo->setCurrentIndex(0);
+        ui->inputYSourceCombo->setCurrentIndex(0);
+        ui->inputAngleSourceCombo->setCurrentIndex(0);
+        m_mainInputSourceAvailable = false;
+        updateMainInputUi();
+        return;
+    }
+
+    int sourceIndex = -1;
+    for (int index = 0; index < m_inputProducers.size(); ++index) {
+        const InputProducerContract &producer = m_inputProducers.at(index);
+        if (producer.producerId == producerId
+                && x.value(QStringLiteral("outputKey")).toString() == producer.xKey
+                && y.value(QStringLiteral("outputKey")).toString() == producer.yKey
+                && angle.value(QStringLiteral("outputKey")).toString() == producer.angleKey) {
+            sourceIndex = index;
+            break;
+        }
+    }
+    if (sourceIndex >= 0) {
+        applyInputProducer(sourceIndex);
+        return;
+    }
+
+    const QString unavailable = x.value(QStringLiteral("displayPath"))
+            .toString(tr("已保存的订阅来源"));
+    ui->inputXSourceCombo->addItem(unavailable + tr(".运行点X"), x);
+    ui->inputYSourceCombo->addItem(unavailable + tr(".运行点Y"), y);
+    ui->inputAngleSourceCombo->addItem(unavailable + tr(".运行角度"), angle);
+    ui->inputXSourceCombo->setCurrentIndex(ui->inputXSourceCombo->count() - 1);
+    ui->inputYSourceCombo->setCurrentIndex(ui->inputYSourceCombo->count() - 1);
+    ui->inputAngleSourceCombo->setCurrentIndex(ui->inputAngleSourceCombo->count() - 1);
+    m_mainInputSourceAvailable = false;
+    updateMainInputUi();
 }
 
 QJsonObject CalibrationTransformDialog::bindingFor(QComboBox *combo,
@@ -341,6 +550,14 @@ QJsonObject CalibrationTransformDialog::bindingFor(QComboBox *combo,
     if (selected.value(QStringLiteral("mode")).toString() == QStringLiteral("binding"))
         return selected;
     return constantBinding(constantValue);
+}
+
+QJsonObject CalibrationTransformDialog::mainInputBinding(QComboBox *combo) const
+{
+    const QJsonObject selected = combo->currentData().toJsonObject();
+    if (selected.value(QStringLiteral("mode")).toString() == QStringLiteral("binding"))
+        return selected;
+    return QJsonObject{{QStringLiteral("mode"), QStringLiteral("unbound")}};
 }
 
 void CalibrationTransformDialog::restoreBinding(QComboBox *combo,
@@ -367,20 +584,16 @@ void CalibrationTransformDialog::restoreBinding(QComboBox *combo,
 
 void CalibrationTransformDialog::loadFromConfig(const ToolConfig &config)
 {
+    const QString stableToolId = m_initialConfig.toolId;
     m_initialConfig = config;
+    if (m_initialConfig.toolId.trimmed().isEmpty())
+        m_initialConfig.toolId = stableToolId;
     const QJsonObject params = config.params.value(QStringLiteral("calibrationTransform")).toObject();
-    ui->coordinateTypeCombo->setCurrentIndex(qMax(0, ui->coordinateTypeCombo->findData(
-                                                      params.value(QStringLiteral("coordinateType"))
-                                                      .toString(QStringLiteral("image")))));
+    ui->coordinateTypeCombo->setCurrentIndex(0);
     const QJsonObject x = params.value(QStringLiteral("inputX")).toObject();
     const QJsonObject y = params.value(QStringLiteral("inputY")).toObject();
     const QJsonObject angle = params.value(QStringLiteral("inputAngle")).toObject();
-    ui->inputXSpin->setValue(x.value(QStringLiteral("value")).toDouble());
-    ui->inputYSpin->setValue(y.value(QStringLiteral("value")).toDouble());
-    ui->inputAngleSpin->setValue(angle.value(QStringLiteral("value")).toDouble());
-    restoreBinding(ui->inputXSourceCombo, x);
-    restoreBinding(ui->inputYSourceCombo, y);
-    restoreBinding(ui->inputAngleSourceCombo, angle);
+    restoreMainInputBindings(x, y, angle);
 
     const QJsonArray files = params.value(QStringLiteral("calibrationFiles")).toArray();
     m_calibrationFiles.clear();
@@ -437,8 +650,6 @@ QJsonObject CalibrationTransformDialog::poseConfig(bool calibration) const
 ToolConfig CalibrationTransformDialog::toolConfig() const
 {
     ToolConfig config = m_initialConfig;
-    if (config.toolId.trimmed().isEmpty())
-        config.toolId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     config.toolType = ToolType::CalibrationTransform;
     config.category = ToolCategory::Location;
     config.toolName = QStringLiteral("CalibrationTransform");
@@ -448,11 +659,11 @@ ToolConfig CalibrationTransformDialog::toolConfig() const
     for (const QString &path : m_calibrationFiles)
         files.append(path);
     QJsonObject params{
-        {QStringLiteral("version"), 1},
-        {QStringLiteral("coordinateType"), ui->coordinateTypeCombo->currentData().toString()},
-        {QStringLiteral("inputX"), bindingFor(ui->inputXSourceCombo, ui->inputXSpin->value())},
-        {QStringLiteral("inputY"), bindingFor(ui->inputYSourceCombo, ui->inputYSpin->value())},
-        {QStringLiteral("inputAngle"), bindingFor(ui->inputAngleSourceCombo, ui->inputAngleSpin->value())},
+        {QStringLiteral("version"), 2},
+        {QStringLiteral("coordinateType"), QStringLiteral("image")},
+        {QStringLiteral("inputX"), mainInputBinding(ui->inputXSourceCombo)},
+        {QStringLiteral("inputY"), mainInputBinding(ui->inputYSourceCombo)},
+        {QStringLiteral("inputAngle"), mainInputBinding(ui->inputAngleSourceCombo)},
         {QStringLiteral("calibrationFiles"), files},
         {QStringLiteral("activeCalibrationFile"), ui->calibrationFileCombo->currentData().toString()},
         {QStringLiteral("calibrationPose"), poseConfig(true)},
@@ -493,39 +704,6 @@ void CalibrationTransformDialog::mergeSchemeCalibrationFiles()
     }
 }
 
-QString CalibrationTransformDialog::importIntoScheme(const QString &sourcePath,
-                                                     QString *errorMessage)
-{
-    const QString schemeDir = SchemeStore::instance().currentScheme().schemeDir;
-    QDir assetDir(QDir(schemeDir).filePath(QStringLiteral("calibrations")));
-    if (!assetDir.exists() && !assetDir.mkpath(QStringLiteral("."))) {
-        if (errorMessage)
-            *errorMessage = tr("无法创建方案标定资产目录");
-        return QString();
-    }
-    QFile source(sourcePath);
-    if (!source.open(QIODevice::ReadOnly)) {
-        if (errorMessage)
-            *errorMessage = tr("无法读取标定文件");
-        return QString();
-    }
-    const QByteArray hash = QCryptographicHash::hash(source.readAll(),
-                                                     QCryptographicHash::Sha256).toHex().left(12);
-    const QFileInfo info(sourcePath);
-    const QString target = assetDir.filePath(QStringLiteral("%1_%2.%3")
-                                             .arg(info.completeBaseName(),
-                                                  QString::fromLatin1(hash),
-                                                  info.suffix()));
-    if (QFileInfo::exists(target))
-        return target;
-    if (!QFile::copy(sourcePath, target)) {
-        if (errorMessage)
-            *errorMessage = tr("无法复制标定文件到当前方案");
-        return QString();
-    }
-    return target;
-}
-
 void CalibrationTransformDialog::importCalibrationFile()
 {
     const QString selected = QFileDialog::getOpenFileName(
@@ -547,27 +725,117 @@ void CalibrationTransformDialog::importCalibrationFile()
         QMessageBox::warning(this, tr("导入失败"), error);
         return;
     }
-    const QString imported = importIntoScheme(selected, &error);
-    if (imported.isEmpty()) {
-        QMessageBox::warning(this, tr("导入失败"), error);
+    if (!m_calibrationFiles.contains(selected))
+        m_calibrationFiles.append(selected);
+    refreshFileList(m_calibrationFiles, selected);
+    ui->statusLabel->setText(tr("已选择 %1，保存方案时写入标定资产")
+                             .arg(QFileInfo(selected).fileName()));
+}
+
+bool CalibrationTransformDialog::validateConfiguration(QString *errorMessage) const
+{
+    const QJsonObject x = mainInputBinding(ui->inputXSourceCombo);
+    const QJsonObject y = mainInputBinding(ui->inputYSourceCombo);
+    const QJsonObject angle = mainInputBinding(ui->inputAngleSourceCombo);
+    const QString producerId = x.value(QStringLiteral("producerId")).toString().trimmed();
+    if (!m_mainInputSourceAvailable
+            || x.value(QStringLiteral("mode")).toString() != QStringLiteral("binding")
+            || y.value(QStringLiteral("mode")).toString() != QStringLiteral("binding")
+            || angle.value(QStringLiteral("mode")).toString() != QStringLiteral("binding")
+            || producerId.isEmpty()
+            || y.value(QStringLiteral("producerId")).toString() != producerId
+            || angle.value(QStringLiteral("producerId")).toString() != producerId) {
+        if (errorMessage)
+            *errorMessage = tr("请先订阅一个可用前序节点的完整 X/Y/Angle 图像坐标");
+        return false;
+    }
+
+    const QString filePath = ui->calibrationFileCombo->currentData().toString().trimmed();
+    if (filePath.isEmpty() || !QFileInfo::exists(filePath)) {
+        if (errorMessage)
+            *errorMessage = tr("请选择有效的标定文件");
+        return false;
+    }
+    ProjectXmlCalibrationLoader project;
+    HikXmlCalibrationLoader hikXml;
+    HikIwcalCalibrationLoader iwcal;
+    const CalibrationFileLoader *loader = project.canLoad(filePath)
+            ? static_cast<const CalibrationFileLoader *>(&project)
+            : iwcal.canLoad(filePath)
+              ? static_cast<const CalibrationFileLoader *>(&iwcal)
+              : hikXml.canLoad(filePath)
+                ? static_cast<const CalibrationFileLoader *>(&hikXml) : nullptr;
+    CalibrationModel probe;
+    QString loadError;
+    if (!loader || !loader->load(filePath, &probe, &loadError)) {
+        if (errorMessage)
+            *errorMessage = loadError.isEmpty() ? tr("标定文件无法读取") : loadError;
+        return false;
+    }
+    return true;
+}
+
+void CalibrationTransformDialog::finishConfiguration()
+{
+    QString error;
+    if (!validateConfiguration(&error)) {
+        ui->statusLabel->setText(tr("NG | %1").arg(error));
         return;
     }
-    if (!m_calibrationFiles.contains(imported))
-        m_calibrationFiles.append(imported);
-    refreshFileList(m_calibrationFiles, imported);
-    ui->statusLabel->setText(tr("已导入 %1").arg(QFileInfo(imported).fileName()));
+    accept();
 }
 
 void CalibrationTransformDialog::runTest()
 {
-    CalibrationTransformAdapter adapter;
-    ToolRequest request;
-    request.config = toolConfig();
-    request.runtimeContext = m_testRuntimeContext;
-    const ToolResult result = adapter.run(request);
-    ui->statusLabel->setText(result.ok ? tr("OK | 转换成功")
-                                      : tr("NG | %1").arg(result.message));
+    const ToolConfig config = toolConfig();
+    ToolResult result;
+    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+    if (!m_sharedToolEngine) {
+        result = ToolResult::error(config.toolId, config.toolType,
+                                   tr("测试运行引擎不可用"),
+                                   QStringLiteral("test_engine_unavailable"));
+    } else if (frame.empty()) {
+        result = ToolResult::error(config.toolId, config.toolType,
+                                   tr("基准图为空，无法运行同帧订阅链"),
+                                   QStringLiteral("test_image_missing"));
+    } else {
+        QVector<ToolConfig> testChain = m_testToolPrefix;
+        testChain.append(config);
+        QJsonObject runtimeContext;
+        const QString frameId = QStringLiteral("calibration-transform-test-%1")
+                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        runtimeContext.insert(QStringLiteral("frameId"), frameId);
+        runtimeContext.insert(
+                    QStringLiteral("referencePositionCorrection"),
+                    PositionCorrection::referenceToJson(m_referencePositionCorrection));
+        const QVector<ToolResult> results = m_sharedToolEngine->runTools(
+                    testChain, frame, frame, runtimeContext);
+        bool found = false;
+        for (auto it = results.crbegin(); it != results.crend(); ++it) {
+            if (it->toolId != config.toolId)
+                continue;
+            result = *it;
+            found = true;
+            break;
+        }
+        if (!found) {
+            result = ToolResult::error(config.toolId, config.toolType,
+                                       tr("标定转换未进入测试工具链"),
+                                       QStringLiteral("test_result_missing"));
+        }
+    }
+    if (result.ok) {
+        const QJsonObject payload = result.payload;
+        ui->statusLabel->setText(
+                    tr("OK | 物理 X:%1  Y:%2  Angle:%3° | %4ms")
+                    .arg(payload.value(QStringLiteral("machineX")).toDouble(), 0, 'f', 3)
+                    .arg(payload.value(QStringLiteral("machineY")).toDouble(), 0, 'f', 3)
+                    .arg(payload.value(QStringLiteral("convertedAngleDeg")).toDouble(), 0, 'f', 3)
+                    .arg(result.elapsedMs));
+    } else {
+        ui->statusLabel->setText(tr("NG | %1").arg(result.message));
+    }
     ui->resultText->setPlainText(QString::fromUtf8(
                                     QJsonDocument(result.toJson()).toJson(QJsonDocument::Indented)));
-    m_snapshot = makeReferenceToolPreviewSnapshot(request.config, result, QRectF());
+    m_snapshot = makeReferenceToolPreviewSnapshot(config, result, QRectF());
 }

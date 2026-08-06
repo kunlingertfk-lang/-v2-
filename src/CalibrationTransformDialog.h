@@ -2,6 +2,7 @@
 #define CALIBRATIONTRANSFORMDIALOG_H
 
 #include "toolcore/ToolConfig.h"
+#include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolPreviewSnapshot.h"
 
 #include <QDialog>
@@ -17,7 +18,9 @@ class QComboBox;
 class QDoubleSpinBox;
 class QHBoxLayout;
 class QImage;
+class QLineEdit;
 class QToolButton;
+class ToolEngine;
 
 class CalibrationTransformDialog : public QDialog
 {
@@ -32,35 +35,63 @@ public:
     void setProducerTools(const QVector<ToolConfig> &tools,
                           int consumerIndex,
                           const QMap<QString, ToolPreviewSnapshot> &snapshots = {});
+    void setToolChainTestContext(
+            const QVector<ToolConfig> &tools,
+            int consumerIndex,
+            ToolEngine *sharedToolEngine,
+            const ReferencePositionCorrectionConfig &referencePositionCorrection);
 
 private slots:
     void importCalibrationFile();
     void runTest();
+    void finishConfiguration();
 
 private:
+    struct InputProducerContract
+    {
+        QString producerId;
+        QString displayName;
+        QString xKey;
+        QString yKey;
+        QString angleKey;
+    };
+
     QJsonObject bindingFor(QComboBox *combo, double constantValue) const;
+    QJsonObject mainInputBinding(QComboBox *combo) const;
     void restoreBinding(QComboBox *combo, const QJsonObject &binding);
+    void restoreMainInputBindings(const QJsonObject &x,
+                                  const QJsonObject &y,
+                                  const QJsonObject &angle);
     QToolButton *createBindingButton(QComboBox *stateCombo,
                                      QDoubleSpinBox *valueSpin,
                                      QWidget *parent,
                                      const QString &fieldName);
+    QToolButton *createInputBindingButton(QWidget *parent,
+                                          const QString &fieldName);
     void updateBindingButton(QComboBox *stateCombo,
                              QDoubleSpinBox *valueSpin,
                              QToolButton *button,
                              const QString &fieldName);
+    void applyInputProducer(int producerIndex);
+    void updateMainInputUi();
+    void invalidatePreviewSnapshot();
+    bool validateConfiguration(QString *errorMessage) const;
     QJsonObject poseConfig(bool calibration) const;
     void setupPoseSourceUi();
     void updateReferenceImage(const QImage &image);
     void refreshFileList(const QStringList &paths, const QString &activePath);
     void mergeSchemeCalibrationFiles();
-    QString importIntoScheme(const QString &sourcePath, QString *errorMessage);
 
     Ui::CalibrationTransformDialog *ui;
     FrameViewHelper *m_previewHelper = nullptr;
     ToolConfig m_initialConfig;
     ToolPreviewSnapshot m_snapshot;
     QStringList m_calibrationFiles;
-    QJsonObject m_testRuntimeContext;
+    QVector<InputProducerContract> m_inputProducers;
+    bool m_mainInputSourceAvailable = false;
+    QVector<ToolConfig> m_testToolPrefix;
+    ToolEngine *m_sharedToolEngine = nullptr;
+    ReferencePositionCorrectionConfig m_referencePositionCorrection;
     QToolButton *m_inputXLinkButton = nullptr;
     QToolButton *m_inputYLinkButton = nullptr;
     QToolButton *m_inputAngleLinkButton = nullptr;
