@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CalibrationModel schemaVersion="1.0">
+    <calibrationId>CAL-20260805115724270-57865860</calibrationId>
+    <methodId>n_point</methodId>
+    <modelType>affine_2d</modelType>
+    <coordinateConvention>pixel_column_row_to_machine_xy</coordinateConvention>
+    <createdAt>2026-08-05T11:57:24.270</createdAt>
+    <forwardTransform>0.16666666666666669,0,-83.333333333333343,0,0.16666666666666666,-70</forwardTransform>
+    <inverseTransform>5.9999999999999991,0,500,0,6,420</inverseTransform>
+    <quality meanError="2.3684757858670005e-15" rmse="4.1023203976182695e-15" maxError="7.1054273576010019e-15" rmseX="4.1023203976182695e-15" rmseY="0" rmseLimit="0.10000000000000001" maxErrorLimit="0.25" passed="true"/>
+    <validRegion>
+        <point column="200" row="180"/>
+        <point column="500" row="180"/>
+        <point column="800" row="180"/>
+        <point column="200" row="420"/>
+        <point column="500" row="420"/>
+        <point column="800" row="420"/>
+        <point column="200" row="660"/>
+        <point column="500" row="660"/>
+        <point column="800" row="660"/>
+    </validRegion>
+    <imageBinding><![CDATA[{"mode":"manual"}]]></imageBinding>
+    <methodData><![CDATA[{"fitProcedure":"HALCON.VectorToHomMat2d","inverseRoundTripMaxPx":0,"rotationCount":0,"sampleCount":9,"translationCount":9,"version":1}]]></methodData>
+    <samples>
+        <sample index="1" column="200" row="180" machineX="-50" machineY="-40" imageAngleDeg="0" machineAngleDeg="0" residualX="-7.1054273576010019e-15" residualY="0" residual="7.1054273576010019e-15" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="2" column="500" row="180" machineX="0" machineY="-40" imageAngleDeg="0" machineAngleDeg="0" residualX="0" residualY="0" residual="0" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="3" column="800" row="180" machineX="50" machineY="-40" imageAngleDeg="0" machineAngleDeg="0" residualX="0" residualY="0" residual="0" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="4" column="200" row="420" machineX="-50" machineY="0" imageAngleDeg="0" machineAngleDeg="0" residualX="-7.1054273576010019e-15" residualY="0" residual="7.1054273576010019e-15" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="5" column="500" row="420" machineX="0" machineY="0" imageAngleDeg="0" machineAngleDeg="0" residualX="0" residualY="0" residual="0" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="6" column="800" row="420" machineX="50" machineY="0" imageAngleDeg="0" machineAngleDeg="0" residualX="0" residualY="0" residual="0" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="7" column="200" row="660" machineX="-50" machineY="40" imageAngleDeg="0" machineAngleDeg="0" residualX="-7.1054273576010019e-15" residualY="0" residual="7.1054273576010019e-15" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="8" column="500" row="660" machineX="0" machineY="40" imageAngleDeg="0" machineAngleDeg="0" residualX="0" residualY="0" residual="0" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+        <sample index="9" column="800" row="660" machineX="50" machineY="40" imageAngleDeg="0" machineAngleDeg="0" residualX="0" residualY="0" residual="0" source="manual" capturedAt="2026-08-05T11:57:24.269"/>
+    </samples>
+    <checksum algorithm="SHA-256">a4106dcfcd3c47164f51e9f15b4a49225da943669b3b14d99652de8dc0d37a73</checksum>
+</CalibrationModel>

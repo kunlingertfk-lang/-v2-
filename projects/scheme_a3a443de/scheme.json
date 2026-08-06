@@ -1,0 +1,61 @@
+{
+    "output": {
+    },
+    "previews": {
+    },
+    "referenceImage": "reference.png",
+    "referenceInputMetadata": {
+        "bitShift": 0,
+        "colorMode": "color",
+        "originalChannels": 3,
+        "originalDepth": 8,
+        "pixelFormat": "BGR8",
+        "source": "file",
+        "validBits": 8
+    },
+    "referencePositionCorrection": {
+        "customOriginNormalized": {
+            "x": 0.5,
+            "y": 0.5
+        },
+        "elapsedMs": 0,
+        "enabled": false,
+        "message": "基准图已更新，请重新确认模板区域和定位点",
+        "originMode": "centroid",
+        "referenceCreated": false,
+        "referencePose": {
+        },
+        "score": 0,
+        "status": "reference_image_changed",
+        "templateMaskCircleCenterNormalized": {
+            "x": 0,
+            "y": 0
+        },
+        "templateMaskCircleRadiusNormalized": 0,
+        "templateMaskPolygonNormalized": [
+        ],
+        "templateMaskRegionType": "none",
+        "templateMaskRoiNormalized": {
+            "height": 0,
+            "width": 0,
+            "x": 0,
+            "y": 0
+        },
+        "templatePolygonNormalized": [
+        ],
+        "templateRegionType": "rectangle",
+        "templateRoiNormalized": {
+            "height": 0,
+            "width": 0,
+            "x": 0,
+            "y": 0
+        },
+        "version": 2
+    },
+    "schemaVersion": 1,
+    "schemeId": "scheme_a3a443de",
+    "schemeName": "注册分类",
+    "tools": [
+    ],
+    "updatedAt": "2026-08-04T13:40:01"
+}

@@ -1,0 +1,244 @@
+{
+    "output": {
+    },
+    "previews": {
+    },
+    "referenceImage": "reference_a.png",
+    "referenceInputMetadata": {
+        "bitShift": 0,
+        "colorMode": "color",
+        "originalChannels": 3,
+        "originalDepth": 8,
+        "pixelFormat": "BGR8",
+        "source": "file",
+        "validBits": 8
+    },
+    "referencePositionCorrection": {
+        "customOriginNormalized": {
+            "x": 0.5,
+            "y": 0.5
+        },
+        "elapsedMs": 0,
+        "enabled": false,
+        "message": "基准图已更新，请重新确认模板区域和定位点",
+        "originMode": "centroid",
+        "referenceCreated": false,
+        "referencePose": {
+        },
+        "score": 0,
+        "status": "reference_image_changed",
+        "templateMaskCircleCenterNormalized": {
+            "x": 0,
+            "y": 0
+        },
+        "templateMaskCircleRadiusNormalized": 0,
+        "templateMaskPolygonNormalized": [
+        ],
+        "templateMaskRegionType": "none",
+        "templateMaskRoiNormalized": {
+            "height": 0,
+            "width": 0,
+            "x": 0,
+            "y": 0
+        },
+        "templatePolygonNormalized": [
+        ],
+        "templateRegionType": "rectangle",
+        "templateRoiNormalized": {
+            "height": 0,
+            "width": 0,
+            "x": 0,
+            "y": 0
+        },
+        "version": 3
+    },
+    "schemaVersion": 1,
+    "schemeId": "scheme_6c3a666e",
+    "schemeName": "Calib0804",
+    "tools": [
+        {
+            "category": "Location",
+            "displayName": "标定转换",
+            "enabled": true,
+            "judgeRule": {
+            },
+            "params": {
+                "calibrationTransform": {
+                    "activeCalibrationFile": "",
+                    "calibrationFiles": [
+                    ],
+                    "calibrationPose": {
+                        "enabled": false,
+                        "joint0Angle": {
+                            "mode": "constant",
+                            "value": 0
+                        },
+                        "joint1Angle": {
+                            "mode": "constant",
+                            "value": 0
+                        },
+                        "x": {
+                            "mode": "constant",
+                            "value": 0
+                        },
+                        "y": {
+                            "mode": "constant",
+                            "value": 0
+                        }
+                    },
+                    "coordinateType": "image",
+                    "inputAngle": {
+                        "mode": "constant",
+                        "value": 0
+                    },
+                    "inputX": {
+                        "mode": "constant",
+                        "value": 0
+                    },
+                    "inputY": {
+                        "mode": "constant",
+                        "value": -5
+                    },
+                    "runPose": {
+                        "enabled": false,
+                        "joint0Angle": {
+                            "mode": "constant",
+                            "value": 0
+                        },
+                        "joint1Angle": {
+                            "mode": "constant",
+                            "value": 0
+                        },
+                        "x": {
+                            "mode": "constant",
+                            "value": 0
+                        },
+                        "y": {
+                            "mode": "constant",
+                            "value": 0
+                        }
+                    },
+                    "version": 1
+                }
+            },
+            "roiNormalized": {
+                "height": 0,
+                "width": 0,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "",
+            "toolId": "a6128f97-24f8-4182-9f97-c419e296026b",
+            "toolName": "CalibrationTransform",
+            "toolType": "CalibrationTransform"
+        },
+        {
+            "category": "Recognition",
+            "displayName": "颜色比较",
+            "enabled": true,
+            "judgeRule": {
+                "minScore": 80,
+                "mode": "min_score"
+            },
+            "params": {
+                "colorComparison": {
+                    "comparison": {
+                        "brightnessCompensation": false,
+                        "sensitivity": "high"
+                    },
+                    "detectCircleNormalized": {
+                        "boundingRect": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                        },
+                        "center": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "radius": 0,
+                        "valid": false
+                    },
+                    "detectGlobal": false,
+                    "detectMaskPolygon": [
+                    ],
+                    "detectRegionType": "rectangle",
+                    "detectRoiNormalized": {
+                        "height": 1,
+                        "width": 1,
+                        "x": 0,
+                        "y": 0
+                    },
+                    "dialogLifecycle": {
+                        "originVersion": 2,
+                        "reason": "尚未取样，请点击重新取样",
+                        "status": "model_empty"
+                    },
+                    "model": {
+                        "algorithm": "histogram_intersection",
+                        "brightnessReference": {
+                            "deviation": 0,
+                            "mean": 0
+                        },
+                        "colorSpace": "hsv",
+                        "effectivePixelCount": 0,
+                        "extractParamsHash": "",
+                        "featureType": "histogram_hs_2d",
+                        "hueBins": 32,
+                        "inputSignature": {
+                            "bitDepth": -1,
+                            "ccm": null,
+                            "colorMode": "unknown",
+                            "exposure": null,
+                            "gain": null,
+                            "pixelFormat": "",
+                            "whiteBalance": null
+                        },
+                        "layout": "hue_major",
+                        "normalized": true,
+                        "referenceImageHash": "",
+                        "saturationBins": 32,
+                        "state": "empty",
+                        "valueHistogram": [
+                        ],
+                        "values": [
+                        ]
+                    },
+                    "positionCorrection": {
+                        "enabled": false,
+                        "interfaceVersion": 1,
+                        "showMatchContour": true,
+                        "sourceId": "reference.positionCorrection"
+                    },
+                    "templateMaskPolygon": [
+                    ],
+                    "templateRegionMode": "custom",
+                    "templateRoiNormalized": {
+                        "height": 0.25,
+                        "width": 0.25,
+                        "x": 0.05,
+                        "y": 0.05
+                    },
+                    "version": 2
+                },
+                "enablePositionCorrection": false,
+                "positionCorrectionSource": "来源不可用：0 基准图.位置修正信息",
+                "positionCorrectionSourceId": "reference.positionCorrection"
+            },
+            "roiNormalized": {
+                "height": 1,
+                "width": 1,
+                "x": 0,
+                "y": 0
+            },
+            "schemaVersion": 1,
+            "summary": "HSV直方图比较；最低分 80",
+            "toolId": "color_comparison_7c40d6e1-ccc7-4bf4-855f-e13b296970d8",
+            "toolName": "ColorComparison",
+            "toolType": "ColorComparison"
+        }
+    ],
+    "updatedAt": "2026-08-04T13:53:36"
+}

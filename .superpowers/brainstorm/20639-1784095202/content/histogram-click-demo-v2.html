@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>颜色比较特征点击演示</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#1f2024;color:#e5e7eb;font-family:"Noto Sans CJK SC","Microsoft YaHei",sans-serif}.page{max-width:1120px;margin:auto;padding:34px 24px}h1{font-size:28px;margin:0 0 8px}.sub{color:#9ca3af;margin:0 0 24px}.feature{width:390px;background:#f8fafc;color:#243244;border:1px solid #cbd5e1;border-radius:10px;padding:14px;box-shadow:0 14px 35px #0005}.head{font-weight:700;font-size:16px}.legend{display:flex;gap:15px;margin:9px 0;color:#64748b;font-size:12px}.key{display:inline-block;width:15px;height:10px;margin-right:5px;vertical-align:-1px}.template{background:#f97316}.detect{border:2px solid #64748b}.overlap{background:repeating-linear-gradient(135deg,#84cc16 0 2px,transparent 2px 4px);border:1px solid #65a30d}.small-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.plot{appearance:none;border:1px solid #111827;background:#252a31;height:92px;color:#fff;position:relative;cursor:pointer;padding:0;overflow:hidden}.plot:hover,.heat:hover{outline:2px solid #f59e0b;outline-offset:1px}.label{position:absolute;left:7px;top:5px;font-weight:700;z-index:3}.zoom{position:absolute;right:6px;top:4px;z-index:3;color:#f59e0b;font-size:16px}.bars{position:absolute;inset:24px 8px 7px;display:flex;align-items:end;gap:2px}.pair{flex:1;height:100%;position:relative}.t,.d{position:absolute;bottom:0}.t{left:0;width:65%;height:var(--t);background:#f97316;opacity:.85}.d{right:0;width:65%;height:var(--d);border:2px solid #dbeafe;background:#93c5fd22}.joint{display:grid;grid-template-columns:150px 1fr;gap:10px;margin-top:10px}.heat{height:150px;border:1px solid #111827;cursor:pointer;position:relative;background:radial-gradient(circle at 27% 70%,#fef08a 0 3%,#f97316 10%,transparent 20%),radial-gradient(circle at 71% 31%,#d9f99d 0 4%,#06b6d4 11%,transparent 23%),radial-gradient(circle at 60% 68%,#f9a8d4 0 3%,#7c3aed 10%,transparent 19%),#172033;color:#fff}.axis-s{position:absolute;left:6px;top:6px}.axis-h{position:absolute;right:7px;bottom:5px}.metrics{background:#e2e8f0;border-radius:7px;padding:11px;font-size:13px;line-height:1.9}.hint{margin-top:16px;padding:11px 13px;border-left:4px solid #f59e0b;background:#2b2d33;color:#d1d5db}.modal{display:none;position:fixed;inset:0;background:#020617bf;z-index:20;align-items:center;justify-content:center;padding:30px}.modal.open{display:flex}.dialog{width:min(900px,94vw);background:#f8fafc;color:#243244;border-radius:10px;overflow:hidden;box-shadow:0 24px 80px #000b}.dialog-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#e2e8f0;font-weight:700}.close{border:0;border-radius:5px;background:#ef4444;color:#fff;padding:6px 13px;cursor:pointer;font-size:14px}.dialog-body{display:grid;grid-template-columns:1fr 220px;gap:16px;padding:16px}.large{height:400px;background:#252a31;position:relative;border:1px solid #111827}.large .bars{inset:40px 22px 25px;gap:5px}.large .label{font-size:18px;left:14px;top:10px}.large-heat{height:480px;background:radial-gradient(circle at 27% 70%,#fef08a 0 4%,#f97316 11%,transparent 21%),radial-gradient(circle at 71% 31%,#d9f99d 0 5%,#06b6d4 12%,transparent 24%),radial-gradient(circle at 60% 68%,#f9a8d4 0 4%,#7c3aed 11%,transparent 20%),#172033;position:relative;color:#fff}.details{font-size:13px;line-height:1.8}.details strong{color:#ea580c}.kbd{display:inline-block;border:1px solid #94a3b8;border-bottom-width:2px;border-radius:4px;padding:0 5px;background:#fff}@media(max-width:700px){.feature{width:100%}.dialog-body{grid-template-columns:1fr}.large,.large-heat{height:300px}}
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>颜色比较：点击放大交互演示</h1>
+  <p class="sub">点击 H、S、V 或 HS 二维联合图，体验真实的打开与关闭效果。</p>
+  <section class="feature">
+    <div class="head">模型与检测色彩特征</div>
+    <div class="legend"><span><i class="key template"></i>模板</span><span><i class="key detect"></i>检测</span><span><i class="key overlap"></i>重合</span></div>
+    <div class="small-grid">
+      <button class="plot" data-title="H 直方图对比（32 bins）" data-kind="H"><span class="label">H</span><span class="zoom">⌕</span><span class="bars"></span></button>
+      <button class="plot" data-title="S 直方图对比（32 bins）" data-kind="S"><span class="label">S</span><span class="zoom">⌕</span><span class="bars"></span></button>
+      <button class="plot" data-title="V 直方图对比（32 bins）" data-kind="V"><span class="label">V</span><span class="zoom">⌕</span><span class="bars"></span></button>
+    </div>
+    <div class="joint">
+      <div class="heat" data-title="HS 二维联合直方图（32 × 32）" data-kind="HS"><span class="axis-s">S ↑</span><span class="zoom">⌕</span><span class="axis-h">H →</span></div>
+      <div class="metrics">HS 联合重合：72.4%<br>当前得分：68.5<br>判定阈值：80<br><small>二维图显示模板与检测差异</small></div>
+    </div>
+  </section>
+  <div class="hint">关闭方式：右上角“× 关闭”、键盘 <span class="kbd">Esc</span>，或者点击弹窗外的深色遮罩。</div>
+</main>
+
+<div class="modal" id="modal" aria-hidden="true">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="dialog-head"><span id="modalTitle"></span><button class="close" id="closeBtn">× 关闭</button></div>
+    <div class="dialog-body"><div id="largeVisual"></div><aside class="details"><div class="legend"><span><i class="key template"></i>模板</span><span><i class="key detect"></i>检测</span><span><i class="key overlap"></i>重合</span></div><p><strong id="overlapText">重合率：74.8%</strong><br>差异最大 bin：12<br>模板值：0.084<br>检测值：0.021</p><p>模板与检测共用同一纵轴尺度，避免分别缩放造成误判。</p></aside></div>
+  </div>
+</div>
+
+<script>
+const heights=[[35,60],[70,45],[85,76],[55,82],[92,63],[48,38],[74,88],[32,57],[65,41],[87,72],[52,69],[76,49]];
+function bars(kind){const shift=kind==='S'?2:kind==='V'?4:0;return heights.map((p,i)=>`<i class="pair" style="--t:${p[0]}%;--d:${heights[(i+shift)%heights.length][1]}%"><i class="t"></i><i class="d"></i></i>`).join('')}
+document.querySelectorAll('.plot .bars').forEach((el,i)=>el.innerHTML=bars(['H','S','V'][i]));
+const modal=document.getElementById('modal'), title=document.getElementById('modalTitle'), visual=document.getElementById('largeVisual'), overlap=document.getElementById('overlapText');
+function openModal(el){const kind=el.dataset.kind;title.textContent=el.dataset.title;if(kind==='HS'){visual.className='large-heat';visual.innerHTML='<span class="axis-s">Saturation ↑</span><span class="axis-h">Hue →</span>';overlap.textContent='HS 联合重合：72.4%'}else{visual.className='large';visual.innerHTML=`<span class="label">${kind}</span><span class="bars">${bars(kind)}</span>`;overlap.textContent=`${kind} 边缘重合率：74.8%`}modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.getElementById('closeBtn').focus()}
+function closeModal(){modal.classList.remove('open');modal.setAttribute('aria-hidden','true')}
+document.querySelectorAll('[data-kind]').forEach(el=>el.addEventListener('click',()=>openModal(el)));
+document.getElementById('closeBtn').addEventListener('click',closeModal);
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+</script>
+</body>
+</html>

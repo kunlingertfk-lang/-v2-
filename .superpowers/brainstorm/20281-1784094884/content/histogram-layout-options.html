@@ -1,0 +1,114 @@
+<style>
+  .layout-grid { display:grid; grid-template-columns:repeat(3,minmax(260px,1fr)); gap:18px; }
+  .design { cursor:pointer; border:2px solid #293241; border-radius:12px; background:#f4f7fb; overflow:hidden; transition:.15s; }
+  .design:hover { transform:translateY(-2px); border-color:#f59e0b; }
+  .design.selected { border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.2); }
+  .design-head { padding:12px 14px; background:#e9eef5; border-bottom:1px solid #cbd5e1; }
+  .design-body { padding:12px; }
+  .feature-card { background:#fff; border:1px solid #cbd5e1; border-radius:8px; padding:10px; }
+  .feature-title { font-weight:700; color:#263445; margin-bottom:8px; }
+  .legend { display:flex; gap:10px; align-items:center; font-size:11px; color:#475569; margin-bottom:8px; }
+  .mark { width:13px; height:9px; display:inline-block; margin-right:4px; vertical-align:middle; }
+  .solid { background:#f97316; }
+  .outline { border:2px solid #e2e8f0; background:transparent; box-sizing:border-box; }
+  .hatch { background:repeating-linear-gradient(135deg,#a3e635 0 2px,transparent 2px 4px); border:1px solid #65a30d; }
+  .charts { display:grid; gap:7px; }
+  .charts.three { grid-template-columns:repeat(3,1fr); }
+  .charts.two { grid-template-columns:1fr 1fr; }
+  .chart { height:64px; background:#252a31; border:1px solid #111827; position:relative; overflow:hidden; }
+  .chart:after { content:""; position:absolute; inset:13px 7px 4px; background:repeating-linear-gradient(90deg,transparent 0 5px,rgba(249,115,22,.85) 5px 7px,transparent 7px 9px,rgba(226,232,240,.75) 9px 11px); clip-path:polygon(0 82%,8% 70%,16% 76%,25% 32%,33% 55%,42% 18%,50% 46%,58% 29%,67% 64%,75% 44%,83% 74%,92% 61%,100% 86%,100% 100%,0 100%); }
+  .chart-label { position:absolute; z-index:2; top:3px; left:6px; color:#d1d5db; font-size:10px; }
+  .zoom { position:absolute; z-index:3; right:4px; top:3px; color:#f8fafc; font-size:12px; background:#475569; border-radius:3px; padding:0 3px; }
+  .heat { aspect-ratio:1; min-height:115px; border:1px solid #111827; position:relative; background:
+    radial-gradient(circle at 24% 72%,#fef08a 0 4%,#f97316 9%,transparent 18%),
+    radial-gradient(circle at 70% 30%,#a3e635 0 5%,#06b6d4 11%,transparent 22%),
+    radial-gradient(circle at 58% 65%,#fb7185 0 3%,#7c3aed 12%,transparent 20%),#172033; }
+  .heat:before { content:"S ↑"; position:absolute; left:4px; top:4px; color:#fff; font-size:10px; }
+  .heat:after { content:"H →"; position:absolute; right:5px; bottom:3px; color:#fff; font-size:10px; }
+  .metrics { margin-top:8px; padding:7px 8px; background:#eef2f7; border-radius:6px; font-size:11px; color:#334155; line-height:1.6; }
+  .tabs { display:flex; gap:4px; margin-bottom:8px; }
+  .tab { padding:4px 10px; border-radius:5px; background:#e2e8f0; font-size:11px; }
+  .tab.on { background:#f59e0b; color:#fff; }
+  .modal-preview { margin-top:24px; background:rgba(15,23,42,.92); border-radius:12px; padding:18px; color:#fff; }
+  .modal-box { max-width:720px; margin:auto; background:#f8fafc; color:#1e293b; border-radius:9px; overflow:hidden; }
+  .modal-head { display:flex; justify-content:space-between; padding:10px 14px; background:#e2e8f0; font-weight:700; }
+  .modal-main { display:grid; grid-template-columns:1fr 190px; gap:14px; padding:14px; }
+  .large-chart { height:230px; background:#252a31; border:1px solid #111827; position:relative; }
+  .large-chart:after { content:""; position:absolute; inset:24px 16px 15px; background:repeating-linear-gradient(90deg,transparent 0 11px,rgba(249,115,22,.9) 11px 16px,transparent 16px 19px,rgba(226,232,240,.75) 19px 24px); clip-path:polygon(0 82%,8% 70%,16% 76%,25% 32%,33% 55%,42% 18%,50% 46%,58% 29%,67% 64%,75% 44%,83% 74%,92% 61%,100% 86%,100% 100%,0 100%); }
+  .close { background:#ef4444; color:#fff; border-radius:4px; padding:1px 8px; }
+  @media(max-width:1000px){ .layout-grid{grid-template-columns:1fr;} }
+</style>
+
+<h2>颜色比较：特征区布局选择</h2>
+<p class="subtitle">三种方案都支持点击任意 H / S / V / HS 图进入可关闭的放大窗口。请选择更适合左侧窄参数栏的布局。</p>
+
+<div class="layout-grid">
+  <div class="design option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="design-head"><strong>A · 横排 + 联合图在下（推荐）</strong></div>
+    <div class="design-body">
+      <div class="feature-card">
+        <div class="feature-title">模型与检测色彩特征</div>
+        <div class="legend"><span><i class="mark solid"></i>模板</span><span><i class="mark outline"></i>检测</span><span><i class="mark hatch"></i>重合</span></div>
+        <div class="charts three">
+          <div class="chart"><b class="chart-label">H</b><i class="zoom">⌕</i></div>
+          <div class="chart"><b class="chart-label">S</b><i class="zoom">⌕</i></div>
+          <div class="chart"><b class="chart-label">V</b><i class="zoom">⌕</i></div>
+        </div>
+        <div style="display:grid;grid-template-columns:126px 1fr;gap:8px;margin-top:8px">
+          <div class="heat"><i class="zoom">⌕</i></div>
+          <div class="metrics">HS 联合重合：72.4%<br>当前得分：68.5<br>判定阈值：80<br><small>二维图默认显示“差异热力图”</small></div>
+        </div>
+      </div>
+      <p>保留现有三图阅读习惯，二维图和关键数值紧邻；纵向增加约 140 px。</p>
+    </div>
+  </div>
+
+  <div class="design option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="design-head"><strong>B · 2 × 2 等尺寸网格</strong></div>
+    <div class="design-body">
+      <div class="feature-card">
+        <div class="feature-title">模型与检测色彩特征</div>
+        <div class="legend"><span><i class="mark solid"></i>模板</span><span><i class="mark outline"></i>检测</span><span><i class="mark hatch"></i>重合</span></div>
+        <div class="charts two">
+          <div class="chart"><b class="chart-label">H</b><i class="zoom">⌕</i></div>
+          <div class="chart"><b class="chart-label">S</b><i class="zoom">⌕</i></div>
+          <div class="chart"><b class="chart-label">V</b><i class="zoom">⌕</i></div>
+          <div class="heat"><i class="zoom">⌕</i></div>
+        </div>
+        <div class="metrics">HS 联合重合 72.4%　得分 68.5　阈值 80</div>
+      </div>
+      <p>四张图地位一致、点击目标更大；会明显拉长参数区。</p>
+    </div>
+  </div>
+
+  <div class="design option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="design-head"><strong>C · 1D / 2D 页签切换</strong></div>
+    <div class="design-body">
+      <div class="feature-card">
+        <div class="feature-title">模型与检测色彩特征</div>
+        <div class="tabs"><span class="tab on">H/S/V</span><span class="tab">HS 联合</span></div>
+        <div class="legend"><span><i class="mark solid"></i>模板</span><span><i class="mark outline"></i>检测</span><span><i class="mark hatch"></i>重合</span></div>
+        <div class="charts three">
+          <div class="chart"><b class="chart-label">H</b><i class="zoom">⌕</i></div>
+          <div class="chart"><b class="chart-label">S</b><i class="zoom">⌕</i></div>
+          <div class="chart"><b class="chart-label">V</b><i class="zoom">⌕</i></div>
+        </div>
+        <div class="metrics">HS 联合重合 72.4%　得分 68.5</div>
+      </div>
+      <p>最省空间，但二维差异默认被隐藏，需要多一次点击。</p>
+    </div>
+  </div>
+</div>
+
+<div class="modal-preview">
+  <div class="modal-box">
+    <div class="modal-head"><span>H 直方图对比（32 bins）</span><span class="close">× 关闭</span></div>
+    <div class="modal-main">
+      <div class="large-chart"></div>
+      <div>
+        <div class="legend"><span><i class="mark solid"></i>模板</span><span><i class="mark outline" style="border-color:#64748b"></i>检测</span></div>
+        <div class="metrics">重合率：74.8%<br>差异最大 bin：12<br>模板：0.084<br>检测：0.021<br><br>Esc、右上角 × 或点击遮罩均可关闭。</div>
+      </div>
+    </div>
+  </div>
+</div>
