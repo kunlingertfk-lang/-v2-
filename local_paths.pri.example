@@ -1,0 +1,14 @@
+# 每开发者本地路径覆盖模板。
+# 用法: cp local_paths.pri.example local_paths.pri  然后编辑。
+# local_paths.pri 已被 .gitignore 忽略，不会入库。
+# 取消下面相应行的注释并改成你本机的路径即可。
+# qt_ui_test.pro 会在存在时自动 include 本文件。
+
+# --- OpenCV 自编译安装(不设则用系统 /usr/include/opencv4) ---
+# OPENCV_ROOT = $$quote(/home/you/.local/opencv-4.8.0)
+# INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
+# LIBS += -L$$OPENCV_ROOT/lib -Wl,-rpath,$$OPENCV_ROOT/lib
+
+# --- HALCON 20.11 安装目录(等价于 export HALCONROOT=...) ---
+# HALCON_ROOT = $$quote(/opt/halcon)
+# INCLUDEPATH += $$HALCON_ROOT/include

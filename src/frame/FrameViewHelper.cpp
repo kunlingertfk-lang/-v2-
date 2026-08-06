@@ -1,0 +1,2668 @@
+#include "frame/FrameViewHelper.h"
+
+#include <QBrush>
+#include <QColor>
+#include <QEvent>
+#include <QFrame>
+#include <QGraphicsEllipseItem>
+#include <QGraphicsLineItem>
+#include <QGraphicsPathItem>
+#include <QGraphicsPixmapItem>
+#include <QGraphicsPolygonItem>
+#include <QGraphicsRectItem>
+#include <QGraphicsScene>
+#include <QGraphicsSimpleTextItem>
+#include <QGraphicsView>
+#include <QLabel>
+#include <QLineF>
+#include <QKeyEvent>
+#include <QMouseEvent>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPen>
+#include <QPixmap>
+#include <QPolygonF>
+#include <QScrollBar>
+#include <QResizeEvent>
+#include <QSizePolicy>
+#include <QtGlobal>
+#include <QtMath>
+#include <QWidget>
+#include <QFont>
+#include <QWheelEvent>
+
+#include <cmath>
+
+namespace {
+
+const int kMaxOverlayTextChars = 32;
+
+bool finiteValue(qreal value);
+bool finitePoint(const QPointF &point);
+bool finiteRect(const QRectF &rect);
+
+QPen cosmeticPen(const QColor &color, const qreal width = 2.0)
+{
+    QPen pen(color, width);
+    pen.setCosmetic(true);
+    return pen;
+}
+
+QColor overlayColor(const ToolOverlay &overlay)
+{
+    const QString displayRole = overlay.extra.value(
+                QStringLiteral("displayRole")).toString();
+    if (displayRole == QStringLiteral("color_template_roi"))
+        return QColor(255, 122, 0);
+    if (displayRole == QStringLiteral("color_template_mask"))
+        return QColor(255, 82, 45);
+    if (displayRole == QStringLiteral("color_detect_roi"))
+        return QColor(0, 210, 220);
+    if (displayRole == QStringLiteral("color_detect_mask"))
+        return QColor(40, 130, 255);
+    if (displayRole == QStringLiteral("template_location_model"))
+        return QColor(255, 122, 0);
+    if (displayRole == QStringLiteral("template_location_origin"))
+        return QColor(0, 210, 255);
+
+    const QString label = overlay.label.trimmed().toLower();
+    if (label == QStringLiteral("roi") || label == QStringLiteral("detect_roi"))
+        return QColor(255, 122, 0);
+    if (label == QStringLiteral("template_roi"))
+        return QColor(0, 170, 255);
+    if (label == QStringLiteral("candidate_contour"))
+        return QColor(255, 190, 0);
+    if (label == QStringLiteral("contour_points") ||
+        label == QStringLiteral("contour_line") ||
+        label == QStringLiteral("contour_model_line") ||
+        label == QStringLiteral("contour_model_points"))
+        return QColor(0, 210, 255);
+    if (label == QStringLiteral("line_band_center"))
+        return QColor(0, 210, 255);
+    if (label == QStringLiteral("line_band_boundary"))
+        return QColor(255, 122, 0);
+    if (label == QStringLiteral("measure_regions") ||
+        label == QStringLiteral("measure_rectangle"))
+        return QColor(255, 190, 0);
+    if (label == QStringLiteral("sample_points") ||
+        label == QStringLiteral("edge_points"))
+        return QColor(255, 70, 70);
+    if (label == QStringLiteral("fitted_line"))
+        return QColor(0, 255, 130);
+    if (label == QStringLiteral("blob_bbox"))
+        return QColor(0, 200, 120);
+    if (label == QStringLiteral("blob_center") ||
+        label == QStringLiteral("circle_center"))
+        return QColor(255, 70, 70);
+    if (label == QStringLiteral("circle"))
+        return QColor(0, 210, 255);
+    if (label == QStringLiteral("blob_area_text") ||
+        label == QStringLiteral("blob_count_text") ||
+        label == QStringLiteral("circle_radius_text") ||
+        label == QStringLiteral("circularity_text") ||
+        label == QStringLiteral("circle_count_text") ||
+        label == QStringLiteral("edge_count_text") ||
+        label == QStringLiteral("line_result_text"))
+        return QColor(255, 255, 255);
+    if (label == QStringLiteral("color_result_text")) {
+        const QString status = overlay.extra.value(QStringLiteral("status")).toString().trimmed().toUpper();
+        if (status == QStringLiteral("OK"))
+            return QColor(0, 210, 120);
+        if (status == QStringLiteral("NG"))
+            return QColor(255, 70, 70);
+        if (status == QStringLiteral("MASKED"))
+            return QColor(150, 90, 35);
+        return QColor(255, 255, 255);
+    }
+    if (label == QStringLiteral("match_result") ||
+        label == QStringLiteral("match_rect") ||
+        label == QStringLiteral("match_bbox") ||
+        label == QStringLiteral("match_center") ||
+        label == QStringLiteral("match_score"))
+        return QColor(0, 200, 120);
+    if (overlay.type == ToolOverlayType::Text)
+        return QColor(255, 255, 255);
+    return QColor(0, 200, 120);
+}
+
+QString overlayDisplayRole(const ToolOverlay &overlay)
+{
+    return overlay.extra.value(QStringLiteral("displayRole")).toString();
+}
+
+QPen styledOverlayPen(const ToolOverlay &overlay, const QColor &color)
+{
+    const QString emphasis = overlay.extra.value(
+                QStringLiteral("emphasis")).toString();
+    QPen pen = cosmeticPen(color, emphasis == QStringLiteral("active")
+                           ? 3.5 : 2.0);
+    if (overlayDisplayRole(overlay).endsWith(QStringLiteral("_mask")))
+        pen.setStyle(Qt::DashLine);
+    return pen;
+}
+
+QBrush styledOverlayBrush(const ToolOverlay &overlay, const QColor &color)
+{
+    if (!overlayDisplayRole(overlay).endsWith(QStringLiteral("_mask")))
+        return Qt::NoBrush;
+    QColor fill = color;
+    fill.setAlpha(72);
+    return QBrush(fill, Qt::BDiagPattern);
+}
+
+qreal styledOverlayOpacity(const ToolOverlay &overlay)
+{
+    return overlay.extra.value(QStringLiteral("emphasis")).toString()
+            == QStringLiteral("muted") ? 0.30 : 1.0;
+}
+
+QPainterPath polygonPath(const QPolygonF &polygon)
+{
+    QPainterPath path;
+    if (polygon.size() < 3)
+        return path;
+    path.addPolygon(polygon);
+    path.closeSubpath();
+    return path;
+}
+
+QPainterPath overlayClipPath(const ToolOverlay &overlay)
+{
+    const QJsonObject clip = overlay.extra.value(
+                QStringLiteral("clipGeometry")).toObject();
+    const QString type = clip.value(QStringLiteral("type")).toString();
+    QPainterPath path;
+    if (type == QStringLiteral("rect")) {
+        const QJsonObject rect = clip.value(QStringLiteral("rect")).toObject();
+        const QRectF geometry(rect.value(QStringLiteral("x")).toDouble(),
+                              rect.value(QStringLiteral("y")).toDouble(),
+                              rect.value(QStringLiteral("width")).toDouble(),
+                              rect.value(QStringLiteral("height")).toDouble());
+        if (finiteRect(geometry) && geometry.width() > 0.0
+                && geometry.height() > 0.0)
+            path.addRect(geometry.normalized());
+    } else if (type == QStringLiteral("circle")) {
+        const QJsonObject center = clip.value(
+                    QStringLiteral("center")).toObject();
+        const QPointF point(center.value(QStringLiteral("x")).toDouble(),
+                            center.value(QStringLiteral("y")).toDouble());
+        const qreal radius = clip.value(QStringLiteral("radius")).toDouble();
+        if (finitePoint(point) && finiteValue(radius) && radius > 0.0) {
+            path.addEllipse(point, radius, radius);
+        }
+    }
+    return path;
+}
+
+qreal overlayZValue(const ToolOverlay &overlay)
+{
+    const QString label = overlay.label.trimmed().toLower();
+    if (label == QStringLiteral("template_roi"))
+        return 104.0;
+    if (label == QStringLiteral("roi") || label == QStringLiteral("detect_roi"))
+        return 106.0;
+    if (label == QStringLiteral("match_result") ||
+        label == QStringLiteral("match_rect") ||
+        label == QStringLiteral("match_bbox") ||
+        label == QStringLiteral("match_center"))
+        return 112.0;
+    if (label == QStringLiteral("contour_points") ||
+        label == QStringLiteral("contour_line") ||
+        label == QStringLiteral("contour_model_line") ||
+        label == QStringLiteral("contour_model_points"))
+        return 114.0;
+    if (label == QStringLiteral("line_band_center") || label == QStringLiteral("line_band_boundary"))
+        return 108.0;
+    if (label == QStringLiteral("measure_regions") ||
+        label == QStringLiteral("measure_rectangle"))
+        return 110.0;
+    if (label == QStringLiteral("sample_points") ||
+        label == QStringLiteral("edge_points") ||
+        label == QStringLiteral("fitted_line"))
+        return 114.0;
+    if (label == QStringLiteral("blob_bbox") ||
+        label == QStringLiteral("circle"))
+        return 112.0;
+    if (label == QStringLiteral("blob_center") ||
+        label == QStringLiteral("circle_center"))
+        return 114.0;
+    if (label == QStringLiteral("blob_area_text") ||
+        label == QStringLiteral("blob_count_text") ||
+        label == QStringLiteral("circle_radius_text") ||
+        label == QStringLiteral("circularity_text") ||
+        label == QStringLiteral("circle_count_text") ||
+        label == QStringLiteral("edge_count_text") ||
+        label == QStringLiteral("line_result_text"))
+        return 116.0;
+    if (label == QStringLiteral("score_text") ||
+        label == QStringLiteral("match_score_text") ||
+        label == QStringLiteral("color_result_text") ||
+        overlay.type == ToolOverlayType::Text)
+        return 116.0;
+    return 110.0;
+}
+
+QRectF rectFromOverlayExtra(const QJsonObject &extra)
+{
+    const QJsonObject json = extra.value(QStringLiteral("anchorRect")).toObject();
+    if (json.isEmpty())
+        return QRectF();
+
+    return QRectF(json.value(QStringLiteral("x")).toDouble(),
+                  json.value(QStringLiteral("y")).toDouble(),
+                  json.value(QStringLiteral("width")).toDouble(),
+                  json.value(QStringLiteral("height")).toDouble()).normalized();
+}
+
+bool finiteValue(const qreal value)
+{
+    return std::isfinite(static_cast<double>(value));
+}
+
+bool finitePoint(const QPointF &point)
+{
+    return finiteValue(point.x()) && finiteValue(point.y());
+}
+
+bool finiteRect(const QRectF &rect)
+{
+    return finiteValue(rect.x()) &&
+           finiteValue(rect.y()) &&
+           finiteValue(rect.width()) &&
+           finiteValue(rect.height());
+}
+
+QString overlayTextForDisplay(const QString &text)
+{
+    if (text.size() <= kMaxOverlayTextChars)
+        return text;
+
+    return text.left(kMaxOverlayTextChars - 3) + QStringLiteral("...");
+}
+
+} // namespace
+
+FrameViewHelper::FrameViewHelper(QGraphicsView *view, QObject *parent)
+    : QObject(parent)
+    , m_view(view)
+    , m_scene(new QGraphicsScene(this))
+    , m_pixmapItem(nullptr)
+{
+    if (!m_view) {
+        return;
+    }
+
+    m_pixmapItem = m_scene->addPixmap(QPixmap());
+    m_pixmapItem->setZValue(0.0);
+
+    m_roiItem = m_scene->addRect(QRectF(), cosmeticPen(QColor(255, 122, 0), 2.0));
+    m_roiItem->setZValue(100.0);
+    m_roiItem->hide();
+
+    m_polygonItem = m_scene->addPolygon(QPolygonF(), cosmeticPen(QColor(0, 170, 255), 2.0));
+    m_polygonItem->setZValue(102.0);
+    m_polygonItem->hide();
+
+    m_circleItem = m_scene->addEllipse(QRectF(), cosmeticPen(QColor(0, 170, 255), 2.0));
+    m_circleItem->setZValue(102.0);
+    m_circleItem->hide();
+
+    m_view->setScene(m_scene);
+    m_view->setBackgroundBrush(QColor(0, 0, 0));
+    m_view->setFrameShape(QFrame::NoFrame);
+    m_view->setAlignment(Qt::AlignCenter);
+    m_view->setRenderHint(QPainter::SmoothPixmapTransform, true);
+    m_view->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
+    m_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_view->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_view->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    m_view->setMinimumSize(0, 0);
+    m_view->viewport()->installEventFilter(this);
+    m_view->viewport()->setMouseTracking(true);
+    m_view->viewport()->setFocusPolicy(Qt::StrongFocus);
+}
+
+void FrameViewHelper::setImage(const QImage &image)
+{
+    if (!m_view || !m_pixmapItem) {
+        return;
+    }
+
+    if (image.isNull()) {
+        clear();
+        return;
+    }
+
+    const QSize previousSize = m_lastImage.size();
+    m_lastImage = image;
+    m_imageRect = QRectF(QPointF(0.0, 0.0), QSizeF(m_lastImage.size()));
+    m_roiEditor.setBounds(m_imageRect);
+    m_roiEditor.setMinimumSize(2.0);
+    const QPixmap pixmap = QPixmap::fromImage(m_lastImage);
+    m_pixmapItem->setPixmap(pixmap);
+    updateRoiItem();
+    updatePolygonItem();
+    updateCircleItem();
+    updateLineBandItem();
+
+    if (m_scene->sceneRect().size() != m_imageRect.size() || previousSize != m_lastImage.size()) {
+        m_scene->setSceneRect(m_imageRect);
+        fitToView();
+    }
+}
+
+void FrameViewHelper::clear()
+{
+    endPan();
+    m_lastImage = QImage();
+    publishCursorPixel(FramePixelSample());
+    clearToolOverlays();
+    clearDraftRoiItem();
+    clearRoiHandleItems();
+    clearDraftPolygonItem();
+    clearPolygonVertexItems();
+    clearDraftCircleItem();
+    clearCircleHandleItems();
+    clearLineBandWidthHandleItem();
+    clearLineBandItems(&m_lineBandDraftItems);
+    clearLineBandItems(&m_lineBandItems);
+
+    if (!m_view || !m_pixmapItem) {
+        return;
+    }
+
+    if (m_view->viewport())
+        m_view->viewport()->unsetCursor();
+    m_pixmapItem->setPixmap(QPixmap());
+    m_imageRect = QRectF();
+    if (m_roiItem)
+        m_roiItem->hide();
+    if (m_polygonItem)
+        m_polygonItem->hide();
+    clearPolygonVertexItems();
+    if (m_circleItem)
+        m_circleItem->hide();
+    m_scene->setSceneRect(QRectF());
+    m_view->resetTransform();
+    m_viewScale = 1.0;
+    m_isFitToView = true;
+    emit viewTransformChanged(m_viewScale, m_isFitToView);
+    m_view->viewport()->update();
+}
+
+void FrameViewHelper::fitToView()
+{
+    if (!m_view || m_imageRect.isEmpty()) {
+        return;
+    }
+
+    m_view->resetTransform();
+    m_view->fitInView(m_imageRect, Qt::KeepAspectRatio);
+    m_viewScale = 1.0;
+    m_isFitToView = true;
+    emit viewTransformChanged(m_viewScale, m_isFitToView);
+}
+
+bool FrameViewHelper::hasImage() const
+{
+    return !m_lastImage.isNull();
+}
+
+void FrameViewHelper::setNavigationEnabled(bool enabled)
+{
+    if (m_navigationEnabled == enabled)
+        return;
+
+    endPan();
+    m_navigationEnabled = enabled;
+    fitToView();
+}
+
+bool FrameViewHelper::navigationEnabled() const
+{
+    return m_navigationEnabled;
+}
+
+qreal FrameViewHelper::viewScale() const
+{
+    return m_viewScale;
+}
+
+bool FrameViewHelper::isFitToView() const
+{
+    return m_isFitToView;
+}
+
+void FrameViewHelper::zoomIn()
+{
+    if (!m_navigationEnabled || !m_view)
+        return;
+    applyWheelZoom(m_view->viewport()->rect().center(), 120);
+}
+
+void FrameViewHelper::zoomOut()
+{
+    if (!m_navigationEnabled || !m_view)
+        return;
+    applyWheelZoom(m_view->viewport()->rect().center(), -120);
+}
+
+QPointF FrameViewHelper::viewToImage(const QPoint &viewPos) const
+{
+    QPointF imagePoint;
+    return viewPosToImagePoint(viewPos, &imagePoint) ? imagePoint : QPointF();
+}
+
+QRectF FrameViewHelper::imageRectToNormalized(const QRectF &imageRect) const
+{
+    if (m_lastImage.isNull())
+        return QRectF();
+
+    const QRectF rect = clampedImageRect(imageRect.normalized());
+    if (rect.width() <= 0.0 || rect.height() <= 0.0)
+        return QRectF();
+
+    return validNormalizedRect(QRectF(rect.x() / static_cast<double>(m_lastImage.width()),
+                                      rect.y() / static_cast<double>(m_lastImage.height()),
+                                      rect.width() / static_cast<double>(m_lastImage.width()),
+                                      rect.height() / static_cast<double>(m_lastImage.height())));
+}
+
+QRectF FrameViewHelper::normalizedToImageRect(const QRectF &normalized) const
+{
+    if (m_lastImage.isNull())
+        return QRectF();
+
+    const QRectF rect = validNormalizedRect(normalized);
+    return clampedImageRect(QRectF(rect.x() * m_lastImage.width(),
+                                   rect.y() * m_lastImage.height(),
+                                   rect.width() * m_lastImage.width(),
+                                   rect.height() * m_lastImage.height()));
+}
+
+QSize FrameViewHelper::imageSize() const
+{
+    return m_lastImage.size();
+}
+
+void FrameViewHelper::bindPixelStatusLabel(QLabel *label)
+{
+    if (!label)
+        return;
+
+    label->setText(FramePixelProbe::displayText(m_lastPixelSample));
+    connect(this, &FrameViewHelper::cursorPixelChanged,
+            label, [label](const FramePixelSample &sample) {
+        label->setText(FramePixelProbe::displayText(sample));
+    });
+}
+
+void FrameViewHelper::setRoiDrawingEnabled(bool enabled)
+{
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
+    if (enabled && m_polygonDrawingEnabled)
+        setPolygonDrawingEnabled(false);
+    if (enabled && m_circleDrawingEnabled)
+        setCircleDrawingEnabled(false);
+    if (enabled && m_lineBandDrawingEnabled)
+        setLineBandDrawingEnabled(false);
+
+    m_roiDrawingEnabled = enabled;
+    if (m_view && m_view->viewport()) {
+        if (enabled)
+            m_view->viewport()->setCursor(Qt::CrossCursor);
+        else
+            m_view->viewport()->unsetCursor();
+    }
+
+    if (!enabled) {
+        if (m_roiEditor.isActive()) {
+            const QRectF restored = m_roiEditor.cancel();
+            if (restored.width() > 0.0 && restored.height() > 0.0)
+                m_roiNormalized = imageRectToNormalized(restored);
+        }
+        m_roiTransforming = false;
+        m_roiDrawing = false;
+        clearDraftRoiItem();
+    }
+    updateRoiItem();
+}
+
+bool FrameViewHelper::isRoiDrawingEnabled() const
+{
+    return m_roiDrawingEnabled;
+}
+
+void FrameViewHelper::setRoiRectNormalized(const QRectF &roi)
+{
+    const QRectF validRoi = validNormalizedRect(roi);
+    if (validRoi.width() <= 0.0 || validRoi.height() <= 0.0) {
+        clearRoi();
+        return;
+    }
+
+    m_roiNormalized = validRoi;
+    m_hasRoi = true;
+    updateRoiItem();
+}
+
+QRectF FrameViewHelper::roiRectNormalized() const
+{
+    return m_hasRoi ? m_roiNormalized : QRectF();
+}
+
+void FrameViewHelper::clearRoi()
+{
+    m_hasRoi = false;
+    m_roiNormalized = QRectF();
+    if (m_roiItem)
+        m_roiItem->hide();
+    clearRoiHandleItems();
+}
+
+void FrameViewHelper::setPolygonDrawingEnabled(bool enabled)
+{
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
+    if (enabled && m_roiDrawingEnabled)
+        setRoiDrawingEnabled(false);
+    if (enabled && m_circleDrawingEnabled)
+        setCircleDrawingEnabled(false);
+    if (enabled && m_lineBandDrawingEnabled)
+        setLineBandDrawingEnabled(false);
+
+    m_polygonDrawingEnabled = enabled;
+    m_polygonDrawingState = enabled
+            ? PolygonDrawingState::DrawingPolygon
+            : PolygonDrawingState::Idle;
+    m_polygonHoverPointValid = false;
+    if (enabled)
+        m_draftPolygonImagePoints.clear();
+    if (m_view && m_view->viewport()) {
+        if (enabled) {
+            m_view->viewport()->setCursor(Qt::CrossCursor);
+            m_view->viewport()->setFocus();
+        } else {
+            m_view->viewport()->unsetCursor();
+        }
+    }
+
+    if (!enabled) {
+        m_draftPolygonImagePoints.clear();
+        clearDraftPolygonItem();
+    }
+}
+
+bool FrameViewHelper::isPolygonDrawingEnabled() const
+{
+    return m_polygonDrawingEnabled;
+}
+
+bool FrameViewHelper::finishPolygonDrawing()
+{
+    if (m_polygonDrawingState != PolygonDrawingState::DrawingPolygon ||
+        m_draftPolygonImagePoints.isEmpty()) {
+        return m_hasPolygonRoi && m_polygonNormalized.size() >= 3;
+    }
+
+    if (m_draftPolygonImagePoints.size() < 3) {
+        emit polygonSelectionRejected(m_draftPolygonImagePoints.size());
+        return false;
+    }
+
+    return completeDraftPolygon();
+}
+
+void FrameViewHelper::setPolygonRoiNormalized(const QVector<QPointF> &points)
+{
+    const QVector<QPointF> validPoints = validNormalizedPolygon(points);
+    if (validPoints.size() < 3) {
+        clearPolygonRoi();
+        return;
+    }
+
+    m_polygonNormalized = validPoints;
+    m_hasPolygonRoi = true;
+    updatePolygonItem();
+}
+
+QVector<QPointF> FrameViewHelper::polygonRoiNormalized() const
+{
+    return m_hasPolygonRoi ? m_polygonNormalized : QVector<QPointF>();
+}
+
+void FrameViewHelper::clearPolygonRoi()
+{
+    m_hasPolygonRoi = false;
+    m_polygonNormalized.clear();
+    m_polygonDragging = false;
+    m_draggingPolygonVertexIndex = -1;
+    m_polygonDragStartNormalized.clear();
+    if (m_polygonItem)
+        m_polygonItem->hide();
+    clearPolygonVertexItems();
+}
+
+void FrameViewHelper::setCircleDrawingEnabled(bool enabled)
+{
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
+    if (enabled && m_roiDrawingEnabled)
+        setRoiDrawingEnabled(false);
+    if (enabled && m_polygonDrawingEnabled)
+        setPolygonDrawingEnabled(false);
+    if (enabled && m_lineBandDrawingEnabled)
+        setLineBandDrawingEnabled(false);
+
+    m_circleDrawingEnabled = enabled;
+    if (m_view && m_view->viewport()) {
+        if (enabled) {
+            m_view->viewport()->setCursor(Qt::CrossCursor);
+            m_view->viewport()->setFocus();
+        } else {
+            m_view->viewport()->unsetCursor();
+        }
+    }
+
+    if (!enabled) {
+        if (m_roiEditor.isCircleActive()) {
+            const RoiEditorController::CircleGeometry restored =
+                    m_roiEditor.cancelCircle();
+            const CircleRoi roi = imageCircleToNormalized(restored.center,
+                                                           restored.radius);
+            if (roi.valid)
+                m_circleRoi = roi;
+        }
+        m_circleTransforming = false;
+        m_circleDrawing = false;
+        clearDraftCircleItem();
+    }
+    updateCircleItem();
+}
+
+bool FrameViewHelper::isCircleDrawingEnabled() const
+{
+    return m_circleDrawingEnabled;
+}
+
+void FrameViewHelper::setPointSelectionEnabled(bool enabled)
+{
+    if (enabled && m_roiDrawingEnabled)
+        setRoiDrawingEnabled(false);
+    if (enabled && m_polygonDrawingEnabled)
+        setPolygonDrawingEnabled(false);
+    if (enabled && m_circleDrawingEnabled)
+        setCircleDrawingEnabled(false);
+    if (enabled && m_lineBandDrawingEnabled)
+        setLineBandDrawingEnabled(false);
+
+    m_pointSelectionEnabled = enabled;
+    if (m_view && m_view->viewport()) {
+        if (enabled)
+            m_view->viewport()->setCursor(Qt::CrossCursor);
+        else
+            m_view->viewport()->unsetCursor();
+    }
+}
+
+bool FrameViewHelper::isPointSelectionEnabled() const
+{
+    return m_pointSelectionEnabled;
+}
+
+void FrameViewHelper::setCircleRoiNormalized(const CircleRoi &roi)
+{
+    const CircleRoi validRoi = validCircleRoi(roi);
+    if (!validRoi.valid) {
+        clearCircleRoi();
+        return;
+    }
+
+    m_circleRoi = validRoi;
+    m_hasCircleRoi = true;
+    updateCircleItem();
+}
+
+CircleRoi FrameViewHelper::circleRoiNormalized() const
+{
+    return m_hasCircleRoi ? m_circleRoi : CircleRoi();
+}
+
+QRectF FrameViewHelper::circleBoundingRectNormalized(const CircleRoi &roi) const
+{
+    return validCircleRoi(roi).boundingRectNormalized;
+}
+
+void FrameViewHelper::clearCircleRoi()
+{
+    m_hasCircleRoi = false;
+    m_circleRoi = CircleRoi();
+    if (m_circleItem)
+        m_circleItem->hide();
+    clearCircleHandleItems();
+}
+
+void FrameViewHelper::setLineBandDrawingEnabled(bool enabled)
+{
+    if (enabled && m_pointSelectionEnabled)
+        setPointSelectionEnabled(false);
+    if (enabled && m_roiDrawingEnabled)
+        setRoiDrawingEnabled(false);
+    if (enabled && m_polygonDrawingEnabled)
+        setPolygonDrawingEnabled(false);
+    if (enabled && m_circleDrawingEnabled)
+        setCircleDrawingEnabled(false);
+
+    m_lineBandDrawingEnabled = enabled;
+    if (m_view && m_view->viewport()) {
+        if (enabled)
+            m_view->viewport()->setCursor(Qt::CrossCursor);
+        else
+            m_view->viewport()->unsetCursor();
+    }
+
+    if (!enabled) {
+        if (m_roiEditor.isLineBandActive()) {
+            const RoiEditorController::LineBandGeometry restored =
+                    m_roiEditor.cancelLineBand();
+            const LineBandRoi roi = imageLineBandToNormalized(restored.p1,
+                                                               restored.p2,
+                                                               restored.width);
+            if (roi.valid)
+                m_lineBandRoi = roi;
+        }
+        m_lineBandTransforming = false;
+        m_lineBandDrawingLine = false;
+        m_lineBandAdjustingWidth = false;
+        clearLineBandItems(&m_lineBandDraftItems);
+    }
+    updateLineBandItem();
+}
+
+bool FrameViewHelper::isLineBandDrawingEnabled() const
+{
+    return m_lineBandDrawingEnabled;
+}
+
+void FrameViewHelper::setLineBandRoiNormalized(const LineBandRoi &roi)
+{
+    const LineBandRoi validRoi = validLineBand(roi);
+    if (!validRoi.valid) {
+        clearLineBandRoi();
+        return;
+    }
+
+    m_lineBandRoi = validRoi;
+    m_hasLineBandRoi = true;
+    updateLineBandItem();
+}
+
+LineBandRoi FrameViewHelper::lineBandRoiNormalized() const
+{
+    return m_hasLineBandRoi ? m_lineBandRoi : LineBandRoi();
+}
+
+QRectF FrameViewHelper::lineBandBoundingRectNormalized(const LineBandRoi &roi) const
+{
+    if (!isValidLineBand(roi))
+        return QRectF();
+
+    QVector<QPointF> points = lineBandPolygonImagePoints(roi);
+    if (points.isEmpty()) {
+        const QPointF p1 = roi.p1Normalized;
+        const QPointF p2 = roi.p2Normalized;
+        const double pad = qBound(0.001, roi.widthNormalized / 2.0, 0.5);
+        const QRectF rect(QPointF(qMin(p1.x(), p2.x()) - pad, qMin(p1.y(), p2.y()) - pad),
+                          QPointF(qMax(p1.x(), p2.x()) + pad, qMax(p1.y(), p2.y()) + pad));
+        return validNormalizedRect(rect);
+    }
+
+    const QPointF first = imagePointToNormalized(points.first());
+    double left = first.x();
+    double top = first.y();
+    double right = left;
+    double bottom = top;
+    for (const QPointF &point : points) {
+        const QPointF normalized = imagePointToNormalized(point);
+        left = qMin(left, normalized.x());
+        top = qMin(top, normalized.y());
+        right = qMax(right, normalized.x());
+        bottom = qMax(bottom, normalized.y());
+    }
+    return validNormalizedRect(QRectF(QPointF(left, top), QPointF(right, bottom)));
+}
+
+void FrameViewHelper::clearLineBandRoi()
+{
+    m_hasLineBandRoi = false;
+    m_lineBandRoi = LineBandRoi();
+    clearLineBandWidthHandleItem();
+    clearLineBandItems(&m_lineBandItems);
+}
+
+void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
+{
+    clearToolOverlays();
+    if (!m_scene || m_imageRect.isEmpty())
+        return;
+
+    for (const ToolOverlay &overlay : overlays) {
+        const QColor color = overlayColor(overlay);
+        const QPen pen = styledOverlayPen(overlay, color);
+        const QBrush brush = styledOverlayBrush(overlay, color);
+        const qreal opacity = styledOverlayOpacity(overlay);
+        switch (overlay.type) {
+        case ToolOverlayType::Rect: {
+            if (!finiteRect(overlay.rect))
+                break;
+
+            const QRectF rect = overlay.rect.normalized().intersected(m_imageRect);
+            if (rect.width() <= 0.0 || rect.height() <= 0.0)
+                break;
+
+            QGraphicsRectItem *item = m_scene->addRect(rect, pen, brush);
+            item->setOpacity(opacity);
+            item->setToolTip(overlay.label);
+            addOverlayItem(item, overlayZValue(overlay));
+            break;
+        }
+        case ToolOverlayType::Line: {
+            if (!finitePoint(overlay.p1) || !finitePoint(overlay.p2))
+                break;
+
+            QGraphicsLineItem *item = m_scene->addLine(QLineF(clampedImagePoint(overlay.p1),
+                                                             clampedImagePoint(overlay.p2)),
+                                                       pen);
+            item->setOpacity(opacity);
+            item->setToolTip(overlay.label);
+            addOverlayItem(item, overlayZValue(overlay));
+            break;
+        }
+        case ToolOverlayType::Circle: {
+            if (!finitePoint(overlay.center) || !finiteValue(overlay.radius) || overlay.radius <= 0.0)
+                break;
+
+            const QPointF center = clampedImagePoint(overlay.center);
+            const QRectF clampedRect = QRectF(center.x() - overlay.radius,
+                                              center.y() - overlay.radius,
+                                              overlay.radius * 2.0,
+                                              overlay.radius * 2.0)
+                    .intersected(m_imageRect);
+            if (clampedRect.width() <= 0.0 || clampedRect.height() <= 0.0)
+                break;
+
+            QGraphicsEllipseItem *item = m_scene->addEllipse(clampedRect, pen, brush);
+            item->setOpacity(opacity);
+            item->setToolTip(overlay.label);
+            addOverlayItem(item, overlayZValue(overlay));
+            break;
+        }
+        case ToolOverlayType::Polygon: {
+            QPolygonF polygon;
+            for (const QPointF &point : overlay.points) {
+                if (!finitePoint(point)) {
+                    polygon.clear();
+                    break;
+                }
+                polygon << clampedImagePoint(point);
+            }
+            if (polygon.size() < 3)
+                break;
+
+            const QPainterPath originalPath = polygonPath(polygon);
+            const QPainterPath clipPath = overlayClipPath(overlay);
+            if (!clipPath.isEmpty()
+                    && overlayDisplayRole(overlay).endsWith(
+                        QStringLiteral("_mask"))) {
+                const QPainterPath effectivePath = originalPath.intersected(
+                            clipPath);
+                if (!effectivePath.isEmpty()) {
+                    QGraphicsPathItem *item = m_scene->addPath(
+                                effectivePath, pen, brush);
+                    item->setOpacity(opacity);
+                    item->setToolTip(overlay.label);
+                    addOverlayItem(item, overlayZValue(overlay));
+                }
+                const QPainterPath outsidePath = originalPath.subtracted(
+                            clipPath);
+                if (!outsidePath.isEmpty()) {
+                    QPen outsidePen = cosmeticPen(QColor(255, 70, 70), 2.0);
+                    outsidePen.setStyle(Qt::DashLine);
+                    QGraphicsPathItem *outside = m_scene->addPath(
+                                outsidePath, outsidePen, Qt::NoBrush);
+                    outside->setOpacity(opacity);
+                    outside->setToolTip(
+                                QStringLiteral("%1 (outside owner ROI)")
+                                .arg(overlay.label));
+                    addOverlayItem(outside, overlayZValue(overlay) + 0.1);
+                }
+            } else {
+                QGraphicsPolygonItem *item = m_scene->addPolygon(
+                            polygon, pen, brush);
+                item->setOpacity(opacity);
+                item->setToolTip(overlay.label);
+                addOverlayItem(item, overlayZValue(overlay));
+            }
+            break;
+        }
+        case ToolOverlayType::Text: {
+            if (!finitePoint(overlay.p1))
+                break;
+
+            const QString fullText = overlay.text.isEmpty() ? overlay.label : overlay.text;
+            const QString text = overlayTextForDisplay(fullText);
+            QGraphicsSimpleTextItem *item = m_scene->addSimpleText(text);
+            if (overlay.label.trimmed().compare(QStringLiteral("color_result_text"), Qt::CaseInsensitive) == 0) {
+                QFont font = item->font();
+                font.setPointSize(18);
+                font.setBold(true);
+                item->setFont(font);
+            }
+            item->setBrush(QBrush(color));
+            item->setPen(cosmeticPen(QColor(0, 0, 0), 1.0));
+            item->setOpacity(opacity);
+            QPointF textPosition = clampedImagePoint(overlay.p1);
+            const QRectF anchorRect = rectFromOverlayExtra(overlay.extra).intersected(m_imageRect);
+            if (overlay.label.trimmed().compare(QStringLiteral("color_result_text"), Qt::CaseInsensitive) == 0 &&
+                anchorRect.width() > 0.0 && anchorRect.height() > 0.0) {
+                const QRectF bounds = item->boundingRect();
+                const qreal margin = 8.0;
+                if (anchorRect.width() >= bounds.width() + margin * 2.0 &&
+                    anchorRect.height() >= bounds.height() + margin * 2.0) {
+                    textPosition = QPointF(anchorRect.center().x() - bounds.width() / 2.0,
+                                           anchorRect.center().y() - bounds.height() / 2.0);
+                } else if (anchorRect.top() - bounds.height() - margin >= m_imageRect.top()) {
+                    textPosition = QPointF(anchorRect.left(), anchorRect.top() - bounds.height() - margin);
+                } else if (anchorRect.bottom() + bounds.height() + margin <= m_imageRect.bottom()) {
+                    textPosition = QPointF(anchorRect.left(), anchorRect.bottom() + margin);
+                } else {
+                    textPosition = QPointF(anchorRect.right() + margin, anchorRect.top());
+                }
+            }
+            item->setPos(clampedTextPosition(textPosition, item->boundingRect()));
+            item->setToolTip(fullText);
+            item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+            addOverlayItem(item, overlayZValue(overlay));
+            break;
+        }
+        case ToolOverlayType::Unknown:
+        default:
+            break;
+        }
+    }
+
+    restoreImageSceneRect();
+}
+
+void FrameViewHelper::clearToolOverlays()
+{
+    if (!m_scene) {
+        m_overlayItems.clear();
+        return;
+    }
+
+    for (QGraphicsItem *item : m_overlayItems) {
+        if (item) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    m_overlayItems.clear();
+    restoreImageSceneRect();
+}
+
+bool FrameViewHelper::drawingInteractionActive() const
+{
+    return m_roiDrawingEnabled || m_polygonDrawingEnabled ||
+            m_circleDrawingEnabled || m_lineBandDrawingEnabled ||
+            m_pointSelectionEnabled;
+}
+
+bool FrameViewHelper::navigationGestureAllowed(Qt::KeyboardModifiers modifiers) const
+{
+    return !drawingInteractionActive() || (modifiers & Qt::ControlModifier);
+}
+
+bool FrameViewHelper::viewPositionInsideImage(const QPoint &viewPosition) const
+{
+    return m_view && !m_imageRect.isEmpty() &&
+            m_imageRect.contains(m_view->mapToScene(viewPosition));
+}
+
+qreal FrameViewHelper::sceneUnitsForViewportPixels(qreal pixels) const
+{
+    if (!m_view || pixels <= 0.0)
+        return pixels;
+
+    const QPointF origin = m_view->mapToScene(QPoint(0, 0));
+    const QPointF offset = m_view->mapToScene(QPoint(qRound(pixels), 0));
+    const qreal sceneUnits = QLineF(origin, offset).length();
+    return sceneUnits > 0.0 ? sceneUnits : pixels;
+}
+
+void FrameViewHelper::applyWheelZoom(const QPoint &viewPosition, int angleDeltaY)
+{
+    if (!m_view || m_imageRect.isEmpty() || angleDeltaY == 0)
+        return;
+
+    const qreal next = qBound<qreal>(1.0,
+            m_viewScale * (angleDeltaY > 0 ? 1.25 : 0.8), 8.0);
+    if (qFuzzyCompare(next, m_viewScale))
+        return;
+
+    const qreal factor = next / m_viewScale;
+    const QGraphicsView::ViewportAnchor anchor = m_view->transformationAnchor();
+    m_view->setTransformationAnchor(QGraphicsView::NoAnchor);
+    const QPointF before = m_view->mapToScene(viewPosition);
+    m_view->scale(factor, factor);
+    const QPointF after = m_view->mapToScene(viewPosition);
+    m_view->translate(after.x() - before.x(), after.y() - before.y());
+    m_view->setTransformationAnchor(anchor);
+    m_viewScale = next;
+    m_isFitToView = qFuzzyCompare(next, 1.0);
+    emit viewTransformChanged(m_viewScale, m_isFitToView);
+}
+
+void FrameViewHelper::beginPan(const QPoint &viewPosition)
+{
+    if (!m_view || m_imageRect.isEmpty())
+        return;
+
+    m_panning = true;
+    m_lastPanPosition = viewPosition;
+    m_view->viewport()->setCursor(Qt::ClosedHandCursor);
+}
+
+void FrameViewHelper::updatePan(const QPoint &viewPosition)
+{
+    if (!m_panning || !m_view)
+        return;
+
+    const QPoint delta = viewPosition - m_lastPanPosition;
+    m_view->horizontalScrollBar()->setValue(
+                m_view->horizontalScrollBar()->value() - delta.x());
+    m_view->verticalScrollBar()->setValue(
+                m_view->verticalScrollBar()->value() - delta.y());
+    m_lastPanPosition = viewPosition;
+}
+
+void FrameViewHelper::endPan()
+{
+    if (!m_panning)
+        return;
+
+    m_panning = false;
+    if (!m_view || !m_view->viewport())
+        return;
+
+    if (drawingInteractionActive())
+        m_view->viewport()->setCursor(Qt::CrossCursor);
+    else
+        m_view->viewport()->unsetCursor();
+}
+
+bool FrameViewHelper::eventFilter(QObject *obj, QEvent *event)
+{
+    if (m_view && obj == m_view->viewport()) {
+        if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            updateCursorPixel(mouseEvent->pos());
+        } else if (event->type() == QEvent::Leave) {
+            publishCursorPixel(FramePixelSample());
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && event->type() == QEvent::Resize) {
+        if (m_isFitToView) {
+            fitToView();
+        } else {
+            QResizeEvent *resizeEvent = static_cast<QResizeEvent *>(event);
+            const QSize delta = resizeEvent->size() - resizeEvent->oldSize();
+            m_view->horizontalScrollBar()->setValue(
+                        m_view->horizontalScrollBar()->value() - delta.width() / 2);
+            m_view->verticalScrollBar()->setValue(
+                        m_view->verticalScrollBar()->value() - delta.height() / 2);
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_navigationEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::Wheel) {
+            QWheelEvent *wheelEvent = static_cast<QWheelEvent *>(event);
+            if (navigationGestureAllowed(wheelEvent->modifiers())) {
+                applyWheelZoom(wheelEvent->position().toPoint(), wheelEvent->angleDelta().y());
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton &&
+                navigationGestureAllowed(mouseEvent->modifiers())) {
+                beginPan(mouseEvent->pos());
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove && m_panning) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            updatePan(mouseEvent->pos());
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_panning) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                endPan();
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonDblClick) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton &&
+                !drawingInteractionActive()) {
+                fitToView();
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_pointSelectionEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                setPointSelectionEnabled(false);
+                return true;
+            }
+        }
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                QPointF imagePoint;
+                if (viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    emit pointSelected(imagePointToNormalized(imagePoint));
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_lineBandDrawingEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape
+                    && m_roiEditor.isLineBandActive()) {
+                const RoiEditorController::LineBandGeometry restored =
+                        m_roiEditor.cancelLineBand();
+                m_lineBandTransforming = false;
+                const LineBandRoi roi = imageLineBandToNormalized(
+                            restored.p1, restored.p2, restored.width);
+                if (roi.valid)
+                    setLineBandRoiNormalized(roi);
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                if (m_lineBandAdjustingWidth) {
+                    const LineBandRoi roi = imageLineBandToNormalized(m_lineBandDraftP1,
+                                                                       m_lineBandDraftP2,
+                                                                       m_lineBandDraftWidthPixels);
+                    if (!roi.valid) {
+                        emit lineBandSelectionRejected();
+                        return true;
+                    }
+                    setLineBandRoiNormalized(roi);
+                    clearLineBandItems(&m_lineBandDraftItems);
+                    m_lineBandAdjustingWidth = false;
+                    emit lineBandChanged(m_lineBandRoi);
+                    return true;
+                }
+
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
+                const QPointF imagePoint = viewToImage(mouseEvent->pos());
+                if (m_hasLineBandRoi && m_roiEditor.beginLineBand(
+                            lineBandEditGeometry(m_lineBandRoi),
+                            imagePoint,
+                            sceneUnitsForViewportPixels(8.0))) {
+                    m_lineBandTransforming = true;
+                    updateLineBandEditCursor(imagePoint);
+                    return true;
+                }
+                if (m_hasLineBandRoi && m_roiEditor.isNearLineBand(
+                            lineBandEditGeometry(m_lineBandRoi),
+                            imagePoint,
+                            sceneUnitsForViewportPixels(16.0))) {
+                    return true;
+                }
+
+                m_lineBandDrawingLine = true;
+                m_lineBandDraftP1 = imagePoint;
+                m_lineBandDraftP2 = m_lineBandDraftP1;
+                m_lineBandDraftWidthPixels = 24.0;
+                updateDraftLineBandItem();
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            const QPointF imagePoint = viewToImage(mouseEvent->pos());
+            if (m_lineBandTransforming) {
+                const RoiEditorController::LineBandGeometry geometry =
+                        m_roiEditor.updateLineBand(imagePoint);
+                const LineBandRoi roi = imageLineBandToNormalized(
+                            geometry.p1, geometry.p2, geometry.width);
+                if (roi.valid)
+                    setLineBandRoiNormalized(roi);
+                return true;
+            }
+            if (m_lineBandDrawingLine) {
+                m_lineBandDraftP2 = imagePoint;
+                updateDraftLineBandItem();
+                return true;
+            }
+            if (m_lineBandAdjustingWidth) {
+                const QLineF line(m_lineBandDraftP1, m_lineBandDraftP2);
+                const double length = line.length();
+                if (length > 0.001) {
+                    const double distance = std::abs((imagePoint.x() - m_lineBandDraftP1.x()) *
+                                                     (m_lineBandDraftP2.y() - m_lineBandDraftP1.y()) -
+                                                     (imagePoint.y() - m_lineBandDraftP1.y()) *
+                                                     (m_lineBandDraftP2.x() - m_lineBandDraftP1.x())) / length;
+                    m_lineBandDraftWidthPixels = qBound(4.0, distance * 2.0, qMax(m_imageRect.width(), m_imageRect.height()));
+                    updateDraftLineBandItem();
+                }
+                return true;
+            }
+            updateLineBandEditCursor(imagePoint);
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_lineBandTransforming) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                const RoiEditorController::LineBandGeometry geometry =
+                        m_roiEditor.updateLineBand(viewToImage(mouseEvent->pos()));
+                m_roiEditor.finishLineBand();
+                m_lineBandTransforming = false;
+                const LineBandRoi roi = imageLineBandToNormalized(
+                            geometry.p1, geometry.p2, geometry.width);
+                if (roi.valid) {
+                    setLineBandRoiNormalized(roi);
+                    emit lineBandChanged(m_lineBandRoi);
+                }
+                updateLineBandEditCursor(viewToImage(mouseEvent->pos()));
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_lineBandDrawingLine) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                m_lineBandDrawingLine = false;
+                m_lineBandDraftP2 = viewToImage(mouseEvent->pos());
+                if (QLineF(m_lineBandDraftP1, m_lineBandDraftP2).length() < 2.0) {
+                    clearLineBandItems(&m_lineBandDraftItems);
+                    emit lineBandSelectionRejected();
+                    return true;
+                }
+                m_lineBandDraftWidthPixels = qBound(12.0,
+                                                    QLineF(m_lineBandDraftP1, m_lineBandDraftP2).length() / 6.0,
+                                                    80.0);
+                m_lineBandAdjustingWidth = true;
+                updateDraftLineBandItem();
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_circleDrawingEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape
+                    && m_roiEditor.isCircleActive()) {
+                const RoiEditorController::CircleGeometry restored =
+                        m_roiEditor.cancelCircle();
+                m_circleTransforming = false;
+                const CircleRoi roi = imageCircleToNormalized(restored.center,
+                                                               restored.radius);
+                if (roi.valid)
+                    setCircleRoiNormalized(roi);
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return true;
+
+                if (m_hasCircleRoi && m_roiEditor.beginCircle(
+                            circleEditGeometry(m_circleRoi),
+                            imagePoint,
+                            sceneUnitsForViewportPixels(8.0))) {
+                    m_circleTransforming = true;
+                    updateCircleEditCursor(imagePoint);
+                    return true;
+                }
+                if (m_hasCircleRoi && m_roiEditor.isNearCircle(
+                            circleEditGeometry(m_circleRoi),
+                            imagePoint,
+                            sceneUnitsForViewportPixels(16.0))) {
+                    return true;
+                }
+
+                m_circleDrawing = true;
+                m_circleDraftCenter = imagePoint;
+                m_circleDraftRadiusPixels = 0.0;
+                updateDraftCircleItem();
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove && m_circleTransforming) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            QPointF imagePoint;
+            if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                return true;
+            const RoiEditorController::CircleGeometry geometry =
+                    m_roiEditor.updateCircle(imagePoint);
+            const CircleRoi roi = imageCircleToNormalized(geometry.center,
+                                                           geometry.radius);
+            if (roi.valid)
+                setCircleRoiNormalized(roi);
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove && m_circleDrawing) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            QPointF imagePoint;
+            if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                return true;
+
+            m_circleDraftRadiusPixels = QLineF(m_circleDraftCenter, imagePoint).length();
+            updateDraftCircleItem();
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            updateCircleEditCursor(viewToImage(mouseEvent->pos()));
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_circleTransforming) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                const RoiEditorController::CircleGeometry geometry =
+                        m_roiEditor.updateCircle(viewToImage(mouseEvent->pos()));
+                m_roiEditor.finishCircle();
+                m_circleTransforming = false;
+                const CircleRoi roi = imageCircleToNormalized(geometry.center,
+                                                               geometry.radius);
+                if (roi.valid) {
+                    setCircleRoiNormalized(roi);
+                    emit circleChanged(m_circleRoi);
+                }
+                updateCircleEditCursor(viewToImage(mouseEvent->pos()));
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_circleDrawing) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return true;
+
+                m_circleDrawing = false;
+                m_circleDraftRadiusPixels = QLineF(m_circleDraftCenter, imagePoint).length();
+                clearDraftCircleItem();
+                if (m_circleDraftRadiusPixels < 2.0) {
+                    emit circleSelectionRejected();
+                    return true;
+                }
+
+                const CircleRoi roi = imageCircleToNormalized(m_circleDraftCenter,
+                                                              m_circleDraftRadiusPixels);
+                if (!roi.valid) {
+                    emit circleSelectionRejected();
+                    return true;
+                }
+
+                setCircleRoiNormalized(roi);
+                emit circleChanged(m_circleRoi);
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && !m_roiDrawingEnabled && !m_polygonDrawingEnabled &&
+        !m_circleDrawingEnabled && !m_lineBandDrawingEnabled &&
+        m_hasPolygonRoi && m_polygonNormalized.size() >= 3 && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return false;
+
+                const int vertexIndex = polygonVertexIndexAt(imagePoint);
+                if (vertexIndex >= 0) {
+                    m_draggingPolygonVertexIndex = vertexIndex;
+                    return true;
+                }
+
+                if (polygonContainsImagePoint(imagePoint)) {
+                    m_polygonDragging = true;
+                    m_polygonDragStartImagePoint = imagePoint;
+                    m_polygonDragStartNormalized = m_polygonNormalized;
+                    return true;
+                }
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (m_draggingPolygonVertexIndex >= 0 && (mouseEvent->buttons() & Qt::LeftButton)) {
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return true;
+
+                QVector<QPointF> points = m_polygonNormalized;
+                if (m_draggingPolygonVertexIndex < points.size()) {
+                    points[m_draggingPolygonVertexIndex] = imagePointToNormalized(imagePoint);
+                    setPolygonRoiNormalized(points);
+                    emit polygonChanged(m_polygonNormalized);
+                }
+                return true;
+            }
+
+            if (m_polygonDragging && (mouseEvent->buttons() & Qt::LeftButton)) {
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return true;
+
+                setPolygonRoiNormalized(translatedPolygonNormalized(imagePoint - m_polygonDragStartImagePoint));
+                emit polygonChanged(m_polygonNormalized);
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton &&
+                (m_draggingPolygonVertexIndex >= 0 || m_polygonDragging)) {
+                m_draggingPolygonVertexIndex = -1;
+                m_polygonDragging = false;
+                m_polygonDragStartNormalized.clear();
+                emit polygonChanged(m_polygonNormalized);
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_polygonDrawingEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                m_draftPolygonImagePoints.clear();
+                m_polygonHoverPointValid = false;
+                clearDraftPolygonItem();
+                setPolygonDrawingEnabled(false);
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
+                QPointF imagePoint;
+                if (!viewPosToImagePoint(mouseEvent->pos(), &imagePoint))
+                    return true;
+
+                if (m_draftPolygonImagePoints.size() >= 3 &&
+                    QLineF(imagePoint, m_draftPolygonImagePoints.first()).length() <= polygonCloseThresholdPixels()) {
+                    completeDraftPolygon();
+                    return true;
+                }
+
+                m_draftPolygonImagePoints.append(imagePoint);
+                m_polygonHoverPointValid = false;
+                updateDraftPolygonItem();
+                return true;
+            }
+
+            if (mouseEvent->button() == Qt::RightButton) {
+                if (m_draftPolygonImagePoints.isEmpty()) {
+                    setPolygonDrawingEnabled(false);
+                    return true;
+                }
+
+                m_draftPolygonImagePoints.removeLast();
+                m_polygonHoverPointValid = false;
+                if (m_draftPolygonImagePoints.isEmpty()) {
+                    clearDraftPolygonItem();
+                } else {
+                    updateDraftPolygonItem();
+                }
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove && !m_draftPolygonImagePoints.isEmpty()) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            QPointF imagePoint;
+            if (viewPosToImagePoint(mouseEvent->pos(), &imagePoint)) {
+                m_polygonHoverPoint = imagePoint;
+                m_polygonHoverPointValid = true;
+            } else {
+                m_polygonHoverPointValid = false;
+            }
+            updateDraftPolygonItem();
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonDblClick) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                if (m_draftPolygonImagePoints.size() >= 3) {
+                    completeDraftPolygon();
+                } else {
+                    emit polygonSelectionRejected(m_draftPolygonImagePoints.size());
+                }
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_polygonDrawingEnabled && m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                setPolygonDrawingEnabled(false);
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_circleDrawingEnabled && m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                setCircleDrawingEnabled(false);
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_circleDrawingEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                setCircleDrawingEnabled(false);
+                return true;
+            }
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_polygonDrawingEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::MouseMove && m_draftPolygonImagePoints.isEmpty()) {
+            m_polygonHoverPointValid = false;
+            return true;
+        }
+    }
+
+    if (m_view && obj == m_view->viewport() && m_roiDrawingEnabled && !m_lastImage.isNull()) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape && m_roiEditor.isActive()) {
+                const QRectF restored = m_roiEditor.cancel();
+                m_roiTransforming = false;
+                if (restored.width() > 0.0 && restored.height() > 0.0)
+                    setRoiRectNormalized(imageRectToNormalized(restored));
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                if (!viewPositionInsideImage(mouseEvent->pos()))
+                    return true;
+
+                const QPointF imagePoint = viewToImage(mouseEvent->pos());
+                const QRectF imageRoi = normalizedToImageRect(m_roiNormalized);
+                const qreal editTolerance = sceneUnitsForViewportPixels(8.0);
+                const RoiEditorController::Handle handle = m_hasRoi
+                        ? m_roiEditor.hitTest(imageRoi, imagePoint, editTolerance)
+                        : RoiEditorController::Handle::None;
+                // 全图通常是各工具的默认算法范围，不应占满画布后阻止首次重画。
+                // 保留边缘手柄缩放；全图内部按下则直接开始绘制新 ROI。
+                const bool beginExistingTransform = m_hasRoi
+                        && !(roiCoversFullImage()
+                             && handle == RoiEditorController::Handle::Move);
+                if (beginExistingTransform && m_roiEditor.beginRectangle(
+                            imageRoi, imagePoint, editTolerance)) {
+                    m_roiTransforming = true;
+                    updateRoiEditCursor(imagePoint);
+                    return true;
+                }
+                if (m_hasRoi && !roiCoversFullImage()
+                        && m_roiEditor.isNearRectangle(
+                            imageRoi,
+                            imagePoint,
+                            sceneUnitsForViewportPixels(16.0))) {
+                    return true;
+                }
+
+                m_roiDrawing = true;
+                m_roiDrawStart = imagePoint;
+                updateDraftRoiItem(QRectF(m_roiDrawStart, QSizeF()));
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseMove && m_roiTransforming) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            const QRectF imageRect = m_roiEditor.updateRectangle(
+                        viewToImage(mouseEvent->pos()));
+            setRoiRectNormalized(imageRectToNormalized(imageRect));
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove && m_roiDrawing) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            updateDraftRoiItem(QRectF(m_roiDrawStart, viewToImage(mouseEvent->pos())).normalized());
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            updateRoiEditCursor(viewToImage(mouseEvent->pos()));
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_roiTransforming) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                const QRectF imageRect = m_roiEditor.updateRectangle(
+                            viewToImage(mouseEvent->pos()));
+                m_roiEditor.finishRectangle();
+                m_roiTransforming = false;
+                setRoiRectNormalized(imageRectToNormalized(imageRect));
+                emit roiChanged(m_roiNormalized);
+                updateRoiEditCursor(viewToImage(mouseEvent->pos()));
+                return true;
+            }
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && m_roiDrawing) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                m_roiDrawing = false;
+                const QRectF imageRect = clampedImageRect(QRectF(m_roiDrawStart,
+                                                                 viewToImage(mouseEvent->pos())).normalized());
+                clearDraftRoiItem();
+                if (imageRect.width() >= 2.0 && imageRect.height() >= 2.0) {
+                    const QRectF normalized = imageRectToNormalized(imageRect);
+                    setRoiRectNormalized(normalized);
+                    emit roiChanged(m_roiNormalized);
+                } else {
+                    emit roiSelectionRejected(imageRect);
+                }
+                return true;
+            }
+        }
+    }
+
+    return QObject::eventFilter(obj, event);
+}
+
+void FrameViewHelper::updateCursorPixel(const QPoint &viewPosition)
+{
+    if (!m_view || m_lastImage.isNull()) {
+        publishCursorPixel(FramePixelSample());
+        return;
+    }
+
+    const QPointF scenePoint = m_view->mapToScene(viewPosition);
+    if (!finitePoint(scenePoint)
+            || scenePoint.x() < 0.0 || scenePoint.x() >= m_lastImage.width()
+            || scenePoint.y() < 0.0 || scenePoint.y() >= m_lastImage.height()) {
+        publishCursorPixel(FramePixelSample());
+        return;
+    }
+
+    publishCursorPixel(FramePixelProbe::sample(
+                           m_lastImage,
+                           QPoint(qFloor(scenePoint.x()), qFloor(scenePoint.y()))));
+}
+
+void FrameViewHelper::publishCursorPixel(const FramePixelSample &sample)
+{
+    if (FramePixelProbe::equal(m_lastPixelSample, sample))
+        return;
+
+    m_lastPixelSample = sample;
+    emit cursorPixelChanged(m_lastPixelSample);
+}
+
+bool FrameViewHelper::viewPosToImagePoint(const QPoint &viewPos, QPointF *imagePoint) const
+{
+    if (!imagePoint || !m_view || m_lastImage.isNull() || m_imageRect.isEmpty())
+        return false;
+
+    const QPointF scenePoint = m_view->mapToScene(viewPos);
+    if (!finitePoint(scenePoint))
+        return false;
+
+    const QPointF clamped = clampedImagePoint(scenePoint);
+    if (!finitePoint(clamped))
+        return false;
+
+    *imagePoint = clamped;
+    return true;
+}
+
+QRectF FrameViewHelper::clampedImageRect(const QRectF &rect) const
+{
+    if (m_imageRect.isEmpty() || !finiteRect(rect))
+        return QRectF();
+
+    const QRectF normalized = rect.normalized();
+    const double left = qBound(m_imageRect.left(), normalized.left(), m_imageRect.right());
+    const double top = qBound(m_imageRect.top(), normalized.top(), m_imageRect.bottom());
+    const double right = qBound(m_imageRect.left(), normalized.right(), m_imageRect.right());
+    const double bottom = qBound(m_imageRect.top(), normalized.bottom(), m_imageRect.bottom());
+    return QRectF(QPointF(left, top), QPointF(right, bottom)).normalized();
+}
+
+QPointF FrameViewHelper::clampedImagePoint(const QPointF &point) const
+{
+    if (m_imageRect.isEmpty() || !finitePoint(point))
+        return QPointF();
+
+    return QPointF(qBound(m_imageRect.left(), point.x(), m_imageRect.right()),
+                   qBound(m_imageRect.top(), point.y(), m_imageRect.bottom()));
+}
+
+QPointF FrameViewHelper::imagePointToNormalized(const QPointF &point) const
+{
+    if (m_lastImage.isNull())
+        return QPointF();
+
+    const QPointF clamped = clampedImagePoint(point);
+    return QPointF(clamped.x() / static_cast<double>(m_lastImage.width()),
+                   clamped.y() / static_cast<double>(m_lastImage.height()));
+}
+
+QPointF FrameViewHelper::normalizedToImagePoint(const QPointF &point) const
+{
+    if (m_lastImage.isNull())
+        return QPointF();
+
+    const QPointF normalized(qBound(0.0, point.x(), 1.0),
+                             qBound(0.0, point.y(), 1.0));
+    return clampedImagePoint(QPointF(normalized.x() * m_lastImage.width(),
+                                     normalized.y() * m_lastImage.height()));
+}
+
+QVector<QPointF> FrameViewHelper::validNormalizedPolygon(const QVector<QPointF> &points) const
+{
+    QVector<QPointF> validPoints;
+    validPoints.reserve(points.size());
+    for (const QPointF &point : points) {
+        if (!finitePoint(point))
+            continue;
+        validPoints.append(QPointF(qBound(0.0, point.x(), 1.0),
+                                   qBound(0.0, point.y(), 1.0)));
+    }
+    return validPoints;
+}
+
+bool FrameViewHelper::completeDraftPolygon()
+{
+    if (m_draftPolygonImagePoints.size() < 3) {
+        emit polygonSelectionRejected(m_draftPolygonImagePoints.size());
+        return false;
+    }
+
+    QVector<QPointF> normalizedPoints;
+    normalizedPoints.reserve(m_draftPolygonImagePoints.size());
+    for (const QPointF &point : qAsConst(m_draftPolygonImagePoints))
+        normalizedPoints.append(imagePointToNormalized(point));
+
+    setPolygonRoiNormalized(normalizedPoints);
+    m_draftPolygonImagePoints.clear();
+    m_polygonHoverPointValid = false;
+    clearDraftPolygonItem();
+    m_polygonDrawingState = PolygonDrawingState::CompletedPolygon;
+    m_polygonDrawingEnabled = false;
+    if (m_view && m_view->viewport())
+        m_view->viewport()->unsetCursor();
+
+    emit polygonChanged(m_polygonNormalized);
+    return true;
+}
+
+double FrameViewHelper::polygonCloseThresholdPixels() const
+{
+    return sceneUnitsForViewportPixels(12.0);
+}
+
+int FrameViewHelper::polygonVertexIndexAt(const QPointF &imagePoint) const
+{
+    if (m_lastImage.isNull() || m_polygonNormalized.isEmpty())
+        return -1;
+
+    const double hitRadius = sceneUnitsForViewportPixels(9.0);
+    for (int index = 0; index < m_polygonNormalized.size(); ++index) {
+        if (QLineF(imagePoint, normalizedToImagePoint(m_polygonNormalized.at(index))).length() <= hitRadius)
+            return index;
+    }
+    return -1;
+}
+
+bool FrameViewHelper::polygonContainsImagePoint(const QPointF &imagePoint) const
+{
+    if (m_polygonNormalized.size() < 3)
+        return false;
+
+    QPolygonF polygon;
+    for (const QPointF &point : qAsConst(m_polygonNormalized))
+        polygon << normalizedToImagePoint(point);
+    return polygon.containsPoint(imagePoint, Qt::OddEvenFill);
+}
+
+QVector<QPointF> FrameViewHelper::translatedPolygonNormalized(const QPointF &deltaImage) const
+{
+    QVector<QPointF> translated;
+    if (m_lastImage.isNull() || m_polygonDragStartNormalized.isEmpty())
+        return translated;
+
+    translated.reserve(m_polygonDragStartNormalized.size());
+    for (const QPointF &point : qAsConst(m_polygonDragStartNormalized))
+        translated.append(imagePointToNormalized(normalizedToImagePoint(point) + deltaImage));
+    return translated;
+}
+
+bool FrameViewHelper::isValidCircleRoi(const CircleRoi &roi) const
+{
+    if (!finitePoint(roi.centerNormalized) || !finiteValue(roi.radiusNormalized))
+        return false;
+    return roi.radiusNormalized > 0.0;
+}
+
+CircleRoi FrameViewHelper::validCircleRoi(const CircleRoi &roi) const
+{
+    CircleRoi validRoi;
+    if (!isValidCircleRoi(roi))
+        return validRoi;
+
+    validRoi.centerNormalized = QPointF(qBound(0.0, roi.centerNormalized.x(), 1.0),
+                                        qBound(0.0, roi.centerNormalized.y(), 1.0));
+    validRoi.radiusNormalized = qBound(0.0, roi.radiusNormalized, 1.0);
+    if (roi.boundingRectNormalized.isValid()) {
+        validRoi.boundingRectNormalized = validNormalizedRect(roi.boundingRectNormalized);
+    } else {
+        const double maxDimension = m_lastImage.isNull()
+                ? 1.0
+                : static_cast<double>(qMax(m_lastImage.width(), m_lastImage.height()));
+        const double xRadius = m_lastImage.isNull() || m_lastImage.width() <= 0
+                ? validRoi.radiusNormalized
+                : validRoi.radiusNormalized * maxDimension / static_cast<double>(m_lastImage.width());
+        const double yRadius = m_lastImage.isNull() || m_lastImage.height() <= 0
+                ? validRoi.radiusNormalized
+                : validRoi.radiusNormalized * maxDimension / static_cast<double>(m_lastImage.height());
+        validRoi.boundingRectNormalized = validNormalizedRect(
+                    QRectF(validRoi.centerNormalized.x() - xRadius,
+                           validRoi.centerNormalized.y() - yRadius,
+                           xRadius * 2.0,
+                           yRadius * 2.0));
+    }
+    if (validRoi.boundingRectNormalized.width() <= 0.0 ||
+        validRoi.boundingRectNormalized.height() <= 0.0) {
+        validRoi.valid = false;
+        return validRoi;
+    }
+
+    validRoi.valid = true;
+    return validRoi;
+}
+
+CircleRoi FrameViewHelper::imageCircleToNormalized(const QPointF &center, double radiusPixels) const
+{
+    CircleRoi roi;
+    if (m_lastImage.isNull() || radiusPixels <= 0.0)
+        return roi;
+
+    const double maxDimension = static_cast<double>(qMax(m_lastImage.width(), m_lastImage.height()));
+    if (maxDimension <= 0.0)
+        return roi;
+
+    roi.centerNormalized = imagePointToNormalized(center);
+    roi.radiusNormalized = radiusPixels / maxDimension;
+    roi.boundingRectNormalized = imageRectToNormalized(QRectF(center.x() - radiusPixels,
+                                                             center.y() - radiusPixels,
+                                                             radiusPixels * 2.0,
+                                                             radiusPixels * 2.0));
+    roi.valid = roi.radiusNormalized > 0.0 &&
+            roi.boundingRectNormalized.width() > 0.0 &&
+            roi.boundingRectNormalized.height() > 0.0;
+    return roi;
+}
+
+QRectF FrameViewHelper::circleBoundingRectImage(const CircleRoi &roi) const
+{
+    if (m_lastImage.isNull() || !isValidCircleRoi(roi))
+        return QRectF();
+
+    const QPointF center = normalizedToImagePoint(roi.centerNormalized);
+    const double maxDimension = static_cast<double>(qMax(m_lastImage.width(), m_lastImage.height()));
+    const double radius = roi.radiusNormalized * maxDimension;
+    return QRectF(center.x() - radius,
+                  center.y() - radius,
+                  radius * 2.0,
+                  radius * 2.0);
+}
+
+RoiEditorController::CircleGeometry FrameViewHelper::circleEditGeometry(
+        const CircleRoi &roi) const
+{
+    RoiEditorController::CircleGeometry geometry;
+    if (!isValidCircleRoi(roi) || m_lastImage.isNull())
+        return geometry;
+    geometry.center = normalizedToImagePoint(roi.centerNormalized);
+    geometry.radius = roi.radiusNormalized
+            * static_cast<double>(qMax(m_lastImage.width(), m_lastImage.height()));
+    return geometry;
+}
+
+bool FrameViewHelper::isValidLineBand(const LineBandRoi &roi) const
+{
+    if (!finitePoint(roi.p1Normalized) || !finitePoint(roi.p2Normalized))
+        return false;
+    if (!finiteValue(roi.widthNormalized) || roi.widthNormalized <= 0.0)
+        return false;
+
+    const QPointF p1(qBound(0.0, roi.p1Normalized.x(), 1.0),
+                     qBound(0.0, roi.p1Normalized.y(), 1.0));
+    const QPointF p2(qBound(0.0, roi.p2Normalized.x(), 1.0),
+                     qBound(0.0, roi.p2Normalized.y(), 1.0));
+    return QLineF(p1, p2).length() > 0.001;
+}
+
+LineBandRoi FrameViewHelper::validLineBand(const LineBandRoi &roi) const
+{
+    LineBandRoi validRoi;
+    validRoi.p1Normalized = QPointF(qBound(0.0, roi.p1Normalized.x(), 1.0),
+                                    qBound(0.0, roi.p1Normalized.y(), 1.0));
+    validRoi.p2Normalized = QPointF(qBound(0.0, roi.p2Normalized.x(), 1.0),
+                                    qBound(0.0, roi.p2Normalized.y(), 1.0));
+    validRoi.widthNormalized = qBound(0.001, roi.widthNormalized, 1.0);
+    validRoi.valid = isValidLineBand(validRoi);
+    return validRoi;
+}
+
+LineBandRoi FrameViewHelper::imageLineBandToNormalized(const QPointF &p1,
+                                                       const QPointF &p2,
+                                                       double widthPixels) const
+{
+    LineBandRoi roi;
+    if (m_lastImage.isNull())
+        return roi;
+
+    const double maxDimension = qMax(1, qMax(m_lastImage.width(), m_lastImage.height()));
+    roi.p1Normalized = imagePointToNormalized(p1);
+    roi.p2Normalized = imagePointToNormalized(p2);
+    roi.widthNormalized = qBound(0.001, widthPixels / maxDimension, 1.0);
+    roi.valid = isValidLineBand(roi);
+    return roi;
+}
+
+RoiEditorController::LineBandGeometry FrameViewHelper::lineBandEditGeometry(
+        const LineBandRoi &roi) const
+{
+    RoiEditorController::LineBandGeometry geometry;
+    if (!isValidLineBand(roi) || m_lastImage.isNull())
+        return geometry;
+    geometry.p1 = normalizedToImagePoint(roi.p1Normalized);
+    geometry.p2 = normalizedToImagePoint(roi.p2Normalized);
+    geometry.width = roi.widthNormalized
+            * static_cast<double>(qMax(m_lastImage.width(), m_lastImage.height()));
+    return geometry;
+}
+
+QVector<QPointF> FrameViewHelper::lineBandPolygonImagePoints(const LineBandRoi &roi) const
+{
+    QVector<QPointF> points;
+    if (m_lastImage.isNull() || !isValidLineBand(roi))
+        return points;
+
+    const QPointF p1 = normalizedToImagePoint(roi.p1Normalized);
+    const QPointF p2 = normalizedToImagePoint(roi.p2Normalized);
+    const QLineF line(p1, p2);
+    const double length = line.length();
+    if (length <= 0.001)
+        return points;
+
+    const double widthPixels = roi.widthNormalized *
+            static_cast<double>(qMax(m_lastImage.width(), m_lastImage.height()));
+    const double halfWidth = qMax(1.0, widthPixels / 2.0);
+    const double nx = -(p2.y() - p1.y()) / length;
+    const double ny = (p2.x() - p1.x()) / length;
+    const QPointF offset(nx * halfWidth, ny * halfWidth);
+
+    points.reserve(4);
+    points << clampedImagePoint(p1 + offset)
+           << clampedImagePoint(p2 + offset)
+           << clampedImagePoint(p2 - offset)
+           << clampedImagePoint(p1 - offset);
+    return points;
+}
+
+QPointF FrameViewHelper::clampedTextPosition(const QPointF &position, const QRectF &textBounds) const
+{
+    if (m_imageRect.isEmpty())
+        return QPointF();
+
+    QPointF clamped = clampedImagePoint(position);
+
+    if (textBounds.width() > 0.0 && textBounds.width() < m_imageRect.width()) {
+        clamped.setX(qBound(m_imageRect.left() - textBounds.left(),
+                            clamped.x(),
+                            m_imageRect.right() - textBounds.right()));
+    } else {
+        clamped.setX(m_imageRect.left() - textBounds.left());
+    }
+
+    if (textBounds.height() > 0.0 && textBounds.height() < m_imageRect.height()) {
+        clamped.setY(qBound(m_imageRect.top() - textBounds.top(),
+                            clamped.y(),
+                            m_imageRect.bottom() - textBounds.bottom()));
+    } else {
+        clamped.setY(m_imageRect.top() - textBounds.top());
+    }
+
+    return clamped;
+}
+
+QRectF FrameViewHelper::validNormalizedRect(const QRectF &rect) const
+{
+    QRectF normalized = rect.normalized();
+    const double left = qBound(0.0, normalized.left(), 1.0);
+    const double top = qBound(0.0, normalized.top(), 1.0);
+    const double right = qBound(0.0, normalized.right(), 1.0);
+    const double bottom = qBound(0.0, normalized.bottom(), 1.0);
+    return QRectF(QPointF(left, top), QPointF(right, bottom)).normalized();
+}
+
+bool FrameViewHelper::roiCoversFullImage() const
+{
+    if (!m_hasRoi)
+        return false;
+
+    const QRectF roi = validNormalizedRect(m_roiNormalized);
+    constexpr qreal epsilon = 0.000001;
+    return qAbs(roi.left()) <= epsilon
+            && qAbs(roi.top()) <= epsilon
+            && qAbs(roi.right() - 1.0) <= epsilon
+            && qAbs(roi.bottom() - 1.0) <= epsilon;
+}
+
+void FrameViewHelper::updateRoiItem()
+{
+    if (!m_roiItem)
+        return;
+
+    if (!m_hasRoi || m_lastImage.isNull()) {
+        m_roiItem->hide();
+        clearRoiHandleItems();
+        return;
+    }
+
+    m_roiItem->setRect(normalizedToImageRect(m_roiNormalized));
+    m_roiItem->show();
+    updateRoiHandleItems();
+}
+
+void FrameViewHelper::updateRoiHandleItems()
+{
+    clearRoiHandleItems();
+    if (!m_scene || !m_roiDrawingEnabled || !m_hasRoi || m_lastImage.isNull())
+        return;
+
+    const QRectF rect = normalizedToImageRect(m_roiNormalized);
+    if (rect.width() < 2.0 || rect.height() < 2.0)
+        return;
+
+    const QVector<QPointF> points{
+        rect.topLeft(),
+        QPointF(rect.center().x(), rect.top()),
+        rect.topRight(),
+        QPointF(rect.right(), rect.center().y()),
+        rect.bottomRight(),
+        QPointF(rect.center().x(), rect.bottom()),
+        rect.bottomLeft(),
+        QPointF(rect.left(), rect.center().y())
+    };
+    for (const QPointF &point : points) {
+        QGraphicsRectItem *item = m_scene->addRect(
+                    QRectF(-4.5, -4.5, 9.0, 9.0),
+                    cosmeticPen(QColor(255, 122, 0), 1.2),
+                    QBrush(QColor(255, 255, 255)));
+        item->setPos(point);
+        item->setZValue(106.0);
+        item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+        item->setAcceptedMouseButtons(Qt::NoButton);
+        m_roiHandleItems.append(item);
+    }
+}
+
+void FrameViewHelper::clearRoiHandleItems()
+{
+    if (!m_scene) {
+        m_roiHandleItems.clear();
+        return;
+    }
+
+    for (QGraphicsItem *item : qAsConst(m_roiHandleItems)) {
+        if (!item)
+            continue;
+        m_scene->removeItem(item);
+        delete item;
+    }
+    m_roiHandleItems.clear();
+}
+
+void FrameViewHelper::updateRoiEditCursor(const QPointF &imagePoint)
+{
+    if (!m_view || !m_view->viewport() || !m_roiDrawingEnabled || !m_hasRoi)
+        return;
+
+    const QRectF rect = normalizedToImageRect(m_roiNormalized);
+    const qreal tolerance = sceneUnitsForViewportPixels(8.0);
+    RoiEditorController::Handle handle =
+            m_roiEditor.hitTest(rect, imagePoint, tolerance);
+    if (roiCoversFullImage() && handle == RoiEditorController::Handle::Move)
+        handle = RoiEditorController::Handle::None;
+    switch (handle) {
+    case RoiEditorController::Handle::Move:
+        m_view->viewport()->setCursor(Qt::SizeAllCursor);
+        break;
+    case RoiEditorController::Handle::Left:
+    case RoiEditorController::Handle::Right:
+        m_view->viewport()->setCursor(Qt::SizeHorCursor);
+        break;
+    case RoiEditorController::Handle::Top:
+    case RoiEditorController::Handle::Bottom:
+        m_view->viewport()->setCursor(Qt::SizeVerCursor);
+        break;
+    case RoiEditorController::Handle::TopLeft:
+    case RoiEditorController::Handle::BottomRight:
+        m_view->viewport()->setCursor(Qt::SizeFDiagCursor);
+        break;
+    case RoiEditorController::Handle::TopRight:
+    case RoiEditorController::Handle::BottomLeft:
+        m_view->viewport()->setCursor(Qt::SizeBDiagCursor);
+        break;
+    case RoiEditorController::Handle::None:
+    default:
+        m_view->viewport()->setCursor(Qt::CrossCursor);
+        break;
+    }
+}
+
+void FrameViewHelper::updatePolygonItem()
+{
+    if (!m_polygonItem)
+        return;
+
+    if (!m_hasPolygonRoi || m_lastImage.isNull() || m_polygonNormalized.size() < 3) {
+        m_polygonItem->hide();
+        clearPolygonVertexItems();
+        return;
+    }
+
+    QPolygonF polygon;
+    for (const QPointF &point : qAsConst(m_polygonNormalized))
+        polygon << normalizedToImagePoint(point);
+
+    m_polygonItem->setPolygon(polygon);
+    m_polygonItem->show();
+    updatePolygonVertexItems();
+}
+
+void FrameViewHelper::updatePolygonVertexItems()
+{
+    clearPolygonVertexItems();
+    if (!m_scene || !m_hasPolygonRoi || m_lastImage.isNull() || m_polygonNormalized.size() < 3)
+        return;
+
+    const double side = 10.0;
+    for (const QPointF &point : qAsConst(m_polygonNormalized)) {
+        const QPointF imagePoint = normalizedToImagePoint(point);
+        QGraphicsRectItem *item = m_scene->addRect(QRectF(imagePoint.x() - side / 2.0,
+                                                          imagePoint.y() - side / 2.0,
+                                                          side,
+                                                          side),
+                                                   cosmeticPen(QColor(0, 210, 255, 160), 1.2),
+                                                   QBrush(QColor(0, 210, 255, 35)));
+        item->setZValue(105.0);
+        m_polygonVertexItems.append(item);
+    }
+}
+
+void FrameViewHelper::clearPolygonVertexItems()
+{
+    if (!m_scene) {
+        m_polygonVertexItems.clear();
+        return;
+    }
+
+    for (QGraphicsItem *item : m_polygonVertexItems) {
+        if (item) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    m_polygonVertexItems.clear();
+}
+
+void FrameViewHelper::updateCircleItem()
+{
+    if (!m_circleItem)
+        return;
+
+    if (!m_hasCircleRoi || m_lastImage.isNull() || !isValidCircleRoi(m_circleRoi)) {
+        m_circleItem->hide();
+        clearCircleHandleItems();
+        return;
+    }
+
+    const QRectF circleRect = circleBoundingRectImage(m_circleRoi);
+    if (circleRect.width() <= 0.0 || circleRect.height() <= 0.0) {
+        m_circleItem->hide();
+        clearCircleHandleItems();
+        return;
+    }
+
+    m_circleItem->setRect(circleRect);
+    m_circleItem->show();
+    updateCircleHandleItems();
+}
+
+void FrameViewHelper::updateCircleHandleItems()
+{
+    clearCircleHandleItems();
+    if (!m_scene || !m_circleDrawingEnabled || !m_hasCircleRoi
+            || !isValidCircleRoi(m_circleRoi) || m_lastImage.isNull()) {
+        return;
+    }
+
+    const RoiEditorController::CircleGeometry circle =
+            circleEditGeometry(m_circleRoi);
+    const QVector<QPointF> points{
+        circle.center,
+        QPointF(circle.center.x() + circle.radius, circle.center.y())
+    };
+    for (int index = 0; index < points.size(); ++index) {
+        QGraphicsEllipseItem *item = m_scene->addEllipse(
+                    QRectF(-4.5, -4.5, 9.0, 9.0),
+                    cosmeticPen(QColor(0, 170, 255), 1.2),
+                    QBrush(index == 0 ? QColor(0, 170, 255)
+                                      : QColor(255, 255, 255)));
+        item->setPos(points.at(index));
+        item->setZValue(106.0);
+        item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+        item->setAcceptedMouseButtons(Qt::NoButton);
+        m_circleHandleItems.append(item);
+    }
+}
+
+void FrameViewHelper::clearCircleHandleItems()
+{
+    if (!m_scene) {
+        m_circleHandleItems.clear();
+        return;
+    }
+    for (QGraphicsItem *item : qAsConst(m_circleHandleItems)) {
+        if (!item)
+            continue;
+        m_scene->removeItem(item);
+        delete item;
+    }
+    m_circleHandleItems.clear();
+}
+
+void FrameViewHelper::updateCircleEditCursor(const QPointF &imagePoint)
+{
+    if (!m_view || !m_view->viewport() || !m_circleDrawingEnabled
+            || !m_hasCircleRoi) {
+        return;
+    }
+    const RoiEditorController::CircleHandle handle = m_roiEditor.hitTestCircle(
+                circleEditGeometry(m_circleRoi),
+                imagePoint,
+                sceneUnitsForViewportPixels(8.0));
+    if (handle == RoiEditorController::CircleHandle::Move)
+        m_view->viewport()->setCursor(Qt::SizeAllCursor);
+    else if (handle == RoiEditorController::CircleHandle::Radius)
+        m_view->viewport()->setCursor(Qt::SizeHorCursor);
+    else
+        m_view->viewport()->setCursor(Qt::CrossCursor);
+}
+
+void FrameViewHelper::updateLineBandItem()
+{
+    clearLineBandItems(&m_lineBandItems);
+    clearLineBandWidthHandleItem();
+    if (!m_hasLineBandRoi || m_lastImage.isNull() || !isValidLineBand(m_lineBandRoi))
+        return;
+
+    addLineBandItems(m_lineBandRoi, &m_lineBandItems, 104.0);
+    updateLineBandWidthHandleItem();
+}
+
+void FrameViewHelper::updateLineBandWidthHandleItem()
+{
+    clearLineBandWidthHandleItem();
+    if (!m_scene || !m_lineBandDrawingEnabled || !m_hasLineBandRoi
+            || !isValidLineBand(m_lineBandRoi) || m_lastImage.isNull()) {
+        return;
+    }
+    const QPointF point = RoiEditorController::lineBandWidthHandle(
+                lineBandEditGeometry(m_lineBandRoi));
+    QGraphicsRectItem *item = m_scene->addRect(
+                QRectF(-4.5, -4.5, 9.0, 9.0),
+                cosmeticPen(QColor(255, 122, 0), 1.2),
+                QBrush(QColor(255, 255, 255)));
+    item->setPos(point);
+    item->setZValue(108.0);
+    item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+    item->setAcceptedMouseButtons(Qt::NoButton);
+    m_lineBandWidthHandleItem = item;
+}
+
+void FrameViewHelper::clearLineBandWidthHandleItem()
+{
+    if (!m_lineBandWidthHandleItem)
+        return;
+    if (m_scene)
+        m_scene->removeItem(m_lineBandWidthHandleItem);
+    delete m_lineBandWidthHandleItem;
+    m_lineBandWidthHandleItem = nullptr;
+}
+
+void FrameViewHelper::updateLineBandEditCursor(const QPointF &imagePoint)
+{
+    if (!m_view || !m_view->viewport() || !m_lineBandDrawingEnabled
+            || !m_hasLineBandRoi) {
+        return;
+    }
+    switch (m_roiEditor.hitTestLineBand(lineBandEditGeometry(m_lineBandRoi),
+                                        imagePoint,
+                                        sceneUnitsForViewportPixels(8.0))) {
+    case RoiEditorController::LineBandHandle::Move:
+        m_view->viewport()->setCursor(Qt::SizeAllCursor);
+        break;
+    case RoiEditorController::LineBandHandle::FirstEndpoint:
+    case RoiEditorController::LineBandHandle::SecondEndpoint:
+        m_view->viewport()->setCursor(Qt::CrossCursor);
+        break;
+    case RoiEditorController::LineBandHandle::Width:
+        m_view->viewport()->setCursor(Qt::SizeVerCursor);
+        break;
+    case RoiEditorController::LineBandHandle::None:
+    default:
+        m_view->viewport()->setCursor(Qt::CrossCursor);
+        break;
+    }
+}
+
+void FrameViewHelper::updateDraftRoiItem(const QRectF &imageRect)
+{
+    if (!m_scene)
+        return;
+
+    if (!m_draftRoiItem) {
+        m_draftRoiItem = m_scene->addRect(QRectF(),
+                                          cosmeticPen(QColor(255, 185, 90), 1.5));
+        m_draftRoiItem->setZValue(101.0);
+    }
+
+    m_draftRoiItem->setRect(clampedImageRect(imageRect));
+    m_draftRoiItem->show();
+}
+
+void FrameViewHelper::clearDraftRoiItem()
+{
+    if (!m_draftRoiItem || !m_scene)
+        return;
+
+    m_scene->removeItem(m_draftRoiItem);
+    delete m_draftRoiItem;
+    m_draftRoiItem = nullptr;
+}
+
+void FrameViewHelper::updateDraftPolygonItem()
+{
+    if (!m_scene)
+        return;
+
+    if (m_draftPolygonImagePoints.isEmpty()) {
+        clearDraftPolygonItem();
+        return;
+    }
+
+    if (!m_draftPolygonItem) {
+        m_draftPolygonItem = m_scene->addPath(QPainterPath(),
+                                              cosmeticPen(QColor(0, 210, 255), 1.5));
+        m_draftPolygonItem->setZValue(103.0);
+    }
+
+    QPainterPath path;
+    const QPointF firstPoint = clampedImagePoint(m_draftPolygonImagePoints.first());
+    path.moveTo(firstPoint);
+    for (int index = 1; index < m_draftPolygonImagePoints.size(); ++index)
+        path.lineTo(clampedImagePoint(m_draftPolygonImagePoints.at(index)));
+    if (m_polygonHoverPointValid)
+        path.lineTo(clampedImagePoint(m_polygonHoverPoint));
+
+    for (QGraphicsItem *item : m_draftPolygonPointItems) {
+        if (item) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    m_draftPolygonPointItems.clear();
+
+    const double radius = 3.5;
+    for (const QPointF &point : qAsConst(m_draftPolygonImagePoints)) {
+        const QPointF clamped = clampedImagePoint(point);
+        QGraphicsEllipseItem *pointItem = m_scene->addEllipse(QRectF(clamped.x() - radius,
+                                                                     clamped.y() - radius,
+                                                                     radius * 2.0,
+                                                                     radius * 2.0),
+                                                              cosmeticPen(QColor(0, 210, 255), 1.2),
+                                                              QBrush(QColor(0, 210, 255, 90)));
+        pointItem->setZValue(104.0);
+        m_draftPolygonPointItems.append(pointItem);
+    }
+
+    m_draftPolygonItem->setPath(path);
+    m_draftPolygonItem->show();
+}
+
+void FrameViewHelper::clearDraftPolygonItem()
+{
+    if (!m_scene) {
+        m_draftPolygonItem = nullptr;
+        m_draftPolygonPointItems.clear();
+        return;
+    }
+
+    if (m_draftPolygonItem) {
+        m_scene->removeItem(m_draftPolygonItem);
+        delete m_draftPolygonItem;
+        m_draftPolygonItem = nullptr;
+    }
+
+    for (QGraphicsItem *item : m_draftPolygonPointItems) {
+        if (item) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    m_draftPolygonPointItems.clear();
+}
+
+void FrameViewHelper::updateDraftCircleItem()
+{
+    if (!m_scene)
+        return;
+
+    if (!m_draftCircleItem) {
+        m_draftCircleItem = m_scene->addEllipse(QRectF(),
+                                                cosmeticPen(QColor(0, 210, 255), 1.5));
+        m_draftCircleItem->setZValue(103.0);
+    }
+
+    const double radius = qMax(0.0, m_circleDraftRadiusPixels);
+    m_draftCircleItem->setRect(QRectF(m_circleDraftCenter.x() - radius,
+                                      m_circleDraftCenter.y() - radius,
+                                      radius * 2.0,
+                                      radius * 2.0));
+    m_draftCircleItem->show();
+}
+
+void FrameViewHelper::clearDraftCircleItem()
+{
+    if (!m_draftCircleItem || !m_scene)
+        return;
+
+    m_scene->removeItem(m_draftCircleItem);
+    delete m_draftCircleItem;
+    m_draftCircleItem = nullptr;
+}
+
+void FrameViewHelper::updateDraftLineBandItem()
+{
+    clearLineBandItems(&m_lineBandDraftItems);
+    if (m_lastImage.isNull())
+        return;
+
+    const LineBandRoi roi = imageLineBandToNormalized(m_lineBandDraftP1,
+                                                      m_lineBandDraftP2,
+                                                      m_lineBandDraftWidthPixels);
+    if (!roi.valid)
+        return;
+
+    addLineBandItems(roi, &m_lineBandDraftItems, 105.0);
+}
+
+void FrameViewHelper::clearLineBandItems(QVector<QGraphicsItem *> *items)
+{
+    if (!items)
+        return;
+
+    if (!m_scene) {
+        items->clear();
+        return;
+    }
+
+    for (QGraphicsItem *item : *items) {
+        if (item) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    items->clear();
+}
+
+void FrameViewHelper::addLineBandItems(const LineBandRoi &roi,
+                                       QVector<QGraphicsItem *> *items,
+                                       qreal zValue)
+{
+    if (!m_scene || !items || !isValidLineBand(roi))
+        return;
+
+    const QVector<QPointF> polygonPoints = lineBandPolygonImagePoints(roi);
+    if (polygonPoints.size() < 4)
+        return;
+
+    QPolygonF polygon;
+    for (const QPointF &point : polygonPoints)
+        polygon << point;
+
+    QGraphicsPolygonItem *bandItem = m_scene->addPolygon(polygon,
+                                                         cosmeticPen(QColor(255, 122, 0), 2.0));
+    bandItem->setToolTip(QStringLiteral("line_band"));
+    bandItem->setZValue(zValue);
+    items->append(bandItem);
+
+    const QPointF p1 = normalizedToImagePoint(roi.p1Normalized);
+    const QPointF p2 = normalizedToImagePoint(roi.p2Normalized);
+    QGraphicsLineItem *centerItem = m_scene->addLine(QLineF(p1, p2),
+                                                     cosmeticPen(QColor(0, 210, 255), 2.0));
+    centerItem->setToolTip(QStringLiteral("line_band_center"));
+    centerItem->setZValue(zValue + 1.0);
+    items->append(centerItem);
+
+    const double radius = 4.0;
+    QGraphicsEllipseItem *p1Item = m_scene->addEllipse(QRectF(-radius,
+                                                              -radius,
+                                                              radius * 2.0,
+                                                              radius * 2.0),
+                                                       cosmeticPen(QColor(0, 210, 255), 2.0),
+                                                       QBrush(QColor(0, 210, 255, 80)));
+    p1Item->setPos(p1);
+    p1Item->setToolTip(QStringLiteral("line_band_p1"));
+    p1Item->setZValue(zValue + 2.0);
+    p1Item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+    p1Item->setAcceptedMouseButtons(Qt::NoButton);
+    items->append(p1Item);
+
+    QGraphicsEllipseItem *p2Item = m_scene->addEllipse(QRectF(-radius,
+                                                              -radius,
+                                                              radius * 2.0,
+                                                              radius * 2.0),
+                                                       cosmeticPen(QColor(0, 210, 255), 2.0),
+                                                       QBrush(QColor(0, 210, 255, 80)));
+    p2Item->setPos(p2);
+    p2Item->setToolTip(QStringLiteral("line_band_p2"));
+    p2Item->setZValue(zValue + 2.0);
+    p2Item->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+    p2Item->setAcceptedMouseButtons(Qt::NoButton);
+    items->append(p2Item);
+}
+
+void FrameViewHelper::addOverlayItem(QGraphicsItem *item, qreal zValue)
+{
+    if (!item)
+        return;
+
+    item->setZValue(zValue);
+    m_overlayItems.append(item);
+}
+
+void FrameViewHelper::restoreImageSceneRect()
+{
+    if (m_scene)
+        m_scene->setSceneRect(m_imageRect);
+}

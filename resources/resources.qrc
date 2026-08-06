@@ -1,0 +1,95 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="styles/app.qss">../styles/app.qss</file>
+        <file alias="images/logo-mark.svg">images/logo-mark.svg</file>
+        <file alias="icons/add.svg">icons/add.svg</file>
+        <file alias="icons/arrow-down.svg">icons/arrow-down.svg</file>
+        <file alias="icons/camera.svg">icons/camera.svg</file>
+        <file alias="icons/close.svg">icons/close.svg</file>
+        <file alias="icons/comm.svg">icons/comm.svg</file>
+        <file alias="icons/compare.svg">icons/compare.svg</file>
+        <file alias="icons/circle-spin-plus.svg">icons/circle-spin-plus.svg</file>
+        <file alias="icons/circle-spin-minus.svg">icons/circle-spin-minus.svg</file>
+        <file alias="icons/device.svg">icons/device.svg</file>
+        <file alias="icons/delete-outline.svg">icons/delete-outline.svg</file>
+        <file alias="icons/delete-all-tools.svg">icons/delete-all-tools.svg</file>
+        <file alias="icons/eye.svg">icons/eye.svg</file>
+        <file alias="icons/external-link.svg">icons/external-link.svg</file>
+        <file alias="icons/export-output.svg">icons/export-output.svg</file>
+        <file alias="icons/fit.svg">icons/fit.svg</file>
+        <file alias="icons/fullscreen.svg">icons/fullscreen.svg</file>
+        <file alias="icons/grid.svg">icons/grid.svg</file>
+        <file alias="icons/global-search.svg">icons/global-search.svg</file>
+        <file alias="icons/roi-rectangle.svg">icons/roi-rectangle.svg</file>
+        <file alias="icons/roi-circle.svg">icons/roi-circle.svg</file>
+        <file alias="icons/roi-polygon.svg">icons/roi-polygon.svg</file>
+        <file alias="icons/io.svg">icons/io.svg</file>
+        <file alias="icons/lock.svg">icons/lock.svg</file>
+        <file alias="icons/measure.svg">icons/measure.svg</file>
+        <file alias="icons/monitor.svg">icons/monitor.svg</file>
+        <file alias="icons/plan.svg">icons/plan.svg</file>
+        <file alias="icons/play.svg">icons/play.svg</file>
+        <file alias="icons/refresh.svg">icons/refresh.svg</file>
+        <file alias="icons/reference-active.svg">icons/reference-active.svg</file>
+        <file alias="icons/reference.svg">icons/reference.svg</file>
+        <file alias="icons/save-as.svg">icons/save-as.svg</file>
+        <file alias="icons/save.svg">icons/save.svg</file>
+        <file alias="icons/settings.svg">icons/settings.svg</file>
+        <file alias="icons/settings-dark.svg">icons/settings-dark.svg</file>
+        <file alias="icons/sliders-active.svg">icons/sliders-active.svg</file>
+        <file alias="icons/sliders.svg">icons/sliders.svg</file>
+        <file alias="icons/stop.svg">icons/stop.svg</file>
+        <file alias="icons/tool.svg">icons/tool.svg</file>
+        <file alias="icons/tool-step.svg">icons/tool-step.svg</file>
+        <file alias="icons/toggle-off.svg">icons/toggle-off.svg</file>
+        <file alias="icons/toggle-on.svg">icons/toggle-on.svg</file>
+        <file alias="icons/trash.svg">icons/trash.svg</file>
+        <file alias="icons/user.svg">icons/user.svg</file>
+        <file alias="icons/output-active.svg">icons/output-active.svg</file>
+        <file alias="icons/output.svg">icons/output.svg</file>
+        <file alias="icons/copy.svg">icons/copy.svg</file>
+        <file alias="icons/zoom.svg">icons/zoom.svg</file>
+        <file>resources.qrc</file>
+        <file>images/checkbox_checked_disabled.png</file>
+        <file>images/checkbox_checked_focus.png</file>
+        <file>images/checkbox_unchecked_disabled.png</file>
+        <file>images/checkbox_unchecked_focus.png</file>
+        <file>images/dangan_03.png</file>
+        <file>images/dangan_06.png</file>
+        <file>images/dangan_08.png</file>
+        <file>images/Lali_back_close.png</file>
+        <file>images/Lali_back_open.png</file>
+        <file>images/Lali_close.png</file>
+        <file>images/Lali_close_l.png</file>
+        <file>images/Lali_color_clear.png</file>
+        <file>images/Lali_color_start.png</file>
+        <file>images/Lali_config.png</file>
+        <file>images/Lali_config_select.png</file>
+        <file>images/Lali_detect.png</file>
+        <file>images/Lali_detect_select.png</file>
+        <file>images/Lali_down_arrow.png</file>
+        <file>images/Lali_ng.png</file>
+        <file>images/Lali_ok.png</file>
+        <file>images/Lali_open.png</file>
+        <file>images/Lali_record.png</file>
+        <file>images/Lali_record_select.png</file>
+        <file>images/Link_Connected.png</file>
+        <file>images/Link_Disconnect.png</file>
+        <file>images/LoggedIn.png</file>
+        <file>images/Login.png</file>
+        <file>images/LOGO.png</file>
+        <file>images/my_checkbox_checked.png</file>
+        <file>images/my_checkbox_unchecked.png</file>
+        <file>images/NotLogIn.png</file>
+        <file>images/Triangle_Down.png</file>
+        <file>images/WIFI.png</file>
+        <file>images/WIFI_Connected.png</file>
+        <file>images/WIFI_Disconnect.png</file>
+        <file>fonts/ALIMAMASHUHEITI-BOLD.OTF</file>
+        <file>images/home_03.png</file>
+        <file>images/home_07.png</file>
+        <file>images/home_10.png</file>
+        <file>images/home_15.png</file>
+        <file>images/home_17.png</file>
+    </qresource>
+</RCC>
