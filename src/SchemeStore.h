@@ -26,6 +26,7 @@ struct SchemeState
     ReferencePositionCorrectionConfig referencePositionCorrection;
     QVector<ToolConfig> toolConfigs;
     QMap<QString, ToolPreviewSnapshot> referencePreviewSnapshots;
+    QJsonObject quickCalibrationConfig;
     QJsonObject outputConfig;
     QDateTime updatedAt;
 };
@@ -64,6 +65,7 @@ public:
     void setSchemeName(const QString &schemeName);
     void setToolConfigs(const QVector<ToolConfig> &configs,
                         const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
+    void setQuickCalibrationConfig(const QJsonObject &quickCalibrationConfig);
     void setOutputConfig(const QJsonObject &outputConfig);
     void setReferencePositionCorrection(const ReferencePositionCorrectionConfig &config);
 

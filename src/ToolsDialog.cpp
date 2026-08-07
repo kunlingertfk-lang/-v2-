@@ -6,6 +6,7 @@
 #include <QColor>
 #include <QComboBox>
 #include <QEvent>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -19,6 +20,7 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QPushButton>
+#include <QSet>
 #include <QSize>
 #include <QSizePolicy>
 #include <QStyle>
@@ -54,6 +56,8 @@
 #include "RegisteredClassificationDetectionDialog.h"
 #include "SchemeStore.h"
 #include "ToolLibraryDialog.h"
+#include "calibration/CalibrationFileLoader.h"
+#include "calibration/CalibrationSourceFingerprint.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
@@ -78,6 +82,182 @@ void refreshWidgetStyle(QWidget *widget)
 QImage imageFromFrame(const cv::Mat &frame)
 {
     return MatImageConverter::matToDisplayImage(frame, QStringLiteral("ToolsDialog"));
+}
+
+const ToolConfig *toolById(const QVector<ToolConfig> &tools,
+                           const QString &toolId)
+{
+    for (const ToolConfig &tool : tools) {
+        if (tool.toolId == toolId)
+            return &tool;
+    }
+    return nullptr;
+}
+
+bool validateGeneratedCalibrationTarget(
+        const ToolConfig &target,
+        const QVector<ToolConfig> &tools,
+        const QMap<QString, ToolPreviewSnapshot> &snapshots,
+        const QJsonObject &expectedFingerprint,
+        QString *errorMessage)
+{
+    if (expectedFingerprint.isEmpty()
+            || expectedFingerprint.value(QStringLiteral("mode")).toString()
+               == QStringLiteral("manual")) {
+        return true;
+    }
+    QString invalidField;
+    if (!CalibrationSourceFingerprint::isComplete(expectedFingerprint,
+                                                   &invalidField)) {
+        if (errorMessage) {
+            *errorMessage = QObject::tr("生成的标定文件来源指纹无效：%1")
+                    .arg(invalidField);
+        }
+        return false;
+    }
+
+    const QJsonObject transform = target.params.value(
+                QStringLiteral("calibrationTransform")).toObject();
+    const QJsonObject xBinding = transform.value(QStringLiteral("inputX")).toObject();
+    const QJsonObject yBinding = transform.value(QStringLiteral("inputY")).toObject();
+    const QJsonObject angleBinding = transform.value(
+                QStringLiteral("inputAngle")).toObject();
+    const QString inputProducerId = xBinding.value(
+                QStringLiteral("producerId")).toString().trimmed();
+    if (xBinding.value(QStringLiteral("mode")).toString()
+            != QStringLiteral("binding")
+            || yBinding.value(QStringLiteral("mode")).toString()
+               != QStringLiteral("binding")
+            || angleBinding.value(QStringLiteral("mode")).toString()
+               != QStringLiteral("binding")
+            || inputProducerId.isEmpty()
+            || yBinding.value(QStringLiteral("producerId")).toString()
+               != inputProducerId
+            || angleBinding.value(QStringLiteral("producerId")).toString()
+               != inputProducerId) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("目标 %1 未绑定唯一完整的 X/Y/Angle 来源")
+                    .arg(target.displayName);
+        return false;
+    }
+
+    const ToolConfig *inputProducer = toolById(tools, inputProducerId);
+    if (!inputProducer || !inputProducer->enabled) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("目标 %1 的坐标来源不存在或已禁用")
+                    .arg(target.displayName);
+        return false;
+    }
+
+    const QJsonObject outputContract = expectedFingerprint.value(
+                QStringLiteral("outputContract")).toObject();
+    const QString expectedX = outputContract.value(QStringLiteral("x"))
+            .toString(QStringLiteral("x"));
+    const QString expectedY = outputContract.value(QStringLiteral("y"))
+            .toString(QStringLiteral("y"));
+    const QString expectedAngle = outputContract.value(QStringLiteral("angle"))
+            .toString(QStringLiteral("angle"));
+    const ToolConfig *effectiveProducer = inputProducer;
+    if (inputProducer->toolType == ToolType::TemplateLocation) {
+        if (xBinding.value(QStringLiteral("outputKey")).toString() != expectedX
+                || yBinding.value(QStringLiteral("outputKey")).toString() != expectedY
+                || angleBinding.value(QStringLiteral("outputKey")).toString()
+                   != expectedAngle) {
+            if (errorMessage)
+                *errorMessage = QObject::tr("目标 %1 的输出字段与标定采样字段不一致")
+                        .arg(target.displayName);
+            return false;
+        }
+    } else if (inputProducer->toolType == ToolType::PositionCorrection) {
+        if (xBinding.value(QStringLiteral("outputKey")).toString()
+                != QStringLiteral("runPose.x")
+                || yBinding.value(QStringLiteral("outputKey")).toString()
+                   != QStringLiteral("runPose.y")
+                || angleBinding.value(QStringLiteral("outputKey")).toString()
+                   != QStringLiteral("runPose.angleDeg")) {
+            if (errorMessage) {
+                *errorMessage = QObject::tr("目标 %1 的位置修正输出字段不完整或顺序错误")
+                        .arg(target.displayName);
+            }
+            return false;
+        }
+        const PositionRunPoseSource source = PositionCorrection::runPoseSourceFromConfig(
+                    inputProducer->params.value(
+                        QStringLiteral("positionCorrection")).toObject());
+        effectiveProducer = toolById(tools, source.producerId);
+        if (!source.valid || source.inconsistent || !effectiveProducer
+                || effectiveProducer->toolType != ToolType::TemplateLocation
+                || source.xKey != expectedX || source.yKey != expectedY
+                || source.angleKey != expectedAngle) {
+            if (errorMessage) {
+                *errorMessage = QObject::tr("目标 %1 的位置修正无法追溯到标定时模板来源")
+                        .arg(target.displayName);
+            }
+            return false;
+        }
+    } else {
+        if (errorMessage)
+            *errorMessage = QObject::tr("目标 %1 的输入不是模板定位或位置修正")
+                    .arg(target.displayName);
+        return false;
+    }
+
+    QJsonObject payload;
+    const QJsonObject params = effectiveProducer->params;
+    payload.insert(QStringLiteral("originMode"),
+                   params.value(QStringLiteral("originMode"))
+                   .toString(QStringLiteral("centroid")));
+    payload.insert(QStringLiteral("customOriginNormalized"),
+                   params.value(QStringLiteral("customOriginNormalized"))
+                   .toObject());
+    const ToolPreviewSnapshot sourceSnapshot = snapshots.value(
+                effectiveProducer->toolId);
+    QJsonObject snapshotPayload = sourceSnapshot.result.payload;
+    if (snapshotPayload.isEmpty())
+        snapshotPayload = QJsonObject::fromVariantMap(sourceSnapshot.payload);
+    const QString currentConfigSignature =
+            CalibrationSourceFingerprint::coordinateSourceConfigSignature(
+                *effectiveProducer);
+    const QString currentReferenceSignature =
+            CalibrationSourceFingerprint::imageSignature(
+                ReferenceImageProvider::instance().referenceFrame());
+    const bool snapshotFresh = sourceSnapshot.valid
+            && snapshotPayload.value(QStringLiteral(
+                                         "coordinateSourceConfigSignature"))
+               .toString() == currentConfigSignature
+            && !currentReferenceSignature.isEmpty()
+            && snapshotPayload.value(QStringLiteral(
+                                         "coordinateSourceReferenceSignature"))
+               .toString() == currentReferenceSignature;
+    QString modelSignature = snapshotFresh
+            ? snapshotPayload.value(QStringLiteral("modelSignature"))
+              .toString().trimmed()
+            : QString();
+    if (modelSignature.isEmpty()) {
+        modelSignature = expectedFingerprint.value(
+                    QStringLiteral("modelSignature")).toString();
+    }
+    payload.insert(QStringLiteral("modelSignature"), modelSignature);
+    payload.insert(QStringLiteral("coordinateSourceConfigSignature"),
+                   currentConfigSignature);
+    payload.insert(QStringLiteral("coordinateSourceReferenceSignature"),
+                   currentReferenceSignature);
+    const QJsonObject actualFingerprint = CalibrationSourceFingerprint::makeFingerprint(
+                effectiveProducer->toolId,
+                effectiveProducer->toolType,
+                payload,
+                outputContract);
+    QString mismatchField;
+    if (!CalibrationSourceFingerprint::matches(expectedFingerprint,
+                                               actualFingerprint,
+                                               &mismatchField)) {
+        if (errorMessage) {
+            *errorMessage = QObject::tr("目标 %1 与标定来源不兼容（%2）")
+                    .arg(target.displayName, mismatchField);
+        }
+        return false;
+    }
+    return true;
 }
 
 //当前实时图
@@ -446,7 +626,10 @@ ToolsDialog::ToolsDialog(QWidget *parent)
     connect(&ReferenceImageProvider::instance(),
             &ReferenceImageProvider::referenceFrameChanged,
             this,
-            [this](const QImage &) { refreshReferencePreview(); });
+            [this](const QImage &) {
+        m_toolPreviewSnapshots.clear();
+        refreshReferencePreview();
+    });
     QString error;
     if (SchemeStore::instance().ensureLoaded(&error)) {
         const SchemeState &scheme = SchemeStore::instance().currentScheme();
@@ -610,18 +793,162 @@ void ToolsDialog::openQuickCalibration()
 {
     if (!commitToolStateToScheme(true))
         return;
+    SchemeStore &store = SchemeStore::instance();
+    const QJsonObject previousQuickConfiguration =
+            store.currentScheme().quickCalibrationConfig;
     QuickCalibrationWizard wizard(this);
-    wizard.setProducerTools(m_toolConfigs, m_toolPreviewSnapshots);
+    wizard.setProducerTools(m_toolConfigs, m_toolPreviewSnapshots,
+                            m_selectedToolIndex);
+    wizard.setPersistentConfiguration(previousQuickConfiguration);
     wizard.setPreviewImage(currentReferenceImage());
     PlanDialogUtils::fitDialogToScreen(&wizard, this, 24);
     PlanDialogUtils::centerWindowOnScreen(&wizard, this, 24);
     wizard.exec();
-    if (!wizard.generatedFilePath().isEmpty()) {
-        QMessageBox::information(this,
-                                 tr("快速标定"),
-                                 tr("标定文件已生成，并已进入当前方案的标定资产列表：\n%1")
-                                 .arg(wizard.generatedFilePath()));
+
+    store.setQuickCalibrationConfig(wizard.persistentConfiguration());
+    const QString generatedPath = wizard.generatedFilePath();
+    const QStringList targetIds = wizard.targetCalibrationTransformIds();
+    QString saveError;
+    if (!generatedPath.isEmpty() && !targetIds.isEmpty()) {
+        QStringList appliedNames;
+        if (!applyGeneratedCalibrationToTransforms(
+                    generatedPath, targetIds, &appliedNames, &saveError)) {
+            store.setQuickCalibrationConfig(previousQuickConfiguration);
+            QMessageBox::warning(
+                        this, tr("标定文件未应用"),
+                        tr("XML 已生成，但目标标定转换更新失败：%1\n%2")
+                        .arg(saveError, generatedPath));
+            return;
+        }
+        QMessageBox::information(
+                    this, tr("快速标定"),
+                    tr("标定文件已生成并应用到：%1\n%2")
+                    .arg(appliedNames.join(QStringLiteral("、")), generatedPath));
+        return;
     }
+
+    if (!store.saveCurrentScheme(&saveError)) {
+        store.setQuickCalibrationConfig(previousQuickConfiguration);
+        QMessageBox::warning(this, tr("快速标定配置保存失败"), saveError);
+        return;
+    }
+    if (!generatedPath.isEmpty()) {
+        QMessageBox::information(
+                    this, tr("快速标定"),
+                    tr("标定文件已生成；当前未选择目标标定转换，运行配置未改变：\n%1")
+                    .arg(generatedPath));
+    }
+}
+
+bool ToolsDialog::applyGeneratedCalibrationToTransforms(
+        const QString &filePath,
+        const QStringList &targetToolIds,
+        QStringList *appliedToolNames,
+        QString *errorMessage)
+{
+    if (appliedToolNames)
+        appliedToolNames->clear();
+    if (errorMessage)
+        errorMessage->clear();
+    const QString normalizedPath = QFileInfo(filePath).absoluteFilePath();
+    const QFileInfo fileInfo(normalizedPath);
+    if (!fileInfo.exists() || !fileInfo.isFile()) {
+        if (errorMessage)
+            *errorMessage = tr("标定文件不存在：%1").arg(normalizedPath);
+        return false;
+    }
+
+    QSet<QString> requestedIds;
+    for (const QString &id : targetToolIds) {
+        const QString normalizedId = id.trimmed();
+        if (!normalizedId.isEmpty())
+            requestedIds.insert(normalizedId);
+    }
+    if (requestedIds.isEmpty())
+        return true;
+
+    QMap<QString, int> targetIndexes;
+    for (int index = 0; index < m_toolConfigs.size(); ++index) {
+        const ToolConfig &config = m_toolConfigs.at(index);
+        if (requestedIds.contains(config.toolId))
+            targetIndexes.insert(config.toolId, index);
+    }
+    if (targetIndexes.size() != requestedIds.size()) {
+        if (errorMessage)
+            *errorMessage = tr("部分目标工具不存在或已被删除");
+        return false;
+    }
+    for (auto it = targetIndexes.constBegin(); it != targetIndexes.constEnd(); ++it) {
+        if (m_toolConfigs.at(it.value()).toolType != ToolType::CalibrationTransform) {
+            if (errorMessage)
+                *errorMessage = tr("目标 %1 不是标定转换工具").arg(it.key());
+            return false;
+        }
+    }
+
+    ProjectXmlCalibrationLoader projectLoader;
+    if (projectLoader.canLoad(normalizedPath)) {
+        CalibrationModel generatedModel;
+        QString loadError;
+        if (!projectLoader.load(normalizedPath, &generatedModel, &loadError)) {
+            if (errorMessage) {
+                *errorMessage = loadError.isEmpty()
+                        ? tr("生成的标定文件无法读取") : loadError;
+            }
+            return false;
+        }
+        const QJsonObject expectedFingerprint = generatedModel.imageBinding.value(
+                    QStringLiteral("coordinateSourceFingerprint")).toObject();
+        for (auto it = targetIndexes.constBegin();
+             it != targetIndexes.constEnd(); ++it) {
+            QString compatibilityError;
+            if (!validateGeneratedCalibrationTarget(
+                        m_toolConfigs.at(it.value()),
+                        m_toolConfigs,
+                        m_toolPreviewSnapshots,
+                        expectedFingerprint,
+                        &compatibilityError)) {
+                if (errorMessage)
+                    *errorMessage = compatibilityError;
+                return false;
+            }
+        }
+    }
+
+    const QVector<ToolConfig> configsBefore = m_toolConfigs;
+    const QMap<QString, ToolPreviewSnapshot> snapshotsBefore =
+            m_toolPreviewSnapshots;
+    const int selectedIndexBefore = m_selectedToolIndex;
+    QStringList names;
+    for (auto it = targetIndexes.constBegin(); it != targetIndexes.constEnd(); ++it) {
+        ToolConfig &config = m_toolConfigs[it.value()];
+        QJsonObject transform = config.params
+                .value(QStringLiteral("calibrationTransform")).toObject();
+        QJsonArray files = transform.value(QStringLiteral("calibrationFiles")).toArray();
+        if (!files.contains(normalizedPath))
+            files.append(normalizedPath);
+        transform.insert(QStringLiteral("version"),
+                         transform.value(QStringLiteral("version")).toInt(2));
+        transform.insert(QStringLiteral("calibrationFiles"), files);
+        transform.insert(QStringLiteral("activeCalibrationFile"), normalizedPath);
+        config.params.insert(QStringLiteral("calibrationTransform"), transform);
+        config.summary = fileInfo.fileName();
+        m_toolPreviewSnapshots.remove(config.toolId);
+        names.append(toolDisplayName(config));
+    }
+
+    if (!commitToolStateToScheme(true)) {
+        restoreToolState(configsBefore, snapshotsBefore, selectedIndexBefore);
+        if (errorMessage)
+            *errorMessage = tr("方案保存或主运行态同步失败");
+        return false;
+    }
+    refreshToolList();
+    if (selectedIndexBefore >= 0 && selectedIndexBefore < m_toolConfigs.size())
+        selectTool(selectedIndexBefore);
+    if (appliedToolNames)
+        *appliedToolNames = names;
+    return true;
 }
 
 void ToolsDialog::refreshSchemeHeader()
@@ -1102,7 +1429,29 @@ void ToolsDialog::storePreviewSnapshot(const ToolConfig &config,
         return;
 
     if (!snapshot.valid) {
-        if (!keepExistingWhenInvalid)
+        bool keepExisting = keepExistingWhenInvalid;
+        if (keepExisting && config.toolType == ToolType::TemplateLocation) {
+            const ToolPreviewSnapshot existing =
+                    m_toolPreviewSnapshots.value(config.toolId);
+            QJsonObject payload = existing.result.payload;
+            if (payload.isEmpty())
+                payload = QJsonObject::fromVariantMap(existing.payload);
+            const QString currentConfigSignature =
+                    CalibrationSourceFingerprint::coordinateSourceConfigSignature(
+                        config);
+            const QString currentReferenceSignature =
+                    CalibrationSourceFingerprint::imageSignature(
+                        ReferenceImageProvider::instance().referenceFrame());
+            keepExisting = existing.valid
+                    && payload.value(QStringLiteral(
+                                         "coordinateSourceConfigSignature"))
+                       .toString() == currentConfigSignature
+                    && !currentReferenceSignature.isEmpty()
+                    && payload.value(QStringLiteral(
+                                         "coordinateSourceReferenceSignature"))
+                       .toString() == currentReferenceSignature;
+        }
+        if (!keepExisting)
             m_toolPreviewSnapshots.remove(config.toolId);
         return;
     }

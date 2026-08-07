@@ -53,6 +53,39 @@ bool hasNonCollinearTriple(const QVector<CalibrationSample> &samples, bool pixel
     return false;
 }
 
+QVector<QPointF> convexValidRegion(const HTuple &rows, const HTuple &columns)
+{
+    HObject sampleContour;
+    HObject hullContour;
+    HTuple hullRows;
+    HTuple hullColumns;
+    GenContourPolygonXld(&sampleContour, rows, columns);
+    ShapeTransXld(sampleContour, &hullContour, HTuple("convex"));
+    GetContourXld(hullContour, &hullRows, &hullColumns);
+
+    QVector<QPointF> result;
+    const Hlong pointCount = std::min(hullRows.Length(), hullColumns.Length());
+    result.reserve(static_cast<int>(pointCount));
+    constexpr double kSamePointTolerance = 1e-9;
+    for (Hlong index = 0; index < pointCount; ++index) {
+        const QPointF point(hullColumns[index].D(), hullRows[index].D());
+        if (!result.isEmpty()
+                && std::hypot(result.constLast().x() - point.x(),
+                              result.constLast().y() - point.y())
+                   <= kSamePointTolerance) {
+            continue;
+        }
+        result.append(point);
+    }
+    if (result.size() > 1
+            && std::hypot(result.constFirst().x() - result.constLast().x(),
+                          result.constFirst().y() - result.constLast().y())
+               <= kSamePointTolerance) {
+        result.removeLast();
+    }
+    return result;
+}
+
 } // namespace
 
 CalibrationSolveResult CalibrationSolver::solveNPoint(
@@ -143,7 +176,11 @@ CalibrationSolveResult CalibrationSolver::solveNPoint(
                         std::hypot(verifiedColumns[i].D() - sample.column,
                                    verifiedRows[i].D() - sample.row));
             model.samples.append(sample);
-            model.validRegion.append(QPointF(sample.column, sample.row));
+        }
+        model.validRegion = convexValidRegion(rows, columns);
+        if (model.validRegion.size() < 3) {
+            return failure(QStringLiteral("CAL-SOL-001"),
+                           QStringLiteral("HALCON未能生成有效的标定区域凸包"));
         }
         const double count = static_cast<double>(input.size());
         model.quality.meanError = sum / count;
@@ -161,6 +198,14 @@ CalibrationSolveResult CalibrationSolver::solveNPoint(
         model.methodData.insert(QStringLiteral("sampleCount"), input.size());
         model.methodData.insert(QStringLiteral("inverseRoundTripMaxPx"),
                                 inverseRoundTripMaxPx);
+        model.methodData.insert(QStringLiteral("validRegionType"),
+                                QStringLiteral("convex_hull"));
+        model.methodData.insert(QStringLiteral("validRegionSource"),
+                                QStringLiteral("translation_samples"));
+        model.methodData.insert(QStringLiteral("validRegionCoordinateSystem"),
+                                QStringLiteral("image_pixel_column_row"));
+        model.methodData.insert(QStringLiteral("validRegionPointCount"),
+                                model.validRegion.size());
 
         QString modelError;
         if (!model.isValid(&modelError))

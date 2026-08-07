@@ -64,6 +64,10 @@ QColor overlayColor(const ToolOverlay &overlay)
         return QColor(255, 122, 0);
     if (displayRole == QStringLiteral("template_location_origin"))
         return QColor(0, 210, 255);
+    if (displayRole == QStringLiteral("calibration_translation_path_pending"))
+        return QColor(255, 70, 70);
+    if (displayRole == QStringLiteral("calibration_translation_path_solved"))
+        return QColor(0, 210, 120);
 
     const QString label = overlay.label.trimmed().toLower();
     if (label == QStringLiteral("roi") || label == QStringLiteral("detect_roi"))

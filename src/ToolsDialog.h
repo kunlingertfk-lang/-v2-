@@ -69,6 +69,11 @@ private:
     void connectNavigation();
     void refreshSchemeHeader();
     bool commitToolStateToScheme(bool saveToDisk);
+    bool applyGeneratedCalibrationToTransforms(
+            const QString &filePath,
+            const QStringList &targetToolIds,
+            QStringList *appliedToolNames,
+            QString *errorMessage);
     void restoreToolState(const QVector<ToolConfig> &configs,
                           const QMap<QString, ToolPreviewSnapshot> &snapshots,
                           int selectedIndex);

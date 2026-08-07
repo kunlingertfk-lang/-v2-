@@ -450,6 +450,13 @@ MainWindow::MainWindow(QWidget *parent)
             [](const QString &message) {
                 qWarning() << "[MainWindow]" << message;
             });
+    connect(&ReferenceImageProvider::instance(),
+            &ReferenceImageProvider::referenceFrameChanged,
+            this,
+            [this](const QImage &) {
+        m_referencePreviewSnapshots.clear();
+        refreshLivePreview();
+    });
     refreshLivePreview();
     QTimer::singleShot(0, this, &MainWindow::ensureCameraRunning);
 }

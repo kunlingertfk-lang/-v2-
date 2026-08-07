@@ -1,6 +1,7 @@
 #include "tooladapters/CalibrationTransformAdapter.h"
 
 #include "calibration/CalibrationFileLoader.h"
+#include "calibration/CalibrationSourceFingerprint.h"
 
 #include <QFileInfo>
 #include <QJsonValue>
@@ -127,6 +128,7 @@ bool resolveMainInputs(const QJsonObject &params,
                        double *inputAngle,
                        QString *producerId,
                        ToolType *producerType,
+                       QJsonObject *producerPayload,
                        QString *status,
                        QString *error)
 {
@@ -243,7 +245,58 @@ bool resolveMainInputs(const QJsonObject &params,
         *producerId = sourceId;
     if (producerType)
         *producerType = sourceType;
+    if (producerPayload)
+        *producerPayload = payload;
     return true;
+}
+
+QJsonObject effectiveCoordinateSourceFingerprint(
+        const QString &inputProducerId,
+        ToolType inputProducerType,
+        const QJsonObject &inputProducerPayload,
+        const QJsonObject &directOutputContract,
+        QString *error)
+{
+    QString effectiveProducerId = inputProducerId;
+    ToolType effectiveProducerType = inputProducerType;
+    if (inputProducerType == ToolType::PositionCorrection) {
+        effectiveProducerId = inputProducerPayload
+                .value(QStringLiteral("poseProducerId")).toString().trimmed();
+        effectiveProducerType = ToolType::TemplateLocation;
+        if (effectiveProducerId.isEmpty()) {
+            if (error) {
+                *error = QStringLiteral(
+                            "位置修正结果缺少 poseProducerId，无法验证标定来源");
+            }
+            return QJsonObject();
+        }
+    }
+    QJsonObject outputContract = directOutputContract;
+    if (inputProducerType == ToolType::PositionCorrection) {
+        const QJsonObject propagatedContract = inputProducerPayload.value(
+                    QStringLiteral("coordinateSourceOutputContract")).toObject();
+        if (!propagatedContract.isEmpty())
+            outputContract = propagatedContract;
+    }
+    return CalibrationSourceFingerprint::makeFingerprint(
+                effectiveProducerId,
+                effectiveProducerType,
+                inputProducerPayload,
+                outputContract);
+}
+
+void annotateBindingValidation(ToolResult *result,
+                               bool verified,
+                               const QString &status,
+                               const QString &warning = QString())
+{
+    if (!result)
+        return;
+    result->payload.insert(QStringLiteral("calibrationBindingVerified"), verified);
+    result->payload.insert(QStringLiteral("calibrationBindingStatus"), status);
+    result->payload.insert(QStringLiteral("calibrationSourceValidation"), status);
+    if (!warning.trimmed().isEmpty())
+        result->payload.insert(QStringLiteral("calibrationBindingWarning"), warning);
 }
 
 bool singleProducerBinding(const QJsonObject &group,
@@ -358,6 +411,7 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
     QString inputStatus;
     QString inputProducerId;
     ToolType inputProducerType = ToolType::Unknown;
+    QJsonObject inputProducerPayload;
     if (!singleProducerBinding(params.value(QStringLiteral("calibrationPose")).toObject(),
                                       {QStringLiteral("x"), QStringLiteral("y"),
                                        QStringLiteral("joint0Angle"), QStringLiteral("joint1Angle")},
@@ -371,11 +425,123 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
     if (!resolveMainInputs(params, request,
                            &inputX, &inputY, &inputAngle,
                            &inputProducerId, &inputProducerType,
+                           &inputProducerPayload,
                            &inputStatus, &inputError)) {
         return failure(config,
                        inputStatus.isEmpty() ? QStringLiteral("input_binding_invalid")
                                              : inputStatus,
                        inputError);
+    }
+
+    bool calibrationBindingVerified = false;
+    QString calibrationBindingStatus = QStringLiteral("legacy_unverifiable");
+    QString calibrationBindingWarning = QStringLiteral(
+                "该标定文件未记录坐标来源指纹，已执行转换，但无法确认模板原点或配置是否发生变化");
+    QJsonObject expectedSourceFingerprint = model.imageBinding
+            .value(QStringLiteral("coordinateSourceFingerprint")).toObject();
+    if (expectedSourceFingerprint.isEmpty()) {
+        expectedSourceFingerprint = fingerprint
+                .value(QStringLiteral("coordinateSourceFingerprint")).toObject();
+    }
+    if (!expectedSourceFingerprint.isEmpty()) {
+        const QString expectedSignature = expectedSourceFingerprint
+                .value(QStringLiteral("coordinateSourceSignature"))
+                .toString().trimmed();
+        const QString expectedMode = expectedSourceFingerprint
+                .value(QStringLiteral("mode")).toString().trimmed();
+        if (expectedMode == QStringLiteral("manual") && expectedSignature.isEmpty()) {
+            calibrationBindingStatus = QStringLiteral("manual_unverifiable");
+            calibrationBindingWarning = QStringLiteral(
+                        "该标定文件由手动坐标生成，无法验证当前模板定位来源");
+        } else if (expectedSignature.isEmpty()
+                   || expectedSignature
+                      != CalibrationSourceFingerprint::coordinateSourceSignature(
+                          expectedSourceFingerprint)
+                   || expectedSourceFingerprint
+                      .value(QStringLiteral("producerId")).toString().trimmed().isEmpty()
+                   || expectedSourceFingerprint
+                      .value(QStringLiteral("producerType")).toString().trimmed().isEmpty()
+                   || expectedSourceFingerprint
+                      .value(QStringLiteral("outputContract")).toObject().isEmpty()
+                   || expectedSourceFingerprint
+                      .value(QStringLiteral("originMode")).toString().trimmed().isEmpty()
+                   || expectedSourceFingerprint
+                      .value(QStringLiteral("customOriginNormalized")).toObject().isEmpty()
+                   || expectedSourceFingerprint
+                      .value(QStringLiteral("modelSignature")).toString().trimmed().isEmpty()
+                   || expectedSourceFingerprint
+                      .value(QStringLiteral("coordinateSourceConfigSignature"))
+                      .toString().trimmed().isEmpty()) {
+            ToolResult result = failure(
+                        config,
+                        QStringLiteral("calibration_stale"),
+                        QStringLiteral("标定文件的坐标来源指纹不完整，需重新标定"));
+            annotateBindingValidation(&result, false,
+                                      QStringLiteral("fingerprint_invalid"));
+            result.payload.insert(QStringLiteral("expectedCoordinateSourceFingerprint"),
+                                  expectedSourceFingerprint);
+            return result;
+        } else {
+            QString fingerprintError;
+            QJsonObject directOutputContract =
+                    CalibrationSourceFingerprint::templateOutputContract();
+            directOutputContract.insert(
+                        QStringLiteral("x"),
+                        params.value(QStringLiteral("inputX")).toObject()
+                        .value(QStringLiteral("outputKey")).toString());
+            directOutputContract.insert(
+                        QStringLiteral("y"),
+                        params.value(QStringLiteral("inputY")).toObject()
+                        .value(QStringLiteral("outputKey")).toString());
+            directOutputContract.insert(
+                        QStringLiteral("angle"),
+                        params.value(QStringLiteral("inputAngle")).toObject()
+                        .value(QStringLiteral("outputKey")).toString());
+            const QJsonObject actualSourceFingerprint =
+                    effectiveCoordinateSourceFingerprint(
+                        inputProducerId,
+                        inputProducerType,
+                        inputProducerPayload,
+                        directOutputContract,
+                        &fingerprintError);
+            QString mismatchField;
+            if (actualSourceFingerprint.isEmpty()
+                    || !CalibrationSourceFingerprint::matches(
+                        expectedSourceFingerprint,
+                        actualSourceFingerprint,
+                        &mismatchField)) {
+                ToolResult result = failure(
+                            config,
+                            QStringLiteral("calibration_stale"),
+                            fingerprintError.isEmpty()
+                            ? QStringLiteral("当前坐标来源与标定时不一致（%1），需重新标定")
+                              .arg(mismatchField.isEmpty()
+                                   ? QStringLiteral("unknown") : mismatchField)
+                            : fingerprintError);
+                annotateBindingValidation(&result, false,
+                                          QStringLiteral("fingerprint_mismatch"));
+                result.payload.insert(QStringLiteral("calibrationBindingMismatchField"),
+                                      mismatchField);
+                result.payload.insert(QStringLiteral("expectedCoordinateSourceFingerprint"),
+                                      expectedSourceFingerprint);
+                result.payload.insert(QStringLiteral("actualCoordinateSourceFingerprint"),
+                                      actualSourceFingerprint);
+                return result;
+            }
+            if (expectedSourceFingerprint.contains(
+                        QStringLiteral("referenceImageSignature"))) {
+                calibrationBindingVerified = true;
+                calibrationBindingStatus = QStringLiteral("verified");
+                calibrationBindingWarning.clear();
+            } else {
+                calibrationBindingVerified = false;
+                calibrationBindingStatus =
+                        QStringLiteral("reference_unverifiable");
+                calibrationBindingWarning = QStringLiteral(
+                            "该坐标来源签名来自兼容旧版，未记录基准图内容签名；"
+                            "已核对模板原点与配置，但无法完整验证基准图");
+            }
+        }
     }
     CalibrationTransformPose calibrationPose;
     CalibrationTransformPose runPose;
@@ -413,5 +579,9 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
     result.payload.insert(QStringLiteral("inputProducerId"), inputProducerId);
     result.payload.insert(QStringLiteral("inputProducerType"),
                           toolTypeToString(inputProducerType));
+    annotateBindingValidation(&result,
+                              calibrationBindingVerified,
+                              calibrationBindingStatus,
+                              calibrationBindingWarning);
     return result;
 }

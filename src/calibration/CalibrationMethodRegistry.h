@@ -4,6 +4,7 @@
 #include "calibration/CalibrationSolver.h"
 
 #include <QJsonObject>
+#include <QLineF>
 #include <QWidget>
 #include <QString>
 #include <QVector>
@@ -57,9 +58,13 @@ public:
                                          double angleDeg) = 0;
     virtual QString captureImageProducerId() const = 0;
     virtual bool captureCurrentSample(QString *errorMessage = nullptr) = 0;
+    virtual QVector<QLineF> completedTranslationSegments() const { return {}; }
+    virtual int completedTranslationSampleCount() const { return 0; }
+    virtual int translationSampleCount() const { return 0; }
 
 signals:
     void sampleStateChanged(const QString &text, bool ok);
+    void sampleDataChanged();
 };
 
 class ICalibrationMethod

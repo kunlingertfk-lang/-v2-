@@ -1,5 +1,6 @@
 #include "tooladapters/PositionCorrectionAdapter.h"
 
+#include "calibration/CalibrationSourceFingerprint.h"
 #include "toolcore/PositionCorrection.h"
 
 #include <QJsonArray>
@@ -277,6 +278,8 @@ ToolResult PositionCorrectionAdapter::run(const ToolRequest &request)
                           request.runtimeContext.value(QStringLiteral("frameId")).toString());
     result.payload.insert(QStringLiteral("frameMeta"),
                           request.runtimeContext.value(QStringLiteral("frameMeta")).toObject());
+    CalibrationSourceFingerprint::propagateIdentityFields(producerPayload,
+                                                           &result.payload);
     const ToolResult producerToolResult = ToolResult::fromJson(producerResult);
     for (ToolOverlay overlay : producerToolResult.overlays) {
         if (overlay.label == QStringLiteral("match_result")) {

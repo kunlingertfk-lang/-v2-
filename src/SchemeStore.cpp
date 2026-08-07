@@ -575,6 +575,7 @@ SchemeState SchemeStore::createEmptyScheme(const QString &schemeName, QString *e
     state.referencePositionCorrection = ReferencePositionCorrectionConfig();
     state.toolConfigs.clear();
     state.referencePreviewSnapshots.clear();
+    state.quickCalibrationConfig = QJsonObject();
     state.outputConfig = QJsonObject();
     state.updatedAt = QDateTime::currentDateTime();
 
@@ -724,6 +725,16 @@ void SchemeStore::setOutputConfig(const QJsonObject &outputConfig)
     m_currentScheme.updatedAt = QDateTime::currentDateTime();
 }
 
+void SchemeStore::setQuickCalibrationConfig(
+        const QJsonObject &quickCalibrationConfig)
+{
+    if (!ensureLoaded(nullptr))
+        return;
+
+    m_currentScheme.quickCalibrationConfig = quickCalibrationConfig;
+    m_currentScheme.updatedAt = QDateTime::currentDateTime();
+}
+
 void SchemeStore::setReferencePositionCorrection(
         const ReferencePositionCorrectionConfig &config)
 {
@@ -760,6 +771,10 @@ bool SchemeStore::setReferenceFrame(const cv::Mat &frame,
             : metadata.source;
     candidate.referenceInputMetadata =
             FrameInputMetadata::fromMat(normalizedFrame, source);
+    // Every reference-image preview/model is tied to the previous pixels.
+    // Keeping those snapshots would make source validation trust a stale
+    // TemplateLocation model after the reference image changes.
+    candidate.referencePreviewSnapshots.clear();
     candidate.updatedAt = QDateTime::currentDateTime();
 
     SchemeState savedState;
@@ -882,6 +897,8 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
                 json.value(QStringLiteral("referencePositionCorrection")).toObject());
     loaded.toolConfigs = toolConfigsFromJson(json.value(QStringLiteral("tools")).toArray());
     loaded.referencePreviewSnapshots = previewSnapshotsFromJson(json.value(QStringLiteral("previews")).toObject());
+    loaded.quickCalibrationConfig = json.value(
+                QStringLiteral("quickCalibration")).toObject();
     loaded.outputConfig = json.value(QStringLiteral("output")).toObject();
     loaded.updatedAt = QDateTime::fromString(json.value(QStringLiteral("updatedAt")).toString(), Qt::ISODate);
     if (!loaded.updatedAt.isValid())
@@ -991,6 +1008,8 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
                 PositionCorrection::referenceToJson(normalized.referencePositionCorrection));
     json.insert(QStringLiteral("tools"), toolConfigsToJson(normalized.toolConfigs));
     json.insert(QStringLiteral("previews"), previewSnapshotsToJson(normalized.referencePreviewSnapshots));
+    json.insert(QStringLiteral("quickCalibration"),
+                normalized.quickCalibrationConfig);
     json.insert(QStringLiteral("output"), normalized.outputConfig);
     json.insert(QStringLiteral("updatedAt"), QDateTime::currentDateTime().toString(Qt::ISODate));
 

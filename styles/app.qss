@@ -1,6 +1,8 @@
 QWidget {
-    color: #f3f5f7;
-    background: #2f323b;
+    /* Global foreground/background colors are intentionally disabled.
+       Dark surfaces must opt in through a page-scoped selector. */
+    /* color: #f3f5f7; */
+    /* background: #2f323b; */
     font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
     font-size: 14px;
 }
@@ -2272,6 +2274,23 @@ QDialog#CalibrationTransformDialog QFrame[panelRole="configCard"] {
     border-radius: 8px;
 }
 
+/* N-point calibration uses code-created QWidget content containers. Keep
+   those containers transparent so the light configuration card stays visible. */
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget,
+QDialog#QuickCalibrationWizard QWidget#nPointMovementCardContent,
+QDialog#QuickCalibrationWizard QWidget#nPointCalibrationParametersCardContent,
+QDialog#QuickCalibrationWizard QWidget#nPointCaptureSubscriptionWidget {
+    background: transparent;
+    color: #314968;
+    border: 0;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLabel[role="rowField"],
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLabel[role="cardHint"] {
+    background: transparent;
+    color: #314968;
+}
+
 QDialog#QuickCalibrationWizard QLabel,
 QDialog#CalibrationPointEditorDialog QLabel,
 QDialog#CalibrationTransformDialog QScrollArea QLabel,
@@ -2444,6 +2463,29 @@ QDialog#CalibrationTransformDialog QLabel#viewerCursorLabel {
 QDialog#CalibrationTransformDialog QGraphicsView#previewGraphicsView {
     background: #15171a;
     border: 0;
+}
+
+QDialog#CalibrationTransformDialog QFrame#viewerCanvasContainer,
+QDialog#CalibrationTransformDialog QWidget#conversionResultOverlay {
+    background: transparent;
+    border: 0;
+}
+
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: #edf1f5;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="ok"] {
+    color: #20c933;
+}
+
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="ng"] {
+    color: #ff2020;
 }
 
 QDialog#QuickCalibrationWizard QFrame#calibrationPreviewToolbar,

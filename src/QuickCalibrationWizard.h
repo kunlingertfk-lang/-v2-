@@ -38,8 +38,12 @@ public:
     explicit QuickCalibrationWizard(QWidget *parent = nullptr);
 
     QString generatedFilePath() const;
+    QStringList targetCalibrationTransformIds() const;
+    QJsonObject persistentConfiguration() const;
+    void setPersistentConfiguration(const QJsonObject &configuration);
     void setProducerTools(const QVector<ToolConfig> &tools,
-                          const QMap<QString, ToolPreviewSnapshot> &snapshots);
+                          const QMap<QString, ToolPreviewSnapshot> &snapshots,
+                          int selectedToolIndex = -1);
     void setPreviewImage(const QImage &image);
 
 private:
@@ -63,6 +67,11 @@ private:
     void advanceExternalImageAfterCapture();
     bool ensureMethodConfigWidget();
     void updatePreviewImage(const QImage &image);
+    void updateCalibrationOverlays();
+    bool calibrationResultPassed() const;
+    bool validateCoordinateSourceFingerprint(
+            const QJsonObject &fingerprint,
+            QString *errorMessage = nullptr) const;
     void importExternalImages();
     void addExternalImageFiles(const QStringList &filePaths);
     void showExternalImage(int index);
@@ -70,6 +79,17 @@ private:
     void removeCurrentExternalImage();
     void clearExternalImages();
     void updateImageModeUi();
+    void rebuildTargetTransformList(const QVector<ToolConfig> &tools,
+                                    int selectedToolIndex);
+    QString configurationTargetKey() const;
+    QString draftTargetKey() const;
+    QJsonObject communicationSettings() const;
+    void restoreCommunicationSettings(const QJsonObject &settings);
+    QString draftFilePath() const;
+    bool saveDraft(QString *errorMessage = nullptr);
+    bool restoreDraft(QString *errorMessage = nullptr);
+    void promptRestoreDraft();
+    void discardDraft();
 
     QStackedWidget *m_pages = nullptr;
     QButtonGroup *m_methodButtons = nullptr;
@@ -122,9 +142,13 @@ private:
     QLabel *m_qualityLabel = nullptr;
     QCheckBox *m_updateAfterGenerate = nullptr;
     QLineEdit *m_filePath = nullptr;
+    QListWidget *m_targetTransformList = nullptr;
+    QLabel *m_targetTransformHint = nullptr;
     CalibrationSolveResult m_solveResult;
+    QVector<ToolOverlay> m_currentLocationOverlays;
     QVector<QJsonObject> m_sessionLog;
     QMap<QString, ToolConfig> m_calibrationProducerConfigs;
+    QMap<QString, ToolConfig> m_targetTransformConfigs;
     QVector<CalibrationProducerSnapshot> m_calibrationProducerSnapshots;
     TemplateLocationAdapter m_captureTemplateLocationAdapter;
     ToolEngine m_captureToolEngine;
@@ -132,7 +156,19 @@ private:
     CalibrationCommunicationSession *m_communicationSession = nullptr;
     QString m_methodId = QStringLiteral("n_point");
     QString m_generatedFilePath;
+    QString m_lastSavedDraftPath;
+    QString m_configurationTargetToolId;
+    QJsonObject m_loadedPersistentConfiguration;
+    QJsonObject m_pendingMethodSettings;
+    QJsonObject m_lockedCoordinateSourceFingerprint;
     bool m_externalImageSequenceComplete = false;
+    bool m_draftRestoreHandled = false;
+    bool m_draftRestorePromptActive = false;
+    bool m_restoringDraft = false;
+    bool m_generatedFileCompleted = false;
+    bool m_draftPersistenceEnabled = false;
+    bool m_persistentConfigurationWritable = true;
+    QString m_persistentConfigurationError;
     qint64 m_lastCapturedCameraFrameIndex = -1;
     qint64 m_pendingCaptureCameraFrameIndex = -1;
     int m_step = 0;

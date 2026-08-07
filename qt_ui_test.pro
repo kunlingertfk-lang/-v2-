@@ -170,6 +170,7 @@ HEADERS += \
     src/toolcore/PositionCorrectionConsumer.h \
     src/toolcore/PositionCorrectionTransform.h \
     src/calibration/CalibrationModel.h \
+    src/calibration/CalibrationSourceFingerprint.h \
     src/calibration/CalibrationSolver.h \
     src/calibration/CalibrationFileLoader.h \
     src/calibration/CalibrationCommunicationProtocol.h \

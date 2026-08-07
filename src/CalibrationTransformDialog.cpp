@@ -4,12 +4,16 @@
 #include "PlanDialogUtils.h"
 #include "SchemeStore.h"
 #include "calibration/CalibrationFileLoader.h"
+#include "calibration/CalibrationSourceFingerprint.h"
+#include "frame/FrameInputMetadata.h"
 #include "frame/FrameViewHelper.h"
+#include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolEngine.h"
 
 #include <QCheckBox>
+#include <QColor>
 #include <QComboBox>
 #include <QDir>
 #include <QDoubleSpinBox>
@@ -24,8 +28,13 @@
 #include <QMessageBox>
 #include <QHBoxLayout>
 #include <QStyle>
+#include <QSignalBlocker>
 #include <QToolButton>
 #include <QUuid>
+
+#include <opencv2/imgcodecs.hpp>
+
+#include <cmath>
 
 namespace {
 
@@ -59,6 +68,88 @@ QJsonObject bindingItem(const QString &producerId,
                        {QStringLiteral("displayPath"), displayPath}};
 }
 
+QString payloadNumber(const QJsonObject &payload,
+                      const QString &key,
+                      int precision)
+{
+    const QJsonValue value = payload.value(key);
+    if (!value.isDouble())
+        return QStringLiteral("--");
+    const double number = value.toDouble();
+    return std::isfinite(number)
+            ? QString::number(number, 'f', precision)
+            : QStringLiteral("--");
+}
+
+bool loadCalibrationModel(const QString &filePath,
+                          CalibrationModel *model,
+                          QString *errorMessage)
+{
+    ProjectXmlCalibrationLoader project;
+    HikXmlCalibrationLoader hikXml;
+    HikIwcalCalibrationLoader iwcal;
+    const CalibrationFileLoader *loader = project.canLoad(filePath)
+            ? static_cast<const CalibrationFileLoader *>(&project)
+            : iwcal.canLoad(filePath)
+              ? static_cast<const CalibrationFileLoader *>(&iwcal)
+              : hikXml.canLoad(filePath)
+                ? static_cast<const CalibrationFileLoader *>(&hikXml) : nullptr;
+    if (!loader) {
+        if (errorMessage)
+            *errorMessage = QObject::tr("不支持的标定文件格式");
+        return false;
+    }
+    return loader->load(filePath, model, errorMessage);
+}
+
+QJsonObject snapshotPayload(const ToolPreviewSnapshot &snapshot)
+{
+    if (!snapshot.valid)
+        return QJsonObject();
+    if (!snapshot.result.payload.isEmpty())
+        return snapshot.result.payload;
+    return QJsonObject::fromVariantMap(snapshot.payload);
+}
+
+QString fingerprintFieldText(const QString &field)
+{
+    if (field == QStringLiteral("producerId"))
+        return QObject::tr("来源节点");
+    if (field == QStringLiteral("producerType"))
+        return QObject::tr("来源类型");
+    if (field == QStringLiteral("outputContract"))
+        return QObject::tr("输出字段");
+    if (field == QStringLiteral("originMode"))
+        return QObject::tr("原点模式");
+    if (field == QStringLiteral("customOriginNormalized"))
+        return QObject::tr("自定义原点");
+    if (field == QStringLiteral("modelSignature"))
+        return QObject::tr("模板模型");
+    if (field == QStringLiteral("referenceImageSignature"))
+        return QObject::tr("基准图");
+    if (field == QStringLiteral("coordinateSourceConfigSignature"))
+        return QObject::tr("模板配置");
+    return field.isEmpty() ? QObject::tr("来源信息") : field;
+}
+
+bool completeSignedFingerprint(const QJsonObject &fingerprint)
+{
+    const QString signature = fingerprint
+            .value(QStringLiteral("coordinateSourceSignature")).toString().trimmed();
+    return !signature.isEmpty()
+            && signature == CalibrationSourceFingerprint::coordinateSourceSignature(
+                fingerprint)
+            && !fingerprint.value(QStringLiteral("producerId")).toString().trimmed().isEmpty()
+            && fingerprint.value(QStringLiteral("producerType")).toString()
+               == toolTypeToString(ToolType::TemplateLocation)
+            && !fingerprint.value(QStringLiteral("outputContract")).toObject().isEmpty()
+            && !fingerprint.value(QStringLiteral("originMode")).toString().trimmed().isEmpty()
+            && !fingerprint.value(QStringLiteral("customOriginNormalized")).toObject().isEmpty()
+            && !fingerprint.value(QStringLiteral("modelSignature")).toString().trimmed().isEmpty()
+            && !fingerprint.value(QStringLiteral("coordinateSourceConfigSignature"))
+                .toString().trimmed().isEmpty();
+}
+
 } // namespace
 
 CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
@@ -85,8 +176,16 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
         label->setProperty("role", QStringLiteral("rowField"));
     ui->closeButton->setProperty("actionRole", QStringLiteral("windowClose"));
     ui->importButton->setProperty("actionRole", QStringLiteral("secondary"));
+    ui->calibrationTransformPcImportButton->setProperty(
+                "actionRole", QStringLiteral("secondary"));
+    ui->calibrationTransformPcImportButton->setProperty("optionalEntry", true);
+    ui->exitPcTestButton->setProperty("actionRole", QStringLiteral("secondary"));
     ui->testButton->setProperty("actionRole", QStringLiteral("secondary"));
     ui->finishButton->setProperty("actionRole", QStringLiteral("highlight"));
+    ui->conversionResultOverlay->setAttribute(Qt::WA_TransparentForMouseEvents);
+    ui->conversionResultLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    ui->conversionResultLabel->setProperty("resultState", QStringLiteral("idle"));
+    ui->viewerCanvasLayout->setCurrentWidget(ui->conversionResultOverlay);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
     m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     updateReferenceImage(ReferenceImageProvider::instance().referenceImage());
@@ -122,11 +221,18 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
             this, &CalibrationTransformDialog::finishConfiguration);
     connect(ui->importButton, &QPushButton::clicked,
             this, &CalibrationTransformDialog::importCalibrationFile);
+    connect(ui->calibrationTransformPcImportButton, &QPushButton::clicked,
+            this, &CalibrationTransformDialog::importTestImageFromPc);
+    connect(ui->exitPcTestButton, &QPushButton::clicked,
+            this, &CalibrationTransformDialog::exitImportedTestMode);
     connect(ui->testButton, &QPushButton::clicked,
             this, &CalibrationTransformDialog::runTest);
     connect(ui->calibrationFileCombo,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this](int) { invalidatePreviewSnapshot(); });
+            this, [this](int) {
+        invalidatePreviewSnapshot();
+        refreshCalibrationSourceValidation();
+    });
     connect(ui->calibrationPoseEnabled, &QCheckBox::toggled,
             this, [this](bool) { invalidatePreviewSnapshot(); });
     connect(ui->runPoseEnabled, &QCheckBox::toggled,
@@ -156,6 +262,10 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
         ui->allModeButton->setChecked(true);
         ui->poseGroup->setVisible(true);
     });
+    // 新建工具没有 loadFromConfig() 调用，也应能看到当前方案的标定资产。
+    updateImportedTestUi();
+    mergeSchemeCalibrationFiles();
+    refreshFileList(m_calibrationFiles, QString());
 }
 
 void CalibrationTransformDialog::setupPoseSourceUi()
@@ -332,11 +442,22 @@ void CalibrationTransformDialog::applyInputProducer(int producerIndex)
     m_mainInputSourceAvailable = true;
     invalidatePreviewSnapshot();
     updateMainInputUi();
+    refreshCalibrationSourceValidation();
 }
 
 void CalibrationTransformDialog::invalidatePreviewSnapshot()
 {
     m_snapshot = ToolPreviewSnapshot();
+    clearDisplayedConversionResult();
+}
+
+void CalibrationTransformDialog::clearDisplayedConversionResult()
+{
+    ui->conversionResultLabel->clear();
+    ui->conversionResultLabel->setProperty("resultState", QStringLiteral("idle"));
+    ui->conversionResultLabel->hide();
+    ui->conversionResultLabel->style()->unpolish(ui->conversionResultLabel);
+    ui->conversionResultLabel->style()->polish(ui->conversionResultLabel);
 }
 
 void CalibrationTransformDialog::updateMainInputUi()
@@ -393,6 +514,21 @@ CalibrationTransformDialog::~CalibrationTransformDialog()
 
 void CalibrationTransformDialog::updateReferenceImage(const QImage &image)
 {
+    invalidatePreviewSnapshot();
+    if (m_importedTestActive && !m_importedTestFrame.empty()) {
+        displayImportedTestImage();
+        ui->statusLabel->setProperty("sourceValidationState",
+                                     QStringLiteral("testPending"));
+        ui->statusLabel->setStyleSheet(QStringLiteral("color: #edf1f5;"));
+        ui->statusLabel->setText(
+                    tr("基准图已更新，请重新运行当前 PC 导入图片"));
+        return;
+    }
+    displayReferenceImage(image);
+}
+
+void CalibrationTransformDialog::displayReferenceImage(const QImage &image)
+{
     if (image.isNull()) {
         m_previewHelper->clear();
         ui->viewerTitleLabel->setText(tr("请先设置基准图"));
@@ -405,11 +541,51 @@ void CalibrationTransformDialog::updateReferenceImage(const QImage &image)
     m_previewHelper->setImage(image);
 }
 
+void CalibrationTransformDialog::displayImportedTestImage()
+{
+    if (!m_importedTestActive || m_importedTestFrame.empty())
+        return;
+    const QImage image = MatImageConverter::matToDisplayImage(
+                m_importedTestFrame,
+                QStringLiteral("CalibrationTransformDialog.pcImport"));
+    ui->viewerTitleLabel->setText(
+                m_importedTestImageTitle.trimmed().isEmpty()
+                ? tr("PC导入图片") : m_importedTestImageTitle);
+    ui->viewerStatusLabel->setText(
+                tr("PC导入图片已加载 | %1 × %2")
+                .arg(m_importedTestFrame.cols).arg(m_importedTestFrame.rows));
+    if (image.isNull()) {
+        m_previewHelper->clear();
+        ui->viewerStatusLabel->setText(
+                    tr("PC导入图片已加载，但当前像素格式无法预览 | %1 × %2")
+                    .arg(m_importedTestFrame.cols).arg(m_importedTestFrame.rows));
+        return;
+    }
+    m_previewHelper->setImage(image);
+}
+
+void CalibrationTransformDialog::updateImportedTestUi()
+{
+    const bool active = m_importedTestActive && !m_importedTestFrame.empty();
+    ui->exitPcTestButton->setVisible(active);
+    ui->testButton->setText(active ? tr("测试运行（导入图）")
+                                   : tr("测试运行"));
+    ui->testButton->setToolTip(
+                active
+                ? tr("重新运行当前 PC 导入图片：%1")
+                  .arg(m_importedTestImageTitle)
+                : QString());
+    ui->finishButton->setText(active ? tr("运行一次") : tr("完成"));
+    ui->finishButton->setToolTip(
+                active ? tr("导入图测试结果不保存；请先退出图片测试")
+                       : QString());
+}
+
 void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &tools,
                                                    int consumerIndex,
                                                    const QMap<QString, ToolPreviewSnapshot> &snapshots)
 {
-    Q_UNUSED(snapshots)
+    invalidatePreviewSnapshot();
     const QJsonObject savedInputX = ui->inputXSourceCombo->currentData().toJsonObject();
     const QJsonObject savedInputY = ui->inputYSourceCombo->currentData().toJsonObject();
     const QJsonObject savedInputAngle = ui->inputAngleSourceCombo->currentData().toJsonObject();
@@ -422,6 +598,8 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
                 m_runPoseSources[static_cast<size_t>(i)]->currentData().toJsonObject();
     }
     m_inputProducers.clear();
+    m_producerConfigs.clear();
+    m_producerSnapshots.clear();
     addUnboundItem(ui->inputXSourceCombo);
     addUnboundItem(ui->inputYSourceCombo);
     addUnboundItem(ui->inputAngleSourceCombo);
@@ -432,6 +610,12 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
     const int limit = qBound(0, consumerIndex, tools.size());
     for (int index = 0; index < limit; ++index) {
         const ToolConfig &tool = tools.at(index);
+        if (!tool.toolId.trimmed().isEmpty()) {
+            m_producerConfigs.insert(tool.toolId, tool);
+            const auto snapshotIt = snapshots.constFind(tool.toolId);
+            if (snapshotIt != snapshots.cend())
+                m_producerSnapshots.insert(tool.toolId, snapshotIt.value());
+        }
         if (!tool.enabled || tool.toolId.trimmed().isEmpty()
                 || (tool.toolType != ToolType::TemplateLocation
                     && tool.toolType != ToolType::PositionCorrection)) {
@@ -478,6 +662,7 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
         restoreBinding(m_runPoseSources[static_cast<size_t>(i)],
                        savedRunPose[static_cast<size_t>(i)]);
     }
+    refreshCalibrationSourceValidation();
 }
 
 void CalibrationTransformDialog::setToolChainTestContext(
@@ -486,6 +671,7 @@ void CalibrationTransformDialog::setToolChainTestContext(
         ToolEngine *sharedToolEngine,
         const ReferencePositionCorrectionConfig &referencePositionCorrection)
 {
+    invalidatePreviewSnapshot();
     const int limit = consumerIndex < 0
             ? tools.size() : qBound(0, consumerIndex, tools.size());
     m_testToolPrefix = tools.mid(0, limit);
@@ -584,6 +770,13 @@ void CalibrationTransformDialog::restoreBinding(QComboBox *combo,
 
 void CalibrationTransformDialog::loadFromConfig(const ToolConfig &config)
 {
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateImportedTestUi();
+    invalidatePreviewSnapshot();
+    ui->resultText->clear();
+    displayReferenceImage(ReferenceImageProvider::instance().referenceImage());
     const QString stableToolId = m_initialConfig.toolId;
     m_initialConfig = config;
     if (m_initialConfig.toolId.trimmed().isEmpty())
@@ -629,6 +822,7 @@ void CalibrationTransformDialog::loadFromConfig(const ToolConfig &config)
     };
     restorePose(params.value(QStringLiteral("calibrationPose")).toObject(), true, ui);
     restorePose(params.value(QStringLiteral("runPose")).toObject(), false, ui);
+    refreshCalibrationSourceValidation();
 }
 
 QJsonObject CalibrationTransformDialog::poseConfig(bool calibration) const
@@ -682,17 +876,21 @@ ToolPreviewSnapshot CalibrationTransformDialog::referencePreviewSnapshot() const
 void CalibrationTransformDialog::refreshFileList(const QStringList &paths,
                                                 const QString &activePath)
 {
+    const QSignalBlocker blocker(ui->calibrationFileCombo);
     ui->calibrationFileCombo->clear();
     for (const QString &path : paths)
         ui->calibrationFileCombo->addItem(QFileInfo(path).fileName(), path);
     const int activeIndex = ui->calibrationFileCombo->findData(activePath);
     if (activeIndex >= 0)
         ui->calibrationFileCombo->setCurrentIndex(activeIndex);
+    refreshCalibrationSourceValidation();
 }
 
 void CalibrationTransformDialog::mergeSchemeCalibrationFiles()
 {
     const QString schemeDir = SchemeStore::instance().currentScheme().schemeDir;
+    if (schemeDir.trimmed().isEmpty())
+        return;
     const QDir assetDir(QDir(schemeDir).filePath(QStringLiteral("calibrations")));
     const QFileInfoList candidates = assetDir.entryInfoList(
                 QStringList{QStringLiteral("*.xml"), QStringLiteral("*.iwcal")},
@@ -728,8 +926,378 @@ void CalibrationTransformDialog::importCalibrationFile()
     if (!m_calibrationFiles.contains(selected))
         m_calibrationFiles.append(selected);
     refreshFileList(m_calibrationFiles, selected);
-    ui->statusLabel->setText(tr("已选择 %1，保存方案时写入标定资产")
-                             .arg(QFileInfo(selected).fileName()));
+    refreshCalibrationSourceValidation();
+}
+
+bool CalibrationTransformDialog::loadTestImageFromFile(
+        const QString &filePath,
+        QString *errorMessage)
+{
+    if (errorMessage)
+        errorMessage->clear();
+    const QString normalizedPath = filePath.trimmed();
+    if (normalizedPath.isEmpty()) {
+        if (errorMessage)
+            *errorMessage = tr("未选择测试图片");
+        return false;
+    }
+
+    const cv::Mat decoded = cv::imread(
+                normalizedPath.toLocal8Bit().constData(),
+                cv::IMREAD_UNCHANGED);
+    if (decoded.empty()) {
+        if (errorMessage)
+            *errorMessage = tr("无法读取所选图片");
+        return false;
+    }
+
+    m_importedTestFrame = decoded.clone();
+    m_importedTestImageTitle = QFileInfo(normalizedPath).fileName();
+    m_importedTestActive = true;
+    clearDisplayedConversionResult();
+    ui->resultText->clear();
+    ui->statusLabel->setProperty("sourceValidationState",
+                                 QStringLiteral("testPending"));
+    ui->statusLabel->setStyleSheet(QStringLiteral("color: #edf1f5;"));
+    ui->statusLabel->setText(
+                tr("PC图片 %1 已导入，等待测试运行")
+                .arg(m_importedTestImageTitle));
+    updateImportedTestUi();
+    displayImportedTestImage();
+    return true;
+}
+
+void CalibrationTransformDialog::importTestImageFromPc()
+{
+    const QString selected = QFileDialog::getOpenFileName(
+                this,
+                tr("PC导入测试图片"),
+                QString(),
+                tr("图片 (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;所有文件 (*.*)"));
+    if (selected.trimmed().isEmpty())
+        return;
+
+    QString error;
+    if (!loadTestImageFromFile(selected, &error)) {
+        QMessageBox::warning(this, tr("PC导入图片"), error);
+        return;
+    }
+    runTest();
+}
+
+void CalibrationTransformDialog::exitImportedTestMode()
+{
+    if (!m_importedTestActive && m_importedTestFrame.empty())
+        return;
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateImportedTestUi();
+    clearDisplayedConversionResult();
+    ui->resultText->clear();
+    displayReferenceImage(ReferenceImageProvider::instance().referenceImage());
+    refreshCalibrationSourceValidation();
+}
+
+CalibrationTransformDialog::SourceValidationResult
+CalibrationTransformDialog::evaluateCalibrationSource() const
+{
+    SourceValidationResult validation;
+    const QString filePath = ui->calibrationFileCombo->currentData().toString().trimmed();
+    if (filePath.isEmpty()) {
+        validation.message = tr("请选择标定文件");
+        return validation;
+    }
+    if (!QFileInfo::exists(filePath)) {
+        validation.message = tr("标定文件不存在");
+        return validation;
+    }
+
+    CalibrationModel model;
+    QString loadError;
+    if (!loadCalibrationModel(filePath, &model, &loadError)) {
+        validation.message = loadError.isEmpty() ? tr("标定文件无法读取") : loadError;
+        return validation;
+    }
+
+    const QJsonObject imageBinding = model.imageBinding;
+    QJsonObject expected = imageBinding
+            .value(QStringLiteral("coordinateSourceFingerprint")).toObject();
+    if (expected.isEmpty()) {
+        expected = imageBinding.value(QStringLiteral("inputFingerprint")).toObject()
+                .value(QStringLiteral("coordinateSourceFingerprint")).toObject();
+    }
+    if (expected.isEmpty()) {
+        validation.state = SourceValidationState::Unverifiable;
+        validation.message = imageBinding.value(QStringLiteral("mode")).toString()
+                == QStringLiteral("manual")
+                ? tr("该文件由手动图像坐标生成，未记录可追踪的模板来源")
+                : tr("旧版标定文件未记录模板原点和配置签名");
+        return validation;
+    }
+    if (expected.value(QStringLiteral("mode")).toString()
+            == QStringLiteral("manual")) {
+        validation.state = SourceValidationState::Unverifiable;
+        validation.message = tr("该文件由手动图像坐标生成，未记录可追踪的模板来源");
+        return validation;
+    }
+    if (!completeSignedFingerprint(expected)) {
+        validation.state = SourceValidationState::Stale;
+        validation.message = tr("标定文件中的坐标来源签名不完整或已损坏");
+        return validation;
+    }
+
+    const QJsonObject xBinding = mainInputBinding(ui->inputXSourceCombo);
+    const QJsonObject yBinding = mainInputBinding(ui->inputYSourceCombo);
+    const QJsonObject angleBinding = mainInputBinding(ui->inputAngleSourceCombo);
+    const QString selectedProducerId = xBinding
+            .value(QStringLiteral("producerId")).toString().trimmed();
+    if (!m_mainInputSourceAvailable
+            || selectedProducerId.isEmpty()
+            || yBinding.value(QStringLiteral("producerId")).toString()
+               != selectedProducerId
+            || angleBinding.value(QStringLiteral("producerId")).toString()
+               != selectedProducerId) {
+        validation.message = tr("请先选择完整的当前坐标来源");
+        return validation;
+    }
+    const auto selectedConfigIt = m_producerConfigs.constFind(selectedProducerId);
+    if (selectedConfigIt == m_producerConfigs.cend()) {
+        validation.state = SourceValidationState::Stale;
+        validation.message = tr("标定时使用的坐标来源节点已不存在");
+        return validation;
+    }
+
+    const ToolConfig &selectedConfig = selectedConfigIt.value();
+    QString effectiveProducerId = selectedProducerId;
+    ToolConfig effectiveTemplateConfig;
+    bool hasEffectiveTemplateConfig = false;
+    QJsonObject identityPayload;
+
+    if (selectedConfig.toolType == ToolType::TemplateLocation) {
+        const QJsonObject outputContract = expected
+                .value(QStringLiteral("outputContract")).toObject();
+        if (xBinding.value(QStringLiteral("outputKey")).toString()
+                != outputContract.value(QStringLiteral("x")).toString()
+                || yBinding.value(QStringLiteral("outputKey")).toString()
+                != outputContract.value(QStringLiteral("y")).toString()
+                || angleBinding.value(QStringLiteral("outputKey")).toString()
+                != outputContract.value(QStringLiteral("angle")).toString()) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("当前订阅的输出字段与标定时不一致");
+            return validation;
+        }
+        effectiveTemplateConfig = selectedConfig;
+        hasEffectiveTemplateConfig = true;
+        identityPayload = snapshotPayload(m_producerSnapshots.value(selectedProducerId));
+    } else if (selectedConfig.toolType == ToolType::PositionCorrection) {
+        if (xBinding.value(QStringLiteral("outputKey")).toString()
+                != QStringLiteral("runPose.x")
+                || yBinding.value(QStringLiteral("outputKey")).toString()
+                   != QStringLiteral("runPose.y")
+                || angleBinding.value(QStringLiteral("outputKey")).toString()
+                   != QStringLiteral("runPose.angleDeg")) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("当前位置修正输出字段与标定转换坐标合同不一致");
+            return validation;
+        }
+        const QJsonObject correctionPayload = snapshotPayload(
+                    m_producerSnapshots.value(selectedProducerId));
+        const QString snapshotProducerId = correctionPayload
+                .value(QStringLiteral("poseProducerId")).toString().trimmed();
+        const PositionRunPoseSource traced = PositionCorrection::runPoseSourceFromConfig(
+                    selectedConfig.params.value(
+                        QStringLiteral("positionCorrection")).toObject());
+        if (traced.valid && !snapshotProducerId.isEmpty()
+                && traced.producerId != snapshotProducerId) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("位置修正配置与其最近输出指向不同的模板来源");
+            return validation;
+        }
+        effectiveProducerId = traced.valid ? traced.producerId : snapshotProducerId;
+        if (effectiveProducerId.isEmpty()) {
+            validation.state = SourceValidationState::Unverifiable;
+            validation.message = tr("位置修正未提供可追溯的模板定位来源");
+            return validation;
+        }
+        identityPayload = correctionPayload;
+        const auto templateConfigIt = m_producerConfigs.constFind(effectiveProducerId);
+        if (templateConfigIt != m_producerConfigs.cend()
+                && templateConfigIt->toolType == ToolType::TemplateLocation) {
+            effectiveTemplateConfig = templateConfigIt.value();
+            hasEffectiveTemplateConfig = true;
+        }
+        if (identityPayload.value(QStringLiteral("modelSignature"))
+                .toString().trimmed().isEmpty()) {
+            identityPayload = snapshotPayload(
+                        m_producerSnapshots.value(effectiveProducerId));
+        }
+    } else {
+        validation.state = SourceValidationState::Stale;
+        validation.message = tr("当前节点不再提供标定所需的图像坐标");
+        return validation;
+    }
+
+    if (expected.value(QStringLiteral("producerId")).toString().trimmed()
+            != effectiveProducerId) {
+        validation.state = SourceValidationState::Stale;
+        validation.message = tr("当前坐标来源节点与标定时不一致");
+        return validation;
+    }
+
+    if (hasEffectiveTemplateConfig) {
+        const QString cachedConfigSignature = identityPayload.value(
+                    QStringLiteral("coordinateSourceConfigSignature"))
+                .toString().trimmed();
+        const QString cachedReferenceSignature = identityPayload.value(
+                    QStringLiteral("coordinateSourceReferenceSignature"))
+                .toString().trimmed();
+        const QString currentConfigSignature =
+                CalibrationSourceFingerprint::coordinateSourceConfigSignature(
+                    effectiveTemplateConfig);
+        const QString currentReferenceSignature =
+                CalibrationSourceFingerprint::imageSignature(
+                    ReferenceImageProvider::instance().referenceFrame());
+        const bool expectsReferenceSignature = expected.contains(
+                    QStringLiteral("referenceImageSignature"));
+        const bool snapshotFresh = !cachedConfigSignature.isEmpty()
+                && cachedConfigSignature == currentConfigSignature
+                && (!expectsReferenceSignature
+                    || (!currentReferenceSignature.isEmpty()
+                        && cachedReferenceSignature
+                           == currentReferenceSignature));
+        if (!snapshotFresh)
+            identityPayload.remove(QStringLiteral("modelSignature"));
+        const QJsonObject params = effectiveTemplateConfig.params;
+        identityPayload.insert(
+                    QStringLiteral("originMode"),
+                    params.value(QStringLiteral("originMode"))
+                    .toString(QStringLiteral("centroid")));
+        identityPayload.insert(
+                    QStringLiteral("customOriginNormalized"),
+                    CalibrationSourceFingerprint::normalizedPoint(
+                        params.value(QStringLiteral("customOriginNormalized")).toObject()));
+        CalibrationSourceFingerprint::enrichTemplatePayload(
+                    effectiveTemplateConfig, &identityPayload);
+        identityPayload.insert(
+                    QStringLiteral("coordinateSourceReferenceSignature"),
+                    currentReferenceSignature);
+    }
+
+    const bool hasCurrentModelSignature = !identityPayload
+            .value(QStringLiteral("modelSignature")).toString().trimmed().isEmpty();
+    const bool hasCurrentConfigSignature = !identityPayload
+            .value(QStringLiteral("coordinateSourceConfigSignature"))
+            .toString().trimmed().isEmpty();
+    if (!hasCurrentModelSignature || !hasCurrentConfigSignature) {
+        // Even without a current preview, configuration and origin changes are
+        // still observable and must invalidate the calibration immediately.
+        const QString currentConfigSignature = identityPayload
+                .value(QStringLiteral("coordinateSourceConfigSignature"))
+                .toString().trimmed();
+        if (!currentConfigSignature.isEmpty()
+                && currentConfigSignature
+                != expected.value(QStringLiteral("coordinateSourceConfigSignature"))
+                   .toString()) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("模板定位配置已改变");
+            return validation;
+        }
+        const QString currentOriginMode = identityPayload
+                .value(QStringLiteral("originMode")).toString().trimmed();
+        if (!currentOriginMode.isEmpty()
+                && currentOriginMode
+                != expected.value(QStringLiteral("originMode")).toString()) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("模板定位原点模式已改变");
+            return validation;
+        }
+        if (expected.value(QStringLiteral("originMode")).toString()
+                == QStringLiteral("custom")
+                && !identityPayload.value(QStringLiteral("customOriginNormalized"))
+                   .toObject().isEmpty()
+                && CalibrationSourceFingerprint::canonicalJson(
+                    identityPayload.value(QStringLiteral("customOriginNormalized")))
+                != CalibrationSourceFingerprint::canonicalJson(
+                    expected.value(QStringLiteral("customOriginNormalized")))) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("模板定位自定义原点已改变");
+            return validation;
+        }
+        if (expected.contains(QStringLiteral("referenceImageSignature"))
+                && identityPayload.value(QStringLiteral(
+                                             "coordinateSourceReferenceSignature"))
+                   .toString()
+                   != expected.value(QStringLiteral("referenceImageSignature"))
+                      .toString()) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("当前基准图与标定时不一致");
+            return validation;
+        }
+        validation.state = SourceValidationState::Unverifiable;
+        validation.message = tr("当前模板尚无有效预览结果，无法核对模板模型签名");
+        return validation;
+    }
+
+    const QJsonObject actual = CalibrationSourceFingerprint::makeFingerprint(
+                effectiveProducerId,
+                ToolType::TemplateLocation,
+                identityPayload);
+    QString mismatchField;
+    if (!CalibrationSourceFingerprint::matches(expected, actual, &mismatchField)) {
+        validation.state = SourceValidationState::Stale;
+        validation.message = tr("%1已改变").arg(fingerprintFieldText(mismatchField));
+        return validation;
+    }
+
+    if (!expected.contains(QStringLiteral("referenceImageSignature"))) {
+        validation.state = SourceValidationState::Unverifiable;
+        validation.message = tr("兼容旧版来源签名未记录基准图内容；"
+                                "模板原点与配置一致，但基准图无法完整核对");
+        return validation;
+    }
+
+    validation.state = SourceValidationState::Verified;
+    validation.message = tr("当前来源、模板原点及配置与标定文件一致");
+    return validation;
+}
+
+void CalibrationTransformDialog::showSourceValidationStatus(
+        const SourceValidationResult &validation)
+{
+    QString state;
+    QString text;
+    QString color = QStringLiteral("#edf1f5");
+    switch (validation.state) {
+    case SourceValidationState::Verified:
+        state = QStringLiteral("verified");
+        text = tr("标定来源已验证 | %1").arg(validation.message);
+        color = QStringLiteral("#20c933");
+        break;
+    case SourceValidationState::Unverifiable:
+        state = QStringLiteral("unverifiable");
+        text = tr("来源无法验证，建议重新标定 | %1").arg(validation.message);
+        color = QStringLiteral("#ff9d18");
+        break;
+    case SourceValidationState::Stale:
+        state = QStringLiteral("stale");
+        text = tr("标定已失效 | %1").arg(validation.message);
+        color = QStringLiteral("#ff2020");
+        break;
+    case SourceValidationState::NotReady:
+        state = QStringLiteral("notReady");
+        text = validation.message.isEmpty() ? tr("尚未验证标定来源") : validation.message;
+        break;
+    }
+    ui->statusLabel->setProperty("sourceValidationState", state);
+    ui->statusLabel->setText(text);
+    ui->statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(color));
+}
+
+void CalibrationTransformDialog::refreshCalibrationSourceValidation()
+{
+    m_sourceValidation = evaluateCalibrationSource();
+    showSourceValidationStatus(m_sourceValidation);
 }
 
 bool CalibrationTransformDialog::validateConfiguration(QString *errorMessage) const
@@ -756,20 +1324,17 @@ bool CalibrationTransformDialog::validateConfiguration(QString *errorMessage) co
             *errorMessage = tr("请选择有效的标定文件");
         return false;
     }
-    ProjectXmlCalibrationLoader project;
-    HikXmlCalibrationLoader hikXml;
-    HikIwcalCalibrationLoader iwcal;
-    const CalibrationFileLoader *loader = project.canLoad(filePath)
-            ? static_cast<const CalibrationFileLoader *>(&project)
-            : iwcal.canLoad(filePath)
-              ? static_cast<const CalibrationFileLoader *>(&iwcal)
-              : hikXml.canLoad(filePath)
-                ? static_cast<const CalibrationFileLoader *>(&hikXml) : nullptr;
     CalibrationModel probe;
     QString loadError;
-    if (!loader || !loader->load(filePath, &probe, &loadError)) {
+    if (!loadCalibrationModel(filePath, &probe, &loadError)) {
         if (errorMessage)
             *errorMessage = loadError.isEmpty() ? tr("标定文件无法读取") : loadError;
+        return false;
+    }
+    const SourceValidationResult sourceValidation = evaluateCalibrationSource();
+    if (sourceValidation.state == SourceValidationState::Stale) {
+        if (errorMessage)
+            *errorMessage = tr("标定已失效：%1").arg(sourceValidation.message);
         return false;
     }
     return true;
@@ -777,27 +1342,82 @@ bool CalibrationTransformDialog::validateConfiguration(QString *errorMessage) co
 
 void CalibrationTransformDialog::finishConfiguration()
 {
+    if (m_importedTestActive) {
+        runTest();
+        return;
+    }
     QString error;
     if (!validateConfiguration(&error)) {
-        ui->statusLabel->setText(tr("NG | %1").arg(error));
+        const SourceValidationResult sourceValidation = evaluateCalibrationSource();
+        if (sourceValidation.state == SourceValidationState::Stale) {
+            m_sourceValidation = sourceValidation;
+            showSourceValidationStatus(sourceValidation);
+        } else {
+            ui->statusLabel->setProperty("sourceValidationState",
+                                         QStringLiteral("invalid"));
+            ui->statusLabel->setText(tr("NG | %1").arg(error));
+            ui->statusLabel->setStyleSheet(QStringLiteral("color: #ff2020;"));
+        }
         return;
     }
     accept();
+}
+
+void CalibrationTransformDialog::displayConversionResult(const ToolResult &result)
+{
+    QString state;
+    QString text;
+    if (result.success && result.ok) {
+        const QJsonObject payload = result.payload;
+        state = QStringLiteral("ok");
+        text = tr("标定转换输出为OK\n"
+                  "转换坐标X：%1，转换坐标Y：%2，转换角度：%3°，单像素精度：%4")
+                .arg(payloadNumber(payload, QStringLiteral("machineX"), 2))
+                .arg(payloadNumber(payload, QStringLiteral("machineY"), 2))
+                .arg(payloadNumber(payload, QStringLiteral("convertedAngleDeg"), 2))
+                .arg(payloadNumber(payload, QStringLiteral("pixelAccuracy"), 2));
+    } else {
+        state = QStringLiteral("ng");
+        QString reason = result.message.trimmed();
+        if (reason.isEmpty())
+            reason = result.status.trimmed();
+        if (reason.isEmpty())
+            reason = tr("未知错误");
+        text = tr("标定转换输出为NG\n失败原因：%1").arg(reason);
+    }
+
+    ui->conversionResultLabel->setText(text);
+    ui->conversionResultLabel->setProperty("resultState", state);
+    ui->conversionResultLabel->style()->unpolish(ui->conversionResultLabel);
+    ui->conversionResultLabel->style()->polish(ui->conversionResultLabel);
+    ui->conversionResultLabel->show();
+    ui->conversionResultOverlay->raise();
+    ui->conversionResultLabel->raise();
 }
 
 void CalibrationTransformDialog::runTest()
 {
     const ToolConfig config = toolConfig();
     ToolResult result;
-    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+    const bool useImportedFrame = m_importedTestActive;
+    const cv::Mat referenceFrame =
+            ReferenceImageProvider::instance().referenceFrame();
+    const cv::Mat frame = useImportedFrame
+            ? m_importedTestFrame.clone() : referenceFrame.clone();
     if (!m_sharedToolEngine) {
         result = ToolResult::error(config.toolId, config.toolType,
                                    tr("测试运行引擎不可用"),
                                    QStringLiteral("test_engine_unavailable"));
     } else if (frame.empty()) {
         result = ToolResult::error(config.toolId, config.toolType,
-                                   tr("基准图为空，无法运行同帧订阅链"),
+                                   useImportedFrame
+                                   ? tr("PC导入图片为空，无法运行同帧订阅链")
+                                   : tr("基准图为空，无法运行同帧订阅链"),
                                    QStringLiteral("test_image_missing"));
+    } else if (referenceFrame.empty()) {
+        result = ToolResult::error(config.toolId, config.toolType,
+                                   tr("基准图为空，无法为前序模板定位提供参考图"),
+                                   QStringLiteral("test_reference_image_missing"));
     } else {
         QVector<ToolConfig> testChain = m_testToolPrefix;
         testChain.append(config);
@@ -806,10 +1426,16 @@ void CalibrationTransformDialog::runTest()
                 .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
         runtimeContext.insert(QStringLiteral("frameId"), frameId);
         runtimeContext.insert(
+                    QStringLiteral("input"),
+                    FrameInputMetadata::fromMat(
+                        frame,
+                        useImportedFrame ? QStringLiteral("file")
+                                         : QStringLiteral("reference")).toJson());
+        runtimeContext.insert(
                     QStringLiteral("referencePositionCorrection"),
                     PositionCorrection::referenceToJson(m_referencePositionCorrection));
         const QVector<ToolResult> results = m_sharedToolEngine->runTools(
-                    testChain, frame, frame, runtimeContext);
+                    testChain, frame, referenceFrame, runtimeContext);
         bool found = false;
         for (auto it = results.crbegin(); it != results.crend(); ++it) {
             if (it->toolId != config.toolId)
@@ -824,18 +1450,33 @@ void CalibrationTransformDialog::runTest()
                                        QStringLiteral("test_result_missing"));
         }
     }
-    if (result.ok) {
+    if (result.success && result.ok) {
         const QJsonObject payload = result.payload;
+        ui->statusLabel->setProperty("sourceValidationState",
+                                     QStringLiteral("testOk"));
+        ui->statusLabel->setStyleSheet(QStringLiteral("color: #20c933;"));
         ui->statusLabel->setText(
-                    tr("OK | 物理 X:%1  Y:%2  Angle:%3° | %4ms")
+                    (useImportedFrame
+                     ? tr("PC图片 %1 | OK | 物理 X:%2  Y:%3  Angle:%4° | %5ms")
+                       .arg(m_importedTestImageTitle)
+                     : tr("OK | 物理 X:%1  Y:%2  Angle:%3° | %4ms"))
                     .arg(payload.value(QStringLiteral("machineX")).toDouble(), 0, 'f', 3)
                     .arg(payload.value(QStringLiteral("machineY")).toDouble(), 0, 'f', 3)
                     .arg(payload.value(QStringLiteral("convertedAngleDeg")).toDouble(), 0, 'f', 3)
                     .arg(result.elapsedMs));
     } else {
-        ui->statusLabel->setText(tr("NG | %1").arg(result.message));
+        ui->statusLabel->setProperty("sourceValidationState",
+                                     QStringLiteral("testNg"));
+        ui->statusLabel->setStyleSheet(QStringLiteral("color: #ff2020;"));
+        ui->statusLabel->setText(
+                    useImportedFrame
+                    ? tr("PC图片 %1 | NG | %2")
+                      .arg(m_importedTestImageTitle, result.message)
+                    : tr("NG | %1").arg(result.message));
     }
     ui->resultText->setPlainText(QString::fromUtf8(
                                     QJsonDocument(result.toJson()).toJson(QJsonDocument::Indented)));
-    m_snapshot = makeReferenceToolPreviewSnapshot(config, result, QRectF());
+    displayConversionResult(result);
+    if (!useImportedFrame)
+        m_snapshot = makeReferenceToolPreviewSnapshot(config, result, QRectF());
 }

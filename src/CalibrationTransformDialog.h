@@ -9,6 +9,8 @@
 #include <QMap>
 #include <QVector>
 
+#include <opencv2/core/mat.hpp>
+
 #include <array>
 
 namespace Ui { class CalibrationTransformDialog; }
@@ -40,13 +42,31 @@ public:
             int consumerIndex,
             ToolEngine *sharedToolEngine,
             const ReferencePositionCorrectionConfig &referencePositionCorrection);
+    bool loadTestImageFromFile(const QString &filePath,
+                               QString *errorMessage = nullptr);
 
 private slots:
     void importCalibrationFile();
+    void importTestImageFromPc();
+    void exitImportedTestMode();
     void runTest();
     void finishConfiguration();
 
 private:
+    enum class SourceValidationState
+    {
+        NotReady,
+        Verified,
+        Unverifiable,
+        Stale
+    };
+
+    struct SourceValidationResult
+    {
+        SourceValidationState state = SourceValidationState::NotReady;
+        QString message;
+    };
+
     struct InputProducerContract
     {
         QString producerId;
@@ -75,12 +95,20 @@ private:
     void applyInputProducer(int producerIndex);
     void updateMainInputUi();
     void invalidatePreviewSnapshot();
+    SourceValidationResult evaluateCalibrationSource() const;
+    void refreshCalibrationSourceValidation();
+    void showSourceValidationStatus(const SourceValidationResult &validation);
     bool validateConfiguration(QString *errorMessage) const;
     QJsonObject poseConfig(bool calibration) const;
     void setupPoseSourceUi();
     void updateReferenceImage(const QImage &image);
+    void displayReferenceImage(const QImage &image);
+    void displayImportedTestImage();
+    void clearDisplayedConversionResult();
+    void updateImportedTestUi();
     void refreshFileList(const QStringList &paths, const QString &activePath);
     void mergeSchemeCalibrationFiles();
+    void displayConversionResult(const ToolResult &result);
 
     Ui::CalibrationTransformDialog *ui;
     FrameViewHelper *m_previewHelper = nullptr;
@@ -88,7 +116,13 @@ private:
     ToolPreviewSnapshot m_snapshot;
     QStringList m_calibrationFiles;
     QVector<InputProducerContract> m_inputProducers;
+    QMap<QString, ToolConfig> m_producerConfigs;
+    QMap<QString, ToolPreviewSnapshot> m_producerSnapshots;
+    SourceValidationResult m_sourceValidation;
     bool m_mainInputSourceAvailable = false;
+    cv::Mat m_importedTestFrame;
+    QString m_importedTestImageTitle;
+    bool m_importedTestActive = false;
     QVector<ToolConfig> m_testToolPrefix;
     ToolEngine *m_sharedToolEngine = nullptr;
     ReferencePositionCorrectionConfig m_referencePositionCorrection;

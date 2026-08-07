@@ -3,7 +3,9 @@
 
 #include "calibration/CalibrationMethodRegistry.h"
 
+#include <QJsonObject>
 #include <QMap>
+#include <QVector>
 
 class QComboBox;
 class QDoubleSpinBox;
@@ -28,22 +30,46 @@ public:
                                  double angleDeg) override;
     QString captureImageProducerId() const override;
     bool captureCurrentSample(QString *errorMessage = nullptr) override;
+    QVector<QLineF> completedTranslationSegments() const override;
+    int completedTranslationSampleCount() const override;
+    int translationSampleCount() const override;
 
     // Reserved online-acquisition contract. The descriptors are exposed through
     // draft().parameters but are intentionally not consumed by the solver yet.
     QJsonObject captureBindings() const;
     void setCaptureBinding(const QString &fieldKey, const QJsonObject &binding);
 
+    // Reusable N-point configuration. This intentionally excludes sampled
+    // coordinates and transient communication/runtime state.
+    QJsonObject persistentSettings() const;
+    bool restorePersistentSettings(const QJsonObject &settings,
+                                   QString *errorMessage = nullptr);
+
+    // Unfinished sampling state. Completion is stored explicitly per row so
+    // that a valid all-zero calibration point is not mistaken for an empty row.
+    QJsonObject draftState() const;
+    bool restoreDraftState(const QJsonObject &state,
+                           QString *errorMessage = nullptr);
+    int completedSampleCount() const;
+    int sampleCount() const;
+
 private:
-    void fillDefaultGrid(int count);
-    void importPoints();
-    void exportPoints();
+    void fillDefaultGrid();
+    QString sampleTypeForRow(int row) const;
+    bool importPoints(QTableWidget *editor,
+                      int *translationCount,
+                      int *rotationCount,
+                      QVector<bool> *completed);
+    void exportPoints(const QTableWidget *editor,
+                      int translationCount);
     void editPoints();
     void setParameterMode(bool showAll);
     void applyImageProducerBinding(const QString &fieldKey, int producerIndex);
     void applyPhysicalCommunicationBinding(const QString &fieldKey, bool enabled);
     void syncLegacyImageProducer();
+    void updateCaptureModeUi();
     void updateCaptureBindingUi(const QString &fieldKey);
+    void resetCaptureCursorToFirstIncomplete();
     QVector<CalibrationSample> samplesFromTable(QString *errorMessage) const;
 
     QComboBox *m_imageProducer = nullptr;
@@ -57,6 +83,7 @@ private:
     QPushButton *m_allButton = nullptr;
     QPushButton *m_triggerCaptureButton = nullptr;
     QPushButton *m_manualCaptureButton = nullptr;
+    QWidget *m_captureSubscriptionWidget = nullptr;
     QWidget *m_physicalCoordinateCard = nullptr;
     QWidget *m_runtimeParametersCard = nullptr;
     QWidget *m_qualityCard = nullptr;
@@ -82,6 +109,8 @@ private:
     double m_physicalY = 0.0;
     double m_physicalAngle = 0.0;
     int m_nextCaptureRow = 0;
+    QVector<bool> m_sampleCompleted;
+    bool m_pointEditorOpen = false;
 };
 
 #endif // CALIBRATION_NPOINTCALIBRATIONCONFIGWIDGET_H

@@ -40,6 +40,15 @@ public:
                 *errorMessage = QStringLiteral("N点标定至少需要3组有效对应点，正式流程建议9点");
             return false;
         }
+        const int expectedCount = draft.parameters.value(
+                    QStringLiteral("translationCount")).toInt(draft.samples.size());
+        if (draft.samples.size() != expectedCount) {
+            if (errorMessage) {
+                *errorMessage = QStringLiteral("标定点尚未完成：%1/%2，请采集或手动录入全部点")
+                        .arg(draft.samples.size()).arg(expectedCount);
+            }
+            return false;
+        }
         return true;
     }
     CalibrationSolveResult solve(const CalibrationDraft &draft) const override
@@ -58,6 +67,9 @@ public:
             result.model.methodData.insert(QStringLiteral("rotationCount"),
                                            draft.parameters.value(
                                                QStringLiteral("rotationCount")).toInt(0));
+            result.model.methodData.insert(QStringLiteral("rotationSamples"),
+                                           draft.parameters.value(
+                                               QStringLiteral("rotationSamples")).toArray());
         }
         return result;
     }

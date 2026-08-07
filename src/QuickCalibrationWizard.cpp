@@ -4,6 +4,8 @@
 #include "SchemeStore.h"
 #include "UiStyleRoles.h"
 #include "calibration/CalibrationFileLoader.h"
+#include "calibration/CalibrationSourceFingerprint.h"
+#include "calibration/NPointCalibrationConfigWidget.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/ReferenceImageProvider.h"
@@ -12,8 +14,11 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCryptographicHash>
 #include <QDateTime>
+#include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -24,6 +29,8 @@
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -31,6 +38,8 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSaveFile>
+#include <QSet>
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -79,6 +88,32 @@ bool finitePayloadNumber(const QJsonObject &payload, const QString &key)
 {
     return payload.value(key).isDouble()
             && std::isfinite(payload.value(key).toDouble());
+}
+
+QString fileSha256(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return QString();
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    if (!hash.addData(&file))
+        return QString();
+    return QString::fromLatin1(hash.result().toHex());
+}
+
+QString imageSha256(const QImage &source)
+{
+    if (source.isNull())
+        return QString();
+    const QImage image = source.convertToFormat(QImage::Format_RGBA8888);
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    const QByteArray metadata = QByteArray::number(image.width()) + 'x'
+            + QByteArray::number(image.height()) + ':'
+            + QByteArray::number(image.bytesPerLine()) + ':';
+    hash.addData(metadata);
+    hash.addData(reinterpret_cast<const char *>(image.constBits()),
+                 image.bytesPerLine() * image.height());
+    return QString::fromLatin1(hash.result().toHex());
 }
 
 } // namespace
@@ -138,6 +173,13 @@ QuickCalibrationWizard::QuickCalibrationWizard(QWidget *parent)
     root->addWidget(footer);
 
     connect(m_closeButton, &QPushButton::clicked, this, &QDialog::reject);
+    connect(this, &QDialog::finished, this, [this](int) {
+        if (m_communicationSession && m_communicationSession->isRunning())
+            m_communicationSession->stop();
+        QString error;
+        if (!saveDraft(&error) && !error.isEmpty())
+            qWarning() << "[QuickCalibrationWizard] 关闭时保存草稿失败:" << error;
+    });
     connect(m_communicationSession, &CalibrationCommunicationSession::messageReceived,
             this, [this](const CalibrationCommunicationMessage &message) {
         m_lastCommunicationMessage = message;
@@ -568,6 +610,7 @@ QWidget *QuickCalibrationWizard::createConfigurationPage()
         m_sampleStatus->setText(CameraFrameProvider::instance().hasFrame()
                                 ? tr("相机模式：实时帧已接入")
                                 : tr("相机模式：当前没有相机帧"));
+        saveDraft(nullptr);
     });
     connect(m_imageModeButton, &QPushButton::clicked, this, [this]() {
         m_cameraModeButton->setChecked(false);
@@ -575,6 +618,7 @@ QWidget *QuickCalibrationWizard::createConfigurationPage()
         m_imageCollectionPanel->show();
         m_imageCounterLabel->show();
         updateImageModeUi();
+        saveDraft(nullptr);
     });
     connect(&ReferenceImageProvider::instance(), &ReferenceImageProvider::referenceFrameChanged,
             this, [this](const QImage &image) {
@@ -628,8 +672,28 @@ QWidget *QuickCalibrationWizard::createResultPage()
     layout->addWidget(m_matrixLabel);
     m_qualityLabel = new QLabel(page);
     layout->addWidget(m_qualityLabel);
+
+    QGroupBox *targetGroup = new QGroupBox(tr("生成后应用到标定转换（可多选）"), page);
+    targetGroup->setObjectName(QStringLiteral("calibrationTargetTransformGroup"));
+    targetGroup->setProperty("panelRole", QStringLiteral("configCard"));
+    QVBoxLayout *targetLayout = new QVBoxLayout(targetGroup);
+    m_targetTransformHint = new QLabel(
+                tr("未勾选时仅生成标定文件，不改变任何标定转换的当前文件。"),
+                targetGroup);
+    m_targetTransformHint->setWordWrap(true);
+    m_targetTransformHint->setProperty("role", QStringLiteral("cardHint"));
+    targetLayout->addWidget(m_targetTransformHint);
+    m_targetTransformList = new QListWidget(targetGroup);
+    m_targetTransformList->setObjectName(
+                QStringLiteral("calibrationTargetTransformList"));
+    m_targetTransformList->setMaximumHeight(132);
+    targetLayout->addWidget(m_targetTransformList);
+    layout->addWidget(targetGroup);
+
     QHBoxLayout *fileRow = new QHBoxLayout;
-    m_updateAfterGenerate = new QCheckBox(tr("文件生成后更新"), page);
+    m_updateAfterGenerate = new QCheckBox(tr("允许覆盖同名文件"), page);
+    m_updateAfterGenerate->setObjectName(
+                QStringLiteral("calibrationAllowOverwriteCheck"));
     m_filePath = new QLineEdit(page);
     QPushButton *browse = new QPushButton(tr("选择路径"), page);
     QPushButton *generate = new QPushButton(tr("生成标定文件"), page);
@@ -655,10 +719,27 @@ QWidget *QuickCalibrationWizard::createResultPage()
 
 void QuickCalibrationWizard::setStep(int step)
 {
+    const int previousStep = m_step;
     m_step = qBound(0, step, 3);
+    if (previousStep == 3 && m_step < 3 && m_generatedFileCompleted) {
+        m_generatedFileCompleted = false;
+        m_generatedFilePath.clear();
+        if (m_sampleStatus) {
+            m_sampleStatus->setText(
+                        tr("已返回标定配置；原 XML 保留为文件，但不会自动应用，需重新求解并生成"));
+            m_sampleStatus->setProperty("status", QStringLiteral("idle"));
+        }
+    }
     if (m_step == 2 && !ensureMethodConfigWidget()) {
         m_step = 0;
         QMessageBox::warning(this, tr("标定配置"), tr("所选标定方式未提供配置页面"));
+    }
+    if (m_step == 2 && m_draftPersistenceEnabled && !m_draftRestoreHandled) {
+        if (m_communicationSession && m_communicationSession->isRunning())
+            m_communicationSession->stop();
+        m_draftRestorePromptActive = true;
+        promptRestoreDraft();
+        m_draftRestorePromptActive = false;
     }
     m_maxVisitedStep = qMax(m_maxVisitedStep, m_step);
     m_pages->setCurrentIndex(m_step);
@@ -742,8 +823,6 @@ void QuickCalibrationWizard::showExternalImage(int index)
         QSignalBlocker blocker(m_imageThumbnailList);
         m_imageThumbnailList->setCurrentRow(index);
     }
-    if (m_previewHelper)
-        m_previewHelper->clearToolOverlays();
     updatePreviewImage(m_externalImages.at(index));
     m_imageThumbnailList->scrollToItem(m_imageThumbnailList->item(index));
     m_imageCounterLabel->setText(tr("当前：%1/%2").arg(index + 1).arg(m_externalImages.size()));
@@ -752,6 +831,7 @@ void QuickCalibrationWizard::showExternalImage(int index)
     m_nextImageButton->setEnabled(index + 1 < m_externalImages.size());
     m_removeImageButton->setEnabled(true);
     m_clearImagesButton->setEnabled(true);
+    saveDraft(nullptr);
 }
 
 void QuickCalibrationWizard::rebuildExternalImageList(int currentIndex)
@@ -781,6 +861,7 @@ void QuickCalibrationWizard::removeCurrentExternalImage()
     m_externalImagePaths.removeAt(index);
     m_externalImageSequenceComplete = false;
     rebuildExternalImageList(qMin(index, m_externalImages.size() - 1));
+    saveDraft(nullptr);
 }
 
 void QuickCalibrationWizard::clearExternalImages()
@@ -791,6 +872,7 @@ void QuickCalibrationWizard::clearExternalImages()
     m_externalImagePaths.clear();
     m_externalImageSequenceComplete = false;
     rebuildExternalImageList(-1);
+    saveDraft(nullptr);
 }
 
 void QuickCalibrationWizard::updateImageModeUi()
@@ -816,6 +898,7 @@ void QuickCalibrationWizard::updatePreviewImage(const QImage &image)
 {
     if (!m_previewHelper)
         return;
+    m_currentLocationOverlays.clear();
     if (image.isNull()) {
         m_previewHelper->clear();
         if (m_previewEmptyLabel)
@@ -826,6 +909,114 @@ void QuickCalibrationWizard::updatePreviewImage(const QImage &image)
     m_previewHelper->fitToView();
     if (m_previewEmptyLabel)
         m_previewEmptyLabel->hide();
+    updateCalibrationOverlays();
+}
+
+bool QuickCalibrationWizard::calibrationResultPassed() const
+{
+    if (!m_methodConfigWidget || !m_solveResult.success)
+        return false;
+    if (m_methodConfigWidget->translationSampleCount() <= 0
+            || m_methodConfigWidget->completedTranslationSampleCount()
+               != m_methodConfigWidget->translationSampleCount()) {
+        return false;
+    }
+    const ICalibrationMethod *method =
+            CalibrationMethodRegistry::instance().method(m_methodId);
+    QString validationError;
+    return method && method->validateResult(m_solveResult, &validationError);
+}
+
+void QuickCalibrationWizard::updateCalibrationOverlays()
+{
+    if (!m_previewHelper)
+        return;
+    QVector<ToolOverlay> overlays = m_currentLocationOverlays;
+    if (m_methodConfigWidget) {
+        const bool solved = calibrationResultPassed();
+        const QVector<QLineF> segments =
+                m_methodConfigWidget->completedTranslationSegments();
+        overlays.reserve(overlays.size() + segments.size());
+        for (const QLineF &segment : segments) {
+            ToolOverlay overlay;
+            overlay.type = ToolOverlayType::Line;
+            overlay.p1 = segment.p1();
+            overlay.p2 = segment.p2();
+            overlay.label = solved ? tr("平移标定路径（已完成）")
+                                   : tr("平移标定路径（采集中）");
+            overlay.extra.insert(
+                        QStringLiteral("displayRole"),
+                        solved
+                        ? QStringLiteral("calibration_translation_path_solved")
+                        : QStringLiteral("calibration_translation_path_pending"));
+            overlay.extra.insert(QStringLiteral("emphasis"),
+                                 QStringLiteral("active"));
+            overlays.append(overlay);
+        }
+    }
+    m_previewHelper->setToolOverlays(overlays);
+}
+
+bool QuickCalibrationWizard::validateCoordinateSourceFingerprint(
+        const QJsonObject &fingerprint,
+        QString *errorMessage) const
+{
+    if (errorMessage)
+        errorMessage->clear();
+    QString invalidField;
+    if (!CalibrationSourceFingerprint::isComplete(fingerprint, &invalidField)) {
+        if (errorMessage)
+            *errorMessage = tr("坐标来源指纹不完整：%1").arg(invalidField);
+        return false;
+    }
+    const QString producerId = fingerprint.value(
+                QStringLiteral("producerId")).toString().trimmed();
+    const auto configIt = m_calibrationProducerConfigs.constFind(producerId);
+    if (configIt == m_calibrationProducerConfigs.cend()
+            || configIt->toolType != ToolType::TemplateLocation
+            || !configIt->enabled) {
+        if (errorMessage)
+            *errorMessage = tr("标定时使用的模板定位来源已不存在或被禁用");
+        return false;
+    }
+
+    const ToolConfig &currentConfig = configIt.value();
+    cv::Mat currentReferenceFrame =
+            ReferenceImageProvider::instance().referenceFrame();
+    if (currentReferenceFrame.empty())
+        currentReferenceFrame = qImageToBgrMat(m_referencePreviewImage);
+    QJsonObject currentPayload{
+        {QStringLiteral("originMode"),
+         currentConfig.params.value(QStringLiteral("originMode"))
+         .toString(QStringLiteral("centroid"))},
+        {QStringLiteral("customOriginNormalized"),
+         currentConfig.params.value(
+             QStringLiteral("customOriginNormalized")).toObject()},
+        // The model signature is deterministic for an unchanged template
+        // configuration and reference image.  The surrounding comparison also
+        // checks both identities before this saved value can be reused.
+        {QStringLiteral("modelSignature"),
+         fingerprint.value(QStringLiteral("modelSignature")).toString()},
+        {QStringLiteral("coordinateSourceConfigSignature"),
+         CalibrationSourceFingerprint::coordinateSourceConfigSignature(
+             currentConfig)},
+        {QStringLiteral("coordinateSourceReferenceSignature"),
+         CalibrationSourceFingerprint::imageSignature(
+             currentReferenceFrame)}
+    };
+    const QJsonObject currentFingerprint =
+            CalibrationSourceFingerprint::makeFingerprint(
+                producerId, currentConfig.toolType, currentPayload);
+    QString mismatchField;
+    if (!CalibrationSourceFingerprint::matches(
+                fingerprint, currentFingerprint, &mismatchField)) {
+        if (errorMessage) {
+            *errorMessage = tr("当前模板、原点、基准图或来源配置已变化（%1）")
+                    .arg(mismatchField);
+        }
+        return false;
+    }
+    return true;
 }
 
 void QuickCalibrationWizard::solveCalibration()
@@ -833,6 +1024,12 @@ void QuickCalibrationWizard::solveCalibration()
     // Every solve attempt owns a fresh result.  Early validation failures must
     // never leave the previous successful model available to the Next action.
     m_solveResult = CalibrationSolveResult();
+    updateCalibrationOverlays();
+    if (!m_persistentConfigurationError.isEmpty()) {
+        QMessageBox::warning(this, tr("求解已禁止"),
+                             m_persistentConfigurationError);
+        return;
+    }
     const ICalibrationMethod *method = CalibrationMethodRegistry::instance().method(m_methodId);
     if (!method) {
         QMessageBox::warning(this, tr("求解失败"), tr("标定方式不存在"));
@@ -878,9 +1075,31 @@ void QuickCalibrationWizard::solveCalibration()
                                 {QStringLiteral("version"), 1},
                                 {QStringLiteral("width"), calibrationImage.width()},
                                 {QStringLiteral("height"), calibrationImage.height()}});
+        const QString captureMode = draft.parameters
+                .value(QStringLiteral("captureBindings")).toObject()
+                .value(QStringLiteral("captureMode"))
+                .toString(QStringLiteral("trigger"));
+        if (captureMode == QStringLiteral("manual")) {
+            imageBinding.insert(QStringLiteral("coordinateSourceFingerprint"),
+                                QJsonObject{{QStringLiteral("mode"),
+                                             QStringLiteral("manual")}});
+        } else {
+            QString sourceError;
+            if (!validateCoordinateSourceFingerprint(
+                        m_lockedCoordinateSourceFingerprint, &sourceError)) {
+                QMessageBox::warning(
+                            this, tr("求解失败"),
+                            tr("标定点来源无法继续使用：%1，请清空后重新采集")
+                            .arg(sourceError));
+                return;
+            }
+            imageBinding.insert(QStringLiteral("coordinateSourceFingerprint"),
+                                m_lockedCoordinateSourceFingerprint);
+        }
         draft.parameters.insert(QStringLiteral("imageBinding"), imageBinding);
     }
     m_solveResult = method->solve(draft);
+    updateCalibrationOverlays();
     if (!m_solveResult.success) {
         QMessageBox::warning(this, tr("求解失败"), m_solveResult.message);
         return;
@@ -941,6 +1160,230 @@ void QuickCalibrationWizard::showSolveResult()
                             .arg(quality.passed ? tr("通过") : tr("超限")));
 }
 
+QString QuickCalibrationWizard::configurationTargetKey() const
+{
+    QStringList ids = targetCalibrationTransformIds();
+    ids.sort();
+    return ids.isEmpty() ? QStringLiteral("unassigned") : ids.first();
+}
+
+QString QuickCalibrationWizard::draftTargetKey() const
+{
+    QStringList ids = targetCalibrationTransformIds();
+    ids.sort();
+    return ids.isEmpty()
+            ? QStringLiteral("unassigned")
+            : QStringLiteral("targets:%1").arg(ids.join(QLatin1Char('|')));
+}
+
+QJsonObject QuickCalibrationWizard::communicationSettings() const
+{
+    QJsonObject addresses{
+        {QStringLiteral("tcpClient"),
+         m_communicationHost->property("tcpClientAddress").toString()},
+        {QStringLiteral("tcpServer"),
+         m_communicationHost->property("tcpServerAddress").toString()},
+        {QStringLiteral("udpBind"),
+         m_communicationHost->property("udpBindAddress").toString()}
+    };
+    const QString transport = m_communicationType->currentData().toString();
+    if (transport == QStringLiteral("tcp_client"))
+        addresses.insert(QStringLiteral("tcpClient"), m_communicationHost->text().trimmed());
+    else if (transport == QStringLiteral("tcp_server"))
+        addresses.insert(QStringLiteral("tcpServer"), m_communicationHost->text().trimmed());
+    else if (transport == QStringLiteral("udp"))
+        addresses.insert(QStringLiteral("udpBind"), m_communicationHost->text().trimmed());
+
+    return QJsonObject{
+        {QStringLiteral("version"), 1},
+        {QStringLiteral("transport"), transport},
+        {QStringLiteral("host"), m_communicationHost->text().trimmed()},
+        {QStringLiteral("addresses"), addresses},
+        {QStringLiteral("port"), m_communicationPort->value()},
+        {QStringLiteral("startSignal"), m_startSignal->text()},
+        {QStringLiteral("captureSignal"), m_calibrationSignal->text()},
+        {QStringLiteral("endSignal"), m_endSignal->text()},
+        {QStringLiteral("delimiter"), m_delimiter->text()},
+        {QStringLiteral("terminator"), m_terminator->text()},
+        {QStringLiteral("startOk"), m_startOk->text()},
+        {QStringLiteral("startNg"), m_startNg->text()},
+        {QStringLiteral("captureOk"), m_captureOk->text()},
+        {QStringLiteral("captureNg"), m_captureNg->text()},
+        {QStringLiteral("endOk"), m_endOk->text()},
+        {QStringLiteral("endNg"), m_endNg->text()},
+        {QStringLiteral("fieldMapping"), QJsonObject{
+             {QStringLiteral("x"), m_xField->value()},
+             {QStringLiteral("y"), m_yField->value()},
+             {QStringLiteral("angle"), m_angleField->value()}
+         }}
+    };
+}
+
+void QuickCalibrationWizard::restoreCommunicationSettings(
+        const QJsonObject &settings)
+{
+    if (settings.isEmpty())
+        return;
+    const QJsonObject addresses = settings.value(QStringLiteral("addresses")).toObject();
+    if (addresses.value(QStringLiteral("tcpClient")).isString())
+        m_communicationHost->setProperty(
+                    "tcpClientAddress",
+                    addresses.value(QStringLiteral("tcpClient")).toString());
+    if (addresses.value(QStringLiteral("tcpServer")).isString())
+        m_communicationHost->setProperty(
+                    "tcpServerAddress",
+                    addresses.value(QStringLiteral("tcpServer")).toString());
+    if (addresses.value(QStringLiteral("udpBind")).isString())
+        m_communicationHost->setProperty(
+                    "udpBindAddress",
+                    addresses.value(QStringLiteral("udpBind")).toString());
+
+    const QString transport = settings.value(QStringLiteral("transport"))
+            .toString(QStringLiteral("none"));
+    const int transportIndex = m_communicationType->findData(transport);
+    if (transportIndex >= 0)
+        m_communicationType->setCurrentIndex(transportIndex);
+    if (settings.value(QStringLiteral("host")).isString())
+        m_communicationHost->setText(settings.value(QStringLiteral("host")).toString());
+    if (settings.value(QStringLiteral("port")).isDouble())
+        m_communicationPort->setValue(settings.value(QStringLiteral("port")).toInt());
+
+    const auto restoreText = [&settings](const QString &key, QLineEdit *edit) {
+        if (settings.value(key).isString())
+            edit->setText(settings.value(key).toString());
+    };
+    restoreText(QStringLiteral("startSignal"), m_startSignal);
+    restoreText(QStringLiteral("captureSignal"), m_calibrationSignal);
+    restoreText(QStringLiteral("endSignal"), m_endSignal);
+    restoreText(QStringLiteral("delimiter"), m_delimiter);
+    restoreText(QStringLiteral("terminator"), m_terminator);
+    restoreText(QStringLiteral("startOk"), m_startOk);
+    restoreText(QStringLiteral("startNg"), m_startNg);
+    restoreText(QStringLiteral("captureOk"), m_captureOk);
+    restoreText(QStringLiteral("captureNg"), m_captureNg);
+    restoreText(QStringLiteral("endOk"), m_endOk);
+    restoreText(QStringLiteral("endNg"), m_endNg);
+    const QJsonObject mapping = settings.value(QStringLiteral("fieldMapping")).toObject();
+    if (mapping.value(QStringLiteral("x")).isDouble())
+        m_xField->setValue(mapping.value(QStringLiteral("x")).toInt());
+    if (mapping.value(QStringLiteral("y")).isDouble())
+        m_yField->setValue(mapping.value(QStringLiteral("y")).toInt());
+    if (mapping.value(QStringLiteral("angle")).isDouble())
+        m_angleField->setValue(mapping.value(QStringLiteral("angle")).toInt());
+}
+
+void QuickCalibrationWizard::setPersistentConfiguration(
+        const QJsonObject &configuration)
+{
+    m_draftPersistenceEnabled = true;
+    m_loadedPersistentConfiguration = configuration;
+    m_persistentConfigurationWritable = true;
+    m_persistentConfigurationError.clear();
+    const int version = configuration.value(QStringLiteral("version")).toInt(1);
+    if (!configuration.isEmpty() && version > 1) {
+        m_persistentConfigurationWritable = false;
+        m_persistentConfigurationError = tr(
+                    "当前方案的快速标定配置版本为 %1，高于本程序支持版本；已禁止求解和生成，请使用兼容版本处理。")
+                .arg(version);
+        if (m_communicationStatus)
+            m_communicationStatus->setText(m_persistentConfigurationError);
+        if (m_sampleStatus)
+            m_sampleStatus->setText(m_persistentConfigurationError);
+        qWarning() << "[QuickCalibrationWizard] 快速标定配置版本高于当前程序，保持只读:"
+                   << version;
+        return;
+    }
+    restoreCommunicationSettings(
+                configuration.value(QStringLiteral("communication")).toObject());
+    if (configuration.contains(QStringLiteral("lastTargetToolIds"))
+            && configuration.value(QStringLiteral("lastTargetToolIds")).isArray()
+            && m_targetTransformList) {
+        QSet<QString> savedIds;
+        const QJsonArray savedTargets = configuration.value(
+                    QStringLiteral("lastTargetToolIds")).toArray();
+        for (const QJsonValue &value : savedTargets) {
+            if (value.isString() && !value.toString().trimmed().isEmpty())
+                savedIds.insert(value.toString().trimmed());
+        }
+        for (int row = 0; row < m_targetTransformList->count(); ++row) {
+            QListWidgetItem *item = m_targetTransformList->item(row);
+            const QString id = item->data(Qt::UserRole).toString();
+            if (!id.isEmpty())
+                item->setCheckState(savedIds.contains(id)
+                                    ? Qt::Checked : Qt::Unchecked);
+        }
+    }
+    const QJsonObject targets = configuration.value(QStringLiteral("targets")).toObject();
+    const QJsonObject target = targets.value(configurationTargetKey()).toObject();
+    m_pendingMethodSettings = target.value(QStringLiteral("nPoint")).toObject();
+    if (m_pendingMethodSettings.value(QStringLiteral("version")).toInt(1) > 1) {
+        m_pendingMethodSettings = QJsonObject();
+        m_persistentConfigurationWritable = false;
+        m_persistentConfigurationError = tr(
+                    "当前方案的 N 点配置版本高于本程序支持版本；已禁止求解和生成，请使用兼容版本处理。");
+        if (m_communicationStatus)
+            m_communicationStatus->setText(m_persistentConfigurationError);
+        if (m_sampleStatus)
+            m_sampleStatus->setText(m_persistentConfigurationError);
+        qWarning() << "[QuickCalibrationWizard] N点稳定配置版本高于当前程序，保持只读";
+        return;
+    }
+    if (NPointCalibrationConfigWidget *nPoint =
+            dynamic_cast<NPointCalibrationConfigWidget *>(m_methodConfigWidget)) {
+        QString restoreError;
+        if (!nPoint->restorePersistentSettings(
+                    m_pendingMethodSettings, &restoreError)) {
+            m_persistentConfigurationWritable = false;
+            m_persistentConfigurationError = tr(
+                        "当前方案的 N 点稳定配置无效：%1。已禁止求解和生成，请修复方案配置。")
+                    .arg(restoreError);
+            if (m_communicationStatus)
+                m_communicationStatus->setText(m_persistentConfigurationError);
+            if (m_sampleStatus)
+                m_sampleStatus->setText(m_persistentConfigurationError);
+            qWarning() << "[QuickCalibrationWizard] N点稳定配置无效，保持原配置不覆盖:"
+                       << restoreError;
+        }
+    }
+}
+
+QJsonObject QuickCalibrationWizard::persistentConfiguration() const
+{
+    if (!m_persistentConfigurationWritable)
+        return m_loadedPersistentConfiguration;
+    QJsonObject configuration = m_loadedPersistentConfiguration;
+    configuration.insert(QStringLiteral("version"), 1);
+    configuration.insert(QStringLiteral("communication"), communicationSettings());
+    configuration.insert(QStringLiteral("lastMethodId"), m_methodId);
+    configuration.insert(QStringLiteral("lastTargetKey"), configurationTargetKey());
+    QJsonArray selectedTargetIds;
+    QStringList targetIds = targetCalibrationTransformIds();
+    targetIds.sort();
+    for (const QString &id : std::as_const(targetIds))
+        selectedTargetIds.append(id);
+    configuration.insert(QStringLiteral("lastTargetToolIds"), selectedTargetIds);
+
+    QJsonObject methodSettings = m_pendingMethodSettings;
+    if (const NPointCalibrationConfigWidget *nPoint =
+            dynamic_cast<const NPointCalibrationConfigWidget *>(m_methodConfigWidget)) {
+        methodSettings = nPoint->persistentSettings();
+    }
+    if (!methodSettings.isEmpty()) {
+        QJsonObject targets = configuration.value(QStringLiteral("targets")).toObject();
+        QStringList settingsTargets = targetIds;
+        if (settingsTargets.isEmpty())
+            settingsTargets.append(QStringLiteral("unassigned"));
+        for (const QString &targetId : std::as_const(settingsTargets)) {
+            QJsonObject target = targets.value(targetId).toObject();
+            target.insert(QStringLiteral("methodId"), QStringLiteral("n_point"));
+            target.insert(QStringLiteral("nPoint"), methodSettings);
+            targets.insert(targetId, target);
+        }
+        configuration.insert(QStringLiteral("targets"), targets);
+    }
+    return configuration;
+}
+
 CalibrationCommunicationConfig QuickCalibrationWizard::communicationConfig() const
 {
     CalibrationCommunicationConfig config;
@@ -968,6 +1411,11 @@ CalibrationCommunicationConfig QuickCalibrationWizard::communicationConfig() con
 
 bool QuickCalibrationWizard::validateCommunicationPage()
 {
+    if (!m_persistentConfigurationError.isEmpty()) {
+        QMessageBox::warning(this, tr("快速标定配置不兼容"),
+                             m_persistentConfigurationError);
+        return false;
+    }
     const ICalibrationMethod *method = CalibrationMethodRegistry::instance().method(m_methodId);
     if (method && method->capabilities().requiresCommunication
             && m_communicationType->currentIndex() == 0) {
@@ -1006,6 +1454,11 @@ void QuickCalibrationWizard::toggleCommunicationSession()
         m_communicationSession->stop();
         return;
     }
+    if (!m_persistentConfigurationError.isEmpty()) {
+        QMessageBox::warning(this, tr("启动通信已禁止"),
+                             m_persistentConfigurationError);
+        return;
+    }
     QString error;
     if (!m_communicationSession->start(communicationConfig(), &error))
         QMessageBox::warning(this, tr("启动通信失败"), error);
@@ -1028,6 +1481,18 @@ bool QuickCalibrationWizard::handleCommunicationMessage(
         m_sampleStatus->style()->unpolish(m_sampleStatus);
         m_sampleStatus->style()->polish(m_sampleStatus);
     };
+    if (m_draftRestorePromptActive || m_restoringDraft) {
+        if (errorMessage)
+            *errorMessage = tr("正在确认或恢复未完成标定，暂不接受触发采样");
+        showCaptureFailure(tr("正在恢复标定草稿"));
+        return false;
+    }
+    if (!m_persistentConfigurationError.isEmpty()) {
+        if (errorMessage)
+            *errorMessage = m_persistentConfigurationError;
+        showCaptureFailure(tr("快速标定配置不兼容"));
+        return false;
+    }
     if (m_step != 2) {
         if (errorMessage)
             *errorMessage = tr("当前不在标定配置页，不能执行触发采样");
@@ -1062,14 +1527,17 @@ bool QuickCalibrationWizard::handleCommunicationMessage(
     m_pendingCaptureCameraFrameIndex = -1;
     m_solveResult = CalibrationSolveResult();
     advanceExternalImageAfterCapture();
+    QString draftError;
+    if (!saveDraft(&draftError) && !draftError.isEmpty())
+        qWarning() << "[QuickCalibrationWizard] 采点后保存草稿失败:" << draftError;
     return true;
 }
 
 bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
 {
     m_pendingCaptureCameraFrameIndex = -1;
-    if (m_previewHelper)
-        m_previewHelper->clearToolOverlays();
+    m_currentLocationOverlays.clear();
+    updateCalibrationOverlays();
     const auto fail = [errorMessage](const QString &message) {
         if (errorMessage)
             *errorMessage = message;
@@ -1148,6 +1616,31 @@ bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
             && finitePayloadNumber(result.payload, QStringLiteral("y"))
             && finitePayloadNumber(result.payload, QStringLiteral("angle"));
 
+    if (validPose) {
+        const QJsonObject currentFingerprint =
+                CalibrationSourceFingerprint::makeFingerprint(
+                    producerId, ToolType::TemplateLocation, result.payload);
+        QString fingerprintError;
+        if (!CalibrationSourceFingerprint::isComplete(
+                    currentFingerprint, &fingerprintError)) {
+            return fail(tr("模板定位未返回完整坐标来源身份（%1），禁止采样")
+                        .arg(fingerprintError));
+        }
+        if (!m_lockedCoordinateSourceFingerprint.isEmpty()) {
+            QString mismatchField;
+            if (!CalibrationSourceFingerprint::matches(
+                        m_lockedCoordinateSourceFingerprint,
+                        currentFingerprint,
+                        &mismatchField)) {
+                return fail(tr("模板、原点、基准图或来源配置已变化（%1），"
+                               "请清空点表后重新采样")
+                            .arg(mismatchField));
+            }
+        } else {
+            m_lockedCoordinateSourceFingerprint = currentFingerprint;
+        }
+    }
+
     bool producerUpdated = false;
     for (CalibrationProducerSnapshot &snapshot : m_calibrationProducerSnapshots) {
         if (snapshot.producerId != producerId)
@@ -1167,8 +1660,8 @@ bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
         m_calibrationProducerSnapshots.append(snapshot);
     }
     m_methodConfigWidget->setProducerSnapshots(m_calibrationProducerSnapshots);
-    if (m_previewHelper)
-        m_previewHelper->setToolOverlays(result.overlays);
+    m_currentLocationOverlays = result.overlays;
+    updateCalibrationOverlays();
 
     if (!result.success || !result.ok) {
         const QString detail = result.message.trimmed().isEmpty()
@@ -1215,10 +1708,408 @@ void QuickCalibrationWizard::advanceExternalImageAfterCapture()
     }
 }
 
+QString QuickCalibrationWizard::draftFilePath() const
+{
+    const QString schemeDir = SchemeStore::instance().currentScheme().schemeDir;
+    if (schemeDir.trimmed().isEmpty())
+        return QString();
+    const QByteArray keyHash = QCryptographicHash::hash(
+                draftTargetKey().toUtf8(), QCryptographicHash::Sha256)
+            .toHex().left(16);
+    const QString draftDir = QDir(schemeDir).filePath(
+                QStringLiteral("calibrations/drafts"));
+    return QDir(draftDir).filePath(
+                QStringLiteral("n_point_%1.json")
+                .arg(QString::fromLatin1(keyHash)));
+}
+
+bool QuickCalibrationWizard::saveDraft(QString *errorMessage)
+{
+    if (errorMessage)
+        errorMessage->clear();
+    if (!m_draftPersistenceEnabled || m_restoringDraft
+            || m_generatedFileCompleted)
+        return true;
+    NPointCalibrationConfigWidget *nPoint =
+            dynamic_cast<NPointCalibrationConfigWidget *>(m_methodConfigWidget);
+    if (!nPoint)
+        return true;
+
+    QString pointError;
+    nPoint->draft(&pointError);
+    if (!pointError.isEmpty()) {
+        if (errorMessage)
+            *errorMessage = tr("标定点表包含无效数据，草稿未覆盖：%1").arg(pointError);
+        return false;
+    }
+
+    const QString path = draftFilePath();
+    if (path.isEmpty()) {
+        if (errorMessage)
+            *errorMessage = tr("当前方案目录为空，无法保存标定草稿");
+        return false;
+    }
+    if (nPoint->completedSampleCount() == 0 && m_externalImagePaths.isEmpty()) {
+        QFile::remove(path);
+        if (!m_lastSavedDraftPath.isEmpty() && m_lastSavedDraftPath != path)
+            QFile::remove(m_lastSavedDraftPath);
+        m_lastSavedDraftPath.clear();
+        return true;
+    }
+
+    QJsonArray images;
+    for (int index = 0; index < m_externalImagePaths.size(); ++index) {
+        const QString imagePath = m_externalImagePaths.at(index);
+        const QImage image = index < m_externalImages.size()
+                ? m_externalImages.at(index) : QImage(imagePath);
+        images.append(QJsonObject{
+            {QStringLiteral("path"), imagePath},
+            {QStringLiteral("width"), image.width()},
+            {QStringLiteral("height"), image.height()},
+            {QStringLiteral("sha256"), fileSha256(imagePath)}
+        });
+    }
+    QJsonArray targetIds;
+    for (const QString &id : targetCalibrationTransformIds())
+        targetIds.append(id);
+    const QJsonObject document{
+        {QStringLiteral("version"), 1},
+        {QStringLiteral("methodId"), QStringLiteral("n_point")},
+        {QStringLiteral("targetKey"), draftTargetKey()},
+        {QStringLiteral("targetToolIds"), targetIds},
+        {QStringLiteral("persistentSettings"), nPoint->persistentSettings()},
+        {QStringLiteral("nPoint"), nPoint->draftState()},
+        {QStringLiteral("coordinateSourceFingerprint"),
+         m_lockedCoordinateSourceFingerprint},
+        {QStringLiteral("inputMode"),
+         m_cameraModeButton && m_cameraModeButton->isChecked()
+            ? QStringLiteral("camera") : QStringLiteral("image")},
+        {QStringLiteral("referenceImage"), QJsonObject{
+             {QStringLiteral("present"), !m_referencePreviewImage.isNull()},
+             {QStringLiteral("width"), m_referencePreviewImage.width()},
+             {QStringLiteral("height"), m_referencePreviewImage.height()},
+             {QStringLiteral("sha256"), imageSha256(m_referencePreviewImage)}
+         }},
+        {QStringLiteral("images"), images},
+        {QStringLiteral("currentImageIndex"),
+         m_imageThumbnailList ? m_imageThumbnailList->currentRow() : -1},
+        {QStringLiteral("updatedAt"),
+         QDateTime::currentDateTime().toString(Qt::ISODateWithMs)}
+    };
+
+    QDir parent = QFileInfo(path).dir();
+    if (!parent.exists() && !parent.mkpath(QStringLiteral("."))) {
+        if (errorMessage)
+            *errorMessage = tr("无法创建标定草稿目录：%1").arg(parent.absolutePath());
+        return false;
+    }
+    QSaveFile file(path);
+    const QByteArray bytes = QJsonDocument(document).toJson(QJsonDocument::Indented);
+    if (!file.open(QIODevice::WriteOnly)
+            || file.write(bytes) != bytes.size()
+            || !file.commit()) {
+        if (errorMessage)
+            *errorMessage = tr("无法原子保存标定草稿：%1").arg(path);
+        return false;
+    }
+    if (!m_lastSavedDraftPath.isEmpty() && m_lastSavedDraftPath != path)
+        QFile::remove(m_lastSavedDraftPath);
+    m_lastSavedDraftPath = path;
+    return true;
+}
+
+bool QuickCalibrationWizard::restoreDraft(QString *errorMessage)
+{
+    if (errorMessage)
+        errorMessage->clear();
+    const QString path = draftFilePath();
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (errorMessage)
+            *errorMessage = tr("无法读取标定草稿：%1").arg(path);
+        return false;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument parsed = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !parsed.isObject()) {
+        if (errorMessage)
+            *errorMessage = tr("标定草稿格式无效：%1").arg(parseError.errorString());
+        return false;
+    }
+    const QJsonObject document = parsed.object();
+    if (document.value(QStringLiteral("version")).toInt() != 1
+            || document.value(QStringLiteral("methodId")).toString()
+               != QStringLiteral("n_point")) {
+        if (errorMessage)
+            *errorMessage = tr("标定草稿版本或标定方式不兼容");
+        return false;
+    }
+    if (document.value(QStringLiteral("targetKey")).toString()
+            != draftTargetKey()) {
+        if (errorMessage)
+            *errorMessage = tr("标定草稿目标与当前选择不一致");
+        return false;
+    }
+    const QJsonArray savedTargetIds = document.value(
+                QStringLiteral("targetToolIds")).toArray();
+    if (document.contains(QStringLiteral("targetToolIds"))
+            && m_targetTransformList) {
+        QSet<QString> availableIds;
+        for (int row = 0; row < m_targetTransformList->count(); ++row) {
+            const QString id = m_targetTransformList->item(row)
+                    ->data(Qt::UserRole).toString();
+            if (!id.isEmpty())
+                availableIds.insert(id);
+        }
+        for (const QJsonValue &value : savedTargetIds) {
+            if (!value.isString() || !availableIds.contains(value.toString())) {
+                if (errorMessage)
+                    *errorMessage = tr("标定草稿引用的目标工具已不存在");
+                return false;
+            }
+        }
+    }
+    if (!ensureMethodConfigWidget()) {
+        if (errorMessage)
+            *errorMessage = tr("无法创建 N 点标定配置页面");
+        return false;
+    }
+    NPointCalibrationConfigWidget *nPoint =
+            dynamic_cast<NPointCalibrationConfigWidget *>(m_methodConfigWidget);
+    if (!nPoint) {
+        if (errorMessage)
+            *errorMessage = tr("当前标定方式不是 N 点标定");
+        return false;
+    }
+
+    const QJsonObject restoredSourceFingerprint = document.value(
+                QStringLiteral("coordinateSourceFingerprint")).toObject();
+    QString sourceFingerprintError;
+    if (!restoredSourceFingerprint.isEmpty()
+            && !CalibrationSourceFingerprint::isComplete(
+                restoredSourceFingerprint, &sourceFingerprintError)) {
+        if (errorMessage) {
+            *errorMessage = tr("标定草稿的坐标来源指纹无效：%1")
+                    .arg(sourceFingerprintError);
+        }
+        return false;
+    }
+    const QJsonObject savedPointState = document.value(
+                QStringLiteral("nPoint")).toObject();
+    int savedCompletedCount = 0;
+    const QJsonArray savedSamples = savedPointState.value(
+                QStringLiteral("samples")).toArray();
+    for (const QJsonValue &value : savedSamples) {
+        if (value.toObject().value(QStringLiteral("completed")).toBool(false))
+            ++savedCompletedCount;
+    }
+    const QString savedCaptureMode = document.value(
+                QStringLiteral("persistentSettings")).toObject()
+            .value(QStringLiteral("captureBindings")).toObject()
+            .value(QStringLiteral("captureMode"))
+            .toString(QStringLiteral("trigger"));
+    if (savedCompletedCount > 0
+            && savedCaptureMode != QStringLiteral("manual")
+            && restoredSourceFingerprint.isEmpty()) {
+        if (errorMessage) {
+            *errorMessage = tr("旧草稿未记录模板来源身份，无法安全续采；请放弃草稿后重新标定");
+        }
+        return false;
+    }
+    if (savedCompletedCount > 0
+            && savedCaptureMode != QStringLiteral("manual")) {
+        QString currentSourceError;
+        if (!validateCoordinateSourceFingerprint(
+                    restoredSourceFingerprint, &currentSourceError)) {
+            if (errorMessage) {
+                *errorMessage = tr("草稿对应的模板来源已变化：%1")
+                        .arg(currentSourceError);
+            }
+            return false;
+        }
+    }
+
+    QVector<QImage> restoredImages;
+    QStringList restoredPaths;
+    const QJsonObject referenceInfo = document.value(
+                QStringLiteral("referenceImage")).toObject();
+    const bool savedReferencePresent = referenceInfo.value(
+                QStringLiteral("present")).toBool();
+    if (savedReferencePresent != !m_referencePreviewImage.isNull()
+            || (savedReferencePresent
+                && (referenceInfo.value(QStringLiteral("width")).toInt()
+                    != m_referencePreviewImage.width()
+                    || referenceInfo.value(QStringLiteral("height")).toInt()
+                    != m_referencePreviewImage.height()
+                    || referenceInfo.value(QStringLiteral("sha256")).toString()
+                    != imageSha256(m_referencePreviewImage)))) {
+        if (errorMessage)
+            *errorMessage = tr("当前方案基准图与草稿采样时不一致");
+        return false;
+    }
+    const QJsonArray images = document.value(QStringLiteral("images")).toArray();
+    for (const QJsonValue &value : images) {
+        const QJsonObject imageInfo = value.toObject();
+        const QString imagePath = imageInfo.value(QStringLiteral("path"))
+                .toString().trimmed();
+        const QImage image(imagePath);
+        if (imagePath.isEmpty() || image.isNull()) {
+            if (errorMessage)
+                *errorMessage = tr("草稿图片缺失或不可读：%1").arg(imagePath);
+            return false;
+        }
+        if (image.width() != imageInfo.value(QStringLiteral("width")).toInt()
+                || image.height() != imageInfo.value(QStringLiteral("height")).toInt()) {
+            if (errorMessage)
+                *errorMessage = tr("草稿图片尺寸已变化：%1").arg(imagePath);
+            return false;
+        }
+        const QString expectedHash = imageInfo.value(QStringLiteral("sha256")).toString();
+        if (!expectedHash.isEmpty() && fileSha256(imagePath) != expectedHash) {
+            if (errorMessage)
+                *errorMessage = tr("草稿图片内容已变化：%1").arg(imagePath);
+            return false;
+        }
+        restoredImages.append(image);
+        restoredPaths.append(QFileInfo(imagePath).absoluteFilePath());
+    }
+
+    const QString inputMode = document.value(QStringLiteral("inputMode"))
+            .toString(QStringLiteral("image"));
+    if (inputMode != QStringLiteral("camera")
+            && inputMode != QStringLiteral("image")) {
+        if (errorMessage)
+            *errorMessage = tr("标定草稿图像输入模式无效");
+        return false;
+    }
+    const int requestedIndex = document.value(
+                QStringLiteral("currentImageIndex")).toInt(-1);
+    if (requestedIndex < -1 || requestedIndex >= restoredImages.size()) {
+        if (errorMessage)
+            *errorMessage = tr("标定草稿当前图片序号无效");
+        return false;
+    }
+
+    m_restoringDraft = true;
+    const QJsonObject previousSettings = nPoint->persistentSettings();
+    const QJsonObject previousState = nPoint->draftState();
+    const QJsonObject previousSourceFingerprint =
+            m_lockedCoordinateSourceFingerprint;
+    QString restoreError;
+    const bool settingsOk = nPoint->restorePersistentSettings(
+                document.value(QStringLiteral("persistentSettings")).toObject(),
+                &restoreError);
+    const bool stateOk = settingsOk && nPoint->restoreDraftState(
+                document.value(QStringLiteral("nPoint")).toObject(),
+                &restoreError);
+    if (!stateOk) {
+        QString rollbackError;
+        nPoint->restorePersistentSettings(previousSettings, &rollbackError);
+        nPoint->restoreDraftState(previousState, &rollbackError);
+        m_lockedCoordinateSourceFingerprint = previousSourceFingerprint;
+        m_restoringDraft = false;
+        if (errorMessage)
+            *errorMessage = restoreError;
+        return false;
+    }
+
+    if (document.contains(QStringLiteral("targetToolIds"))
+            && m_targetTransformList) {
+        for (int row = 0; row < m_targetTransformList->count(); ++row) {
+            QListWidgetItem *item = m_targetTransformList->item(row);
+            const QString id = item->data(Qt::UserRole).toString();
+            if (!id.isEmpty()) {
+                item->setCheckState(savedTargetIds.contains(id)
+                                    ? Qt::Checked : Qt::Unchecked);
+            }
+        }
+    }
+
+    m_externalImages = restoredImages;
+    m_externalImagePaths = restoredPaths;
+    rebuildExternalImageList(requestedIndex);
+    if (inputMode == QStringLiteral("camera")) {
+        m_cameraModeButton->setChecked(true);
+        m_imageModeButton->setChecked(false);
+        m_imageCollectionPanel->hide();
+        m_imageCounterLabel->hide();
+        m_lastCapturedCameraFrameIndex =
+                CameraFrameProvider::instance().currentFrameIndex();
+        updatePreviewImage(CameraFrameProvider::instance().currentImage());
+    } else {
+        m_cameraModeButton->setChecked(false);
+        m_imageModeButton->setChecked(true);
+        m_imageCollectionPanel->show();
+        m_imageCounterLabel->show();
+        updateImageModeUi();
+    }
+    m_externalImageSequenceComplete = false;
+    m_lastCommunicationMessage = CalibrationCommunicationMessage();
+    m_sessionLog.clear();
+    m_solveResult = CalibrationSolveResult();
+    m_lockedCoordinateSourceFingerprint = restoredSourceFingerprint;
+    if (m_communicationSession->isRunning())
+        m_communicationSession->stop();
+    m_communicationStatus->setText(tr("已恢复草稿；通信保持停止，请确认后重新启动"));
+    m_sampleStatus->setText(tr("已恢复未完成标定：%1/%2，下一点为第 %3 点")
+                            .arg(nPoint->completedSampleCount())
+                            .arg(nPoint->sampleCount())
+                            .arg(qMin(nPoint->completedSampleCount() + 1,
+                                      nPoint->sampleCount())));
+    m_sampleStatus->setProperty("status", QStringLiteral("idle"));
+    m_lastSavedDraftPath = path;
+    m_restoringDraft = false;
+    return true;
+}
+
+void QuickCalibrationWizard::promptRestoreDraft()
+{
+    m_draftRestoreHandled = true;
+    const QString path = draftFilePath();
+    if (path.isEmpty() || !QFileInfo::exists(path))
+        return;
+
+    QFile file(path);
+    int completed = 0;
+    int total = 0;
+    if (file.open(QIODevice::ReadOnly)) {
+        const QJsonObject object = QJsonDocument::fromJson(file.readAll()).object();
+        const QJsonObject state = object.value(QStringLiteral("nPoint")).toObject();
+        completed = state.value(QStringLiteral("completedSampleCount")).toInt();
+        total = state.value(QStringLiteral("sampleCount")).toInt();
+    }
+    const QMessageBox::StandardButton answer = QMessageBox::question(
+                this, tr("恢复未完成标定"),
+                tr("发现当前方案未完成的 N 点标定（%1/%2）。\n"
+                   "选择“是”从下一未完成点继续；选择“否”放弃该草稿。\n"
+                   "通信不会自动连接。").arg(completed).arg(total),
+                QMessageBox::Yes | QMessageBox::No,
+                QMessageBox::Yes);
+    if (answer == QMessageBox::No) {
+        discardDraft();
+        return;
+    }
+    QString error;
+    if (!restoreDraft(&error))
+        QMessageBox::warning(this, tr("草稿恢复失败"), error);
+}
+
+void QuickCalibrationWizard::discardDraft()
+{
+    const QString path = draftFilePath();
+    if (!path.isEmpty())
+        QFile::remove(path);
+    if (!m_lastSavedDraftPath.isEmpty() && m_lastSavedDraftPath != path)
+        QFile::remove(m_lastSavedDraftPath);
+    m_lastSavedDraftPath.clear();
+}
+
 void QuickCalibrationWizard::setProducerTools(
         const QVector<ToolConfig> &tools,
-        const QMap<QString, ToolPreviewSnapshot> &snapshots)
+        const QMap<QString, ToolPreviewSnapshot> &snapshots,
+        int selectedToolIndex)
 {
+    rebuildTargetTransformList(tools, selectedToolIndex);
     m_calibrationProducerConfigs.clear();
     m_calibrationProducerSnapshots.clear();
     for (const ToolConfig &tool : tools) {
@@ -1242,6 +2133,102 @@ void QuickCalibrationWizard::setProducerTools(
         m_methodConfigWidget->setProducerSnapshots(m_calibrationProducerSnapshots);
 }
 
+void QuickCalibrationWizard::rebuildTargetTransformList(
+        const QVector<ToolConfig> &tools, int selectedToolIndex)
+{
+    if (!m_targetTransformList)
+        return;
+
+    m_targetTransformList->clear();
+    m_targetTransformConfigs.clear();
+    QVector<int> transformIndexes;
+    for (int index = 0; index < tools.size(); ++index) {
+        if (tools.at(index).toolType == ToolType::CalibrationTransform
+                && !tools.at(index).toolId.trimmed().isEmpty()) {
+            transformIndexes.append(index);
+        }
+    }
+
+    int defaultIndex = -1;
+    if (selectedToolIndex >= 0 && selectedToolIndex < tools.size()
+            && tools.at(selectedToolIndex).toolType
+               == ToolType::CalibrationTransform) {
+        defaultIndex = selectedToolIndex;
+    } else if (transformIndexes.size() == 1) {
+        defaultIndex = transformIndexes.first();
+    }
+    m_configurationTargetToolId = defaultIndex >= 0
+            ? tools.at(defaultIndex).toolId : QString();
+
+    if (transformIndexes.isEmpty()) {
+        QListWidgetItem *empty = new QListWidgetItem(
+                    tr("当前方案没有标定转换；XML 将仅保存为方案标定文件"),
+                    m_targetTransformList);
+        empty->setFlags(Qt::NoItemFlags);
+        if (m_targetTransformHint)
+            m_targetTransformHint->setText(
+                        tr("可先完成标定文件生成，之后新增标定转换并选择该文件。"));
+        return;
+    }
+
+    for (int index : std::as_const(transformIndexes)) {
+        const ToolConfig &tool = tools.at(index);
+        m_targetTransformConfigs.insert(tool.toolId, tool);
+        const QJsonObject transform = tool.params
+                .value(QStringLiteral("calibrationTransform")).toObject();
+        const QString activeFile = transform
+                .value(QStringLiteral("activeCalibrationFile")).toString();
+        const QJsonObject inputX = transform.value(QStringLiteral("inputX")).toObject();
+        const QJsonObject inputY = transform.value(QStringLiteral("inputY")).toObject();
+        const QJsonObject inputAngle = transform
+                .value(QStringLiteral("inputAngle")).toObject();
+        QString producerId = inputX.value(QStringLiteral("producerId")).toString();
+        if (producerId.isEmpty()
+                || inputY.value(QStringLiteral("producerId")).toString() != producerId
+                || inputAngle.value(QStringLiteral("producerId")).toString() != producerId) {
+            producerId.clear();
+        }
+        const QString displayName = tool.displayName.trimmed().isEmpty()
+                ? tr("标定转换") : tool.displayName.trimmed();
+        const QString shortId = tool.toolId.left(8);
+        const QString sourceText = producerId.isEmpty()
+                ? tr("输入来源未唯一绑定")
+                : tr("输入来源 %1").arg(producerId.left(8));
+        const QString activeText = activeFile.trimmed().isEmpty()
+                ? tr("当前文件：未设置")
+                : tr("当前文件：%1").arg(QFileInfo(activeFile).fileName());
+        QListWidgetItem *item = new QListWidgetItem(
+                    tr("#%1 %2 [%3]  ·  %4  ·  %5")
+                    .arg(index + 1).arg(displayName, shortId, sourceText, activeText),
+                    m_targetTransformList);
+        item->setData(Qt::UserRole, tool.toolId);
+        item->setData(Qt::UserRole + 1, producerId);
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(index == defaultIndex ? Qt::Checked : Qt::Unchecked);
+    }
+    if (m_targetTransformHint) {
+        m_targetTransformHint->setText(transformIndexes.size() == 1
+                ? tr("已默认选择唯一标定转换；取消勾选可仅保存文件。")
+                : tr("方案中存在多个标定转换，请确认目标；程序不会默认全部替换。"));
+    }
+}
+
+QStringList QuickCalibrationWizard::targetCalibrationTransformIds() const
+{
+    QStringList ids;
+    if (!m_targetTransformList)
+        return ids;
+    for (int row = 0; row < m_targetTransformList->count(); ++row) {
+        const QListWidgetItem *item = m_targetTransformList->item(row);
+        if (item->checkState() != Qt::Checked)
+            continue;
+        const QString id = item->data(Qt::UserRole).toString().trimmed();
+        if (!id.isEmpty() && !ids.contains(id))
+            ids.append(id);
+    }
+    return ids;
+}
+
 bool QuickCalibrationWizard::ensureMethodConfigWidget()
 {
     if (m_methodConfigWidget && m_configWidgetMethodId == m_methodId)
@@ -1259,6 +2246,24 @@ bool QuickCalibrationWizard::ensureMethodConfigWidget()
         return false;
     m_configWidgetMethodId = m_methodId;
     m_methodConfigWidget->setProducerSnapshots(m_calibrationProducerSnapshots);
+    if (NPointCalibrationConfigWidget *nPoint =
+            dynamic_cast<NPointCalibrationConfigWidget *>(m_methodConfigWidget)) {
+        QString restoreError;
+        if (!m_pendingMethodSettings.isEmpty()
+                && !nPoint->restorePersistentSettings(
+                    m_pendingMethodSettings, &restoreError)) {
+            m_persistentConfigurationWritable = false;
+            m_persistentConfigurationError = tr(
+                        "当前方案的 N 点稳定配置无效：%1。已禁止求解和生成，请修复方案配置。")
+                    .arg(restoreError);
+            if (m_communicationStatus)
+                m_communicationStatus->setText(m_persistentConfigurationError);
+            if (m_sampleStatus)
+                m_sampleStatus->setText(m_persistentConfigurationError);
+            qWarning() << "[QuickCalibrationWizard] 恢复N点稳定配置失败:"
+                       << restoreError;
+        }
+    }
     m_methodConfigWidget->setLatestPhysicalSample(
                 m_lastCommunicationMessage.valid
                 && m_lastCommunicationMessage.event == CalibrationCommunicationEvent::Capture,
@@ -1274,6 +2279,27 @@ bool QuickCalibrationWizard::ensureMethodConfigWidget()
                                                   : QStringLiteral("error"));
         m_sampleStatus->style()->unpolish(m_sampleStatus);
         m_sampleStatus->style()->polish(m_sampleStatus);
+        if (ok && !m_restoringDraft) {
+            QString draftError;
+            if (!saveDraft(&draftError) && !draftError.isEmpty())
+                qWarning() << "[QuickCalibrationWizard] 保存标定草稿失败:"
+                           << draftError;
+        }
+    });
+    connect(m_methodConfigWidget, &CalibrationMethodConfigWidget::sampleDataChanged,
+            this, [this]() {
+        m_solveResult = CalibrationSolveResult();
+        if (!m_restoringDraft && m_methodConfigWidget
+                && m_methodConfigWidget->completedTranslationSampleCount() == 0) {
+            m_lockedCoordinateSourceFingerprint = QJsonObject();
+        }
+        updateCalibrationOverlays();
+        if (!m_restoringDraft) {
+            QString draftError;
+            if (!saveDraft(&draftError) && !draftError.isEmpty())
+                qWarning() << "[QuickCalibrationWizard] 保存点表草稿失败:"
+                           << draftError;
+        }
     });
     m_methodConfigLayout->insertWidget(1, m_methodConfigWidget, 1);
     return true;
@@ -1281,6 +2307,11 @@ bool QuickCalibrationWizard::ensureMethodConfigWidget()
 
 void QuickCalibrationWizard::generateCalibrationFile()
 {
+    if (!m_persistentConfigurationError.isEmpty()) {
+        QMessageBox::warning(this, tr("生成已禁止"),
+                             m_persistentConfigurationError);
+        return;
+    }
     const ICalibrationMethod *method = CalibrationMethodRegistry::instance().method(m_methodId);
     QString validationError;
     if (!method || !method->validateResult(m_solveResult, &validationError)) {
@@ -1297,6 +2328,7 @@ void QuickCalibrationWizard::generateCalibrationFile()
     }
     if (!path.endsWith(QStringLiteral(".xml"), Qt::CaseInsensitive))
         path += QStringLiteral(".xml");
+    path = QFileInfo(path).absoluteFilePath();
     QDir parent = QFileInfo(path).dir();
     if (!parent.exists() && !parent.mkpath(QStringLiteral("."))) {
         QMessageBox::warning(this, tr("生成失败"), tr("无法创建标定文件目录"));
@@ -1306,15 +2338,96 @@ void QuickCalibrationWizard::generateCalibrationFile()
         QMessageBox::warning(this, tr("生成失败"), tr("目标文件已存在；请更换文件名或开启生成后更新"));
         return;
     }
+    if (QFileInfo::exists(path)) {
+        QStringList referencingTools;
+        for (auto it = m_targetTransformConfigs.constBegin();
+             it != m_targetTransformConfigs.constEnd(); ++it) {
+            const QJsonObject transform = it.value().params
+                    .value(QStringLiteral("calibrationTransform")).toObject();
+            bool referenced = QFileInfo(transform.value(
+                        QStringLiteral("activeCalibrationFile")).toString())
+                    .absoluteFilePath() == path;
+            const QJsonArray files = transform.value(
+                        QStringLiteral("calibrationFiles")).toArray();
+            for (const QJsonValue &value : files) {
+                if (QFileInfo(value.toString()).absoluteFilePath() == path) {
+                    referenced = true;
+                    break;
+                }
+            }
+            if (referenced) {
+                referencingTools.append(it.value().displayName.trimmed().isEmpty()
+                                        ? it.key() : it.value().displayName.trimmed());
+            }
+        }
+        if (!referencingTools.isEmpty()) {
+            QMessageBox::warning(
+                        this, tr("生成失败"),
+                        tr("该文件正被标定转换引用，禁止原地覆盖：%1\n"
+                           "请使用新的时间戳文件名，避免未选择的工具被间接改变。")
+                        .arg(referencingTools.join(QStringLiteral("、"))));
+            return;
+        }
+    }
     QString error;
     if (!ProjectXmlCalibrationLoader().save(path, model, &error)) {
         QMessageBox::warning(this, tr("生成失败"), error);
         return;
     }
-    m_generatedFilePath = path;
-    m_filePath->setText(path);
+
+    QString generatedAssetPath = path;
+    const QString schemeDir = SchemeStore::instance().currentScheme().schemeDir;
+    if (schemeDir.trimmed().isEmpty()) {
+        QMessageBox::warning(this, tr("生成未归档"),
+                             tr("XML 已写出，但当前方案目录为空，未应用到运行配置：\n%1")
+                             .arg(path));
+        return;
+    }
+    const QString assetDirectory = QDir(schemeDir).filePath(
+                QStringLiteral("calibrations"));
+    const QString assetRoot = QDir::cleanPath(
+                QFileInfo(assetDirectory).absoluteFilePath()) + QDir::separator();
+    if (!QDir::cleanPath(path).startsWith(assetRoot)) {
+        const QString digest = fileSha256(path);
+        QDir assetDir(assetDirectory);
+        if (digest.isEmpty()
+                || (!assetDir.exists() && !QDir().mkpath(assetDirectory))) {
+            QMessageBox::warning(this, tr("生成未归档"),
+                                 tr("XML 已写出，但无法归档到当前方案：\n%1")
+                                 .arg(path));
+            return;
+        }
+        const QFileInfo sourceInfo(path);
+        generatedAssetPath = assetDir.filePath(
+                    QStringLiteral("%1_%2.%3")
+                    .arg(sourceInfo.completeBaseName(), digest.left(12),
+                         sourceInfo.suffix()));
+        if (QFileInfo::exists(generatedAssetPath)) {
+            if (fileSha256(generatedAssetPath) != digest) {
+                QMessageBox::warning(this, tr("生成未归档"),
+                                     tr("方案标定目录存在内容冲突：\n%1")
+                                     .arg(generatedAssetPath));
+                return;
+            }
+        } else if (!QFile::copy(path, generatedAssetPath)) {
+            QMessageBox::warning(this, tr("生成未归档"),
+                                 tr("XML 已写出，但复制到方案标定目录失败：\n%1")
+                                 .arg(generatedAssetPath));
+            return;
+        }
+    }
+
+    m_generatedFilePath = generatedAssetPath;
+    m_filePath->setText(generatedAssetPath);
+    m_generatedFileCompleted = true;
+    discardDraft();
+    const int targetCount = targetCalibrationTransformIds().size();
     QMessageBox::information(this, tr("生成成功"),
-                             tr("标定文件已生成：\n%1\n可在“标定转换”工具中直接导入。").arg(path));
+                             targetCount > 0
+                             ? tr("标定文件已生成：\n%1\n关闭向导后将应用到 %2 个已勾选的标定转换。")
+                               .arg(generatedAssetPath).arg(targetCount)
+                             : tr("标定文件已生成：\n%1\n当前未选择目标，不会改变标定转换的运行文件。")
+                               .arg(generatedAssetPath));
 }
 
 QString QuickCalibrationWizard::generatedFilePath() const
