@@ -238,7 +238,7 @@ void NPointCalibrationConfigWidget::editPoints()
     QHBoxLayout *toolbar = new QHBoxLayout;
     QPushButton *importButton = new QPushButton(tr("导入"), &dialog);
     QPushButton *exportButton = new QPushButton(tr("导出"), &dialog);
-    QPushButton *resetButton = new QPushButton(tr("恢复12点"), &dialog);
+    QPushButton *resetButton = new QPushButton(tr("恢复当前点数"), &dialog);
     QPushButton *clearButton = new QPushButton(tr("清空"), &dialog);
     for (QPushButton *button : {importButton, exportButton, resetButton, clearButton})
         button->setProperty("actionRole", QStringLiteral("secondary"));
@@ -327,8 +327,13 @@ void NPointCalibrationConfigWidget::editPoints()
             [this, &editorTranslationCount, &editorRotationCount,
              &editorCompleted, &editorUpdating, editor]() {
         editorUpdating = true;
-        importPoints(editor, &editorTranslationCount,
-                     &editorRotationCount, &editorCompleted);
+        bool retryRequested = false;
+        do {
+            retryRequested = false;
+            importPoints(editor, &editorTranslationCount,
+                         &editorRotationCount, &editorCompleted,
+                         &retryRequested);
+        } while (retryRequested && editor->isVisible());
         editorUpdating = false;
     });
     connect(exportButton, &QPushButton::clicked, this,
@@ -336,8 +341,9 @@ void NPointCalibrationConfigWidget::editPoints()
         exportPoints(editor, editorTranslationCount);
     });
     connect(resetButton, &QPushButton::clicked, this,
-            [&fillEditorWithZeros]() {
-        fillEditorWithZeros(9, 3);
+            [&fillEditorWithZeros, &editorTranslationCount,
+             &editorRotationCount]() {
+        fillEditorWithZeros(editorTranslationCount, editorRotationCount);
     });
     connect(clearButton, &QPushButton::clicked, editor,
             [&fillEditorWithZeros, &editorTranslationCount, &editorRotationCount]() {
@@ -1612,12 +1618,14 @@ bool NPointCalibrationConfigWidget::importPoints(
         QTableWidget *editor,
         int *editorTranslationCount,
         int *editorRotationCount,
-        QVector<bool> *editorCompleted)
+        QVector<bool> *editorCompleted,
+        bool *retryRequested)
 {
     if (!editor || !editorTranslationCount || !editorRotationCount
-            || !editorCompleted) {
+            || !editorCompleted || !retryRequested) {
         return false;
     }
+    *retryRequested = false;
     const QString path = QFileDialog::getOpenFileName(
                 this, tr("导入标定点"), QString(), tr("点集文件 (*.txt *.csv)"));
     if (path.isEmpty())
@@ -1631,6 +1639,7 @@ bool NPointCalibrationConfigWidget::importPoints(
     QVector<QString> rowTypes;
     QVector<bool> rowCompleted;
     bool hasExplicitPointType = false;
+    bool hasUntypedPoint = false;
     QTextStream stream(&file);
     while (!stream.atEnd()) {
         const QString line = stream.readLine().trimmed();
@@ -1639,12 +1648,15 @@ bool NPointCalibrationConfigWidget::importPoints(
         QStringList values = line.split(QRegExp(QStringLiteral("[,;\\s]+")),
                                         Qt::SkipEmptyParts);
         QString type = QStringLiteral("translation");
+        bool rowHasExplicitPointType = false;
         const QString first = values.value(0).trimmed().toLower();
         if (first == QStringLiteral("translation") || first == tr("平移")) {
             hasExplicitPointType = true;
+            rowHasExplicitPointType = true;
             values.removeFirst();
         } else if (first == QStringLiteral("rotation") || first == tr("旋转")) {
             hasExplicitPointType = true;
+            rowHasExplicitPointType = true;
             type = QStringLiteral("rotation");
             values.removeFirst();
         }
@@ -1680,41 +1692,95 @@ bool NPointCalibrationConfigWidget::importPoints(
                 return false;
             }
         }
+        if (!rowHasExplicitPointType)
+            hasUntypedPoint = true;
         rows.append(values);
         rowTypes.append(type);
         rowCompleted.append(completed);
     }
-    // Upgrade the legacy untyped 9-point translation file to the current
-    // default 9 + 3 layout without turning the new rotation rows into samples.
-    if (!hasExplicitPointType && rows.size() == 9) {
-        for (int index = 0; index < 3; ++index) {
-            rows.append(QStringList{QStringLiteral("0"), QStringLiteral("0"),
-                                    QStringLiteral("0"), QStringLiteral("0"),
-                                    QStringLiteral("0"), QStringLiteral("0")});
-            rowTypes.append(QStringLiteral("rotation"));
-            rowCompleted.append(false);
-        }
-    }
-    int translationCount = 0;
-    int rotationCount = 0;
-    bool rotationStarted = false;
-    for (const QString &type : rowTypes) {
-        if (type == QStringLiteral("rotation")) {
-            rotationStarted = true;
-            ++rotationCount;
-        } else {
-            if (rotationStarted) {
-                QMessageBox::warning(this, tr("导入失败"),
-                                     tr("平移点必须排列在旋转点之前"));
-                return false;
-            }
-            ++translationCount;
-        }
-    }
-    if (translationCount < 3 || translationCount > 99 || rotationCount > 99) {
-        QMessageBox::warning(this, tr("导入失败"),
-                             tr("平移点必须为3到99组，旋转点必须为0到99组"));
+    file.close();
+    if (hasExplicitPointType && hasUntypedPoint) {
+        QMessageBox::warning(
+                    this, tr("导入失败"),
+                    tr("类型列必须全部填写或全部省略，不能混合导入"));
         return false;
+    }
+
+    const int expectedTranslationCount = *editorTranslationCount;
+    const int expectedRotationCount = *editorRotationCount;
+    const int expectedPointCount = expectedTranslationCount
+            + expectedRotationCount;
+    int importedTranslationCount = 0;
+    int importedRotationCount = 0;
+    bool rotationStarted = false;
+    if (hasExplicitPointType) {
+        for (const QString &type : rowTypes) {
+            if (type == QStringLiteral("rotation")) {
+                rotationStarted = true;
+                ++importedRotationCount;
+            } else {
+                if (rotationStarted) {
+                    QMessageBox::warning(this, tr("导入失败"),
+                                         tr("平移点必须排列在旋转点之前"));
+                    return false;
+                }
+                ++importedTranslationCount;
+            }
+        }
+    }
+
+    auto handlePointCountMismatch = [&]() {
+        const QString importedSummary = hasExplicitPointType
+                ? tr("平移 %1 点、旋转 %2 点，共 %3 点")
+                  .arg(importedTranslationCount)
+                  .arg(importedRotationCount)
+                  .arg(rows.size())
+                : tr("共 %1 点（文件未包含类型列）").arg(rows.size());
+        QMessageBox warning(QMessageBox::Warning,
+                            tr("标定点数量不一致"),
+                            tr("当前已选择：平移 %1 点、旋转 %2 点，共 %3 点。\n"
+                               "导入文件：%4。\n\n"
+                               "导入未生效。请选择重新导入，或返回配置页重新选择标定点数。")
+                            .arg(expectedTranslationCount)
+                            .arg(expectedRotationCount)
+                            .arg(expectedPointCount)
+                            .arg(importedSummary),
+                            QMessageBox::NoButton, editor->window());
+        QPushButton *reimportButton = warning.addButton(
+                    tr("重新导入"), QMessageBox::AcceptRole);
+        QPushButton *reselectButton = warning.addButton(
+                    tr("重新选择点数"), QMessageBox::ActionRole);
+        QPushButton *cancelButton = warning.addButton(
+                    tr("取消"), QMessageBox::RejectRole);
+        warning.setDefaultButton(reimportButton);
+        warning.setEscapeButton(cancelButton);
+        warning.exec();
+        if (warning.clickedButton() == reselectButton) {
+            if (QDialog *pointDialog = qobject_cast<QDialog *>(editor->window()))
+                pointDialog->reject();
+            return false;
+        }
+        return warning.clickedButton() == reimportButton;
+    };
+
+    const bool countMismatch = rows.size() != expectedPointCount
+            || (hasExplicitPointType
+                && (importedTranslationCount != expectedTranslationCount
+                    || importedRotationCount != expectedRotationCount));
+    if (countMismatch) {
+        const bool reimport = handlePointCountMismatch();
+        *retryRequested = reimport;
+        return false;
+    }
+
+    if (!hasExplicitPointType) {
+        rowTypes.clear();
+        rowTypes.reserve(rows.size());
+        for (int row = 0; row < rows.size(); ++row) {
+            rowTypes.append(row < expectedTranslationCount
+                            ? QStringLiteral("translation")
+                            : QStringLiteral("rotation"));
+        }
     }
     QVector<QStringList> normalizedRows;
     normalizedRows.reserve(rows.size());
@@ -1737,8 +1803,6 @@ bool NPointCalibrationConfigWidget::importPoints(
         }
         normalizedRows.append(normalized);
     }
-    *editorTranslationCount = translationCount;
-    *editorRotationCount = rotationCount;
     *editorCompleted = rowCompleted;
     editor->setRowCount(normalizedRows.size());
     for (int row = 0; row < normalizedRows.size(); ++row) {
@@ -1747,8 +1811,9 @@ bool NPointCalibrationConfigWidget::importPoints(
         indexItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
         indexItem->setTextAlignment(Qt::AlignCenter);
         editor->setItem(row, 0, indexItem);
-        editor->setItem(row, 1, typeItem(row < translationCount
-                                        ? tr("平移") : tr("旋转")));
+        editor->setItem(row, 1, typeItem(
+                            rowTypes.at(row) == QStringLiteral("translation")
+                            ? tr("平移") : tr("旋转")));
         for (int column = 0; column < 6; ++column) {
             editor->setItem(row, column + 2,
                             numberItem(normalized.at(column).toDouble()));

@@ -66,7 +66,8 @@ private:
     bool importPoints(QTableWidget *editor,
                       int *translationCount,
                       int *rotationCount,
-                      QVector<bool> *completed);
+                      QVector<bool> *completed,
+                      bool *retryRequested);
     void exportPoints(const QTableWidget *editor,
                       int translationCount);
     void editPoints();

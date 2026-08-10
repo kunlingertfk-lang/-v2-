@@ -168,6 +168,7 @@ private:
     bool m_generatedFileCompleted = false;
     bool m_draftPersistenceEnabled = false;
     bool m_persistentConfigurationWritable = true;
+    bool m_resultTableWidthsInitialized = false;
     QString m_persistentConfigurationError;
     qint64 m_lastCapturedCameraFrameIndex = -1;
     qint64 m_pendingCaptureCameraFrameIndex = -1;

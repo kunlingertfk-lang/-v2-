@@ -45,6 +45,7 @@
 #include <QStackedWidget>
 #include <QStyle>
 #include <QTableWidget>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -673,8 +674,14 @@ QWidget *QuickCalibrationWizard::createResultPage()
     layout->setContentsMargins(120, 36, 120, 36);
     layout->addWidget(pageTitle(tr("结果查看"), page));
     m_resultTable = new QTableWidget(0, 3, page);
+    m_resultTable->setObjectName(QStringLiteral("calibrationResultTable"));
     m_resultTable->setHorizontalHeaderLabels({tr("序号"), tr("信号内容"), tr("结果状态")});
-    m_resultTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    QHeaderView *resultHeader = m_resultTable->horizontalHeader();
+    resultHeader->setSectionsMovable(false);
+    resultHeader->setMinimumSectionSize(60);
+    resultHeader->setSectionResizeMode(0, QHeaderView::Fixed);
+    resultHeader->setSectionResizeMode(1, QHeaderView::Interactive);
+    resultHeader->setSectionResizeMode(2, QHeaderView::Stretch);
     m_resultTable->verticalHeader()->setVisible(false);
     layout->addWidget(m_resultTable, 1);
     m_matrixLabel = new QLabel(page);
@@ -753,6 +760,23 @@ void QuickCalibrationWizard::setStep(int step)
     }
     m_maxVisitedStep = qMax(m_maxVisitedStep, m_step);
     m_pages->setCurrentIndex(m_step);
+    if (m_step == 3 && m_resultTable && !m_resultTableWidthsInitialized) {
+        QTimer::singleShot(0, m_resultTable, [this]() {
+            if (!m_resultTable || m_resultTableWidthsInitialized)
+                return;
+            const int availableWidth = m_resultTable->viewport()->width();
+            if (availableWidth <= 0)
+                return;
+            const int indexWidth = 72;
+            const int statusWidth = qBound(220, availableWidth / 5, 320);
+            QHeaderView *header = m_resultTable->horizontalHeader();
+            header->resizeSection(0, indexWidth);
+            header->resizeSection(
+                        1, qMax(header->minimumSectionSize(),
+                                availableWidth - indexWidth - statusWidth));
+            m_resultTableWidthsInitialized = true;
+        });
+    }
     m_previousButton->setVisible(m_step > 0);
     m_nextButton->setText(m_step == 3 ? tr("关闭") : tr("下一步"));
     if (m_step == 3 && m_filePath->text().isEmpty()) {
