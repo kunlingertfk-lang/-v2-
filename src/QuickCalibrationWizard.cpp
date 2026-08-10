@@ -90,6 +90,16 @@ bool finitePayloadNumber(const QJsonObject &payload, const QString &key)
             && std::isfinite(payload.value(key).toDouble());
 }
 
+QJsonArray overlayPointArray(const QVector<QPointF> &points)
+{
+    QJsonArray array;
+    for (const QPointF &point : points) {
+        array.append(QJsonObject{{QStringLiteral("x"), point.x()},
+                                 {QStringLiteral("y"), point.y()}});
+    }
+    return array;
+}
+
 QString fileSha256(const QString &path)
 {
     QFile file(path);
@@ -934,6 +944,65 @@ void QuickCalibrationWizard::updateCalibrationOverlays()
     QVector<ToolOverlay> overlays = m_currentLocationOverlays;
     if (m_methodConfigWidget) {
         const bool solved = calibrationResultPassed();
+        NPointCalibrationConfigWidget *nPoint =
+                dynamic_cast<NPointCalibrationConfigWidget *>(m_methodConfigWidget);
+        if (m_solveResult.success) {
+            if (nPoint) {
+                const bool regionReady = m_solveResult.model.validRegion.size() >= 3
+                        && m_solveResult.model.safeRegion.size() >= 3;
+                nPoint->setRegionSummary(
+                            m_solveResult.model.validRegion.size(),
+                            m_solveResult.model.safeRegion.size(),
+                            regionReady
+                            ? tr("已生成：安全内缩 %1 px")
+                              .arg(m_solveResult.model.safeMarginPx, 0, 'f', 2)
+                            : tr("有效区域结构无效"),
+                            regionReady
+                            ? (solved ? QStringLiteral("ok")
+                                      : QStringLiteral("warning"))
+                            : QStringLiteral("error"));
+            }
+
+            const QVector<QPointF> &validRegion = m_solveResult.model.validRegion;
+            const QVector<QPointF> &safeRegion = m_solveResult.model.safeRegion;
+            if (validRegion.size() >= 3 && safeRegion.size() >= 3) {
+                ToolOverlay boundaryBand;
+                boundaryBand.type = ToolOverlayType::Polygon;
+                boundaryBand.points = validRegion;
+                boundaryBand.label = tr("Boundary 警戒带");
+                boundaryBand.extra.insert(QStringLiteral("displayRole"),
+                                          QStringLiteral("calibration_boundary_band"));
+                boundaryBand.extra.insert(QStringLiteral("clipGeometry"), QJsonObject{
+                    {QStringLiteral("type"), QStringLiteral("polygon")},
+                    {QStringLiteral("points"), overlayPointArray(safeRegion)}
+                });
+                overlays.append(boundaryBand);
+
+                ToolOverlay safeOverlay;
+                safeOverlay.type = ToolOverlayType::Polygon;
+                safeOverlay.points = safeRegion;
+                safeOverlay.label = tr("SafeROI（生产安全区）");
+                safeOverlay.extra.insert(QStringLiteral("displayRole"),
+                                         QStringLiteral("calibration_safe_roi"));
+                overlays.append(safeOverlay);
+
+                ToolOverlay validOutline;
+                validOutline.type = ToolOverlayType::Polygon;
+                validOutline.points = validRegion;
+                validOutline.label = tr("ValidROI（平移点凸包）");
+                validOutline.extra.insert(QStringLiteral("displayRole"),
+                                          QStringLiteral("calibration_valid_roi"));
+                overlays.append(validOutline);
+            }
+        } else if (nPoint && (!m_solveResult.message.trimmed().isEmpty()
+                              || !m_solveResult.status.trimmed().isEmpty())) {
+            nPoint->setRegionSummary(
+                        m_solveResult.model.validRegion.size(),
+                        m_solveResult.model.safeRegion.size(),
+                        m_solveResult.message.trimmed().isEmpty()
+                        ? m_solveResult.status : m_solveResult.message,
+                        QStringLiteral("error"));
+        }
         const QVector<QLineF> segments =
                 m_methodConfigWidget->completedTranslationSegments();
         overlays.reserve(overlays.size() + segments.size());
@@ -2289,6 +2358,12 @@ bool QuickCalibrationWizard::ensureMethodConfigWidget()
     connect(m_methodConfigWidget, &CalibrationMethodConfigWidget::sampleDataChanged,
             this, [this]() {
         m_solveResult = CalibrationSolveResult();
+        if (NPointCalibrationConfigWidget *nPoint =
+                dynamic_cast<NPointCalibrationConfigWidget *>(m_methodConfigWidget)) {
+            nPoint->setRegionSummary(0, 0,
+                                     tr("参数或点表已改变，请重新执行"),
+                                     QStringLiteral("warning"));
+        }
         if (!m_restoringDraft && m_methodConfigWidget
                 && m_methodConfigWidget->completedTranslationSampleCount() == 0) {
             m_lockedCoordinateSourceFingerprint = QJsonObject();

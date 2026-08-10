@@ -193,6 +193,30 @@ void NPointCalibrationConfigWidget::setParameterMode(bool showAll)
     m_physicalCoordinateCard->setVisible(showAll);
     m_runtimeParametersCard->setVisible(showAll);
     m_qualityCard->setVisible(showAll);
+    m_effectiveRegionCard->setVisible(showAll);
+}
+
+void NPointCalibrationConfigWidget::setRegionSummary(
+        int validRegionPointCount,
+        int safeRegionPointCount,
+        const QString &message,
+        const QString &state)
+{
+    if (!m_validRegionPointCount || !m_safeRegionPointCount
+            || !m_regionGenerationStatus) {
+        return;
+    }
+    m_validRegionPointCount->setText(QString::number(qMax(0, validRegionPointCount)));
+    m_safeRegionPointCount->setText(QString::number(qMax(0, safeRegionPointCount)));
+    m_regionGenerationStatus->setText(message.trimmed().isEmpty()
+                                      ? tr("尚未生成") : message);
+    const QString normalizedState = state == QStringLiteral("ok")
+            || state == QStringLiteral("warning")
+            || state == QStringLiteral("error")
+            ? state : QStringLiteral("idle");
+    m_regionGenerationStatus->setProperty("regionState", normalizedState);
+    m_regionGenerationStatus->style()->unpolish(m_regionGenerationStatus);
+    m_regionGenerationStatus->style()->polish(m_regionGenerationStatus);
 }
 
 void NPointCalibrationConfigWidget::updateCaptureModeUi()
@@ -713,6 +737,52 @@ NPointCalibrationConfigWidget::NPointCalibrationConfigWidget(QWidget *parent)
     thresholds->addRow(maxLabel, m_maxErrorLimit);
     quality.contentLayout->addLayout(thresholds);
     layout->addWidget(m_qualityCard);
+
+    const CollapsibleCard effectiveRegion = createCollapsibleCard(
+                this, QStringLiteral("nPointEffectiveRegionCard"), tr("有效区域"));
+    m_effectiveRegionCard = effectiveRegion.card;
+    QFormLayout *regionForm = new QFormLayout;
+    m_safeMarginPx = new QDoubleSpinBox(effectiveRegion.content);
+    m_safeMarginPx->setObjectName(QStringLiteral("nPointSafeMarginPx"));
+    m_safeMarginPx->setDecimals(2);
+    // HALCON 20.11 ErosionCircle maps the configured margin to radius
+    // (safeMarginPx + 0.5), whose supported upper radius is 511.5 px.
+    m_safeMarginPx->setRange(0.0, 511.0);
+    m_safeMarginPx->setValue(0.0);
+    m_safeMarginPx->setSuffix(tr(" px"));
+    m_safeMarginPx->setToolTip(
+                tr("ValidROI 使用 HALCON ErosionCircle 均匀内缩的像素距离；"
+                   "0 表示 SafeROI 与 ValidROI 等价"));
+    m_validRegionPointCount = new QLabel(QStringLiteral("0"),
+                                         effectiveRegion.content);
+    m_validRegionPointCount->setObjectName(
+                QStringLiteral("nPointValidRegionPointCount"));
+    m_safeRegionPointCount = new QLabel(QStringLiteral("0"),
+                                        effectiveRegion.content);
+    m_safeRegionPointCount->setObjectName(
+                QStringLiteral("nPointSafeRegionPointCount"));
+    m_regionGenerationStatus = new QLabel(tr("尚未生成"),
+                                          effectiveRegion.content);
+    m_regionGenerationStatus->setObjectName(
+                QStringLiteral("nPointRegionGenerationStatus"));
+    m_regionGenerationStatus->setProperty("role", QStringLiteral("cardHint"));
+    m_regionGenerationStatus->setProperty("regionState", QStringLiteral("idle"));
+    m_regionGenerationStatus->setWordWrap(true);
+    regionForm->addRow(fieldLabel(tr("安全内缩距离(px)"),
+                                  tr("只允许向 ValidROI 内部收缩，不支持凸包外扩"),
+                                  effectiveRegion.content),
+                       m_safeMarginPx);
+    regionForm->addRow(fieldLabel(tr("ValidROI顶点数"), QString(),
+                                  effectiveRegion.content),
+                       m_validRegionPointCount);
+    regionForm->addRow(fieldLabel(tr("SafeROI顶点数"), QString(),
+                                  effectiveRegion.content),
+                       m_safeRegionPointCount);
+    regionForm->addRow(fieldLabel(tr("区域生成状态"), QString(),
+                                  effectiveRegion.content),
+                       m_regionGenerationStatus);
+    effectiveRegion.contentLayout->addLayout(regionForm);
+    layout->addWidget(m_effectiveRegionCard);
     layout->addStretch();
 
     connect(editButton, &QPushButton::clicked, this, [this]() { editPoints(); });
@@ -724,6 +794,12 @@ NPointCalibrationConfigWidget::NPointCalibrationConfigWidget(QWidget *parent)
             this, [this](int) { fillDefaultGrid(); });
     connect(m_rotationCount, QOverload<int>::of(&QSpinBox::valueChanged),
             this, [this](int) { fillDefaultGrid(); });
+    connect(m_safeMarginPx, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) {
+        setRegionSummary(0, 0, tr("安全内缩距离已改变，请重新执行"),
+                         QStringLiteral("warning"));
+        emit sampleDataChanged();
+    });
     fillDefaultGrid();
     updateCaptureModeUi();
     setParameterMode(false);
@@ -866,6 +942,7 @@ CalibrationDraft NPointCalibrationConfigWidget::draft(QString *errorMessage) con
     result.samples = samplesFromTable(errorMessage);
     result.parameters.insert(QStringLiteral("rmseLimit"), m_rmseLimit->value());
     result.parameters.insert(QStringLiteral("maxErrorLimit"), m_maxErrorLimit->value());
+    result.parameters.insert(QStringLiteral("safeMarginPx"), m_safeMarginPx->value());
     result.parameters.insert(QStringLiteral("translationCount"), m_translationCount->value());
     result.parameters.insert(QStringLiteral("rotationCount"), m_rotationCount->value());
     result.parameters.insert(QStringLiteral("totalSampleCount"), m_sampleTable->rowCount());
@@ -966,6 +1043,9 @@ QJsonObject NPointCalibrationConfigWidget::persistentSettings() const
         {QStringLiteral("qualityParameters"), QJsonObject{
              {QStringLiteral("rmseLimit"), m_rmseLimit->value()},
              {QStringLiteral("maxErrorLimit"), m_maxErrorLimit->value()}
+         }},
+        {QStringLiteral("regionParameters"), QJsonObject{
+             {QStringLiteral("safeMarginPx"), m_safeMarginPx->value()}
          }}
     };
 }
@@ -1002,6 +1082,8 @@ bool NPointCalibrationConfigWidget::restorePersistentSettings(
                 QStringLiteral("runtimeParameters")).toObject();
     const QJsonObject quality = settings.value(
                 QStringLiteral("qualityParameters")).toObject();
+    const QJsonObject region = settings.value(
+                QStringLiteral("regionParameters")).toObject();
     const auto validDouble = [](const QJsonObject &object, const QString &key,
                                 const QDoubleSpinBox *spin) {
         if (!object.contains(key))
@@ -1031,7 +1113,9 @@ bool NPointCalibrationConfigWidget::restorePersistentSettings(
                          m_weightCoefficient)
             || !validDouble(quality, QStringLiteral("rmseLimit"), m_rmseLimit)
             || !validDouble(quality, QStringLiteral("maxErrorLimit"),
-                            m_maxErrorLimit)) {
+                            m_maxErrorLimit)
+            || !validDouble(region, QStringLiteral("safeMarginPx"),
+                            m_safeMarginPx)) {
         if (errorMessage)
             *errorMessage = tr("N点稳定配置包含超出范围或非有限参数");
         return false;
@@ -1094,6 +1178,10 @@ bool NPointCalibrationConfigWidget::restorePersistentSettings(
     setInt(runtime, QStringLiteral("weightCoefficient"), m_weightCoefficient);
     setDouble(quality, QStringLiteral("rmseLimit"), m_rmseLimit);
     setDouble(quality, QStringLiteral("maxErrorLimit"), m_maxErrorLimit);
+    {
+        const QSignalBlocker safeMarginBlocker(m_safeMarginPx);
+        setDouble(region, QStringLiteral("safeMarginPx"), m_safeMarginPx);
+    }
 
     const QJsonObject bindings = settings.value(QStringLiteral("captureBindings")).toObject();
     for (const QString &fieldKey : {kImagePointX, kImagePointY, kImageAngle,

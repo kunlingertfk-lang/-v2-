@@ -18,12 +18,19 @@ struct CalibrationTransformPose
 struct CalibrationTransformHalconResult
 {
     bool success = false;
+    bool productionAllowed = false;
+    bool coordinateAvailable = false;
+    CalibrationRegion region = CalibrationRegion::Invalid;
+    CalibrationRotationCoverage rotationCoverage =
+            CalibrationRotationCoverage::Unverified;
     QString status;
     QString message;
     double outputX = 0.0;
     double outputY = 0.0;
     double outputAngleDeg = 0.0;
     double pixelAccuracy = 0.0;
+    double distanceToSafeBoundaryPx = 0.0;
+    double distanceToValidBoundaryPx = 0.0;
     bool poseCompensationApplied = false;
     qint64 elapsedMs = 0;
     QJsonObject payload;
@@ -39,7 +46,8 @@ public:
             double inputY,
             double inputAngleDeg,
             const CalibrationTransformPose &calibrationPose = CalibrationTransformPose(),
-            const CalibrationTransformPose &runPose = CalibrationTransformPose()) const;
+            const CalibrationTransformPose &runPose = CalibrationTransformPose(),
+            bool allowBoundaryForProduction = false) const;
 };
 
 #endif // ALGORITHMS_LOCATION_CALIBRATIONTRANSFORMHALCONRUNNER_H

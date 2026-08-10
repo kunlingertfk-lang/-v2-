@@ -8,6 +8,57 @@
 
 namespace {
 
+bool finiteJsonNumber(const QJsonValue &value, double *output)
+{
+    if (!output || !value.isDouble())
+        return false;
+    const double parsed = value.toDouble();
+    if (!std::isfinite(parsed))
+        return false;
+    *output = parsed;
+    return true;
+}
+
+bool parseRotationSamples(const QJsonArray &array,
+                          QVector<CalibrationSample> *samples,
+                          QString *errorMessage)
+{
+    if (!samples)
+        return false;
+    samples->clear();
+    samples->reserve(array.size());
+    for (int index = 0; index < array.size(); ++index) {
+        if (!array.at(index).isObject()) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("第%1个旋转样本不是对象").arg(index + 1);
+            return false;
+        }
+        const QJsonObject object = array.at(index).toObject();
+        CalibrationSample sample;
+        sample.index = object.value(QStringLiteral("index")).toInt(index + 1);
+        if (!finiteJsonNumber(object.value(QStringLiteral("column")), &sample.column)
+                || !finiteJsonNumber(object.value(QStringLiteral("row")), &sample.row)
+                || !finiteJsonNumber(object.value(QStringLiteral("machineX")),
+                                     &sample.machineX)
+                || !finiteJsonNumber(object.value(QStringLiteral("machineY")),
+                                     &sample.machineY)
+                || !finiteJsonNumber(object.value(QStringLiteral("imageAngleDeg")),
+                                     &sample.imageAngleDeg)
+                || !finiteJsonNumber(object.value(QStringLiteral("machineAngleDeg")),
+                                     &sample.machineAngleDeg)) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("第%1个旋转样本包含缺失或非有限字段")
+                        .arg(index + 1);
+            return false;
+        }
+        sample.source = object.value(QStringLiteral("source"))
+                .toString(QStringLiteral("manual"));
+        sample.capturedAt = object.value(QStringLiteral("capturedAt")).toString();
+        samples->append(sample);
+    }
+    return true;
+}
+
 class NPointCalibrationMethod final : public ICalibrationMethod
 {
 public:
@@ -53,10 +104,12 @@ public:
     }
     CalibrationSolveResult solve(const CalibrationDraft &draft) const override
     {
-        CalibrationSolveResult result = CalibrationSolver().solveNPoint(
+        CalibrationSolver solver;
+        CalibrationSolveResult result = solver.solveNPoint(
                     draft.samples,
                     draft.parameters.value(QStringLiteral("rmseLimit")).toDouble(0.10),
-                    draft.parameters.value(QStringLiteral("maxErrorLimit")).toDouble(0.25));
+                    draft.parameters.value(QStringLiteral("maxErrorLimit")).toDouble(0.25),
+                    draft.parameters.value(QStringLiteral("safeMarginPx")).toDouble(0.0));
         if (result.success) {
             result.model.imageBinding = draft.parameters.value(
                         QStringLiteral("imageBinding")).toObject();
@@ -70,6 +123,36 @@ public:
             result.model.methodData.insert(QStringLiteral("rotationSamples"),
                                            draft.parameters.value(
                                                QStringLiteral("rotationSamples")).toArray());
+            QVector<CalibrationSample> rotationSamples;
+            QString rotationError;
+            if (!parseRotationSamples(
+                        draft.parameters.value(QStringLiteral("rotationSamples")).toArray(),
+                        &rotationSamples, &rotationError)) {
+                result.success = false;
+                result.status = QStringLiteral("CAL-SOL-004");
+                result.message = rotationError;
+                result.model.rotationRange.status =
+                        CalibrationRotationRangeStatus::Invalid;
+                return result;
+            }
+            result.model.rotationRange = solver.buildRotationRange(rotationSamples);
+            result.model.methodData.insert(
+                        QStringLiteral("rotationRangeStatus"),
+                        calibrationRotationRangeStatusToString(
+                            result.model.rotationRange.status));
+            if (result.model.rotationRange.status
+                    == CalibrationRotationRangeStatus::Invalid) {
+                result.success = false;
+                result.status = QStringLiteral("CAL-SOL-004");
+                result.message = QStringLiteral("旋转样本覆盖范围退化，无法生成有效范围");
+                return result;
+            }
+            QString modelError;
+            if (!result.model.isValid(&modelError)) {
+                result.success = false;
+                result.status = QStringLiteral("CAL-SOL-004");
+                result.message = modelError;
+            }
         }
         return result;
     }

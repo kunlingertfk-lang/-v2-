@@ -11,6 +11,8 @@ namespace {
 using namespace HalconCpp;
 
 constexpr double kPi = 3.14159265358979323846;
+constexpr double kBoundaryTolerancePx = 1e-6;
+constexpr double kRotationToleranceDeg = 1e-9;
 
 double radians(double degrees)
 {
@@ -37,14 +39,116 @@ bool finitePose(const CalibrationTransformPose &pose)
             && std::isfinite(pose.joint1AngleDeg);
 }
 
+bool finitePolygon(const QVector<QPointF> &polygon)
+{
+    if (polygon.size() < 3)
+        return false;
+    for (const QPointF &point : polygon) {
+        if (!std::isfinite(point.x()) || !std::isfinite(point.y()))
+            return false;
+    }
+    return true;
+}
+
+bool contourForPolygon(const QVector<QPointF> &polygon, HObject *contour)
+{
+    if (!contour || !finitePolygon(polygon))
+        return false;
+    HTuple rows;
+    HTuple columns;
+    for (const QPointF &point : polygon) {
+        rows.Append(point.y());
+        columns.Append(point.x());
+    }
+    HObject polygonContour;
+    GenContourPolygonXld(&polygonContour, rows, columns);
+    ShapeTransXld(polygonContour, contour, HTuple("convex"));
+    return true;
+}
+
+bool classifyAgainstContour(const HObject &contour,
+                            double column,
+                            double row,
+                            bool *insideOrBoundary,
+                            double *distanceToBoundary)
+{
+    if (!insideOrBoundary || !distanceToBoundary)
+        return false;
+    HTuple isInside;
+    HTuple distanceMin;
+    HTuple distanceMax;
+    TestXldPoint(contour, HTuple(row), HTuple(column), &isInside);
+    DistancePc(contour, HTuple(row), HTuple(column), &distanceMin, &distanceMax);
+    if (distanceMin.Length() == 0)
+        return false;
+    const double distance = distanceMin[0].D();
+    if (!std::isfinite(distance))
+        return false;
+    const bool onBoundary = distance <= kBoundaryTolerancePx;
+    *insideOrBoundary = (isInside.Length() > 0 && isInside[0].I() != 0)
+            || onBoundary;
+    *distanceToBoundary = distance;
+    return true;
+}
+
+double angleNearCenter(double angleDeg, double centerDeg, double periodDeg)
+{
+    return angleDeg + periodDeg * std::round((centerDeg - angleDeg) / periodDeg);
+}
+
+bool validRotationRange(const CalibrationRotationRange &range)
+{
+    const double imageSpan = range.imageMaxDeg - range.imageMinDeg;
+    const double machineSpan = range.machineMaxDeg - range.machineMinDeg;
+    return std::isfinite(range.periodDeg) && range.periodDeg > 0.0
+            && std::isfinite(range.imageMinDeg)
+            && std::isfinite(range.imageMaxDeg)
+            && std::isfinite(range.imageCenterDeg)
+            && std::isfinite(range.machineMinDeg)
+            && std::isfinite(range.machineMaxDeg)
+            && std::isfinite(range.machineCenterDeg)
+            && range.imageMinDeg <= range.imageMaxDeg
+            && range.machineMinDeg <= range.machineMaxDeg
+            && imageSpan > kRotationToleranceDeg
+            && machineSpan > kRotationToleranceDeg
+            && imageSpan <= range.periodDeg + kRotationToleranceDeg
+            && machineSpan <= range.periodDeg + kRotationToleranceDeg
+            && range.imageCenterDeg >= range.imageMinDeg
+            && range.imageCenterDeg <= range.imageMaxDeg
+            && range.machineCenterDeg >= range.machineMinDeg
+            && range.machineCenterDeg <= range.machineMaxDeg;
+}
+
+bool angleInRange(double angleDeg,
+                  double minimumDeg,
+                  double maximumDeg,
+                  double centerDeg,
+                  double periodDeg,
+                  double *unwrappedAngleDeg)
+{
+    const double unwrapped = angleNearCenter(angleDeg, centerDeg, periodDeg);
+    if (unwrappedAngleDeg)
+        *unwrappedAngleDeg = unwrapped;
+    return unwrapped >= minimumDeg - kRotationToleranceDeg
+            && unwrapped <= maximumDeg + kRotationToleranceDeg;
+}
+
 CalibrationTransformHalconResult fail(const QString &status,
                                       const QString &message,
                                       qint64 elapsed)
 {
     CalibrationTransformHalconResult result;
+    result.region = CalibrationRegion::Invalid;
     result.status = status;
     result.message = message;
     result.elapsedMs = elapsed;
+    result.payload.insert(QStringLiteral("calibrationRegion"),
+                          calibrationRegionToString(result.region));
+    result.payload.insert(QStringLiteral("rotationCoverage"),
+                          calibrationRotationCoverageToString(
+                              result.rotationCoverage));
+    result.payload.insert(QStringLiteral("productionAllowed"), false);
+    result.payload.insert(QStringLiteral("coordinateAvailable"), false);
     return result;
 }
 
@@ -82,13 +186,36 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
         double inputY,
         double inputAngleDeg,
         const CalibrationTransformPose &calibrationPose,
-        const CalibrationTransformPose &runPose) const
+        const CalibrationTransformPose &runPose,
+        bool allowBoundaryForProduction) const
 {
     QElapsedTimer timer;
     timer.start();
     QString modelError;
-    if (!model.isValid(&modelError))
-        return fail(QStringLiteral("invalid_calibration"), modelError, timer.elapsed());
+    if (!model.isValid(&modelError)) {
+        const bool regionOrRotationInvalid =
+                modelError.contains(QStringLiteral("region"), Qt::CaseInsensitive)
+                || modelError.contains(QStringLiteral("rotation"), Qt::CaseInsensitive);
+        if (regionOrRotationInvalid && !model.quality.passed) {
+            return fail(QStringLiteral("quality_not_passed"),
+                        QStringLiteral("标定模型未通过质量门禁"), timer.elapsed());
+        }
+        CalibrationTransformHalconResult result = fail(
+                    regionOrRotationInvalid
+                    ? QStringLiteral("calibration_region_invalid")
+                    : QStringLiteral("invalid_calibration"),
+                    modelError, timer.elapsed());
+        if (model.rotationRange.status == CalibrationRotationRangeStatus::Invalid
+                || modelError.contains(QStringLiteral("rotation"),
+                                       Qt::CaseInsensitive)) {
+            result.rotationCoverage = CalibrationRotationCoverage::Invalid;
+            result.payload.insert(
+                        QStringLiteral("rotationCoverage"),
+                        calibrationRotationCoverageToString(
+                            result.rotationCoverage));
+        }
+        return result;
+    }
     if (!model.methodIsKnown())
         return fail(QStringLiteral("unsupported_method"), modelError.isEmpty()
                     ? QStringLiteral("未知标定方式只能读取公共摘要，不能执行转换")
@@ -119,68 +246,57 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
         return fail(QStringLiteral("invalid_coordinate_type"),
                     QStringLiteral("坐标类型必须为image"), timer.elapsed());
     }
-    if (model.validRegion.size() < 3) {
+    if (!finitePolygon(model.validRegion) || !finitePolygon(model.safeRegion)
+            || !std::isfinite(model.safeMarginPx) || model.safeMarginPx < 0.0) {
         CalibrationTransformHalconResult result = fail(
-                    QStringLiteral("valid_region_missing"),
-                    QStringLiteral("标定文件缺少至少3个有效区域采样点"), timer.elapsed());
+                    QStringLiteral("calibration_region_invalid"),
+                    QStringLiteral("标定文件的有效区域或安全区域无效"), timer.elapsed());
         result.payload.insert(QStringLiteral("calibrationId"), model.calibrationId);
         result.payload.insert(QStringLiteral("validRegionPointCount"),
                               model.validRegion.size());
+        result.payload.insert(QStringLiteral("safeRegionPointCount"),
+                              model.safeRegion.size());
+        result.payload.insert(QStringLiteral("safeMarginPx"), model.safeMarginPx);
+        return result;
+    }
+    if (model.rotationRange.status == CalibrationRotationRangeStatus::Invalid
+            || (model.rotationRange.status == CalibrationRotationRangeStatus::Verified
+                && !validRotationRange(model.rotationRange))) {
+        CalibrationTransformHalconResult result = fail(
+                    QStringLiteral("calibration_region_invalid"),
+                    QStringLiteral("标定文件的旋转覆盖范围无效"), timer.elapsed());
+        result.rotationCoverage = CalibrationRotationCoverage::Invalid;
+        result.payload.insert(QStringLiteral("rotationCoverage"),
+                              calibrationRotationCoverageToString(
+                                  result.rotationCoverage));
+        result.payload.insert(QStringLiteral("calibrationId"), model.calibrationId);
         return result;
     }
 
     try {
-        HTuple validRows;
-        HTuple validColumns;
-        for (const QPointF &point : model.validRegion) {
-            validRows.Append(point.y());
-            validColumns.Append(point.x());
-        }
-        HObject sampleContour;
         HObject validHullContour;
-        GenContourPolygonXld(&sampleContour, validRows, validColumns);
-        ShapeTransXld(sampleContour, &validHullContour, HTuple("convex"));
-        HTuple isInside;
-        TestXldPoint(validHullContour, HTuple(inputY), HTuple(inputX), &isInside);
-        HTuple distanceMin;
-        HTuple distanceMax;
-        DistancePc(validHullContour, HTuple(inputY), HTuple(inputX),
-                   &distanceMin, &distanceMax);
-        constexpr double kBoundaryTolerancePx = 1e-6;
-        const bool onBoundary = distanceMin.Length() > 0
-                && distanceMin[0].D() <= kBoundaryTolerancePx;
-        if ((isInside.Length() == 0 || isInside[0].I() == 0) && !onBoundary) {
-            HTuple row1;
-            HTuple column1;
-            HTuple row2;
-            HTuple column2;
-            SmallestRectangle1Xld(validHullContour,
-                                  &row1, &column1, &row2, &column2);
-            CalibrationTransformHalconResult result = fail(
-                        QStringLiteral("outside_valid_region"),
-                        QStringLiteral("输入像素坐标超出标定有效区域"), timer.elapsed());
-            result.payload.insert(QStringLiteral("calibrationId"), model.calibrationId);
-            result.payload.insert(QStringLiteral("inputPoint"), QJsonObject{
-                                      {QStringLiteral("x"), inputX},
-                                      {QStringLiteral("y"), inputY},
-                                      {QStringLiteral("angleDeg"), inputAngleDeg}});
-            result.payload.insert(QStringLiteral("validRegionPointCount"),
-                                  model.validRegion.size());
-            result.payload.insert(QStringLiteral("validRegionBoundaryTolerancePx"),
-                                  kBoundaryTolerancePx);
-            if (row1.Length() > 0 && column1.Length() > 0
-                    && row2.Length() > 0 && column2.Length() > 0) {
-                result.payload.insert(QStringLiteral("validRegionBounds"), QJsonObject{
-                                          {QStringLiteral("minColumn"), column1[0].D()},
-                                          {QStringLiteral("minRow"), row1[0].D()},
-                                          {QStringLiteral("maxColumn"), column2[0].D()},
-                                          {QStringLiteral("maxRow"), row2[0].D()}});
-                result.message += QStringLiteral(" (C:%1..%2, R:%3..%4)")
-                        .arg(column1[0].D()).arg(column2[0].D())
-                        .arg(row1[0].D()).arg(row2[0].D());
-            }
-            return result;
+        HObject safeHullContour;
+        if (!contourForPolygon(model.validRegion, &validHullContour)
+                || !contourForPolygon(model.safeRegion, &safeHullContour)) {
+            return fail(QStringLiteral("calibration_region_invalid"),
+                        QStringLiteral("无法构造标定有效区域"), timer.elapsed());
         }
+        bool insideSafe = false;
+        bool insideValid = false;
+        double distanceToSafeBoundary = 0.0;
+        double distanceToValidBoundary = 0.0;
+        if (!classifyAgainstContour(safeHullContour, inputX, inputY,
+                                    &insideSafe, &distanceToSafeBoundary)
+                || !classifyAgainstContour(validHullContour, inputX, inputY,
+                                            &insideValid,
+                                            &distanceToValidBoundary)) {
+            return fail(QStringLiteral("calibration_region_invalid"),
+                        QStringLiteral("无法判断输入点所在标定区域"), timer.elapsed());
+        }
+        const CalibrationRegion region = insideSafe
+                ? CalibrationRegion::Safe
+                : insideValid ? CalibrationRegion::Boundary
+                              : CalibrationRegion::Extrapolation;
 
         CalibrationTransformPose effectiveCalibration = calibrationPose;
         CalibrationTransformPose effectiveRun = runPose;
@@ -210,16 +326,70 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
 
         const double outputAngle = degrees(std::atan2(directionY - baseY,
                                                        directionX - baseX));
+        CalibrationRotationCoverage rotationCoverage =
+                CalibrationRotationCoverage::Unverified;
+        double unwrappedInputAngle = inputAngleDeg;
+        double unwrappedOutputAngle = outputAngle;
+        if (model.rotationRange.status == CalibrationRotationRangeStatus::Verified) {
+            const bool imageAngleInRange = angleInRange(
+                        inputAngleDeg,
+                        model.rotationRange.imageMinDeg,
+                        model.rotationRange.imageMaxDeg,
+                        model.rotationRange.imageCenterDeg,
+                        model.rotationRange.periodDeg,
+                        &unwrappedInputAngle);
+            const bool machineAngleInRange = angleInRange(
+                        outputAngle,
+                        model.rotationRange.machineMinDeg,
+                        model.rotationRange.machineMaxDeg,
+                        model.rotationRange.machineCenterDeg,
+                        model.rotationRange.periodDeg,
+                        &unwrappedOutputAngle);
+            rotationCoverage = imageAngleInRange && machineAngleInRange
+                    ? CalibrationRotationCoverage::InRange
+                    : CalibrationRotationCoverage::OutOfRange;
+        }
         const double scaleX = std::hypot(model.forward[0], model.forward[3]);
         const double scaleY = std::hypot(model.forward[1], model.forward[4]);
         CalibrationTransformHalconResult result;
         result.success = true;
-        result.status = QStringLiteral("converted");
-        result.message = QStringLiteral("标定转换成功");
+        result.coordinateAvailable = true;
+        result.region = region;
+        result.rotationCoverage = rotationCoverage;
+        result.productionAllowed = region == CalibrationRegion::Safe
+                || (region == CalibrationRegion::Boundary
+                    && allowBoundaryForProduction);
+        if (region == CalibrationRegion::Extrapolation
+                || rotationCoverage == CalibrationRotationCoverage::OutOfRange
+                || rotationCoverage == CalibrationRotationCoverage::Invalid) {
+            result.productionAllowed = false;
+        }
+        if (region == CalibrationRegion::Extrapolation) {
+            result.status = QStringLiteral("converted_extrapolation");
+            result.message = QStringLiteral(
+                        "输入像素坐标位于标定有效区域外，转换坐标仅供诊断");
+        } else if (rotationCoverage == CalibrationRotationCoverage::OutOfRange) {
+            result.status = QStringLiteral("rotation_out_of_range");
+            result.message = QStringLiteral(
+                        "输入或输出角度超出已标定旋转覆盖范围");
+        } else if (region == CalibrationRegion::Boundary) {
+            result.status = QStringLiteral("converted_boundary");
+            result.message = allowBoundaryForProduction
+                    ? QStringLiteral("输入像素坐标位于边界警戒带，已按工具配置放行")
+                    : QStringLiteral("输入像素坐标位于边界警戒带，默认禁止生产使用");
+        } else {
+            result.status = QStringLiteral("converted_safe");
+            result.message = QStringLiteral("标定转换成功");
+        }
+        if (rotationCoverage == CalibrationRotationCoverage::Unverified) {
+            result.message += QStringLiteral("；旋转覆盖范围尚未验证");
+        }
         result.outputX = baseX;
         result.outputY = baseY;
         result.outputAngleDeg = outputAngle;
         result.pixelAccuracy = (scaleX + scaleY) / 2.0;
+        result.distanceToSafeBoundaryPx = distanceToSafeBoundary;
+        result.distanceToValidBoundaryPx = distanceToValidBoundary;
         result.poseCompensationApplied = poseApplied;
         result.elapsedMs = timer.elapsed();
         result.payload = QJsonObject{
@@ -236,8 +406,25 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
             {QStringLiteral("pixelAccuracyUnit"), QStringLiteral("physical_per_pixel")},
             {QStringLiteral("calibrationId"), model.calibrationId},
             {QStringLiteral("methodId"), model.methodId},
+            {QStringLiteral("calibrationRegion"),
+             calibrationRegionToString(region)},
+            {QStringLiteral("rotationCoverage"),
+             calibrationRotationCoverageToString(rotationCoverage)},
+            {QStringLiteral("productionAllowed"), result.productionAllowed},
+            {QStringLiteral("coordinateAvailable"), true},
+            {QStringLiteral("distanceToSafeBoundaryPx"),
+             distanceToSafeBoundary},
+            {QStringLiteral("distanceToValidBoundaryPx"),
+             distanceToValidBoundary},
             {QStringLiteral("validRegionPointCount"), model.validRegion.size()},
+            {QStringLiteral("safeRegionPointCount"), model.safeRegion.size()},
+            {QStringLiteral("safeMarginPx"), model.safeMarginPx},
+            {QStringLiteral("allowBoundaryForProduction"),
+             allowBoundaryForProduction},
             {QStringLiteral("validRegionBoundaryTolerancePx"), kBoundaryTolerancePx},
+            {QStringLiteral("safeRegionBoundaryTolerancePx"), kBoundaryTolerancePx},
+            {QStringLiteral("inputAngleUnwrappedDeg"), unwrappedInputAngle},
+            {QStringLiteral("outputAngleUnwrappedDeg"), unwrappedOutputAngle},
             {QStringLiteral("poseCompensationApplied"), poseApplied},
             {QStringLiteral("poseCompensationStatus"),
              poseApplied ? QStringLiteral("applied") : QStringLiteral("disabled")},

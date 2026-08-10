@@ -562,20 +562,25 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
                 inputY,
                 inputAngle,
                 calibrationPose,
-                runPose);
+                runPose,
+                params.value(QStringLiteral("allowBoundaryForProduction"))
+                .toBool(false));
     ToolResult result;
     result.toolId = config.toolId;
     result.toolType = ToolType::CalibrationTransform;
     result.success = converted.success;
-    result.ok = converted.success;
+    result.ok = converted.productionAllowed;
     result.status = converted.status;
     result.message = converted.message;
-    result.value = converted.outputX;
+    if (converted.coordinateAvailable)
+        result.value = converted.outputX;
     result.elapsedMs = converted.elapsedMs;
-    result.text = converted.success ? QStringLiteral("OK") : QStringLiteral("NG");
+    result.text = result.ok ? QStringLiteral("OK") : QStringLiteral("NG");
     result.payload = converted.payload;
     result.payload.insert(QStringLiteral("calibrationFile"), filePath);
     result.payload.insert(QStringLiteral("calibrationFormat"), loader->formatId());
+    result.payload.insert(QStringLiteral("calibrationSchemaVersion"),
+                          model.schemaVersion);
     result.payload.insert(QStringLiteral("inputProducerId"), inputProducerId);
     result.payload.insert(QStringLiteral("inputProducerType"),
                           toolTypeToString(inputProducerType));

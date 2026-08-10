@@ -2279,6 +2279,7 @@ QDialog#CalibrationTransformDialog QFrame[panelRole="configCard"] {
 QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget,
 QDialog#QuickCalibrationWizard QWidget#nPointMovementCardContent,
 QDialog#QuickCalibrationWizard QWidget#nPointCalibrationParametersCardContent,
+QDialog#QuickCalibrationWizard QWidget#nPointEffectiveRegionCardContent,
 QDialog#QuickCalibrationWizard QWidget#nPointCaptureSubscriptionWidget {
     background: transparent;
     color: #314968;
@@ -2289,6 +2290,37 @@ QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLabel[role
 QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLabel[role="cardHint"] {
     background: transparent;
     color: #314968;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="idle"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="idle"] {
+    color: #64748b;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="ok"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="ok"] {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="warning"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="warning"] {
+    color: #d97706;
+    font-weight: 700;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="error"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="error"] {
+    color: #dc2626;
+    font-weight: 700;
 }
 
 QDialog#QuickCalibrationWizard QLabel,
@@ -2484,6 +2516,10 @@ QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="ok"
     color: #20c933;
 }
 
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="warning"] {
+    color: #ff9d18;
+}
+
 QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="ng"] {
     color: #ff2020;
 }
@@ -2646,6 +2682,20 @@ QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox {
     background: transparent;
     border: 0;
     color: #314968;
+}
+
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QCheckBox#allowBoundaryForProductionCheck {
+    min-height: 32px;
+    padding: 0;
+    spacing: 10px;
+    background: transparent;
+    border: 0;
+    color: #314968;
+}
+
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup QLabel[role="rowField"] {
+    min-width: 126px;
 }
 
 QDialog#QuickCalibrationWizard QCheckBox::indicator,

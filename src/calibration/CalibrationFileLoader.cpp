@@ -41,6 +41,7 @@ void writeModel(QXmlStreamWriter &xml,
                 const CalibrationModel &model,
                 bool includeChecksum)
 {
+    const bool schema11 = model.schemaVersion == QStringLiteral("1.1");
     xml.writeStartDocument(QStringLiteral("1.0"));
     xml.writeStartElement(QStringLiteral("CalibrationModel"));
     xml.writeAttribute(QStringLiteral("schemaVersion"), model.schemaVersion);
@@ -64,6 +65,11 @@ void writeModel(QXmlStreamWriter &xml,
     xml.writeEndElement();
 
     xml.writeStartElement(QStringLiteral("validRegion"));
+    if (schema11) {
+        xml.writeAttribute(QStringLiteral("coordinateSystem"),
+                           model.validRegionCoordinateSystem);
+        xml.writeAttribute(QStringLiteral("type"), model.validRegionType);
+    }
     for (const QPointF &point : model.validRegion) {
         xml.writeStartElement(QStringLiteral("point"));
         xml.writeAttribute(QStringLiteral("column"), QString::number(point.x(), 'g', 17));
@@ -71,6 +77,52 @@ void writeModel(QXmlStreamWriter &xml,
         xml.writeEndElement();
     }
     xml.writeEndElement();
+
+    if (schema11) {
+        xml.writeStartElement(QStringLiteral("safeRegion"));
+        xml.writeAttribute(QStringLiteral("coordinateSystem"),
+                           model.safeRegionCoordinateSystem);
+        xml.writeAttribute(QStringLiteral("source"), model.safeRegionSource);
+        xml.writeAttribute(QStringLiteral("type"), model.safeRegionType);
+        xml.writeAttribute(QStringLiteral("marginPx"),
+                           QString::number(model.safeMarginPx, 'g', 17));
+        for (const QPointF &point : model.safeRegion) {
+            xml.writeStartElement(QStringLiteral("point"));
+            xml.writeAttribute(QStringLiteral("column"),
+                               QString::number(point.x(), 'g', 17));
+            xml.writeAttribute(QStringLiteral("row"),
+                               QString::number(point.y(), 'g', 17));
+            xml.writeEndElement();
+        }
+        xml.writeEndElement();
+
+        xml.writeStartElement(QStringLiteral("rotationRange"));
+        xml.writeAttribute(QStringLiteral("status"),
+                           calibrationRotationRangeStatusToString(
+                               model.rotationRange.status));
+        xml.writeAttribute(QStringLiteral("valid"),
+                           model.rotationRange.isVerified()
+                           ? QStringLiteral("true") : QStringLiteral("false"));
+        xml.writeAttribute(QStringLiteral("periodDeg"),
+                           QString::number(model.rotationRange.periodDeg, 'g', 17));
+        xml.writeStartElement(QStringLiteral("image"));
+        xml.writeAttribute(QStringLiteral("minDeg"),
+                           QString::number(model.rotationRange.imageMinDeg, 'g', 17));
+        xml.writeAttribute(QStringLiteral("maxDeg"),
+                           QString::number(model.rotationRange.imageMaxDeg, 'g', 17));
+        xml.writeAttribute(QStringLiteral("centerDeg"),
+                           QString::number(model.rotationRange.imageCenterDeg, 'g', 17));
+        xml.writeEndElement();
+        xml.writeStartElement(QStringLiteral("machine"));
+        xml.writeAttribute(QStringLiteral("minDeg"),
+                           QString::number(model.rotationRange.machineMinDeg, 'g', 17));
+        xml.writeAttribute(QStringLiteral("maxDeg"),
+                           QString::number(model.rotationRange.machineMaxDeg, 'g', 17));
+        xml.writeAttribute(QStringLiteral("centerDeg"),
+                           QString::number(model.rotationRange.machineCenterDeg, 'g', 17));
+        xml.writeEndElement();
+        xml.writeEndElement();
+    }
 
     xml.writeStartElement(QStringLiteral("imageBinding"));
     xml.writeCDATA(QString::fromUtf8(QJsonDocument(model.imageBinding).toJson(QJsonDocument::Compact)));
@@ -125,7 +177,7 @@ bool numberAttribute(const QXmlStreamAttributes &attributes,
 
 QString ProjectXmlCalibrationLoader::formatId() const
 {
-    return QStringLiteral("project_xml_1_0");
+    return QStringLiteral("project_xml_1_1");
 }
 
 bool ProjectXmlCalibrationLoader::canLoad(const QString &filePath) const
@@ -152,6 +204,17 @@ bool ProjectXmlCalibrationLoader::save(const QString &filePath,
                                        QString *errorMessage) const
 {
     CalibrationModel model = input;
+    if (model.schemaVersion != QStringLiteral("1.0")
+            && model.schemaVersion != QStringLiteral("1.1")) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("unsupported schema version: %1")
+                    .arg(model.schemaVersion);
+        }
+        return false;
+    }
+    if (model.safeRegion.isEmpty() && model.safeMarginPx == 0.0)
+        model.safeRegion = model.validRegion;
+    model.schemaVersion = QStringLiteral("1.1");
     QString validationError;
     if (!model.isValid(&validationError)) {
         if (errorMessage)
@@ -193,15 +256,51 @@ bool ProjectXmlCalibrationLoader::load(const QString &filePath,
     }
     QXmlStreamReader xml(&file);
     CalibrationModel parsed;
+    enum class RegionParent { None, Valid, Safe };
+    RegionParent regionParent = RegionParent::None;
+    bool insideRotationRange = false;
     bool rootSeen = false;
+    bool validRegionSeen = false;
+    bool safeRegionSeen = false;
+    bool rotationRangeSeen = false;
+    bool rotationImageSeen = false;
+    bool rotationMachineSeen = false;
+
     while (!xml.atEnd()) {
         xml.readNext();
+        if (xml.isEndElement()) {
+            const QString name = xml.name().toString();
+            if (name == QStringLiteral("validRegion")
+                    || name == QStringLiteral("safeRegion")) {
+                regionParent = RegionParent::None;
+            } else if (name == QStringLiteral("rotationRange")) {
+                insideRotationRange = false;
+            }
+            continue;
+        }
         if (!xml.isStartElement())
             continue;
+
         const QString name = xml.name().toString();
+        const QXmlStreamAttributes attributes = xml.attributes();
+        if (regionParent != RegionParent::None
+                && name != QStringLiteral("point")) {
+            xml.raiseError(QStringLiteral("区域节点只允许直接包含point"));
+            continue;
+        }
         if (name == QStringLiteral("CalibrationModel")) {
+            if (rootSeen) {
+                xml.raiseError(QStringLiteral("CalibrationModel根节点重复"));
+                continue;
+            }
             rootSeen = true;
-            parsed.schemaVersion = xml.attributes().value(QStringLiteral("schemaVersion")).toString();
+            parsed.schemaVersion = attributes.value(
+                        QStringLiteral("schemaVersion")).toString();
+            if (parsed.schemaVersion != QStringLiteral("1.0")
+                    && parsed.schemaVersion != QStringLiteral("1.1")) {
+                xml.raiseError(QStringLiteral("unsupported schema version: %1")
+                               .arg(parsed.schemaVersion));
+            }
         } else if (name == QStringLiteral("calibrationId")) {
             parsed.calibrationId = xml.readElementText();
         } else if (name == QStringLiteral("methodId")) {
@@ -219,50 +318,177 @@ bool ProjectXmlCalibrationLoader::load(const QString &filePath,
             if (!parseMatrix(xml.readElementText(), &parsed.inverse))
                 xml.raiseError(QStringLiteral("inverseTransform格式无效"));
         } else if (name == QStringLiteral("quality")) {
-            const QXmlStreamAttributes a = xml.attributes();
-            if (!numberAttribute(a, QStringLiteral("meanError"), &parsed.quality.meanError)
-                    || !numberAttribute(a, QStringLiteral("rmse"), &parsed.quality.rmse)
-                    || !numberAttribute(a, QStringLiteral("maxError"), &parsed.quality.maxError)
-                    || !numberAttribute(a, QStringLiteral("rmseX"), &parsed.quality.rmseX)
-                    || !numberAttribute(a, QStringLiteral("rmseY"), &parsed.quality.rmseY)
-                    || !numberAttribute(a, QStringLiteral("rmseLimit"), &parsed.quality.rmseLimit)
-                    || !numberAttribute(a, QStringLiteral("maxErrorLimit"), &parsed.quality.maxErrorLimit)) {
+            if (!numberAttribute(attributes, QStringLiteral("meanError"),
+                                 &parsed.quality.meanError)
+                    || !numberAttribute(attributes, QStringLiteral("rmse"),
+                                        &parsed.quality.rmse)
+                    || !numberAttribute(attributes, QStringLiteral("maxError"),
+                                        &parsed.quality.maxError)
+                    || !numberAttribute(attributes, QStringLiteral("rmseX"),
+                                        &parsed.quality.rmseX)
+                    || !numberAttribute(attributes, QStringLiteral("rmseY"),
+                                        &parsed.quality.rmseY)
+                    || !numberAttribute(attributes, QStringLiteral("rmseLimit"),
+                                        &parsed.quality.rmseLimit)
+                    || !numberAttribute(attributes, QStringLiteral("maxErrorLimit"),
+                                        &parsed.quality.maxErrorLimit)) {
                 xml.raiseError(QStringLiteral("quality字段无效"));
             }
-            parsed.quality.passed = a.value(QStringLiteral("passed")) == QStringLiteral("true");
+            parsed.quality.passed = attributes.value(QStringLiteral("passed"))
+                    == QStringLiteral("true");
+        } else if (name == QStringLiteral("validRegion")) {
+            if (validRegionSeen) {
+                xml.raiseError(QStringLiteral("validRegion节点重复"));
+                continue;
+            }
+            validRegionSeen = true;
+            regionParent = RegionParent::Valid;
+            if (parsed.schemaVersion == QStringLiteral("1.1")) {
+                parsed.validRegionCoordinateSystem = attributes.value(
+                            QStringLiteral("coordinateSystem")).toString();
+                parsed.validRegionType = attributes.value(
+                            QStringLiteral("type")).toString();
+            }
+        } else if (name == QStringLiteral("safeRegion")) {
+            if (parsed.schemaVersion != QStringLiteral("1.1")) {
+                xml.raiseError(QStringLiteral("XML 1.0不允许safeRegion"));
+                continue;
+            }
+            if (safeRegionSeen) {
+                xml.raiseError(QStringLiteral("safeRegion节点重复"));
+                continue;
+            }
+            safeRegionSeen = true;
+            regionParent = RegionParent::Safe;
+            parsed.safeRegionCoordinateSystem = attributes.value(
+                        QStringLiteral("coordinateSystem")).toString();
+            parsed.safeRegionSource = attributes.value(
+                        QStringLiteral("source")).toString();
+            parsed.safeRegionType = attributes.value(
+                        QStringLiteral("type")).toString();
+            if (!numberAttribute(attributes, QStringLiteral("marginPx"),
+                                 &parsed.safeMarginPx)) {
+                xml.raiseError(QStringLiteral("safeRegion marginPx无效"));
+            }
         } else if (name == QStringLiteral("point")) {
             double column = 0.0;
             double row = 0.0;
-            if (!numberAttribute(xml.attributes(), QStringLiteral("column"), &column)
-                    || !numberAttribute(xml.attributes(), QStringLiteral("row"), &row)) {
-                xml.raiseError(QStringLiteral("validRegion点无效"));
+            if (regionParent == RegionParent::None) {
+                xml.raiseError(QStringLiteral("区域point缺少合法父节点"));
+                continue;
             }
-            parsed.validRegion.append(QPointF(column, row));
+            if (!numberAttribute(attributes, QStringLiteral("column"), &column)
+                    || !numberAttribute(attributes, QStringLiteral("row"), &row)) {
+                xml.raiseError(QStringLiteral("区域point无效"));
+                continue;
+            }
+            if (regionParent == RegionParent::Valid)
+                parsed.validRegion.append(QPointF(column, row));
+            else
+                parsed.safeRegion.append(QPointF(column, row));
+        } else if (name == QStringLiteral("rotationRange")) {
+            if (parsed.schemaVersion != QStringLiteral("1.1")) {
+                xml.raiseError(QStringLiteral("XML 1.0不允许rotationRange"));
+                continue;
+            }
+            if (rotationRangeSeen) {
+                xml.raiseError(QStringLiteral("rotationRange节点重复"));
+                continue;
+            }
+            rotationRangeSeen = true;
+            insideRotationRange = true;
+            const QString statusText = attributes.value(
+                        QStringLiteral("status")).toString();
+            if (!calibrationRotationRangeStatusFromString(
+                        statusText, &parsed.rotationRange.status)
+                    || !numberAttribute(attributes, QStringLiteral("periodDeg"),
+                                        &parsed.rotationRange.periodDeg)) {
+                xml.raiseError(QStringLiteral("rotationRange字段无效"));
+            }
+            const QString validText = attributes.value(
+                        QStringLiteral("valid")).toString();
+            if (!validText.isEmpty()) {
+                const bool valid = validText == QStringLiteral("true");
+                if ((validText != QStringLiteral("true")
+                     && validText != QStringLiteral("false"))
+                        || valid != parsed.rotationRange.isVerified()) {
+                    xml.raiseError(QStringLiteral("rotationRange valid与status不一致"));
+                }
+            }
+        } else if (name == QStringLiteral("image") && insideRotationRange) {
+            if (rotationImageSeen) {
+                xml.raiseError(QStringLiteral("rotationRange image节点重复"));
+                continue;
+            }
+            rotationImageSeen = true;
+            if (!numberAttribute(attributes, QStringLiteral("minDeg"),
+                                 &parsed.rotationRange.imageMinDeg)
+                    || !numberAttribute(attributes, QStringLiteral("maxDeg"),
+                                        &parsed.rotationRange.imageMaxDeg)
+                    || !numberAttribute(attributes, QStringLiteral("centerDeg"),
+                                        &parsed.rotationRange.imageCenterDeg)) {
+                xml.raiseError(QStringLiteral("rotationRange image字段无效"));
+            }
+        } else if (name == QStringLiteral("machine") && insideRotationRange) {
+            if (rotationMachineSeen) {
+                xml.raiseError(QStringLiteral("rotationRange machine节点重复"));
+                continue;
+            }
+            rotationMachineSeen = true;
+            if (!numberAttribute(attributes, QStringLiteral("minDeg"),
+                                 &parsed.rotationRange.machineMinDeg)
+                    || !numberAttribute(attributes, QStringLiteral("maxDeg"),
+                                        &parsed.rotationRange.machineMaxDeg)
+                    || !numberAttribute(attributes, QStringLiteral("centerDeg"),
+                                        &parsed.rotationRange.machineCenterDeg)) {
+                xml.raiseError(QStringLiteral("rotationRange machine字段无效"));
+            }
         } else if (name == QStringLiteral("imageBinding")) {
-            parsed.imageBinding = QJsonDocument::fromJson(xml.readElementText().toUtf8()).object();
+            QJsonParseError parseError;
+            const QJsonDocument document = QJsonDocument::fromJson(
+                        xml.readElementText().toUtf8(), &parseError);
+            if (parseError.error != QJsonParseError::NoError || !document.isObject())
+                xml.raiseError(QStringLiteral("imageBinding JSON无效"));
+            else
+                parsed.imageBinding = document.object();
         } else if (name == QStringLiteral("methodData")) {
-            parsed.methodData = QJsonDocument::fromJson(xml.readElementText().toUtf8()).object();
+            QJsonParseError parseError;
+            const QJsonDocument document = QJsonDocument::fromJson(
+                        xml.readElementText().toUtf8(), &parseError);
+            if (parseError.error != QJsonParseError::NoError || !document.isObject())
+                xml.raiseError(QStringLiteral("methodData JSON无效"));
+            else
+                parsed.methodData = document.object();
         } else if (name == QStringLiteral("sample")) {
-            const QXmlStreamAttributes a = xml.attributes();
             CalibrationSample sample;
-            sample.index = a.value(QStringLiteral("index")).toInt();
-            if (!numberAttribute(a, QStringLiteral("column"), &sample.column)
-                    || !numberAttribute(a, QStringLiteral("row"), &sample.row)
-                    || !numberAttribute(a, QStringLiteral("machineX"), &sample.machineX)
-                    || !numberAttribute(a, QStringLiteral("machineY"), &sample.machineY)
-                    || !numberAttribute(a, QStringLiteral("imageAngleDeg"), &sample.imageAngleDeg)
-                    || !numberAttribute(a, QStringLiteral("machineAngleDeg"), &sample.machineAngleDeg)
-                    || !numberAttribute(a, QStringLiteral("residualX"), &sample.residualX)
-                    || !numberAttribute(a, QStringLiteral("residualY"), &sample.residualY)
-                    || !numberAttribute(a, QStringLiteral("residual"), &sample.residual)) {
+            bool indexOk = false;
+            sample.index = attributes.value(QStringLiteral("index"))
+                    .toString().toInt(&indexOk);
+            if (!indexOk
+                    || !numberAttribute(attributes, QStringLiteral("column"), &sample.column)
+                    || !numberAttribute(attributes, QStringLiteral("row"), &sample.row)
+                    || !numberAttribute(attributes, QStringLiteral("machineX"), &sample.machineX)
+                    || !numberAttribute(attributes, QStringLiteral("machineY"), &sample.machineY)
+                    || !numberAttribute(attributes, QStringLiteral("imageAngleDeg"),
+                                        &sample.imageAngleDeg)
+                    || !numberAttribute(attributes, QStringLiteral("machineAngleDeg"),
+                                        &sample.machineAngleDeg)
+                    || !numberAttribute(attributes, QStringLiteral("residualX"),
+                                        &sample.residualX)
+                    || !numberAttribute(attributes, QStringLiteral("residualY"),
+                                        &sample.residualY)
+                    || !numberAttribute(attributes, QStringLiteral("residual"),
+                                        &sample.residual)) {
                 xml.raiseError(QStringLiteral("sample字段无效"));
             }
-            sample.source = a.value(QStringLiteral("source")).toString();
-            sample.capturedAt = a.value(QStringLiteral("capturedAt")).toString();
+            sample.source = attributes.value(QStringLiteral("source")).toString();
+            sample.capturedAt = attributes.value(QStringLiteral("capturedAt")).toString();
             parsed.samples.append(sample);
         } else if (name == QStringLiteral("checksum")) {
-            if (xml.attributes().value(QStringLiteral("algorithm")) != QStringLiteral("SHA-256"))
+            if (attributes.value(QStringLiteral("algorithm"))
+                    != QStringLiteral("SHA-256")) {
                 xml.raiseError(QStringLiteral("不支持的校验算法"));
+            }
             parsed.checksum = xml.readElementText().trimmed().toLower();
         }
     }
@@ -271,18 +497,36 @@ bool ProjectXmlCalibrationLoader::load(const QString &filePath,
             *errorMessage = xml.hasError() ? xml.errorString() : QStringLiteral("缺少CalibrationModel根节点");
         return false;
     }
-    QString validationError;
-    if (!parsed.isValid(&validationError)) {
+
+    if (!validRegionSeen
+            || (parsed.schemaVersion == QStringLiteral("1.1")
+                && (!safeRegionSeen || !rotationRangeSeen
+                    || !rotationImageSeen || !rotationMachineSeen))) {
         if (errorMessage)
-            *errorMessage = validationError;
+            *errorMessage = QStringLiteral("标定文件缺少版本要求的区域或旋转节点");
         return false;
     }
+
+    // Verify 1.0 with the exact legacy canonical payload before adding any
+    // 1.1 defaults.  Otherwise every existing signed calibration would fail.
     const QString expected = QString::fromLatin1(QCryptographicHash::hash(
                                                       canonicalPayload(parsed),
                                                       QCryptographicHash::Sha256).toHex());
     if (parsed.checksum.isEmpty() || parsed.checksum != expected) {
         if (errorMessage)
             *errorMessage = QStringLiteral("标定文件SHA-256校验失败");
+        return false;
+    }
+
+    if (parsed.schemaVersion == QStringLiteral("1.0")) {
+        parsed.safeRegion = parsed.validRegion;
+        parsed.safeMarginPx = 0.0;
+        parsed.rotationRange = CalibrationRotationRange();
+    }
+    QString validationError;
+    if (!parsed.isValid(&validationError)) {
+        if (errorMessage)
+            *errorMessage = validationError;
         return false;
     }
     *model = parsed;

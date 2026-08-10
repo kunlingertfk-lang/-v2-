@@ -81,6 +81,32 @@ QString payloadNumber(const QJsonObject &payload,
             : QStringLiteral("--");
 }
 
+QString calibrationRegionDisplayText(const QString &region)
+{
+    if (region == QStringLiteral("safe"))
+        return QObject::tr("Safe（安全区）");
+    if (region == QStringLiteral("boundary"))
+        return QObject::tr("Boundary（边界警戒带）");
+    if (region == QStringLiteral("extrapolation"))
+        return QObject::tr("Extrapolation（凸包外推）");
+    if (region == QStringLiteral("invalid"))
+        return QObject::tr("Invalid（无效）");
+    return region.trimmed().isEmpty() ? QStringLiteral("--") : region;
+}
+
+QString rotationCoverageDisplayText(const QString &coverage)
+{
+    if (coverage == QStringLiteral("in_range"))
+        return QObject::tr("范围内");
+    if (coverage == QStringLiteral("out_of_range"))
+        return QObject::tr("超出范围");
+    if (coverage == QStringLiteral("unverified"))
+        return QObject::tr("未验证");
+    if (coverage == QStringLiteral("invalid"))
+        return QObject::tr("无效");
+    return coverage.trimmed().isEmpty() ? QStringLiteral("--") : coverage;
+}
+
 bool loadCalibrationModel(const QString &filePath,
                           CalibrationModel *model,
                           QString *errorMessage)
@@ -169,10 +195,13 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
     ui->inputGroup->setProperty("panelRole", QStringLiteral("configCard"));
     ui->fileGroup->setProperty("panelRole", QStringLiteral("configCard"));
     ui->poseGroup->setProperty("panelRole", QStringLiteral("configCard"));
+    ui->regionGroup->setProperty("panelRole", QStringLiteral("configCard"));
     for (QLabel *label : {ui->coordinateTypeLabel, ui->inputXLabel, ui->inputYLabel,
                           ui->inputAngleLabel, ui->calXLabel, ui->calYLabel,
                           ui->calJ0Label, ui->calJ1Label, ui->runXLabel,
-                          ui->runYLabel, ui->runJ0Label, ui->runJ1Label})
+                          ui->runYLabel, ui->runJ0Label, ui->runJ1Label,
+                          ui->regionSafeMarginLabel, ui->regionValidCountLabel,
+                          ui->regionSafeCountLabel, ui->regionGenerationLabel})
         label->setProperty("role", QStringLiteral("rowField"));
     ui->closeButton->setProperty("actionRole", QStringLiteral("windowClose"));
     ui->importButton->setProperty("actionRole", QStringLiteral("secondary"));
@@ -215,6 +244,7 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
     setupPoseSourceUi();
     ui->basicModeButton->setChecked(true);
     ui->poseGroup->setVisible(false);
+    ui->regionGroup->setVisible(false);
 
     connect(ui->closeButton, &QToolButton::clicked, this, &QDialog::reject);
     connect(ui->finishButton, &QPushButton::clicked,
@@ -231,8 +261,11 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int) {
         invalidatePreviewSnapshot();
+        refreshCalibrationRegionSummary();
         refreshCalibrationSourceValidation();
     });
+    connect(ui->allowBoundaryForProductionCheck, &QCheckBox::toggled,
+            this, [this](bool) { invalidatePreviewSnapshot(); });
     connect(ui->calibrationPoseEnabled, &QCheckBox::toggled,
             this, [this](bool) { invalidatePreviewSnapshot(); });
     connect(ui->runPoseEnabled, &QCheckBox::toggled,
@@ -256,11 +289,13 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
         ui->basicModeButton->setChecked(true);
         ui->allModeButton->setChecked(false);
         ui->poseGroup->setVisible(false);
+        ui->regionGroup->setVisible(false);
     });
     connect(ui->allModeButton, &QPushButton::clicked, this, [this]() {
         ui->basicModeButton->setChecked(false);
         ui->allModeButton->setChecked(true);
         ui->poseGroup->setVisible(true);
+        ui->regionGroup->setVisible(true);
     });
     // 新建工具没有 loadFromConfig() 调用，也应能看到当前方案的标定资产。
     updateImportedTestUi();
@@ -800,6 +835,9 @@ void CalibrationTransformDialog::loadFromConfig(const ToolConfig &config)
         m_calibrationFiles.append(active);
     mergeSchemeCalibrationFiles();
     refreshFileList(m_calibrationFiles, active);
+    ui->allowBoundaryForProductionCheck->setChecked(
+                params.value(QStringLiteral("allowBoundaryForProduction"))
+                .toBool(false));
 
     const auto restorePose = [this](const QJsonObject &pose, bool calibration,
                                     Ui::CalibrationTransformDialog *ui) {
@@ -860,6 +898,8 @@ ToolConfig CalibrationTransformDialog::toolConfig() const
         {QStringLiteral("inputAngle"), mainInputBinding(ui->inputAngleSourceCombo)},
         {QStringLiteral("calibrationFiles"), files},
         {QStringLiteral("activeCalibrationFile"), ui->calibrationFileCombo->currentData().toString()},
+        {QStringLiteral("allowBoundaryForProduction"),
+         ui->allowBoundaryForProductionCheck->isChecked()},
         {QStringLiteral("calibrationPose"), poseConfig(true)},
         {QStringLiteral("runPose"), poseConfig(false)}
     };
@@ -883,7 +923,56 @@ void CalibrationTransformDialog::refreshFileList(const QStringList &paths,
     const int activeIndex = ui->calibrationFileCombo->findData(activePath);
     if (activeIndex >= 0)
         ui->calibrationFileCombo->setCurrentIndex(activeIndex);
+    refreshCalibrationRegionSummary();
     refreshCalibrationSourceValidation();
+}
+
+void CalibrationTransformDialog::refreshCalibrationRegionSummary()
+{
+    const auto showSummary = [this](const QString &margin,
+                                    const QString &validCount,
+                                    const QString &safeCount,
+                                    const QString &message,
+                                    const QString &state) {
+        ui->regionSafeMarginEdit->setText(margin);
+        ui->regionValidCountEdit->setText(validCount);
+        ui->regionSafeCountEdit->setText(safeCount);
+        ui->regionGenerationValue->setText(message);
+        ui->regionGenerationValue->setProperty("regionState", state);
+        ui->regionGenerationValue->style()->unpolish(ui->regionGenerationValue);
+        ui->regionGenerationValue->style()->polish(ui->regionGenerationValue);
+    };
+
+    const QString filePath = ui->calibrationFileCombo->currentData().toString().trimmed();
+    if (filePath.isEmpty()) {
+        showSummary(QStringLiteral("--"), QStringLiteral("--"),
+                    QStringLiteral("--"), tr("尚未加载标定文件"),
+                    QStringLiteral("idle"));
+        return;
+    }
+
+    CalibrationModel model;
+    QString error;
+    if (!QFileInfo::exists(filePath)
+            || !loadCalibrationModel(filePath, &model, &error)) {
+        showSummary(QStringLiteral("--"), QStringLiteral("--"),
+                    QStringLiteral("--"),
+                    error.trimmed().isEmpty() ? tr("标定文件无法读取") : error,
+                    QStringLiteral("error"));
+        return;
+    }
+
+    const bool regionsReady = model.validRegion.size() >= 3
+            && model.safeRegion.size() >= 3
+            && std::isfinite(model.safeMarginPx)
+            && model.safeMarginPx >= 0.0;
+    showSummary(tr("%1 px").arg(model.safeMarginPx, 0, 'f', 2),
+                QString::number(model.validRegion.size()),
+                QString::number(model.safeRegion.size()),
+                regionsReady
+                ? tr("平移点凸包 + HALCON 均匀内缩")
+                : tr("区域结构无效，禁止生产使用"),
+                regionsReady ? QStringLiteral("ok") : QStringLiteral("error"));
 }
 
 void CalibrationTransformDialog::mergeSchemeCalibrationFiles()
@@ -1365,28 +1454,60 @@ void CalibrationTransformDialog::finishConfiguration()
 
 void CalibrationTransformDialog::displayConversionResult(const ToolResult &result)
 {
-    QString state;
-    QString text;
-    if (result.success && result.ok) {
-        const QJsonObject payload = result.payload;
-        state = QStringLiteral("ok");
-        text = tr("标定转换输出为OK\n"
-                  "转换坐标X：%1，转换坐标Y：%2，转换角度：%3°，单像素精度：%4")
-                .arg(payloadNumber(payload, QStringLiteral("machineX"), 2))
-                .arg(payloadNumber(payload, QStringLiteral("machineY"), 2))
-                .arg(payloadNumber(payload, QStringLiteral("convertedAngleDeg"), 2))
-                .arg(payloadNumber(payload, QStringLiteral("pixelAccuracy"), 2));
+    const QJsonObject payload = result.payload;
+    const QString region = payload.value(QStringLiteral("calibrationRegion"))
+            .toString().trimmed();
+    const QString rotationCoverage = payload.value(QStringLiteral("rotationCoverage"))
+            .toString().trimmed();
+    const bool coordinateAvailable = payload
+            .value(QStringLiteral("coordinateAvailable")).toBool(false);
+    const bool productionAllowed = payload
+            .value(QStringLiteral("productionAllowed")).toBool(result.ok);
+
+    QString reason = result.message.trimmed();
+    if (reason.isEmpty())
+        reason = result.status.trimmed();
+    if (reason.isEmpty())
+        reason = tr("未知状态");
+
+    const bool boundaryWarning = result.success
+            && result.status == QStringLiteral("converted_boundary");
+    QString state = boundaryWarning
+            ? QStringLiteral("warning")
+            : result.ok ? QStringLiteral("ok") : QStringLiteral("ng");
+    QStringList lines;
+    if (result.success) {
+        lines.append(result.ok
+                     ? tr("标定转换输出为OK")
+                     : tr("标定转换输出为NG（数学转换成功，生产门禁阻止）"));
+        if (coordinateAvailable) {
+            lines.append(tr("转换坐标X：%1，转换坐标Y：%2，转换角度：%3°，单像素精度：%4")
+                         .arg(payloadNumber(payload, QStringLiteral("machineX"), 2))
+                         .arg(payloadNumber(payload, QStringLiteral("machineY"), 2))
+                         .arg(payloadNumber(payload, QStringLiteral("convertedAngleDeg"), 2))
+                         .arg(payloadNumber(payload, QStringLiteral("pixelAccuracy"), 2)));
+        } else {
+            lines.append(tr("未返回可诊断的转换坐标"));
+        }
+        lines.append(tr("区域：%1，旋转覆盖：%2，生产允许：%3")
+                     .arg(calibrationRegionDisplayText(region),
+                          rotationCoverageDisplayText(rotationCoverage),
+                          productionAllowed ? tr("是") : tr("否")));
+        lines.append(tr("距SafeROI边界：%1 px，距ValidROI边界：%2 px")
+                     .arg(payloadNumber(payload,
+                                        QStringLiteral("distanceToSafeBoundaryPx"), 2),
+                          payloadNumber(payload,
+                                        QStringLiteral("distanceToValidBoundaryPx"), 2)));
+        if (!result.ok || reason != tr("标定转换成功"))
+            lines.append(tr("诊断：%1").arg(reason));
     } else {
-        state = QStringLiteral("ng");
-        QString reason = result.message.trimmed();
-        if (reason.isEmpty())
-            reason = result.status.trimmed();
-        if (reason.isEmpty())
-            reason = tr("未知错误");
-        text = tr("标定转换输出为NG\n失败原因：%1").arg(reason);
+        lines.append(tr("标定转换输出为NG"));
+        lines.append(tr("区域：%1，生产允许：否")
+                     .arg(calibrationRegionDisplayText(region)));
+        lines.append(tr("失败原因：%1").arg(reason));
     }
 
-    ui->conversionResultLabel->setText(text);
+    ui->conversionResultLabel->setText(lines.join(QLatin1Char('\n')));
     ui->conversionResultLabel->setProperty("resultState", state);
     ui->conversionResultLabel->style()->unpolish(ui->conversionResultLabel);
     ui->conversionResultLabel->style()->polish(ui->conversionResultLabel);
@@ -1450,19 +1571,41 @@ void CalibrationTransformDialog::runTest()
                                        QStringLiteral("test_result_missing"));
         }
     }
-    if (result.success && result.ok) {
+    if (result.success) {
         const QJsonObject payload = result.payload;
+        const QString region = payload.value(QStringLiteral("calibrationRegion"))
+                .toString().trimmed();
+        const bool coordinateAvailable = payload
+                .value(QStringLiteral("coordinateAvailable")).toBool(false);
+        const bool boundaryWarning =
+                result.status == QStringLiteral("converted_boundary");
         ui->statusLabel->setProperty("sourceValidationState",
-                                     QStringLiteral("testOk"));
-        ui->statusLabel->setStyleSheet(QStringLiteral("color: #20c933;"));
+                                     boundaryWarning
+                                     ? QStringLiteral("testWarning")
+                                     : result.ok ? QStringLiteral("testOk")
+                                                 : QStringLiteral("testNg"));
+        ui->statusLabel->setStyleSheet(
+                    QStringLiteral("color: %1;")
+                    .arg(boundaryWarning ? QStringLiteral("#ff9d18")
+                                         : result.ok ? QStringLiteral("#20c933")
+                                                     : QStringLiteral("#ff2020")));
+        const QString coordinateText = coordinateAvailable
+                ? tr("物理 X:%1  Y:%2  Angle:%3°")
+                  .arg(payloadNumber(payload, QStringLiteral("machineX"), 3),
+                       payloadNumber(payload, QStringLiteral("machineY"), 3),
+                       payloadNumber(payload, QStringLiteral("convertedAngleDeg"), 3))
+                : tr("无有效转换坐标");
+        const QString prefix = useImportedFrame
+                ? tr("PC图片 %1 | ").arg(m_importedTestImageTitle)
+                : QString();
         ui->statusLabel->setText(
-                    (useImportedFrame
-                     ? tr("PC图片 %1 | OK | 物理 X:%2  Y:%3  Angle:%4° | %5ms")
-                       .arg(m_importedTestImageTitle)
-                     : tr("OK | 物理 X:%1  Y:%2  Angle:%3° | %4ms"))
-                    .arg(payload.value(QStringLiteral("machineX")).toDouble(), 0, 'f', 3)
-                    .arg(payload.value(QStringLiteral("machineY")).toDouble(), 0, 'f', 3)
-                    .arg(payload.value(QStringLiteral("convertedAngleDeg")).toDouble(), 0, 'f', 3)
+                    tr("%1%2 | %3 | 区域:%4 | %5ms")
+                    .arg(prefix,
+                         boundaryWarning ? tr("Warning")
+                                         : result.ok ? QStringLiteral("OK")
+                                                     : QStringLiteral("NG"),
+                         coordinateText,
+                         calibrationRegionDisplayText(region))
                     .arg(result.elapsedMs));
     } else {
         ui->statusLabel->setProperty("sourceValidationState",

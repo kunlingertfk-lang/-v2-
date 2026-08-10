@@ -68,6 +68,12 @@ QColor overlayColor(const ToolOverlay &overlay)
         return QColor(255, 70, 70);
     if (displayRole == QStringLiteral("calibration_translation_path_solved"))
         return QColor(0, 210, 120);
+    if (displayRole == QStringLiteral("calibration_valid_roi"))
+        return QColor(255, 122, 0);
+    if (displayRole == QStringLiteral("calibration_safe_roi"))
+        return QColor(0, 210, 120);
+    if (displayRole == QStringLiteral("calibration_boundary_band"))
+        return QColor(250, 190, 30);
 
     const QString label = overlay.label.trimmed().toLower();
     if (label == QStringLiteral("roi") || label == QStringLiteral("detect_roi"))
@@ -147,7 +153,15 @@ QPen styledOverlayPen(const ToolOverlay &overlay, const QColor &color)
 
 QBrush styledOverlayBrush(const ToolOverlay &overlay, const QColor &color)
 {
-    if (!overlayDisplayRole(overlay).endsWith(QStringLiteral("_mask")))
+    const QString displayRole = overlayDisplayRole(overlay);
+    if (displayRole == QStringLiteral("calibration_safe_roi")
+            || displayRole == QStringLiteral("calibration_boundary_band")) {
+        QColor fill = color;
+        fill.setAlpha(displayRole == QStringLiteral("calibration_safe_roi")
+                      ? 62 : 54);
+        return QBrush(fill, Qt::SolidPattern);
+    }
+    if (!displayRole.endsWith(QStringLiteral("_mask")))
         return Qt::NoBrush;
     QColor fill = color;
     fill.setAlpha(72);
@@ -194,12 +208,36 @@ QPainterPath overlayClipPath(const ToolOverlay &overlay)
         if (finitePoint(point) && finiteValue(radius) && radius > 0.0) {
             path.addEllipse(point, radius, radius);
         }
+    } else if (type == QStringLiteral("polygon")) {
+        QPolygonF polygon;
+        const QJsonArray points = clip.value(QStringLiteral("points")).toArray();
+        for (const QJsonValue &value : points) {
+            const QJsonObject point = value.toObject();
+            const QPointF position(point.value(QStringLiteral("x")).toDouble(qQNaN()),
+                                   point.value(QStringLiteral("y")).toDouble(qQNaN()));
+            if (!finitePoint(position)) {
+                polygon.clear();
+                break;
+            }
+            polygon.append(position);
+        }
+        if (polygon.size() >= 3)
+            path = polygonPath(polygon);
     }
     return path;
 }
 
 qreal overlayZValue(const ToolOverlay &overlay)
 {
+    const QString displayRole = overlayDisplayRole(overlay);
+    if (displayRole == QStringLiteral("calibration_boundary_band"))
+        return 102.0;
+    if (displayRole == QStringLiteral("calibration_safe_roi"))
+        return 103.0;
+    if (displayRole == QStringLiteral("calibration_valid_roi"))
+        return 104.0;
+    if (displayRole.startsWith(QStringLiteral("calibration_translation_path_")))
+        return 114.0;
     const QString label = overlay.label.trimmed().toLower();
     if (label == QStringLiteral("template_roi"))
         return 104.0;
@@ -917,6 +955,17 @@ void FrameViewHelper::setToolOverlays(const QVector<ToolOverlay> &overlays)
             const QPainterPath originalPath = polygonPath(polygon);
             const QPainterPath clipPath = overlayClipPath(overlay);
             if (!clipPath.isEmpty()
+                    && overlayDisplayRole(overlay)
+                       == QStringLiteral("calibration_boundary_band")) {
+                const QPainterPath boundaryBand = originalPath.subtracted(clipPath);
+                if (!boundaryBand.isEmpty()) {
+                    QGraphicsPathItem *item = m_scene->addPath(
+                                boundaryBand, pen, brush);
+                    item->setOpacity(opacity);
+                    item->setToolTip(overlay.label);
+                    addOverlayItem(item, overlayZValue(overlay));
+                }
+            } else if (!clipPath.isEmpty()
                     && overlayDisplayRole(overlay).endsWith(
                         QStringLiteral("_mask"))) {
                 const QPainterPath effectivePath = originalPath.intersected(

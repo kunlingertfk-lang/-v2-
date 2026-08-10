@@ -12,6 +12,36 @@ namespace {
 
 using namespace HalconCpp;
 
+class HalconThreadClipRegionGuard
+{
+public:
+    HalconThreadClipRegionGuard()
+    {
+        GetSystem(HTuple("tsp_clip_region"), &m_previousValue);
+        SetSystem(HTuple("tsp_clip_region"), HTuple("false"));
+        m_restore = true;
+    }
+
+    ~HalconThreadClipRegionGuard()
+    {
+        if (!m_restore)
+            return;
+        try {
+            SetSystem(HTuple("tsp_clip_region"), m_previousValue);
+        } catch (...) {
+            // A destructor must not mask the original HALCON result/exception.
+        }
+    }
+
+    HalconThreadClipRegionGuard(const HalconThreadClipRegionGuard &) = delete;
+    HalconThreadClipRegionGuard &operator=(
+            const HalconThreadClipRegionGuard &) = delete;
+
+private:
+    HTuple m_previousValue;
+    bool m_restore = false;
+};
+
 CalibrationSolveResult failure(const QString &status, const QString &message)
 {
     CalibrationSolveResult result;
@@ -86,18 +116,171 @@ QVector<QPointF> convexValidRegion(const HTuple &rows, const HTuple &columns)
     return result;
 }
 
+QVector<QPointF> compactPolygon(const HTuple &rows, const HTuple &columns)
+{
+    QVector<QPointF> result;
+    const Hlong pointCount = std::min(rows.Length(), columns.Length());
+    result.reserve(static_cast<int>(pointCount));
+    constexpr double kSamePointTolerance = 1e-9;
+    for (Hlong index = 0; index < pointCount; ++index) {
+        const QPointF point(columns[index].D(), rows[index].D());
+        if (!result.isEmpty()
+                && std::hypot(result.constLast().x() - point.x(),
+                              result.constLast().y() - point.y())
+                   <= kSamePointTolerance) {
+            continue;
+        }
+        result.append(point);
+    }
+    if (result.size() > 1
+            && std::hypot(result.constFirst().x() - result.constLast().x(),
+                          result.constFirst().y() - result.constLast().y())
+               <= kSamePointTolerance) {
+        result.removeLast();
+    }
+    return result;
+}
+
+void polygonTuples(const QVector<QPointF> &polygon,
+                   HTuple *rows,
+                   HTuple *columns)
+{
+    if (!rows || !columns)
+        return;
+    for (const QPointF &point : polygon) {
+        rows->Append(point.y());
+        columns->Append(point.x());
+    }
+}
+
+bool erodedSafeRegion(const QVector<QPointF> &validRegion,
+                      double safeMarginPx,
+                      QVector<QPointF> *safeRegion,
+                      QString *errorMessage)
+{
+    if (!safeRegion)
+        return false;
+    safeRegion->clear();
+    if (safeMarginPx == 0.0) {
+        *safeRegion = validRegion;
+        return true;
+    }
+
+    HTuple validRows;
+    HTuple validColumns;
+    polygonTuples(validRegion, &validRows, &validColumns);
+    // Region generators otherwise clip to HALCON's current image format.  A
+    // calibration polygon is expressed in source-image coordinates and must
+    // not depend on whichever image size happened to run on this thread last.
+    // Use the thread-specific setting and restore it before returning.
+    HalconThreadClipRegionGuard clipRegionGuard;
+    HObject validRegionObject;
+    HObject erodedRegionObject;
+    GenRegionPolygonFilled(&validRegionObject, validRows, validColumns);
+
+    // HALCON's raster circle is centered without a half-pixel translation for
+    // half-integer radii.  In the public contract safeMarginPx denotes the
+    // number of pixels removed, hence the +0.5 mapping.
+    ErosionCircle(validRegionObject, &erodedRegionObject,
+                  HTuple(safeMarginPx + 0.5));
+
+    HTuple area;
+    HTuple centerRow;
+    HTuple centerColumn;
+    AreaCenter(erodedRegionObject, &area, &centerRow, &centerColumn);
+    if (area.Length() == 0 || area[0].D() <= 0.0) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("安全内缩距离过大，SafeROI为空");
+        return false;
+    }
+
+    HTuple isSubset;
+    TestSubsetRegion(erodedRegionObject, validRegionObject, &isSubset);
+    if (isSubset.Length() == 0 || isSubset[0].I() == 0) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("HALCON生成的SafeROI不属于ValidROI");
+        return false;
+    }
+
+    constexpr double kPolygonTolerancePx = 0.5;
+    HTuple safeRows;
+    HTuple safeColumns;
+    GetRegionPolygon(erodedRegionObject, HTuple(kPolygonTolerancePx),
+                     &safeRows, &safeColumns);
+    *safeRegion = compactPolygon(safeRows, safeColumns);
+    if (safeRegion->size() < 3) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("安全内缩后SafeROI退化，顶点不足3个");
+        return false;
+    }
+
+    HTuple polygonRows;
+    HTuple polygonColumns;
+    polygonTuples(*safeRegion, &polygonRows, &polygonColumns);
+    HObject serializedSafeRegion;
+    GenRegionPolygonFilled(&serializedSafeRegion, polygonRows, polygonColumns);
+    TestSubsetRegion(serializedSafeRegion, erodedRegionObject, &isSubset);
+    if (isSubset.Length() == 0 || isSubset[0].I() == 0) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral(
+                        "SafeROI多边形近似超出HALCON内缩区域");
+        return false;
+    }
+    return true;
+}
+
+QVector<double> unwrapAngles(const QVector<CalibrationSample> &samples,
+                             bool imageAngles)
+{
+    QVector<double> result;
+    result.reserve(samples.size());
+    if (samples.isEmpty())
+        return result;
+    result.append(imageAngles ? samples.constFirst().imageAngleDeg
+                              : samples.constFirst().machineAngleDeg);
+    for (int index = 1; index < samples.size(); ++index) {
+        const double raw = imageAngles ? samples.at(index).imageAngleDeg
+                                       : samples.at(index).machineAngleDeg;
+        double delta = std::remainder(raw - result.constLast(), 360.0);
+        if (delta <= -180.0)
+            delta += 360.0;
+        result.append(result.constLast() + delta);
+    }
+    return result;
+}
+
+void angleRange(const QVector<double> &angles,
+                double *minimum,
+                double *maximum,
+                double *center)
+{
+    const auto bounds = std::minmax_element(angles.constBegin(), angles.constEnd());
+    *minimum = *bounds.first;
+    *maximum = *bounds.second;
+    *center = (*minimum + *maximum) * 0.5;
+}
+
 } // namespace
 
 CalibrationSolveResult CalibrationSolver::solveNPoint(
         const QVector<CalibrationSample> &input,
         double rmseLimit,
-        double maxErrorLimit) const
+        double maxErrorLimit,
+        double safeMarginPx) const
 {
     if (input.size() < 3)
         return failure(QStringLiteral("CAL-SOL-001"), QStringLiteral("N点标定至少需要3组有效对应点"));
     if (!std::isfinite(rmseLimit) || !std::isfinite(maxErrorLimit)
             || rmseLimit <= 0.0 || maxErrorLimit <= 0.0) {
         return failure(QStringLiteral("CAL-SOL-001"), QStringLiteral("误差阈值必须为有限正数"));
+    }
+    if (!std::isfinite(safeMarginPx) || safeMarginPx < 0.0) {
+        return failure(QStringLiteral("CAL-SOL-001"),
+                       QStringLiteral("安全内缩距离必须为有限非负数"));
+    }
+    if (safeMarginPx > 511.0) {
+        return failure(QStringLiteral("CAL-SOL-003"),
+                       QStringLiteral("安全内缩距离超过HALCON ErosionCircle支持上限511 px"));
     }
     for (const CalibrationSample &sample : input) {
         if (!finiteSample(sample))
@@ -182,6 +365,12 @@ CalibrationSolveResult CalibrationSolver::solveNPoint(
             return failure(QStringLiteral("CAL-SOL-001"),
                            QStringLiteral("HALCON未能生成有效的标定区域凸包"));
         }
+        QString safeRegionError;
+        if (!erodedSafeRegion(model.validRegion, safeMarginPx,
+                              &model.safeRegion, &safeRegionError)) {
+            return failure(QStringLiteral("CAL-SOL-003"), safeRegionError);
+        }
+        model.safeMarginPx = safeMarginPx;
         const double count = static_cast<double>(input.size());
         model.quality.meanError = sum / count;
         model.quality.rmse = std::sqrt(sumSquares / count);
@@ -206,6 +395,15 @@ CalibrationSolveResult CalibrationSolver::solveNPoint(
                                 QStringLiteral("image_pixel_column_row"));
         model.methodData.insert(QStringLiteral("validRegionPointCount"),
                                 model.validRegion.size());
+        model.methodData.insert(QStringLiteral("safeRegionType"),
+                                model.safeRegionType);
+        model.methodData.insert(QStringLiteral("safeRegionSource"),
+                                model.safeRegionSource);
+        model.methodData.insert(QStringLiteral("safeRegionCoordinateSystem"),
+                                model.safeRegionCoordinateSystem);
+        model.methodData.insert(QStringLiteral("safeRegionPointCount"),
+                                model.safeRegion.size());
+        model.methodData.insert(QStringLiteral("safeMarginPx"), safeMarginPx);
 
         QString modelError;
         if (!model.isValid(&modelError))
@@ -229,4 +427,39 @@ CalibrationSolveResult CalibrationSolver::solveNPoint(
         return failure(QStringLiteral("CAL-SOL-001"),
                        QString::fromLocal8Bit(exception.what()));
     }
+}
+
+CalibrationRotationRange CalibrationSolver::buildRotationRange(
+        const QVector<CalibrationSample> &rotationSamples) const
+{
+    CalibrationRotationRange range;
+    if (rotationSamples.size() < 3)
+        return range;
+
+    for (const CalibrationSample &sample : rotationSamples) {
+        if (!std::isfinite(sample.imageAngleDeg)
+                || !std::isfinite(sample.machineAngleDeg)) {
+            range.status = CalibrationRotationRangeStatus::Invalid;
+            return range;
+        }
+    }
+
+    const QVector<double> imageAngles = unwrapAngles(rotationSamples, true);
+    const QVector<double> machineAngles = unwrapAngles(rotationSamples, false);
+    angleRange(imageAngles, &range.imageMinDeg, &range.imageMaxDeg,
+               &range.imageCenterDeg);
+    angleRange(machineAngles, &range.machineMinDeg, &range.machineMaxDeg,
+               &range.machineCenterDeg);
+    constexpr double kCoverageToleranceDeg = 1e-9;
+    const double imageSpan = range.imageMaxDeg - range.imageMinDeg;
+    const double machineSpan = range.machineMaxDeg - range.machineMinDeg;
+    if (imageSpan <= kCoverageToleranceDeg
+            || machineSpan <= kCoverageToleranceDeg
+            || imageSpan > range.periodDeg + kCoverageToleranceDeg
+            || machineSpan > range.periodDeg + kCoverageToleranceDeg) {
+        range.status = CalibrationRotationRangeStatus::Invalid;
+        return range;
+    }
+    range.status = CalibrationRotationRangeStatus::Verified;
+    return range;
 }

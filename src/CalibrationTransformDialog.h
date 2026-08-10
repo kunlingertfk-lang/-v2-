@@ -107,6 +107,7 @@ private:
     void clearDisplayedConversionResult();
     void updateImportedTestUi();
     void refreshFileList(const QStringList &paths, const QString &activePath);
+    void refreshCalibrationRegionSummary();
     void mergeSchemeCalibrationFiles();
     void displayConversionResult(const ToolResult &result);
 
