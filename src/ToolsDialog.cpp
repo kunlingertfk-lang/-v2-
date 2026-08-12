@@ -94,6 +94,7 @@ const ToolConfig *toolById(const QVector<ToolConfig> &tools,
     return nullptr;
 }
 
+// 校验快速标定生成物能否安全应用到单个标定转换目标，不修改任何配置。
 bool validateGeneratedCalibrationTarget(
         const ToolConfig &target,
         const QVector<ToolConfig> &tools,
@@ -102,6 +103,7 @@ bool validateGeneratedCalibrationTarget(
         bool requiresImageAngle,
         QString *errorMessage)
 {
+    // 应用前先验证目标订阅最终可追溯到标定时同一个模板来源，避免批量写入不兼容文件。
     if (expectedFingerprint.isEmpty()
             || expectedFingerprint.value(QStringLiteral("mode")).toString()
                == QStringLiteral("manual")) {
@@ -289,6 +291,7 @@ QString findParamString(const QJsonObject &object, const QString &key)
     return QString();
 }
 
+// 在位置来源 JSON 的现有字段形态中回写新的工具 ID。
 QJsonObject writeSourceId(QJsonObject object,
                           const QString &sourceId,
                           const QString &sourceText)
@@ -304,6 +307,7 @@ QJsonObject writeSourceId(QJsonObject object,
     return object;
 }
 
+// 递归检查配置 JSON 是否引用指定工具，用于删除依赖门禁。
 bool containsToolReference(const QJsonValue &value, const QString &toolId)
 {
     if (value.isArray()) {
@@ -445,6 +449,7 @@ void configureProducerContext(PositionCorrectionDialog *dialog,
                                   referenceProducers);
 }
 
+// 按消费者在工具链中的位置注入合法前序工具、快照和真实测试上下文。
 void configureProducerContext(CalibrationTransformDialog *dialog,
                               ToolsDialog *toolsDialog,
                               const ToolConfig *initialConfig)
@@ -579,6 +584,7 @@ void configureProducerContext(RegisteredClassificationDialog *dialog,
 }
 
 template <typename Dialog>
+// 统一执行工具配置对话框，并仅在 accept 后回收配置与预览快照。
 bool runToolConfigDialog(QWidget *parent,
                          const ToolConfig *initialConfig,
                          ToolConfig *toolConfig,
@@ -799,6 +805,7 @@ void ToolsDialog::connectNavigation()
 
 void ToolsDialog::openQuickCalibration()
 {
+    // 向导仅产出文件路径和目标选择；真正修改方案与运行态由本函数在关闭后事务式完成。
     if (!commitToolStateToScheme(true))
         return;
     SchemeStore &store = SchemeStore::instance();
@@ -854,6 +861,7 @@ bool ToolsDialog::applyGeneratedCalibrationToTransforms(
         QStringList *appliedToolNames,
         QString *errorMessage)
 {
+    // 先完成全部目标预检，再统一修改；任一保存/同步失败都会恢复内存工具态。
     if (appliedToolNames)
         appliedToolNames->clear();
     if (errorMessage)

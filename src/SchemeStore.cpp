@@ -47,6 +47,7 @@ QVector<ToolConfig> toolConfigsFromJson(const QJsonArray &array)
     return configs;
 }
 
+// 方案保存事务的文件回滚器：提交前失败时删除本轮新建的资产和目录。
 class SaveFileRollback
 {
 public:
@@ -70,6 +71,7 @@ private:
     bool m_committed = false;
 };
 
+// 将标定转换引用的外部文件按内容摘要归档到方案目录，并重写配置/快照路径。
 bool materializeCalibrationAssetsForScheme(SchemeState *scheme,
                                            SaveFileRollback *rollback,
                                            QString *errorMessage)

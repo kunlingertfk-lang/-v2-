@@ -8,6 +8,7 @@
 
 namespace {
 
+// 严格读取旋转样本 JSON 中的有限数值字段。
 bool finiteJsonNumber(const QJsonValue &value, double *output)
 {
     if (!output || !value.isDouble())
@@ -19,6 +20,7 @@ bool finiteJsonNumber(const QJsonValue &value, double *output)
     return true;
 }
 
+// 将三条旋转样本 JSON 解码为强类型数据，并按模式检查 ImageAngle。
 bool parseRotationSamples(const QJsonArray &array,
                           bool requireImageAngle,
                           int firstIndex,
@@ -81,6 +83,7 @@ bool parseRotationSamples(const QJsonArray &array,
     return true;
 }
 
+// 从草稿参数读取 N 点模式；未知模式立即拒绝，禁止按默认模式求解。
 bool draftMode(const QJsonObject &parameters,
                NPointCalibrationMode *mode,
                QString *errorMessage)
@@ -97,6 +100,7 @@ bool draftMode(const QJsonObject &parameters,
     return true;
 }
 
+// 将轴轨迹验证码翻译为可直接指导现场复采的失败说明。
 QString rotationFailureMessage(const CalibrationRotationRange &range)
 {
     const QString details = QStringLiteral(
@@ -145,6 +149,7 @@ QString rotationFailureMessage(const CalibrationRotationRange &range)
             .arg(range.validationCode, details);
 }
 
+// 将姿态角映射验证码翻译为可直接指导现场复采的失败说明。
 QString angleMappingFailureMessage(const CalibrationAngleMapping &mapping)
 {
     const QString details = QStringLiteral(
@@ -177,6 +182,7 @@ QString angleMappingFailureMessage(const CalibrationAngleMapping &mapping)
             .arg(mapping.validationCode, details);
 }
 
+// N 点方式编排层：连接点表草稿、HALCON XY 求解、轴轨迹/角度映射与结果门禁。
 class NPointCalibrationMethod final : public ICalibrationMethod
 {
 public:
@@ -462,6 +468,7 @@ public:
     }
 };
 
+// 未实现方式的显式占位，所有求解入口均返回 unsupported，禁止静默降级。
 class PlannedCalibrationMethod final : public ICalibrationMethod
 {
 public:

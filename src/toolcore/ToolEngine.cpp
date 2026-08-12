@@ -14,11 +14,13 @@
 
 namespace {
 
+// 读取嵌套对象；缺失或类型不符时返回空对象。
 QJsonObject ensureObject(const QJsonObject &parent, const QString &key)
 {
     return parent.value(key).toObject();
 }
 
+// 将本帧结果登记到 toolResultsById；这是标定转换“订阅”前序坐标的进程内通信总线。
 void registerResultInContext(const ToolResult &result, QJsonObject *context)
 {
     if (!context || result.toolId.trimmed().isEmpty())
@@ -57,6 +59,7 @@ bool finiteJsonNumber(const QJsonValue &value, double *number)
     return true;
 }
 
+// 从方案级参考位姿配置读取有限 X/Y/Angle 及可选正 Scale。
 bool poseFromJson(const QJsonObject &object,
                   PositionPose *pose,
                   bool *invalidScale = nullptr)
@@ -122,6 +125,7 @@ ToolResult referencePositionCorrectionError(const QString &status,
     return result;
 }
 
+// 在普通工具链之前运行方案级参考位置修正，并把结果注入同帧上下文。
 ToolResult runReferencePositionCorrection(const cv::Mat &image,
                                           const cv::Mat &referenceImage,
                                           const QJsonObject &runtimeContext)
@@ -332,6 +336,7 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
                                          const QJsonObject &runtimeContext,
                                          ToolResult *referenceCorrectionResult) const
 {
+    // 工具顺序即依赖顺序；每次调用重建动态结果映射，禁止跨帧复用旧坐标。
     QVector<ToolResult> results;
     results.reserve(configs.size());
     QJsonObject frameContext = runtimeContext;

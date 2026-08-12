@@ -1120,6 +1120,7 @@ bool MainWindow::tryRunToolChainOnLatestFrame(qint64 frameIndex)
 
 bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex)
 {
+    // 运行帧、参考图和配置在入队前复制；后序标定转换只消费本次 frameId 的前序结果。
     if (m_isToolChainRunning) {
         if (continuousRun)
             ++m_continuousDroppedFrames;

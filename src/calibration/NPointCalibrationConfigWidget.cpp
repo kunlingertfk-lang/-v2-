@@ -46,12 +46,14 @@ const QString kNinePointXY = QStringLiteral("nine_point_xy");
 const QString kTwelvePointAxisTrace = QStringLiteral("twelve_point_axis_trace");
 const QString kTwelvePointPoseMapping = QStringLiteral("twelve_point_pose_mapping");
 
+// 判断持久化字符串是否为当前支持的 N 点三模式之一。
 bool isKnownCalibrationMode(const QString &mode)
 {
     return mode == kNinePointXY || mode == kTwelvePointAxisTrace
             || mode == kTwelvePointPoseMapping;
 }
 
+// 仅用于旧数据兼容：按严格的 9+0/9+3 点数推断模式。
 QString calibrationModeForCounts(int translationCount, int rotationCount)
 {
     if (translationCount == 9 && rotationCount == 0)
@@ -61,6 +63,7 @@ QString calibrationModeForCounts(int translationCount, int rotationCount)
     return QString();
 }
 
+// 计算 [-180, 180) 范围内的最短有向角差。
 double wrappedAngleDelta(double fromDeg, double toDeg)
 {
     double delta = std::fmod(toDeg - fromDeg, 360.0);
@@ -71,6 +74,7 @@ double wrappedAngleDelta(double fromDeg, double toDeg)
     return delta;
 }
 
+// 校验三个角度既彼此独立又具有足够跨度，避免不可观测的旋转拟合。
 bool anglesAreObservable(const QVector<double> &anglesDeg,
                          double minimumSpanDeg = 5.0)
 {
@@ -129,6 +133,7 @@ QTableWidgetItem *typeItem(const QString &type)
     return item;
 }
 
+// 用显式未完成标记重建全零点表，避免把合法 (0,0) 当作空数据。
 void fillZeroPointTable(QTableWidget *table, int count)
 {
     if (!table)
@@ -169,11 +174,13 @@ QDoubleSpinBox *coordinateSpinBox(const QString &objectName,
     return spin;
 }
 
+// 草稿恢复使用的严格有限 JSON 数值判断。
 bool isFiniteJsonNumber(const QJsonValue &value)
 {
     return value.isDouble() && std::isfinite(value.toDouble());
 }
 
+// 草稿版本、点数等整数合同的范围校验。
 bool isJsonIntegerInRange(const QJsonValue &value, int minimum, int maximum)
 {
     if (!isFiniteJsonNumber(value))
@@ -200,6 +207,7 @@ struct CollapsibleCard
     QVBoxLayout *contentLayout = nullptr;
 };
 
+// 创建带 configCard/collapseCard 语义属性的可折叠参数卡片。
 CollapsibleCard createCollapsibleCard(QWidget *parent,
                                       const QString &objectName,
                                       const QString &title)

@@ -38,6 +38,7 @@
 
 namespace {
 
+// 构造固定值绑定，供机构标定位/运行位参数使用。
 QJsonObject constantBinding(double value)
 {
     return QJsonObject{{QStringLiteral("mode"), QStringLiteral("constant")},
@@ -58,6 +59,7 @@ void addUnboundItem(QComboBox *combo)
                    QJsonObject{{QStringLiteral("mode"), QStringLiteral("unbound")}});
 }
 
+// 构造指向前序 ToolResult payload 字段的订阅绑定。
 QJsonObject bindingItem(const QString &producerId,
                         const QString &outputKey,
                         const QString &displayPath)
@@ -68,6 +70,7 @@ QJsonObject bindingItem(const QString &producerId,
                        {QStringLiteral("displayPath"), displayPath}};
 }
 
+// 安全格式化 payload 数值；缺失或非有限值显示占位符。
 QString payloadNumber(const QJsonObject &payload,
                       const QString &key,
                       int precision)
@@ -139,6 +142,7 @@ QString angleMappingDisplayText(const CalibrationAngleMapping &mapping)
     return QObject::tr("未知");
 }
 
+// 按项目 XML、IWCAL、海康 XML 的探测优先级选择加载器，并保留明确 unsupported 错误。
 bool loadCalibrationModel(const QString &filePath,
                           CalibrationModel *model,
                           QString *errorMessage)
@@ -160,6 +164,7 @@ bool loadCalibrationModel(const QString &filePath,
     return loader->load(filePath, model, errorMessage);
 }
 
+// 将有效预览快照转换为来源验证可消费的 payload。
 QJsonObject snapshotPayload(const ToolPreviewSnapshot &snapshot)
 {
     if (!snapshot.valid)
@@ -190,6 +195,7 @@ QString fingerprintFieldText(const QString &field)
     return field.isEmpty() ? QObject::tr("来源信息") : field;
 }
 
+// 校验来源指纹字段完整且自签名可重算一致。
 bool completeSignedFingerprint(const QJsonObject &fingerprint)
 {
     const QString signature = fingerprint
@@ -1491,6 +1497,7 @@ void CalibrationTransformDialog::refreshCalibrationSourceValidation()
 
 bool CalibrationTransformDialog::validateConfiguration(QString *errorMessage) const
 {
+    // 保存门禁与运行时 Adapter 保持同一核心约束：文件有效、主输入同源、来源未失效。
     const QString filePath = ui->calibrationFileCombo->currentData().toString().trimmed();
     if (filePath.isEmpty() || !QFileInfo::exists(filePath)) {
         if (errorMessage)

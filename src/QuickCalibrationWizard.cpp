@@ -61,6 +61,7 @@
 
 namespace {
 
+// 绘制外部标定图片的有序缩略图卡片。
 class CalibrationThumbnailDelegate final : public QStyledItemDelegate
 {
 public:
@@ -129,6 +130,7 @@ public:
     }
 };
 
+// 支持水平拖动排序并输出源行/插入位置的缩略图列表。
 class OrderedThumbnailList final : public QListWidget
 {
 public:
@@ -251,6 +253,7 @@ private:
     QPoint m_dragPosition;
 };
 
+// 创建带统一 pageTitle 语义属性的向导页标题。
 QLabel *pageTitle(const QString &text, QWidget *parent)
 {
     QLabel *label = new QLabel(text, parent);
@@ -258,6 +261,7 @@ QLabel *pageTitle(const QString &text, QWidget *parent)
     return label;
 }
 
+// 将 2x3 仿射矩阵格式化为结果页可读的两行文本。
 QString matrixLine(const std::array<double, 6> &matrix)
 {
     return QStringLiteral("[%1  %2  %3]\n[%4  %5  %6]")
@@ -266,6 +270,7 @@ QString matrixLine(const std::array<double, 6> &matrix)
             .arg(matrix[4], 0, 'g', 12).arg(matrix[5], 0, 'g', 12);
 }
 
+// 将预览 QImage 桥接为定位工具输入的 BGR cv::Mat；不参与标定核心求解。
 cv::Mat qImageToBgrMat(const QImage &image)
 {
     if (image.isNull())
@@ -280,12 +285,14 @@ cv::Mat qImageToBgrMat(const QImage &image)
     return bgr.clone();
 }
 
+// 校验定位结果指定字段存在且为有限数值。
 bool finitePayloadNumber(const QJsonObject &payload, const QString &key)
 {
     return payload.value(key).isDouble()
             && std::isfinite(payload.value(key).toDouble());
 }
 
+// 将区域点集编码为 overlay 使用的 JSON 数组。
 QJsonArray overlayPointArray(const QVector<QPointF> &points)
 {
     QJsonArray array;
@@ -296,6 +303,7 @@ QJsonArray overlayPointArray(const QVector<QPointF> &points)
     return array;
 }
 
+// 计算草稿外部图片文件的 SHA-256，用于恢复时检测文件替换。
 QString fileSha256(const QString &path)
 {
     QFile file(path);
@@ -307,6 +315,7 @@ QString fileSha256(const QString &path)
     return QString::fromLatin1(hash.result().toHex());
 }
 
+// 计算含尺寸和行跨度的图像 SHA-256，用于草稿内容一致性校验。
 QString imageSha256(const QImage &source)
 {
     if (source.isNull())
@@ -1887,6 +1896,7 @@ void QuickCalibrationWizard::toggleCommunicationSession()
 bool QuickCalibrationWizard::handleCommunicationMessage(
         CalibrationCommunicationMessage *message, QString *errorMessage)
 {
+    // Start/End 当前只做协议确认；Capture 才进入定位、来源锁定和点表落点链路。
     if (!message || message->event != CalibrationCommunicationEvent::Capture)
         return true;
     if (errorMessage)

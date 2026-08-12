@@ -14,16 +14,19 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr double kBoundaryTolerancePx = 1e-6;
 constexpr double kRotationToleranceDeg = 1e-9;
 
+// 角度转弧度，供 HALCON 刚性位姿矩阵使用。
 double radians(double degreesValue)
 {
     return degreesValue * kPi / 180.0;
 }
 
+// 弧度转角度，供结果 payload 和范围门禁使用。
 double degrees(double radiansValue)
 {
     return radiansValue * 180.0 / kPi;
 }
 
+// 将项目 2x3 仿射矩阵转换为 HALCON HomMat2D 元组。
 HTuple tupleFor(const std::array<double, 6> &matrix)
 {
     HTuple tuple;
@@ -32,6 +35,7 @@ HTuple tupleFor(const std::array<double, 6> &matrix)
     return tuple;
 }
 
+// 校验机构位姿四个自由度均为有限值。
 bool finitePose(const CalibrationTransformPose &pose)
 {
     return std::isfinite(pose.x) && std::isfinite(pose.y)
@@ -39,6 +43,7 @@ bool finitePose(const CalibrationTransformPose &pose)
             && std::isfinite(pose.joint1AngleDeg);
 }
 
+// 校验区域至少三点且全部为有限 Column/Row。
 bool finitePolygon(const QVector<QPointF> &polygon)
 {
     if (polygon.size() < 3)
@@ -50,6 +55,7 @@ bool finitePolygon(const QVector<QPointF> &polygon)
     return true;
 }
 
+// 将 XML 中的区域多边形转换为 HALCON 凸 XLD 轮廓。
 bool contourForPolygon(const QVector<QPointF> &polygon, HObject *contour)
 {
     if (!contour || !finitePolygon(polygon))
@@ -66,6 +72,7 @@ bool contourForPolygon(const QVector<QPointF> &polygon, HObject *contour)
     return true;
 }
 
+// 使用 HALCON 判断点在区域内/边界上，并返回到边界的最小像素距离。
 bool classifyAgainstContour(const HObject &contour,
                             double column,
                             double row,
@@ -91,11 +98,13 @@ bool classifyAgainstContour(const HObject &contour,
     return true;
 }
 
+// 将周期角归一到最靠近标定范围中心的等价值。
 double angleNearCenter(double angleDeg, double centerDeg, double periodDeg)
 {
     return angleDeg + periodDeg * std::round((centerDeg - angleDeg) / periodDeg);
 }
 
+// 判断周期角是否落在标定覆盖范围内，并返回归一后的角度。
 bool angleInRange(double angleDeg,
                   double minimumDeg,
                   double maximumDeg,
@@ -110,6 +119,7 @@ bool angleInRange(double angleDeg,
             && unwrapped <= maximumDeg + kRotationToleranceDeg;
 }
 
+// 校验运行期可消费的轴轨迹派生模型合同。
 bool validAxisTrace(const CalibrationRotationRange &range)
 {
     const double machineSpan = range.machineMaxDeg - range.machineMinDeg;
@@ -137,6 +147,7 @@ bool validAxisTrace(const CalibrationRotationRange &range)
                + kRotationToleranceDeg;
 }
 
+// 校验运行期可消费的姿态角映射合同。
 bool validAngleMapping(const CalibrationAngleMapping &mapping)
 {
     const double imageSpan = mapping.imageMaxDeg - mapping.imageMinDeg;
@@ -161,6 +172,7 @@ bool validAngleMapping(const CalibrationAngleMapping &mapping)
                + kRotationToleranceDeg;
 }
 
+// 构造 Runner 失败结果并附带已耗时。
 CalibrationTransformHalconResult fail(const QString &status,
                                       const QString &message,
                                       qint64 elapsed)
@@ -184,6 +196,7 @@ CalibrationTransformHalconResult fail(const QString &status,
     return result;
 }
 
+// 用 HALCON AffineTransPoint2d 转换单个 Column/Row 或 X/Y 点。
 void transformPoint(const HTuple &matrix,
                     double x,
                     double y,
@@ -197,6 +210,7 @@ void transformPoint(const HTuple &matrix,
     *outputY = ty[0].D();
 }
 
+// 在机械 X/Y/Joint0 坐标约定下生成标定位到运行位的刚性变换。
 HTuple relativePose(const CalibrationTransformPose &from,
                     const CalibrationTransformPose &to)
 {
@@ -224,6 +238,7 @@ CalibrationTransformHalconResult CalibrationTransformHalconRunner::run(
         const CalibrationTransformPose &runPose,
         bool allowBoundaryForProduction) const
 {
+    // success 表示数学链路完成；productionAllowed 由区域与角度覆盖门禁独立决定。
     QElapsedTimer timer;
     timer.start();
 

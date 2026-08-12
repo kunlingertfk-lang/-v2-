@@ -13,6 +13,7 @@
 
 namespace {
 
+// 按 17 位有效数字序列化 2x3 仿射矩阵，保证校验和往返稳定。
 QString matrixText(const std::array<double, 6> &matrix)
 {
     QStringList values;
@@ -21,6 +22,7 @@ QString matrixText(const std::array<double, 6> &matrix)
     return values.join(QLatin1Char(','));
 }
 
+// 严格解析六个有限矩阵系数，拒绝缺项、多项和非有限值。
 bool parseMatrix(const QString &text, std::array<double, 6> *matrix)
 {
     if (!matrix)
@@ -125,6 +127,7 @@ void writeSample(QXmlStreamWriter &xml,
     xml.writeEndElement();
 }
 
+// 按 Calibration XML 1.4 合同写入模型；includeChecksum 控制规范载荷或最终文件。
 void writeModel(QXmlStreamWriter &xml,
                 const CalibrationModel &model,
                 bool includeChecksum)
@@ -328,6 +331,7 @@ void writeModel(QXmlStreamWriter &xml,
     xml.writeEndDocument();
 }
 
+// 读取 ValidROI/SafeROI 点集，并保持 Column/Row 坐标约定。
 bool parsePointRegion(QXmlStreamReader &xml,
                       QVector<QPointF> *points,
                       const QString &expectedEnd)
@@ -382,6 +386,7 @@ bool parseSample(const QXmlStreamAttributes &attributes,
                                        &sample->residual)));
 }
 
+// 读取平移或旋转样本集合并严格校验计数、索引和类型。
 bool parseSamples(QXmlStreamReader &xml,
                   bool includeResidual,
                   QVector<CalibrationSample> *samples)
@@ -417,6 +422,7 @@ bool parseAngleRange(const QXmlStreamAttributes &attributes,
             && numberAttribute(attributes, QStringLiteral("centerDeg"), center);
 }
 
+// 解析 XML 1.4 的旋转轴轨迹诊断模型。
 bool parseAxisTrace(QXmlStreamReader &xml, CalibrationRotationRange *trace)
 {
     const QXmlStreamAttributes attributes = xml.attributes();
@@ -488,6 +494,7 @@ bool parseAxisTrace(QXmlStreamReader &xml, CalibrationRotationRange *trace)
     return true;
 }
 
+// 解析 XML 1.4 的 ImageAngle -> MachineAngle 姿态映射模型。
 bool parseAngleMapping(QXmlStreamReader &xml,
                        CalibrationAngleMapping *mapping)
 {
@@ -573,6 +580,7 @@ bool near(double first, double second, double tolerance = 1e-8)
     return std::abs(first - second) <= tolerance;
 }
 
+// 由原始样本重算轴轨迹与角度映射，防止文件只篡改派生结果而仍通过校验。
 bool derivedModelsMatch(const CalibrationModel &model, QString *errorMessage)
 {
     if (model.mode == NPointCalibrationMode::NinePointXY)

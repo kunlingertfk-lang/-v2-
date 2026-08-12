@@ -24,6 +24,7 @@
  */
 namespace CalibrationSourceFingerprint {
 
+/// 递归按键排序 JSON 对象，生成与插入顺序无关的稳定表示。
 inline QJsonValue canonicalValue(const QJsonValue &value)
 {
     if (value.isArray()) {
@@ -45,6 +46,7 @@ inline QJsonValue canonicalValue(const QJsonValue &value)
     return value;
 }
 
+/// 将任意 JSON 值编码为紧凑、稳定的字节序列。
 inline QByteArray canonicalJson(const QJsonValue &value)
 {
     if (value.isObject()) {
@@ -57,6 +59,7 @@ inline QByteArray canonicalJson(const QJsonValue &value)
     return encoded.mid(1, qMax(0, encoded.size() - 2));
 }
 
+/// 计算规范化 JSON 的 SHA-256 十六进制摘要。
 inline QString sha256(const QJsonValue &value)
 {
     return QString::fromLatin1(QCryptographicHash::hash(
@@ -64,6 +67,7 @@ inline QString sha256(const QJsonValue &value)
                                   QCryptographicHash::Sha256).toHex());
 }
 
+/// 按尺寸、类型和逐行原始像素计算图像内容签名。
 inline QString imageSignature(const cv::Mat &image)
 {
     if (image.empty())
@@ -91,6 +95,7 @@ inline QJsonObject normalizedPoint(const QJsonObject &point,
     };
 }
 
+/// 提取会影响模板图像坐标语义的稳定配置，排除运行环境和缓存生命周期字段。
 inline QJsonObject templateConfigContract(const ToolConfig &config)
 {
     QJsonObject params = config.params;
@@ -118,11 +123,13 @@ inline QJsonObject templateConfigContract(const ToolConfig &config)
     };
 }
 
+/// 计算模板坐标来源配置合同的稳定签名。
 inline QString coordinateSourceConfigSignature(const ToolConfig &config)
 {
     return sha256(templateConfigContract(config));
 }
 
+/// 返回模板定位对标定公开的 X/Y/Angle 字段及坐标单位合同。
 inline QJsonObject templateOutputContract()
 {
     return QJsonObject{
@@ -135,6 +142,7 @@ inline QJsonObject templateOutputContract()
     };
 }
 
+/// 计算去除自签名字段后的完整来源指纹摘要。
 inline QString coordinateSourceSignature(const QJsonObject &fingerprint)
 {
     QJsonObject unsignedFingerprint = fingerprint;
@@ -142,6 +150,7 @@ inline QString coordinateSourceSignature(const QJsonObject &fingerprint)
     return sha256(unsignedFingerprint);
 }
 
+/// 从生产者身份、输出 payload 与字段合同构造带自校验签名的来源指纹。
 inline QJsonObject makeFingerprint(const QString &producerId,
                                    ToolType producerType,
                                    const QJsonObject &payload,
@@ -180,6 +189,7 @@ inline QJsonObject makeFingerprint(const QString &producerId,
     return fingerprint;
 }
 
+/// 校验必需字段、版本和自签名，返回首个缺失/损坏字段。
 inline bool isComplete(const QJsonObject &fingerprint,
                        QString *missingField = nullptr)
 {
@@ -222,6 +232,7 @@ inline bool isComplete(const QJsonObject &fingerprint,
     return true;
 }
 
+/// 比较标定时与运行时来源语义；仅当期望记录了基准图签名时强制比较该字段。
 inline bool matches(const QJsonObject &expected,
                     const QJsonObject &actual,
                     QString *mismatchField = nullptr)
@@ -266,6 +277,7 @@ inline bool matches(const QJsonObject &expected,
     return true;
 }
 
+/// 给模板定位结果补充来源合同与配置签名，供后序链路传播。
 inline void enrichTemplatePayload(const ToolConfig &config, QJsonObject *payload)
 {
     if (!payload)
@@ -277,6 +289,7 @@ inline void enrichTemplatePayload(const ToolConfig &config, QJsonObject *payload
                     coordinateSourceConfigSignature(config));
 }
 
+/// 将来源身份字段透传到位置修正等中间节点结果，保留可追溯性。
 inline void propagateIdentityFields(const QJsonObject &source, QJsonObject *target)
 {
     if (!target)

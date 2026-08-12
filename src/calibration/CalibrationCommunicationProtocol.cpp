@@ -11,6 +11,7 @@
 
 namespace {
 
+// 将事件枚举转换为通信日志中的稳定英文键。
 QString eventName(CalibrationCommunicationEvent event)
 {
     switch (event) {
@@ -21,6 +22,7 @@ QString eventName(CalibrationCommunicationEvent event)
     }
 }
 
+// 构造统一的无效入站消息，保留原报文、时间戳与可诊断错误。
 CalibrationCommunicationMessage failed(const QString &raw, const QString &error)
 {
     CalibrationCommunicationMessage message;
@@ -91,6 +93,7 @@ bool CalibrationCommunicationSession::start(
         const CalibrationCommunicationConfig &config,
         QString *errorMessage)
 {
+    // 每次启动都先释放旧会话，避免切换 transport 后遗留 socket 或半包。
     stop();
     if (!CalibrationCommunicationProtocol::validate(config, errorMessage))
         return false;
@@ -258,6 +261,7 @@ void CalibrationCommunicationSession::processMessage(
         const QHostAddress &udpSender,
         quint16 udpSenderPort)
 {
+    // 业务处理器同步执行；最终应答反映协议解析与上层处理结果，但 socket write 未做送达确认。
     CalibrationCommunicationMessage message =
             CalibrationCommunicationProtocol::parse(raw, m_config);
     if (message.valid && m_messageHandler) {

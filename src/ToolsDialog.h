@@ -62,6 +62,7 @@ private slots:
     void copySelectedTool();
     void deleteSelectedTool();
     void deleteAllTools();
+    /// 保存当前工具态后打开快速标定，并在关闭后事务式应用新 XML 与稳定配置。
     void openQuickCalibration();
 
 private:
@@ -69,6 +70,7 @@ private:
     void connectNavigation();
     void refreshSchemeHeader();
     bool commitToolStateToScheme(bool saveToDisk);
+    /// 校验生成文件与目标来源兼容性，批量更新所选标定转换并同步方案运行态。
     bool applyGeneratedCalibrationToTransforms(
             const QString &filePath,
             const QStringList &targetToolIds,

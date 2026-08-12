@@ -38,9 +38,11 @@ struct CalibrationTransformHalconResult
     QJsonObject payload;
 };
 
+/// 使用 HALCON 执行像素到物理坐标、区域分类、姿态及可选旋转偏心补偿。
 class CalibrationTransformHalconRunner
 {
 public:
+    /// 转换单个已归一化输入点；数学成功与生产放行分别由 success/productionAllowed 表达。
     CalibrationTransformHalconResult run(
             const CalibrationModel &model,
             const QString &inputCoordinateType,

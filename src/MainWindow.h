@@ -92,6 +92,7 @@ private:
     void refreshToolRunStateRows();
     bool runCurrentToolChainOnce();
     bool tryRunToolChainOnLatestFrame(qint64 frameIndex);
+    /// 快照当前帧与方案配置，异步提交同帧工具链并防止连续运行重入。
     bool submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex);
     void onCameraFrameUpdated(qint64 frameIndex);
     void applyToolChainRunResult(ToolChainRunOutput output);

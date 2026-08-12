@@ -49,6 +49,7 @@ public:
     bool ensureLoaded(QString *errorMessage = nullptr);
     bool setCurrentScheme(const QString &schemeId, QString *errorMessage = nullptr);
     SchemeState loadScheme(const QString &schemeId, QString *errorMessage = nullptr) const;
+    /// 原子保存当前方案；成功后以内存中的规范化状态替换当前运行态。
     bool saveCurrentScheme(QString *errorMessage = nullptr);
     bool saveScheme(const SchemeState &state, QString *errorMessage = nullptr);
     bool saveCurrentSchemeAs(const QString &schemeName, QString *errorMessage = nullptr);
@@ -63,8 +64,10 @@ public:
     QString currentReferenceImageAbsolutePath() const;
 
     void setSchemeName(const QString &schemeName);
+    /// 更新方案工具与基准预览快照；调用方仍需 saveCurrentScheme 才会落盘。
     void setToolConfigs(const QVector<ToolConfig> &configs,
                         const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
+    /// 更新快速标定稳定配置，不包含点表草稿和通信运行态。
     void setQuickCalibrationConfig(const QJsonObject &quickCalibrationConfig);
     void setOutputConfig(const QJsonObject &outputConfig);
     void setReferencePositionCorrection(const ReferencePositionCorrectionConfig &config);
@@ -81,6 +84,7 @@ private:
     bool loadSchemeFromFile(const QString &schemeJsonPath,
                             SchemeState *state,
                             QString *errorMessage = nullptr) const;
+    /// 归档标定资产、可选基准图并通过 QSaveFile 写入规范化 scheme.json。
     bool saveSchemeToFile(const SchemeState &state,
                           QString *errorMessage = nullptr,
                           const cv::Mat *referenceFrame = nullptr,

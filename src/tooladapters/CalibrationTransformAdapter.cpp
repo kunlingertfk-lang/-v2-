@@ -13,6 +13,7 @@
 
 namespace {
 
+// 严格读取 ToolConfig/runtimeContext 中的有限数值。
 bool finiteNumber(const QJsonValue &value, double *output)
 {
     if (!output)
@@ -27,6 +28,7 @@ bool finiteNumber(const QJsonValue &value, double *output)
     return true;
 }
 
+// 按点分隔路径读取嵌套 JSON 字段。
 QJsonValue valueAtObjectPath(const QJsonObject &object, const QString &path)
 {
     const QStringList parts = path.split(QLatin1Char('.'), Qt::SkipEmptyParts);
@@ -43,6 +45,7 @@ QJsonValue valueAtObjectPath(const QJsonObject &object, const QString &path)
     return current;
 }
 
+// 解析 constant 或同帧 tool_result 绑定，并返回可定位的失败原因。
 bool resolveInput(const QJsonObject &binding,
                   const QJsonObject &runtimeContext,
                   const QString &currentFrame,
@@ -96,6 +99,7 @@ bool resolveInput(const QJsonObject &binding,
     return true;
 }
 
+// 解析机构位姿 X/Y/Joint0/Joint1 的四个绑定。
 bool readPose(const QJsonObject &config,
               const QJsonObject &runtimeContext,
               const QString &currentFrame,
@@ -121,6 +125,7 @@ bool readPose(const QJsonObject &config,
                             &pose->joint1AngleDeg, error);
 }
 
+// 从同一个前序 ToolResult 解析主 X/Y/(Angle)，并强制工具类型、字段和 frameId 合同。
 bool resolveMainInputs(const QJsonObject &params,
                        const ToolRequest &request,
                        bool angleRequired,
@@ -271,6 +276,7 @@ bool resolveMainInputs(const QJsonObject &params,
     return true;
 }
 
+// 穿透位置修正中间节点，还原真正模板定位来源并构造运行时指纹。
 QJsonObject effectiveCoordinateSourceFingerprint(
         const QString &inputProducerId,
         ToolType inputProducerType,
@@ -306,6 +312,7 @@ QJsonObject effectiveCoordinateSourceFingerprint(
                 outputContract);
 }
 
+// 将配置时来源验证状态写入结果 payload，便于 UI 区分已验证与不可验证。
 void annotateBindingValidation(ToolResult *result,
                                bool verified,
                                const QString &status,
@@ -320,6 +327,7 @@ void annotateBindingValidation(ToolResult *result,
         result->payload.insert(QStringLiteral("calibrationBindingWarning"), warning);
 }
 
+// 校验主 X/Y/(Angle) 全部来自同一个前序工具结果。
 bool singleProducerBinding(const QJsonObject &group,
                            const QStringList &keys,
                            QString *error)
@@ -340,6 +348,7 @@ bool singleProducerBinding(const QJsonObject &group,
     return false;
 }
 
+// 构造带稳定状态码的标定转换错误结果。
 ToolResult failure(const ToolConfig &config,
                    const QString &status,
                    const QString &message)
@@ -356,6 +365,7 @@ bool CalibrationTransformAdapter::supports(ToolType type) const
 
 ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
 {
+    // 适配层先完成所有文件、订阅与来源门禁，Runner 只接收已归一化的强类型输入。
     const ToolConfig &config = request.config;
     if (config.toolType != ToolType::CalibrationTransform)
         return failure(config, QStringLiteral("invalid_tool_type"),

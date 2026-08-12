@@ -42,6 +42,7 @@ private:
     bool m_restore = false;
 };
 
+// 构造统一的求解失败结果，保留稳定状态码和可诊断消息。
 CalibrationSolveResult failure(const QString &status, const QString &message)
 {
     CalibrationSolveResult result;
@@ -50,6 +51,7 @@ CalibrationSolveResult failure(const QString &status, const QString &message)
     return result;
 }
 
+// 校验平移样本的像素与机械 X/Y 均为有限数值。
 bool finiteSample(const CalibrationSample &sample)
 {
     return std::isfinite(sample.column) && std::isfinite(sample.row)
@@ -70,6 +72,7 @@ double twiceArea(const CalibrationSample &a,
     return std::abs((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
 }
 
+// 检查像素域或机械域至少存在一组三点不共线，避免退化仿射求解。
 bool hasNonCollinearTriple(const QVector<CalibrationSample> &samples, bool pixel)
 {
     for (int i = 0; i < samples.size() - 2; ++i) {
@@ -83,6 +86,7 @@ bool hasNonCollinearTriple(const QVector<CalibrationSample> &samples, bool pixel
     return false;
 }
 
+// 用 HALCON 从样本点生成凸包轮廓，并输出像素 Column/Row 有效区域。
 QVector<QPointF> convexValidRegion(const HTuple &rows, const HTuple &columns)
 {
     HObject sampleContour;
@@ -116,6 +120,7 @@ QVector<QPointF> convexValidRegion(const HTuple &rows, const HTuple &columns)
     return result;
 }
 
+// 清理 HALCON 轮廓导出的相邻重复点与闭合重复端点。
 QVector<QPointF> compactPolygon(const HTuple &rows, const HTuple &columns)
 {
     QVector<QPointF> result;
@@ -153,6 +158,7 @@ void polygonTuples(const QVector<QPointF> &polygon,
     }
 }
 
+// 用 HALCON 对有效区域按像素边距内缩，生成可生产放行的 SafeROI。
 bool erodedSafeRegion(const QVector<QPointF> &validRegion,
                       double safeMarginPx,
                       QVector<QPointF> *safeRegion,
@@ -229,6 +235,7 @@ bool erodedSafeRegion(const QVector<QPointF> &validRegion,
     return true;
 }
 
+// 按采样顺序展开机械角，消除跨越周期边界造成的跳变。
 QVector<double> unwrapAngles(const QVector<CalibrationSample> &samples,
                              bool imageAngles)
 {
@@ -283,6 +290,7 @@ QVector<double> unwrapAngleValues(const QVector<double> &angles)
     return result;
 }
 
+// 统计周期角度中的独立观测数，近似重复角只计一次。
 int independentAngleCount(const QVector<double> &angles,
                           double toleranceDeg = 0.1)
 {
@@ -312,6 +320,7 @@ int independentAngleCount(const QVector<double> &angles,
     return unique.size();
 }
 
+// 用 HALCON 仿射线性部分把图像方向转换为机械平面方向角。
 bool affineDirectionAngles(const std::array<double, 6> &forward,
                            const QVector<double> &imageAngles,
                            QVector<double> *outputAngles)
@@ -381,6 +390,7 @@ struct RotationPositionFitCandidate
     double maxErrorMm = 0.0;
 };
 
+// 针对给定旋转方向拟合偏心圆轨迹，并计算位置残差候选。
 RotationPositionFitCandidate fitRotationPositionCandidate(
         const QVector<double> &machineAngles,
         const QVector<double> &offsetXs,
@@ -443,6 +453,7 @@ RotationPositionFitCandidate fitRotationPositionCandidate(
     return candidate;
 }
 
+// 针对给定角度方向拟合 ImageAngle -> MachineAngle 的偏置与误差候选。
 RotationFitCandidate fitRotationCandidate(
         const std::array<double, 6> &forward,
         const QVector<double> &imageAngles,
