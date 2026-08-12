@@ -99,6 +99,7 @@ bool validateGeneratedCalibrationTarget(
         const QVector<ToolConfig> &tools,
         const QMap<QString, ToolPreviewSnapshot> &snapshots,
         const QJsonObject &expectedFingerprint,
+        bool requiresImageAngle,
         QString *errorMessage)
 {
     if (expectedFingerprint.isEmpty()
@@ -124,20 +125,25 @@ bool validateGeneratedCalibrationTarget(
                 QStringLiteral("inputAngle")).toObject();
     const QString inputProducerId = xBinding.value(
                 QStringLiteral("producerId")).toString().trimmed();
+    const bool angleBindingValid = angleBinding.value(QStringLiteral("mode")).toString()
+            == QStringLiteral("binding")
+            && angleBinding.value(QStringLiteral("producerId")).toString()
+               == inputProducerId;
     if (xBinding.value(QStringLiteral("mode")).toString()
             != QStringLiteral("binding")
             || yBinding.value(QStringLiteral("mode")).toString()
                != QStringLiteral("binding")
-            || angleBinding.value(QStringLiteral("mode")).toString()
-               != QStringLiteral("binding")
             || inputProducerId.isEmpty()
             || yBinding.value(QStringLiteral("producerId")).toString()
                != inputProducerId
-            || angleBinding.value(QStringLiteral("producerId")).toString()
-               != inputProducerId) {
-        if (errorMessage)
-            *errorMessage = QObject::tr("目标 %1 未绑定唯一完整的 X/Y/Angle 来源")
-                    .arg(target.displayName);
+            || (requiresImageAngle && !angleBindingValid)) {
+        if (errorMessage) {
+            *errorMessage = requiresImageAngle
+                    ? QObject::tr("目标 %1 未绑定唯一完整且同源的 X/Y/Angle")
+                      .arg(target.displayName)
+                    : QObject::tr("目标 %1 未绑定唯一完整且同源的 X/Y")
+                      .arg(target.displayName);
+        }
         return false;
     }
 
@@ -161,8 +167,9 @@ bool validateGeneratedCalibrationTarget(
     if (inputProducer->toolType == ToolType::TemplateLocation) {
         if (xBinding.value(QStringLiteral("outputKey")).toString() != expectedX
                 || yBinding.value(QStringLiteral("outputKey")).toString() != expectedY
-                || angleBinding.value(QStringLiteral("outputKey")).toString()
-                   != expectedAngle) {
+                || (requiresImageAngle
+                    && angleBinding.value(QStringLiteral("outputKey")).toString()
+                       != expectedAngle)) {
             if (errorMessage)
                 *errorMessage = QObject::tr("目标 %1 的输出字段与标定采样字段不一致")
                         .arg(target.displayName);
@@ -173,8 +180,9 @@ bool validateGeneratedCalibrationTarget(
                 != QStringLiteral("runPose.x")
                 || yBinding.value(QStringLiteral("outputKey")).toString()
                    != QStringLiteral("runPose.y")
-                || angleBinding.value(QStringLiteral("outputKey")).toString()
-                   != QStringLiteral("runPose.angleDeg")) {
+                || (requiresImageAngle
+                    && angleBinding.value(QStringLiteral("outputKey")).toString()
+                       != QStringLiteral("runPose.angleDeg"))) {
             if (errorMessage) {
                 *errorMessage = QObject::tr("目标 %1 的位置修正输出字段不完整或顺序错误")
                         .arg(target.displayName);
@@ -188,7 +196,7 @@ bool validateGeneratedCalibrationTarget(
         if (!source.valid || source.inconsistent || !effectiveProducer
                 || effectiveProducer->toolType != ToolType::TemplateLocation
                 || source.xKey != expectedX || source.yKey != expectedY
-                || source.angleKey != expectedAngle) {
+                || (requiresImageAngle && source.angleKey != expectedAngle)) {
             if (errorMessage) {
                 *errorMessage = QObject::tr("目标 %1 的位置修正无法追溯到标定时模板来源")
                         .arg(target.displayName);
@@ -899,6 +907,8 @@ bool ToolsDialog::applyGeneratedCalibrationToTransforms(
         }
         const QJsonObject expectedFingerprint = generatedModel.imageBinding.value(
                     QStringLiteral("coordinateSourceFingerprint")).toObject();
+        const bool requiresImageAngle = generatedModel.mode
+                == NPointCalibrationMode::TwelvePointPoseMapping;
         for (auto it = targetIndexes.constBegin();
              it != targetIndexes.constEnd(); ++it) {
             QString compatibilityError;
@@ -907,6 +917,7 @@ bool ToolsDialog::applyGeneratedCalibrationToTransforms(
                         m_toolConfigs,
                         m_toolPreviewSnapshots,
                         expectedFingerprint,
+                        requiresImageAngle,
                         &compatibilityError)) {
                 if (errorMessage)
                     *errorMessage = compatibilityError;
@@ -927,8 +938,8 @@ bool ToolsDialog::applyGeneratedCalibrationToTransforms(
         QJsonArray files = transform.value(QStringLiteral("calibrationFiles")).toArray();
         if (!files.contains(normalizedPath))
             files.append(normalizedPath);
-        transform.insert(QStringLiteral("version"),
-                         transform.value(QStringLiteral("version")).toInt(2));
+        transform.insert(QStringLiteral("version"), 4);
+        transform.remove(QStringLiteral("rotationAxisAngle"));
         transform.insert(QStringLiteral("calibrationFiles"), files);
         transform.insert(QStringLiteral("activeCalibrationFile"), normalizedPath);
         config.params.insert(QStringLiteral("calibrationTransform"), transform);
@@ -1727,15 +1738,21 @@ QString ToolsDialog::toolPreviewStatusLine(const ToolPreviewSnapshot &snapshot) 
             && (snapshot.toolType == ToolType::CalibrationTransform
                 || snapshot.result.toolType == ToolType::CalibrationTransform)) {
         const QJsonObject payload = snapshot.result.payload;
-        return tr("%1 | %2 | 物理X:%3 | 物理Y:%4 | 角度:%5° | %6ms")
+        const QString angleText = payload.value(QStringLiteral("angleValid")).toBool()
+                && payload.value(QStringLiteral("machineAngle")).isDouble()
+                ? tr("机械角度:%1°").arg(
+                      QString::number(payload.value(
+                                          QStringLiteral("machineAngle")).toDouble(),
+                                      'f', 3))
+                : tr("机械角度:未配置");
+        return tr("%1 | %2 | 物理X:%3 | 物理Y:%4 | %5 | %6ms")
                 .arg(status,
                      state,
                      QString::number(payload.value(QStringLiteral("machineX")).toDouble(),
                                      'f', 3),
                      QString::number(payload.value(QStringLiteral("machineY")).toDouble(),
                                      'f', 3),
-                     QString::number(payload.value(QStringLiteral("convertedAngleDeg")).toDouble(),
-                                     'f', 3),
+                     angleText,
                      QString::number(snapshot.result.elapsedMs));
     }
     return tr("%1 | %2 | score:%3 | count:%4")

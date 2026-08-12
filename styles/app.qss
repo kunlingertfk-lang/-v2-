@@ -2504,9 +2504,10 @@ QDialog#CalibrationTransformDialog QWidget#conversionResultOverlay {
 }
 
 QDialog#CalibrationTransformDialog QLabel#conversionResultLabel {
-    background: transparent;
-    border: 0;
-    padding: 0;
+    background: #15171a;
+    border: 1px solid #3a404a;
+    border-radius: 6px;
+    padding: 10px 12px;
     color: #edf1f5;
     font-size: 18px;
     font-weight: 600;

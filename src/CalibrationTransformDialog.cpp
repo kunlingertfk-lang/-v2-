@@ -96,6 +96,10 @@ QString calibrationRegionDisplayText(const QString &region)
 
 QString rotationCoverageDisplayText(const QString &coverage)
 {
+    if (coverage == QStringLiteral("not_configured"))
+        return QObject::tr("未启用（9点XY）");
+    if (coverage == QStringLiteral("verified"))
+        return QObject::tr("已验证");
     if (coverage == QStringLiteral("in_range"))
         return QObject::tr("范围内");
     if (coverage == QStringLiteral("out_of_range"))
@@ -105,6 +109,34 @@ QString rotationCoverageDisplayText(const QString &coverage)
     if (coverage == QStringLiteral("invalid"))
         return QObject::tr("无效");
     return coverage.trimmed().isEmpty() ? QStringLiteral("--") : coverage;
+}
+
+QString calibrationModeDisplayText(NPointCalibrationMode mode)
+{
+    switch (mode) {
+    case NPointCalibrationMode::NinePointXY:
+        return QObject::tr("9点 XY标定");
+    case NPointCalibrationMode::TwelvePointAxisTrace:
+        return QObject::tr("12点 旋转中心/轴轨迹标定");
+    case NPointCalibrationMode::TwelvePointPoseMapping:
+        return QObject::tr("12点 位置与姿态标定");
+    }
+    return QObject::tr("未知模式");
+}
+
+QString angleMappingDisplayText(const CalibrationAngleMapping &mapping)
+{
+    switch (mapping.status) {
+    case CalibrationAngleMappingStatus::NotConfigured:
+        return QObject::tr("未配置");
+    case CalibrationAngleMappingStatus::Verified:
+        return QObject::tr("已验证，机械角范围 %1° ~ %2°")
+                .arg(mapping.machineMinDeg, 0, 'f', 2)
+                .arg(mapping.machineMaxDeg, 0, 'f', 2);
+    case CalibrationAngleMappingStatus::Invalid:
+        return QObject::tr("无效");
+    }
+    return QObject::tr("未知");
 }
 
 bool loadCalibrationModel(const QString &filePath,
@@ -197,7 +229,8 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
     ui->poseGroup->setProperty("panelRole", QStringLiteral("configCard"));
     ui->regionGroup->setProperty("panelRole", QStringLiteral("configCard"));
     for (QLabel *label : {ui->coordinateTypeLabel, ui->inputXLabel, ui->inputYLabel,
-                          ui->inputAngleLabel, ui->calXLabel, ui->calYLabel,
+                          ui->inputAngleLabel,
+                          ui->calXLabel, ui->calYLabel,
                           ui->calJ0Label, ui->calJ1Label, ui->runXLabel,
                           ui->runYLabel, ui->runJ0Label, ui->runJ1Label,
                           ui->regionSafeMarginLabel, ui->regionValidCountLabel,
@@ -235,11 +268,12 @@ CalibrationTransformDialog::CalibrationTransformDialog(QWidget *parent)
     m_inputXLinkButton->setObjectName(QStringLiteral("inputXLinkButton"));
     m_inputYLinkButton = createInputBindingButton(ui->inputGroup, tr("坐标 Y"));
     m_inputYLinkButton->setObjectName(QStringLiteral("inputYLinkButton"));
-    m_inputAngleLinkButton = createInputBindingButton(ui->inputGroup, tr("角度"));
+    m_inputAngleLinkButton = createInputBindingButton(ui->inputGroup, tr("图像角度"));
     m_inputAngleLinkButton->setObjectName(QStringLiteral("inputAngleLinkButton"));
     ui->xLayout->addWidget(m_inputXLinkButton);
     ui->yLayout->addWidget(m_inputYLinkButton);
     ui->angleLayout->addWidget(m_inputAngleLinkButton);
+    updateInputAngleRequirement(false);
     updateMainInputUi();
     setupPoseSourceUi();
     ui->basicModeButton->setChecked(true);
@@ -307,11 +341,11 @@ void CalibrationTransformDialog::setupPoseSourceUi()
 {
     ui->calXLabel->setText(tr("标定位坐标点 X"));
     ui->calYLabel->setText(tr("标定位坐标点 Y"));
-    ui->calJ0Label->setText(tr("标定位关节0角度"));
+    ui->calJ0Label->setText(tr("标定位旋转角度"));
     ui->calJ1Label->setText(tr("标定位关节1角度"));
     ui->runXLabel->setText(tr("运行位坐标点 X"));
     ui->runYLabel->setText(tr("运行位坐标点 Y"));
-    ui->runJ0Label->setText(tr("运行位关节0角度"));
+    ui->runJ0Label->setText(tr("运行位旋转角度"));
     ui->runJ1Label->setText(tr("运行位关节1角度"));
 
     const QList<QWidget *> designedWidgets{
@@ -325,16 +359,14 @@ void CalibrationTransformDialog::setupPoseSourceUi()
     ui->poseLayout->addWidget(ui->calXLabel, 1, 0);
     ui->poseLayout->addWidget(ui->calYLabel, 2, 0);
     ui->poseLayout->addWidget(ui->calJ0Label, 3, 0);
-    ui->poseLayout->addWidget(ui->calJ1Label, 4, 0);
-    ui->poseLayout->addWidget(ui->runPoseEnabled, 5, 0, 1, 2);
-    ui->poseLayout->addWidget(ui->runXLabel, 6, 0);
-    ui->poseLayout->addWidget(ui->runYLabel, 7, 0);
-    ui->poseLayout->addWidget(ui->runJ0Label, 8, 0);
-    ui->poseLayout->addWidget(ui->runJ1Label, 9, 0);
+    ui->poseLayout->addWidget(ui->runPoseEnabled, 4, 0, 1, 2);
+    ui->poseLayout->addWidget(ui->runXLabel, 5, 0);
+    ui->poseLayout->addWidget(ui->runYLabel, 6, 0);
+    ui->poseLayout->addWidget(ui->runJ0Label, 7, 0);
 
     auto wrapField = [this](QDoubleSpinBox *spin, int row, int column,
                             QComboBox **stateCombo, QToolButton **linkButton,
-                            const QString &fieldName) {
+                            const QString &fieldName) -> QWidget * {
         ui->poseLayout->removeWidget(spin);
         QWidget *container = new QWidget(ui->poseGroup);
         container->setProperty("role", QStringLiteral("bindingField"));
@@ -348,7 +380,9 @@ void CalibrationTransformDialog::setupPoseSourceUi()
         (*stateCombo)->hide();
         *linkButton = createBindingButton(*stateCombo, spin, container, fieldName);
         layout->addWidget(*linkButton);
-        ui->poseLayout->addWidget(container, row, column);
+        if (row >= 0)
+            ui->poseLayout->addWidget(container, row, column);
+        return container;
     };
     wrapField(ui->calXSpin, 1, 1, &m_calibrationPoseSources[0],
               &m_calibrationPoseLinkButtons[0], ui->calXLabel->text());
@@ -356,16 +390,25 @@ void CalibrationTransformDialog::setupPoseSourceUi()
               &m_calibrationPoseLinkButtons[1], ui->calYLabel->text());
     wrapField(ui->calJ0Spin, 3, 1, &m_calibrationPoseSources[2],
               &m_calibrationPoseLinkButtons[2], ui->calJ0Label->text());
-    wrapField(ui->calJ1Spin, 4, 1, &m_calibrationPoseSources[3],
-              &m_calibrationPoseLinkButtons[3], ui->calJ1Label->text());
-    wrapField(ui->runXSpin, 6, 1, &m_runPoseSources[0],
+    QWidget *calibrationJoint1Field = wrapField(
+                ui->calJ1Spin, -1, 1, &m_calibrationPoseSources[3],
+                &m_calibrationPoseLinkButtons[3], ui->calJ1Label->text());
+    wrapField(ui->runXSpin, 5, 1, &m_runPoseSources[0],
               &m_runPoseLinkButtons[0], ui->runXLabel->text());
-    wrapField(ui->runYSpin, 7, 1, &m_runPoseSources[1],
+    wrapField(ui->runYSpin, 6, 1, &m_runPoseSources[1],
               &m_runPoseLinkButtons[1], ui->runYLabel->text());
-    wrapField(ui->runJ0Spin, 8, 1, &m_runPoseSources[2],
+    wrapField(ui->runJ0Spin, 7, 1, &m_runPoseSources[2],
               &m_runPoseLinkButtons[2], ui->runJ0Label->text());
-    wrapField(ui->runJ1Spin, 9, 1, &m_runPoseSources[3],
-              &m_runPoseLinkButtons[3], ui->runJ1Label->text());
+    QWidget *runJoint1Field = wrapField(
+                ui->runJ1Spin, -1, 1, &m_runPoseSources[3],
+                &m_runPoseLinkButtons[3], ui->runJ1Label->text());
+
+    // Joint1 尚无平面运动学合同：保留隐藏控件以回显旧配置，
+    // 但不在当前 X/Y/旋转角度界面中暴露数值或订阅入口。
+    ui->calJ1Label->hide();
+    ui->runJ1Label->hide();
+    calibrationJoint1Field->hide();
+    runJoint1Field->hide();
 }
 
 QToolButton *CalibrationTransformDialog::createBindingButton(QComboBox *stateCombo,
@@ -384,11 +427,19 @@ QToolButton *CalibrationTransformDialog::createBindingButton(QComboBox *stateCom
             [this, menu, stateCombo, valueSpin, button, fieldName]() {
         menu->clear();
         for (int index = 0; index < stateCombo->count(); ++index) {
-            if (index == 1)
+            if (index > 0
+                    && stateCombo->itemData(index - 1).toJsonObject()
+                       .value(QStringLiteral("mode")).toString()
+                       != QStringLiteral("binding")
+                    && stateCombo->itemData(index).toJsonObject()
+                       .value(QStringLiteral("mode")).toString()
+                       == QStringLiteral("binding"))
                 menu->addSeparator();
-            QAction *action = menu->addAction(index == 0
-                                              ? tr("使用自定义值")
-                                              : stateCombo->itemText(index));
+            const QString mode = stateCombo->itemData(index).toJsonObject()
+                    .value(QStringLiteral("mode")).toString();
+            QAction *action = menu->addAction(
+                        mode == QStringLiteral("constant")
+                        ? tr("使用自定义值") : stateCombo->itemText(index));
             action->setCheckable(true);
             action->setChecked(index == stateCombo->currentIndex());
             connect(action, &QAction::triggered, this,
@@ -397,7 +448,14 @@ QToolButton *CalibrationTransformDialog::createBindingButton(QComboBox *stateCom
                 updateBindingButton(stateCombo, valueSpin, button, fieldName);
             });
         }
-        if (stateCombo->count() == 1) {
+        bool hasBinding = false;
+        for (int index = 0; index < stateCombo->count(); ++index) {
+            hasBinding = hasBinding
+                    || stateCombo->itemData(index).toJsonObject()
+                       .value(QStringLiteral("mode")).toString()
+                       == QStringLiteral("binding");
+        }
+        if (!hasBinding) {
             menu->addSeparator();
             QAction *empty = menu->addAction(tr("无可用前序输出"));
             empty->setEnabled(false);
@@ -427,7 +485,10 @@ QToolButton *CalibrationTransformDialog::createInputBindingButton(
         for (int index = 0; index < m_inputProducers.size(); ++index) {
             const InputProducerContract &producer = m_inputProducers.at(index);
             QMenu *producerMenu = menu->addMenu(producer.displayName);
-            QAction *poseAction = producerMenu->addAction(tr("图像坐标 X / Y / Angle"));
+            QAction *poseAction = producerMenu->addAction(
+                        m_inputAngleRequired
+                        ? tr("图像坐标 X / Y / Angle")
+                        : tr("图像坐标 X / Y"));
             poseAction->setCheckable(true);
             const QJsonObject selected = ui->inputXSourceCombo->currentData().toJsonObject();
             poseAction->setChecked(m_mainInputSourceAvailable
@@ -450,13 +511,16 @@ void CalibrationTransformDialog::updateBindingButton(QComboBox *stateCombo,
                                                       QToolButton *button,
                                                       const QString &fieldName)
 {
-    const bool bound = stateCombo->currentData().toJsonObject()
-            .value(QStringLiteral("mode")).toString() == QStringLiteral("binding");
+    const QString mode = stateCombo->currentData().toJsonObject()
+            .value(QStringLiteral("mode")).toString();
+    const bool bound = mode == QStringLiteral("binding");
+    const bool custom = mode == QStringLiteral("constant");
     button->setProperty("bindingActive", bound);
     button->setToolTip(bound
                        ? tr("%1 已订阅：%2").arg(fieldName, stateCombo->currentText())
-                       : tr("为%1选择前序输出").arg(fieldName));
-    valueSpin->setEnabled(!bound);
+                       : custom ? tr("%1 使用自定义值").arg(fieldName)
+                                : tr("请为%1选择输入方式").arg(fieldName));
+    valueSpin->setEnabled(custom);
     button->style()->unpolish(button);
     button->style()->polish(button);
 }
@@ -540,6 +604,17 @@ void CalibrationTransformDialog::updateMainInputUi()
                         buttons[static_cast<size_t>(index)]);
         }
     }
+}
+
+void CalibrationTransformDialog::updateInputAngleRequirement(bool required)
+{
+    m_inputAngleRequired = required;
+    ui->inputAngleLabel->setVisible(required);
+    ui->inputAngleEdit->setVisible(required);
+    if (m_inputAngleLinkButton)
+        m_inputAngleLinkButton->setVisible(required);
+    ui->inputAngleLabel->setText(required ? tr("图像角度 *") : tr("图像角度"));
+    updateMainInputUi();
 }
 
 CalibrationTransformDialog::~CalibrationTransformDialog()
@@ -651,9 +726,11 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
             if (snapshotIt != snapshots.cend())
                 m_producerSnapshots.insert(tool.toolId, snapshotIt.value());
         }
-        if (!tool.enabled || tool.toolId.trimmed().isEmpty()
-                || (tool.toolType != ToolType::TemplateLocation
-                    && tool.toolType != ToolType::PositionCorrection)) {
+        if (!tool.enabled || tool.toolId.trimmed().isEmpty()) {
+            continue;
+        }
+        if (tool.toolType != ToolType::TemplateLocation
+                && tool.toolType != ToolType::PositionCorrection) {
             continue;
         }
         const QString title = tool.displayName.trimmed().isEmpty()
@@ -676,8 +753,9 @@ void CalibrationTransformDialog::setProducerTools(const QVector<ToolConfig> &too
                                       bindingItem(tool.toolId, yKey, title));
         ui->inputAngleSourceCombo->addItem(title + tr(".运行角度"),
                                           bindingItem(tool.toolId, angleKey, title));
-        if (!templateLocation)
+        if (!templateLocation) {
             continue;
+        }
         const QStringList outputKeys{QStringLiteral("x"), QStringLiteral("y"),
                                      QStringLiteral("angle"), QStringLiteral("angle")};
         const QStringList outputNames{tr("运行点X"), tr("运行点Y"),
@@ -723,10 +801,8 @@ void CalibrationTransformDialog::restoreMainInputBindings(
     const bool complete = x.value(QStringLiteral("mode")).toString()
             == QStringLiteral("binding")
             && y.value(QStringLiteral("mode")).toString() == QStringLiteral("binding")
-            && angle.value(QStringLiteral("mode")).toString() == QStringLiteral("binding")
             && !producerId.isEmpty()
-            && y.value(QStringLiteral("producerId")).toString() == producerId
-            && angle.value(QStringLiteral("producerId")).toString() == producerId;
+            && y.value(QStringLiteral("producerId")).toString() == producerId;
     if (!complete) {
         ui->inputXSourceCombo->setCurrentIndex(0);
         ui->inputYSourceCombo->setCurrentIndex(0);
@@ -741,8 +817,7 @@ void CalibrationTransformDialog::restoreMainInputBindings(
         const InputProducerContract &producer = m_inputProducers.at(index);
         if (producer.producerId == producerId
                 && x.value(QStringLiteral("outputKey")).toString() == producer.xKey
-                && y.value(QStringLiteral("outputKey")).toString() == producer.yKey
-                && angle.value(QStringLiteral("outputKey")).toString() == producer.angleKey) {
+                && y.value(QStringLiteral("outputKey")).toString() == producer.yKey) {
             sourceIndex = index;
             break;
         }
@@ -756,7 +831,13 @@ void CalibrationTransformDialog::restoreMainInputBindings(
             .toString(tr("已保存的订阅来源"));
     ui->inputXSourceCombo->addItem(unavailable + tr(".运行点X"), x);
     ui->inputYSourceCombo->addItem(unavailable + tr(".运行点Y"), y);
-    ui->inputAngleSourceCombo->addItem(unavailable + tr(".运行角度"), angle);
+    const QJsonObject unavailableAngle =
+            angle.value(QStringLiteral("mode")).toString() == QStringLiteral("binding")
+            && angle.value(QStringLiteral("producerId")).toString() == producerId
+            ? angle
+            : QJsonObject{{QStringLiteral("mode"), QStringLiteral("unbound")}};
+    ui->inputAngleSourceCombo->addItem(unavailable + tr(".运行角度"),
+                                      unavailableAngle);
     ui->inputXSourceCombo->setCurrentIndex(ui->inputXSourceCombo->count() - 1);
     ui->inputYSourceCombo->setCurrentIndex(ui->inputYSourceCombo->count() - 1);
     ui->inputAngleSourceCombo->setCurrentIndex(ui->inputAngleSourceCombo->count() - 1);
@@ -891,11 +972,14 @@ ToolConfig CalibrationTransformDialog::toolConfig() const
     for (const QString &path : m_calibrationFiles)
         files.append(path);
     QJsonObject params{
-        {QStringLiteral("version"), 2},
+        {QStringLiteral("version"), 4},
         {QStringLiteral("coordinateType"), QStringLiteral("image")},
         {QStringLiteral("inputX"), mainInputBinding(ui->inputXSourceCombo)},
         {QStringLiteral("inputY"), mainInputBinding(ui->inputYSourceCombo)},
-        {QStringLiteral("inputAngle"), mainInputBinding(ui->inputAngleSourceCombo)},
+        {QStringLiteral("inputAngle"),
+         m_inputAngleRequired
+         ? mainInputBinding(ui->inputAngleSourceCombo)
+         : QJsonObject{{QStringLiteral("mode"), QStringLiteral("unbound")}}},
         {QStringLiteral("calibrationFiles"), files},
         {QStringLiteral("activeCalibrationFile"), ui->calibrationFileCombo->currentData().toString()},
         {QStringLiteral("allowBoundaryForProduction"),
@@ -945,6 +1029,7 @@ void CalibrationTransformDialog::refreshCalibrationRegionSummary()
 
     const QString filePath = ui->calibrationFileCombo->currentData().toString().trimmed();
     if (filePath.isEmpty()) {
+        updateInputAngleRequirement(false);
         showSummary(QStringLiteral("--"), QStringLiteral("--"),
                     QStringLiteral("--"), tr("尚未加载标定文件"),
                     QStringLiteral("idle"));
@@ -955,6 +1040,7 @@ void CalibrationTransformDialog::refreshCalibrationRegionSummary()
     QString error;
     if (!QFileInfo::exists(filePath)
             || !loadCalibrationModel(filePath, &model, &error)) {
+        updateInputAngleRequirement(false);
         showSummary(QStringLiteral("--"), QStringLiteral("--"),
                     QStringLiteral("--"),
                     error.trimmed().isEmpty() ? tr("标定文件无法读取") : error,
@@ -966,11 +1052,20 @@ void CalibrationTransformDialog::refreshCalibrationRegionSummary()
             && model.safeRegion.size() >= 3
             && std::isfinite(model.safeMarginPx)
             && model.safeMarginPx >= 0.0;
+    const bool poseMapping = model.mode
+            == NPointCalibrationMode::TwelvePointPoseMapping;
+    updateInputAngleRequirement(poseMapping);
+    const QString modeText = calibrationModeDisplayText(model.mode);
+    const QString rotationText = rotationCoverageDisplayText(
+                calibrationRotationRangeStatusToString(
+                    model.rotationRange.status));
+    const QString angleMappingText = angleMappingDisplayText(model.angleMapping);
     showSummary(tr("%1 px").arg(model.safeMarginPx, 0, 'f', 2),
                 QString::number(model.validRegion.size()),
                 QString::number(model.safeRegion.size()),
                 regionsReady
-                ? tr("平移点凸包 + HALCON 均匀内缩")
+                ? tr("平移点凸包 + HALCON 均匀内缩；%1；轴轨迹：%2；角度映射：%3")
+                  .arg(modeText, rotationText, angleMappingText)
                 : tr("区域结构无效，禁止生产使用"),
                 regionsReady ? QStringLiteral("ok") : QStringLiteral("error"));
 }
@@ -1145,9 +1240,12 @@ CalibrationTransformDialog::evaluateCalibrationSource() const
             || selectedProducerId.isEmpty()
             || yBinding.value(QStringLiteral("producerId")).toString()
                != selectedProducerId
-            || angleBinding.value(QStringLiteral("producerId")).toString()
-               != selectedProducerId) {
-        validation.message = tr("请先选择完整的当前坐标来源");
+            || (m_inputAngleRequired
+                && angleBinding.value(QStringLiteral("producerId")).toString()
+                   != selectedProducerId)) {
+        validation.message = m_inputAngleRequired
+                ? tr("请先选择完整的当前 X/Y/Angle 坐标来源")
+                : tr("请先选择完整的当前 X/Y 坐标来源");
         return validation;
     }
     const auto selectedConfigIt = m_producerConfigs.constFind(selectedProducerId);
@@ -1170,8 +1268,9 @@ CalibrationTransformDialog::evaluateCalibrationSource() const
                 != outputContract.value(QStringLiteral("x")).toString()
                 || yBinding.value(QStringLiteral("outputKey")).toString()
                 != outputContract.value(QStringLiteral("y")).toString()
-                || angleBinding.value(QStringLiteral("outputKey")).toString()
-                != outputContract.value(QStringLiteral("angle")).toString()) {
+                || (m_inputAngleRequired
+                    && angleBinding.value(QStringLiteral("outputKey")).toString()
+                       != outputContract.value(QStringLiteral("angle")).toString())) {
             validation.state = SourceValidationState::Stale;
             validation.message = tr("当前订阅的输出字段与标定时不一致");
             return validation;
@@ -1184,8 +1283,9 @@ CalibrationTransformDialog::evaluateCalibrationSource() const
                 != QStringLiteral("runPose.x")
                 || yBinding.value(QStringLiteral("outputKey")).toString()
                    != QStringLiteral("runPose.y")
-                || angleBinding.value(QStringLiteral("outputKey")).toString()
-                   != QStringLiteral("runPose.angleDeg")) {
+                || (m_inputAngleRequired
+                    && angleBinding.value(QStringLiteral("outputKey")).toString()
+                       != QStringLiteral("runPose.angleDeg"))) {
             validation.state = SourceValidationState::Stale;
             validation.message = tr("当前位置修正输出字段与标定转换坐标合同不一致");
             return validation;
@@ -1391,22 +1491,6 @@ void CalibrationTransformDialog::refreshCalibrationSourceValidation()
 
 bool CalibrationTransformDialog::validateConfiguration(QString *errorMessage) const
 {
-    const QJsonObject x = mainInputBinding(ui->inputXSourceCombo);
-    const QJsonObject y = mainInputBinding(ui->inputYSourceCombo);
-    const QJsonObject angle = mainInputBinding(ui->inputAngleSourceCombo);
-    const QString producerId = x.value(QStringLiteral("producerId")).toString().trimmed();
-    if (!m_mainInputSourceAvailable
-            || x.value(QStringLiteral("mode")).toString() != QStringLiteral("binding")
-            || y.value(QStringLiteral("mode")).toString() != QStringLiteral("binding")
-            || angle.value(QStringLiteral("mode")).toString() != QStringLiteral("binding")
-            || producerId.isEmpty()
-            || y.value(QStringLiteral("producerId")).toString() != producerId
-            || angle.value(QStringLiteral("producerId")).toString() != producerId) {
-        if (errorMessage)
-            *errorMessage = tr("请先订阅一个可用前序节点的完整 X/Y/Angle 图像坐标");
-        return false;
-    }
-
     const QString filePath = ui->calibrationFileCombo->currentData().toString().trimmed();
     if (filePath.isEmpty() || !QFileInfo::exists(filePath)) {
         if (errorMessage)
@@ -1418,6 +1502,33 @@ bool CalibrationTransformDialog::validateConfiguration(QString *errorMessage) co
     if (!loadCalibrationModel(filePath, &probe, &loadError)) {
         if (errorMessage)
             *errorMessage = loadError.isEmpty() ? tr("标定文件无法读取") : loadError;
+        return false;
+    }
+
+    const bool angleRequired = probe.mode
+            == NPointCalibrationMode::TwelvePointPoseMapping;
+    const QJsonObject x = mainInputBinding(ui->inputXSourceCombo);
+    const QJsonObject y = mainInputBinding(ui->inputYSourceCombo);
+    const QJsonObject angle = mainInputBinding(ui->inputAngleSourceCombo);
+    const QString producerId = x.value(QStringLiteral("producerId")).toString().trimmed();
+    const bool xyReady = m_mainInputSourceAvailable
+            && x.value(QStringLiteral("mode")).toString()
+               == QStringLiteral("binding")
+            && y.value(QStringLiteral("mode")).toString()
+               == QStringLiteral("binding")
+            && !producerId.isEmpty()
+            && y.value(QStringLiteral("producerId")).toString() == producerId;
+    const bool angleReady = !angleRequired
+            || (angle.value(QStringLiteral("mode")).toString()
+                == QStringLiteral("binding")
+                && angle.value(QStringLiteral("producerId")).toString()
+                   == producerId);
+    if (!xyReady || !angleReady) {
+        if (errorMessage) {
+            *errorMessage = angleRequired
+                    ? tr("当前姿态映射文件要求订阅同一前序节点的 X/Y/Angle 图像坐标")
+                    : tr("请先订阅一个可用前序节点的 X/Y 图像坐标");
+        }
         return false;
     }
     const SourceValidationResult sourceValidation = evaluateCalibrationSource();
@@ -1463,6 +1574,14 @@ void CalibrationTransformDialog::displayConversionResult(const ToolResult &resul
             .value(QStringLiteral("coordinateAvailable")).toBool(false);
     const bool productionAllowed = payload
             .value(QStringLiteral("productionAllowed")).toBool(result.ok);
+    const bool angleProductionAllowed = payload
+            .value(QStringLiteral("angleProductionAllowed")).toBool(false);
+    const bool angleValid = payload.value(QStringLiteral("angleValid"))
+            .toBool(false);
+    const QString angleMappingStatus = payload
+            .value(QStringLiteral("angleMappingStatus")).toString();
+    const QString rotationModel = payload.value(QStringLiteral("rotationModel"))
+            .toString().trimmed();
 
     QString reason = result.message.trimmed();
     if (reason.isEmpty())
@@ -1481,11 +1600,17 @@ void CalibrationTransformDialog::displayConversionResult(const ToolResult &resul
                      ? tr("标定转换输出为OK")
                      : tr("标定转换输出为NG（数学转换成功，生产门禁阻止）"));
         if (coordinateAvailable) {
-            lines.append(tr("转换坐标X：%1，转换坐标Y：%2，转换角度：%3°，单像素精度：%4")
-                         .arg(payloadNumber(payload, QStringLiteral("machineX"), 2))
-                         .arg(payloadNumber(payload, QStringLiteral("machineY"), 2))
-                         .arg(payloadNumber(payload, QStringLiteral("convertedAngleDeg"), 2))
-                         .arg(payloadNumber(payload, QStringLiteral("pixelAccuracy"), 2)));
+            QString coordinateLine = tr("转换坐标X：%1，转换坐标Y：%2")
+                    .arg(payloadNumber(payload, QStringLiteral("machineX"), 2))
+                    .arg(payloadNumber(payload, QStringLiteral("machineY"), 2));
+            if (angleValid) {
+                coordinateLine += tr("，机械角度：%1°")
+                        .arg(payloadNumber(payload,
+                                           QStringLiteral("machineAngle"), 2));
+            }
+            coordinateLine += tr("，单像素精度：%1")
+                    .arg(payloadNumber(payload, QStringLiteral("pixelAccuracy"), 2));
+            lines.append(coordinateLine);
         } else {
             lines.append(tr("未返回可诊断的转换坐标"));
         }
@@ -1493,6 +1618,30 @@ void CalibrationTransformDialog::displayConversionResult(const ToolResult &resul
                      .arg(calibrationRegionDisplayText(region),
                           rotationCoverageDisplayText(rotationCoverage),
                           productionAllowed ? tr("是") : tr("否")));
+        if (rotationModel
+                == QStringLiteral("pose_mapping_eccentric_compensation")) {
+            lines.append(tr("姿态映射偏心补偿：已使用映射机械角；补偿量：(%1, %2)")
+                         .arg(payloadNumber(payload,
+                                            QStringLiteral("rotationCorrectionX"), 4))
+                         .arg(payloadNumber(payload,
+                                            QStringLiteral("rotationCorrectionY"), 4)));
+            lines.append(tr("偏心半径：%1；位置拟合 RMSE/Max：%2/%3")
+                         .arg(payloadNumber(payload,
+                                            QStringLiteral("rotationRadiusMm"), 4))
+                         .arg(payloadNumber(payload,
+                                            QStringLiteral("rotationFitRmseMm"), 4))
+                         .arg(payloadNumber(payload,
+                                            QStringLiteral("rotationMaxErrorMm"), 4)));
+        } else if (rotationModel == QStringLiteral("pose_mapping_coaxial")) {
+            lines.append(tr("姿态映射：已验证共轴，无需位置偏心补偿"));
+        } else if (rotationModel == QStringLiteral("axis_trace_diagnostic")) {
+            lines.append(tr("轴轨迹仅用于诊断，不执行生产动态补偿"));
+        }
+        lines.append(tr("角度映射：%1；角度有效：%2；角度生产允许：%3")
+                     .arg(angleMappingStatus.isEmpty()
+                          ? tr("未配置") : angleMappingStatus,
+                          angleValid ? tr("是") : tr("否"),
+                          angleProductionAllowed ? tr("是") : tr("否")));
         lines.append(tr("距SafeROI边界：%1 px，距ValidROI边界：%2 px")
                      .arg(payloadNumber(payload,
                                         QStringLiteral("distanceToSafeBoundaryPx"), 2),
@@ -1589,12 +1738,17 @@ void CalibrationTransformDialog::runTest()
                     .arg(boundaryWarning ? QStringLiteral("#ff9d18")
                                          : result.ok ? QStringLiteral("#20c933")
                                                      : QStringLiteral("#ff2020")));
-        const QString coordinateText = coordinateAvailable
-                ? tr("物理 X:%1  Y:%2  Angle:%3°")
-                  .arg(payloadNumber(payload, QStringLiteral("machineX"), 3),
-                       payloadNumber(payload, QStringLiteral("machineY"), 3),
-                       payloadNumber(payload, QStringLiteral("convertedAngleDeg"), 3))
-                : tr("无有效转换坐标");
+        QString coordinateText = tr("无有效转换坐标");
+        if (coordinateAvailable) {
+            coordinateText = tr("物理 X:%1  Y:%2")
+                    .arg(payloadNumber(payload, QStringLiteral("machineX"), 3),
+                         payloadNumber(payload, QStringLiteral("machineY"), 3));
+            if (payload.value(QStringLiteral("angleValid")).toBool(false)) {
+                coordinateText += tr("  机械角度:%1°")
+                        .arg(payloadNumber(payload,
+                                           QStringLiteral("machineAngle"), 3));
+            }
+        }
         const QString prefix = useImportedFrame
                 ? tr("PC图片 %1 | ").arg(m_importedTestImageTitle)
                 : QString();

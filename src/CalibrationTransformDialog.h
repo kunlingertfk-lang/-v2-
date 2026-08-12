@@ -94,6 +94,7 @@ private:
                              const QString &fieldName);
     void applyInputProducer(int producerIndex);
     void updateMainInputUi();
+    void updateInputAngleRequirement(bool required);
     void invalidatePreviewSnapshot();
     SourceValidationResult evaluateCalibrationSource() const;
     void refreshCalibrationSourceValidation();
@@ -121,6 +122,7 @@ private:
     QMap<QString, ToolPreviewSnapshot> m_producerSnapshots;
     SourceValidationResult m_sourceValidation;
     bool m_mainInputSourceAvailable = false;
+    bool m_inputAngleRequired = false;
     cv::Mat m_importedTestFrame;
     QString m_importedTestImageTitle;
     bool m_importedTestActive = false;

@@ -11,6 +11,7 @@
 #include "frame/ReferenceImageProvider.h"
 
 #include <QAbstractButton>
+#include <QApplication>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
@@ -35,6 +36,8 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
@@ -44,6 +47,7 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QStyle>
+#include <QStyledItemDelegate>
 #include <QTableWidget>
 #include <QTimer>
 #include <QToolButton>
@@ -52,9 +56,200 @@
 #include <opencv2/imgproc.hpp>
 
 #include <cmath>
+#include <functional>
 #include <utility>
 
 namespace {
+
+class CalibrationThumbnailDelegate final : public QStyledItemDelegate
+{
+public:
+    explicit CalibrationThumbnailDelegate(QObject *parent = nullptr)
+        : QStyledItemDelegate(parent)
+    {
+    }
+
+    QSize sizeHint(const QStyleOptionViewItem &,
+                   const QModelIndex &) const override
+    {
+        return QSize(154, 112);
+    }
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option,
+               const QModelIndex &index) const override
+    {
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        const QRect card = option.rect.adjusted(2, 2, -2, -2);
+        const bool selected = option.state & QStyle::State_Selected;
+        painter->setPen(QPen(selected ? QColor(QStringLiteral("#ff7900"))
+                                      : QColor(QStringLiteral("#414955")),
+                             selected ? 3 : 1));
+        painter->setBrush(QColor(QStringLiteral("#11151a")));
+        painter->drawRoundedRect(card, 3, 3);
+
+        const QRect imageRect = card.adjusted(5, 5, -5, -32);
+        const QIcon icon = qvariant_cast<QIcon>(
+                    index.data(Qt::DecorationRole));
+        const QPixmap pixmap = icon.pixmap(imageRect.size());
+        painter->fillRect(imageRect, QColor(QStringLiteral("#e8e8e8")));
+        if (!pixmap.isNull()) {
+            const QSize fitted = pixmap.size().scaled(imageRect.size(),
+                                                       Qt::KeepAspectRatio);
+            const QRect target(QPoint(imageRect.center().x() - fitted.width() / 2,
+                                      imageRect.center().y() - fitted.height() / 2),
+                               fitted);
+            painter->drawPixmap(target, pixmap);
+        }
+
+        const QRect footer(card.left() + 5, card.bottom() - 26,
+                           card.width() - 10, 22);
+        painter->fillRect(footer, QColor(QStringLiteral("#20262e")));
+        const QString number = QStringLiteral("%1").arg(index.row() + 1,
+                                                          2, 10, QLatin1Char('0'));
+        const QRect numberRect(footer.left() + 4, footer.top() + 3, 24,
+                               footer.height() - 6);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(QStringLiteral("#28c76f")));
+        painter->drawRoundedRect(numberRect, 3, 3);
+        painter->setPen(QColor(QStringLiteral("#07150d")));
+        painter->setFont(QFont(option.font.family(), 8, QFont::Bold));
+        painter->drawText(numberRect, Qt::AlignCenter, number);
+
+        const QRect nameRect(numberRect.right() + 6, footer.top(),
+                             footer.right() - numberRect.right() - 9,
+                             footer.height());
+        painter->setPen(QColor(QStringLiteral("#f4f6f8")));
+        painter->setFont(QFont(option.font.family(), 9, QFont::DemiBold));
+        const QString name = option.fontMetrics.elidedText(
+                    index.data(Qt::DisplayRole).toString(),
+                    Qt::ElideMiddle, nameRect.width());
+        painter->drawText(nameRect, Qt::AlignVCenter | Qt::AlignLeft, name);
+        painter->restore();
+    }
+};
+
+class OrderedThumbnailList final : public QListWidget
+{
+public:
+    explicit OrderedThumbnailList(QWidget *parent = nullptr)
+        : QListWidget(parent)
+    {
+    }
+
+    std::function<void(int, int)> moveRequested;
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        QListWidget::mousePressEvent(event);
+        m_sourceRow = event->button() == Qt::LeftButton
+                ? indexAt(event->pos()).row() : -1;
+        m_pressPosition = event->pos();
+        m_dragPosition = event->pos();
+        m_dragging = false;
+        m_insertionIndex = -1;
+    }
+
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        if (!(event->buttons() & Qt::LeftButton) || m_sourceRow < 0) {
+            QListWidget::mouseMoveEvent(event);
+            return;
+        }
+        if (!m_dragging
+                && (event->pos() - m_pressPosition).manhattanLength()
+                   < QApplication::startDragDistance()) {
+            return;
+        }
+        m_dragging = true;
+        m_dragPosition = event->pos();
+        m_insertionIndex = insertionIndexAt(event->pos());
+        viewport()->update();
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        const bool wasDragging = m_dragging;
+        const int sourceRow = m_sourceRow;
+        const int insertionIndex = m_insertionIndex;
+        m_dragging = false;
+        m_sourceRow = -1;
+        m_insertionIndex = -1;
+        viewport()->update();
+        if (wasDragging && moveRequested)
+            moveRequested(sourceRow, insertionIndex);
+        else
+            QListWidget::mouseReleaseEvent(event);
+        event->accept();
+    }
+
+    void paintEvent(QPaintEvent *event) override
+    {
+        QListWidget::paintEvent(event);
+        if (m_insertionIndex < 0 || count() == 0)
+            return;
+        int x = 3;
+        QRect anchor;
+        if (m_insertionIndex >= count()) {
+            anchor = visualItemRect(item(count() - 1));
+            x = anchor.right() + spacing() / 2 + 1;
+        } else {
+            anchor = visualItemRect(item(m_insertionIndex));
+            x = anchor.left() - spacing() / 2;
+        }
+        x = qBound(2, x, viewport()->width() - 3);
+        QPainter painter(viewport());
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(QColor(QStringLiteral("#28c76f")), 4,
+                            Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(QPoint(x, qMax(4, anchor.top() + 3)),
+                         QPoint(x, qMin(viewport()->height() - 4,
+                                        anchor.bottom() - 3)));
+
+        if (m_dragging && m_sourceRow >= 0 && m_sourceRow < count()) {
+            const QListWidgetItem *source = item(m_sourceRow);
+            const QRect floating(m_dragPosition.x() - 70,
+                                 m_dragPosition.y() - 50, 140, 96);
+            painter.setOpacity(0.82);
+            painter.setPen(QPen(QColor(QStringLiteral("#28c76f")), 2));
+            painter.setBrush(QColor(QStringLiteral("#18201c")));
+            painter.drawRoundedRect(floating, 4, 4);
+            const QRect floatingImage = floating.adjusted(5, 5, -5, -25);
+            const QPixmap pixmap = source->icon().pixmap(floatingImage.size());
+            painter.drawPixmap(floatingImage, pixmap);
+            painter.setPen(Qt::white);
+            painter.drawText(floating.adjusted(6, 70, -6, -3),
+                             Qt::AlignCenter,
+                             fontMetrics().elidedText(source->text(),
+                                                      Qt::ElideMiddle, 124));
+            painter.setOpacity(1.0);
+            painter.setPen(QPen(QColor(QStringLiteral("#28c76f")), 4,
+                                Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(QPoint(x, qMax(4, anchor.top() + 3)),
+                             QPoint(x, qMin(viewport()->height() - 4,
+                                            anchor.bottom() - 3)));
+        }
+    }
+
+private:
+    int insertionIndexAt(const QPoint &position) const
+    {
+        for (int row = 0; row < count(); ++row) {
+            const QRect rect = visualItemRect(item(row));
+            if (position.x() < rect.center().x())
+                return row;
+        }
+        return count();
+    }
+
+    int m_insertionIndex = -1;
+    int m_sourceRow = -1;
+    bool m_dragging = false;
+    QPoint m_pressPosition;
+    QPoint m_dragPosition;
+};
 
 QLabel *pageTitle(const QString &text, QWidget *parent)
 {
@@ -596,16 +791,25 @@ QWidget *QuickCalibrationWizard::createConfigurationPage()
     imageActions->addWidget(m_removeImageButton);
     imageActions->addWidget(m_clearImagesButton);
     collectionLayout->addLayout(imageActions);
-    m_imageThumbnailList = new QListWidget(m_imageCollectionPanel);
+    OrderedThumbnailList *orderedThumbnailList =
+            new OrderedThumbnailList(m_imageCollectionPanel);
+    m_imageThumbnailList = orderedThumbnailList;
     m_imageThumbnailList->setObjectName(QStringLiteral("calibrationImageThumbnailList"));
     m_imageThumbnailList->setViewMode(QListView::IconMode);
     m_imageThumbnailList->setFlow(QListView::LeftToRight);
     m_imageThumbnailList->setMovement(QListView::Static);
+    m_imageThumbnailList->setDragEnabled(false);
+    m_imageThumbnailList->setAcceptDrops(false);
+    m_imageThumbnailList->setDragDropMode(QAbstractItemView::NoDragDrop);
+    m_imageThumbnailList->setItemDelegate(
+                new CalibrationThumbnailDelegate(m_imageThumbnailList));
+    m_imageThumbnailList->setToolTip(tr("按住缩略图拖动可调整采集顺序"));
     m_imageThumbnailList->setResizeMode(QListView::Adjust);
     m_imageThumbnailList->setWrapping(false);
     m_imageThumbnailList->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_imageThumbnailList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_imageThumbnailList->setIconSize(QSize(132, 82));
+    m_imageThumbnailList->setIconSize(QSize(142, 74));
+    m_imageThumbnailList->setGridSize(QSize(158, 116));
     m_imageThumbnailList->setSpacing(8);
     m_imageThumbnailList->setFixedHeight(126);
     collectionLayout->addWidget(m_imageThumbnailList);
@@ -661,6 +865,10 @@ QWidget *QuickCalibrationWizard::createConfigurationPage()
         m_externalImageSequenceComplete = false;
         showExternalImage(index);
     });
+    orderedThumbnailList->moveRequested = [this](int sourceRow,
+                                                  int insertionIndex) {
+        moveExternalImage(sourceRow, insertionIndex);
+    };
     m_referencePreviewImage = ReferenceImageProvider::instance().referenceImage();
     updateImageModeUi();
     return page;
@@ -873,17 +1081,36 @@ void QuickCalibrationWizard::rebuildExternalImageList(int currentIndex)
     QSignalBlocker blocker(m_imageThumbnailList);
     m_imageThumbnailList->clear();
     for (int i = 0; i < m_externalImages.size(); ++i) {
+        const QFileInfo imageFile(m_externalImagePaths.at(i));
         QListWidgetItem *item = new QListWidgetItem(
                     QIcon(QPixmap::fromImage(m_externalImages.at(i))),
-                    QFileInfo(m_externalImagePaths.at(i)).fileName(), m_imageThumbnailList);
-        item->setToolTip(m_externalImagePaths.at(i));
+                    imageFile.fileName(), m_imageThumbnailList);
+        item->setToolTip(tr("完整文件名：%1\n完整路径：%2")
+                         .arg(imageFile.fileName(), imageFile.absoluteFilePath()));
         item->setTextAlignment(Qt::AlignHCenter | Qt::AlignBottom);
-        item->setSizeHint(QSize(150, 108));
+        item->setSizeHint(QSize(154, 112));
     }
     if (!m_externalImages.isEmpty())
         m_imageThumbnailList->setCurrentRow(qBound(0, currentIndex, m_externalImages.size() - 1));
     blocker.unblock();
     updateImageModeUi();
+}
+
+void QuickCalibrationWizard::moveExternalImage(int sourceRow, int insertionIndex)
+{
+    if (sourceRow < 0 || sourceRow >= m_externalImages.size())
+        return;
+    int targetRow = insertionIndex;
+    if (targetRow > sourceRow)
+        --targetRow;
+    targetRow = qBound(0, targetRow, m_externalImages.size() - 1);
+    if (targetRow == sourceRow)
+        return;
+    m_externalImages.move(sourceRow, targetRow);
+    m_externalImagePaths.move(sourceRow, targetRow);
+    m_externalImageSequenceComplete = false;
+    rebuildExternalImageList(targetRow);
+    saveDraft(nullptr);
 }
 
 void QuickCalibrationWizard::removeCurrentExternalImage()
@@ -954,6 +1181,12 @@ bool QuickCalibrationWizard::calibrationResultPassed() const
             || m_methodConfigWidget->completedTranslationSampleCount()
                != m_methodConfigWidget->translationSampleCount()) {
         return false;
+    }
+    if (const NPointCalibrationConfigWidget *nPoint =
+            dynamic_cast<const NPointCalibrationConfigWidget *>(
+                m_methodConfigWidget)) {
+        if (nPoint->completedSampleCount() != nPoint->sampleCount())
+            return false;
     }
     const ICalibrationMethod *method =
             CalibrationMethodRegistry::instance().method(m_methodId);
@@ -1042,6 +1275,25 @@ void QuickCalibrationWizard::updateCalibrationOverlays()
                         solved
                         ? QStringLiteral("calibration_translation_path_solved")
                         : QStringLiteral("calibration_translation_path_pending"));
+            overlay.extra.insert(QStringLiteral("emphasis"),
+                                 QStringLiteral("active"));
+            overlays.append(overlay);
+        }
+        const QVector<QLineF> rotationSegments =
+                m_methodConfigWidget->completedRotationSegments();
+        overlays.reserve(overlays.size() + rotationSegments.size());
+        for (const QLineF &segment : rotationSegments) {
+            ToolOverlay overlay;
+            overlay.type = ToolOverlayType::Line;
+            overlay.p1 = segment.p1();
+            overlay.p2 = segment.p2();
+            overlay.label = solved ? tr("旋转标定路径（已完成）")
+                                   : tr("旋转标定路径（采集中）");
+            overlay.extra.insert(
+                        QStringLiteral("displayRole"),
+                        solved
+                        ? QStringLiteral("calibration_rotation_path_solved")
+                        : QStringLiteral("calibration_rotation_path_pending"));
             overlay.extra.insert(QStringLiteral("emphasis"),
                                  QStringLiteral("active"));
             overlays.append(overlay);
@@ -1204,7 +1456,9 @@ void QuickCalibrationWizard::showSolveResult()
 {
     if (!m_solveResult.success)
         return;
-    m_resultTable->setRowCount(m_sessionLog.size() + m_solveResult.model.samples.size());
+    m_resultTable->setRowCount(m_sessionLog.size()
+                               + m_solveResult.model.samples.size()
+                               + m_solveResult.model.rotationSamples.size());
     int outputRow = 0;
     for (const QJsonObject &entry : m_sessionLog) {
         m_resultTable->setItem(outputRow, 0, new QTableWidgetItem(
@@ -1235,6 +1489,32 @@ void QuickCalibrationWizard::showSolveResult()
                                    tr("残差 %1 mm").arg(sample.residual, 0, 'f', 6)));
         ++outputRow;
     }
+    for (const CalibrationSample &sample : m_solveResult.model.rotationSamples) {
+        m_resultTable->setItem(outputRow, 0, new QTableWidgetItem(
+                                   QString::number(outputRow + 1)));
+        const bool poseMapping = m_solveResult.model.mode
+                == NPointCalibrationMode::TwelvePointPoseMapping;
+        m_resultTable->setItem(outputRow, 1, new QTableWidgetItem(
+                                   poseMapping
+                                   ? tr("旋转点%1：C=%2,R=%3，图像A=%4° → X=%5,Y=%6，机械A=%7°")
+                                     .arg(sample.index)
+                                     .arg(sample.column).arg(sample.row)
+                                     .arg(sample.imageAngleDeg)
+                                     .arg(sample.machineX)
+                                     .arg(sample.machineY)
+                                     .arg(sample.machineAngleDeg)
+                                   : tr("旋转点%1：C=%2,R=%3 → X=%4,Y=%5，机械A=%6°")
+                                     .arg(sample.index)
+                                     .arg(sample.column).arg(sample.row)
+                                     .arg(sample.machineX)
+                                     .arg(sample.machineY)
+                                     .arg(sample.machineAngleDeg)));
+        m_resultTable->setItem(outputRow, 2, new QTableWidgetItem(
+                                   poseMapping
+                                   ? tr("轴轨迹 + 姿态映射样本")
+                                   : tr("轴轨迹诊断样本")));
+        ++outputRow;
+    }
     m_matrixLabel->setText(tr("标定矩阵\n%1\n\n逆矩阵\n%2")
                            .arg(matrixLine(m_solveResult.model.forward),
                                 matrixLine(m_solveResult.model.inverse)));
@@ -1242,15 +1522,62 @@ void QuickCalibrationWizard::showSolveResult()
     const ICalibrationMethod *method = CalibrationMethodRegistry::instance().method(m_methodId);
     const QJsonObject methodSummary = method
             ? method->createResultSummary(m_solveResult) : QJsonObject();
-    m_qualityLabel->setText(tr("方式=%1  模型=%2  Mean=%3 mm  RMSE=%4 mm  Max=%5 mm  |  %6")
+    const CalibrationRotationRange &rotation =
+            m_solveResult.model.rotationRange;
+    QString pointMode;
+    switch (m_solveResult.model.mode) {
+    case NPointCalibrationMode::NinePointXY:
+        pointMode = tr("9点 XY标定");
+        break;
+    case NPointCalibrationMode::TwelvePointAxisTrace:
+        pointMode = tr("12点 旋转中心/轴轨迹标定");
+        break;
+    case NPointCalibrationMode::TwelvePointPoseMapping:
+        pointMode = tr("12点 位置与姿态标定");
+        break;
+    }
+    QString rotationSummary = rotation.status
+            == CalibrationRotationRangeStatus::NotConfigured
+            ? tr("旋转未启用")
+            : rotation.status == CalibrationRotationRangeStatus::Verified
+              ? (rotation.coaxial
+                 ? tr("旋转已验证：近似共轴，位置RMSE=%1 mm，Max=%2 mm")
+                   .arg(rotation.fitRmseMm, 0, 'f', 6)
+                   .arg(rotation.maxErrorMm, 0, 'f', 6)
+                 : tr("旋转已验证：偏心半径=%1 mm，圆心偏移=(%2,%3) mm，位置RMSE=%4 mm，Max=%5 mm")
+                   .arg(rotation.radiusMm, 0, 'f', 6)
+                   .arg(rotation.centerOffsetX, 0, 'f', 6)
+                   .arg(rotation.centerOffsetY, 0, 'f', 6)
+                   .arg(rotation.fitRmseMm, 0, 'f', 6)
+                   .arg(rotation.maxErrorMm, 0, 'f', 6))
+              : tr("旋转%1")
+                .arg(calibrationRotationRangeStatusToString(rotation.status));
+    const CalibrationAngleMapping &angleMapping =
+            m_solveResult.model.angleMapping;
+    if (m_solveResult.model.mode
+            == NPointCalibrationMode::TwelvePointPoseMapping) {
+        rotationSummary += angleMapping.isVerified()
+                ? tr("；姿态映射已验证：%1，偏移=%2°，RMSE=%3°，Max=%4°")
+                  .arg(calibrationAngleDirectionToString(
+                           angleMapping.direction))
+                  .arg(angleMapping.offsetDeg, 0, 'f', 6)
+                  .arg(angleMapping.rmseDeg, 0, 'f', 6)
+                  .arg(angleMapping.maxErrorDeg, 0, 'f', 6)
+                : tr("；姿态映射未通过");
+    } else {
+        rotationSummary += tr("；姿态角输出未配置");
+    }
+    m_qualityLabel->setText(tr("方式=%1  模式=%2  模型=%3  Mean=%4 mm  RMSE=%5 mm  Max=%6 mm  |  %7  |  %8")
                             .arg(methodSummary.value(QStringLiteral("methodId"))
                                  .toString(m_solveResult.model.methodId))
+                            .arg(pointMode)
                             .arg(methodSummary.value(QStringLiteral("modelType"))
                                  .toString(m_solveResult.model.modelType))
                             .arg(quality.meanError, 0, 'f', 6)
                             .arg(quality.rmse, 0, 'f', 6)
                             .arg(quality.maxError, 0, 'f', 6)
-                            .arg(quality.passed ? tr("通过") : tr("超限")));
+                            .arg(quality.passed ? tr("通过") : tr("超限"))
+                            .arg(rotationSummary));
 }
 
 QString QuickCalibrationWizard::configurationTargetKey() const
@@ -1641,7 +1968,12 @@ bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
 
     const QString producerId = m_methodConfigWidget->captureImageProducerId();
     if (producerId.isEmpty()) {
-        return fail(tr("图像点 X、Y、角度必须绑定到同一个模板定位工具"));
+        const NPointCalibrationConfigWidget *nPoint =
+                dynamic_cast<const NPointCalibrationConfigWidget *>(
+                    m_methodConfigWidget);
+        return fail(nPoint && nPoint->requiresImageAngle()
+                    ? tr("位置与姿态模式要求图像 X、Y、角度绑定到同一个模板定位工具")
+                    : tr("图像 X、Y 必须绑定到同一个模板定位工具"));
     }
     const auto configIt = m_calibrationProducerConfigs.constFind(producerId);
     if (configIt == m_calibrationProducerConfigs.constEnd())
@@ -1704,10 +2036,15 @@ bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
         {QStringLiteral("imageIndex"), externalImageIndex}
     };
     const ToolResult result = m_captureToolEngine.runTool(request);
+    const NPointCalibrationConfigWidget *nPoint =
+            dynamic_cast<const NPointCalibrationConfigWidget *>(
+                m_methodConfigWidget);
+    const bool imageAngleRequired = nPoint && nPoint->requiresImageAngle();
     const bool validPose = result.success && result.ok
             && finitePayloadNumber(result.payload, QStringLiteral("x"))
             && finitePayloadNumber(result.payload, QStringLiteral("y"))
-            && finitePayloadNumber(result.payload, QStringLiteral("angle"));
+            && (!imageAngleRequired
+                || finitePayloadNumber(result.payload, QStringLiteral("angle")));
 
     if (validPose) {
         const QJsonObject currentFingerprint =
@@ -1762,7 +2099,9 @@ bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
         return fail(tr("当前图片模板定位失败：%1").arg(detail));
     }
     if (!validPose)
-        return fail(tr("当前图片模板定位未返回有效的 X、Y、角度"));
+        return fail(imageAngleRequired
+                    ? tr("当前图片模板定位未返回有效的 X、Y、图像角度")
+                    : tr("当前图片模板定位未返回有效的 X、Y"));
     return true;
 }
 

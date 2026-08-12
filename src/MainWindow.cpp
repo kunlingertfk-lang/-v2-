@@ -1776,7 +1776,14 @@ QString MainWindow::toolSnapshotStatusLine(const ToolPreviewSnapshot &snapshot,
             && (snapshot.toolType == ToolType::CalibrationTransform
                 || snapshot.result.toolType == ToolType::CalibrationTransform)) {
         const QJsonObject payload = snapshot.result.payload;
-        return tr("%1 | %2 | %3 | 物理X:%4 | 物理Y:%5 | 角度:%6° | %7ms")
+        const QString angleText = payload.value(QStringLiteral("angleValid")).toBool()
+                && payload.value(QStringLiteral("machineAngle")).isDouble()
+                ? tr("机械角度:%1°").arg(
+                      QString::number(payload.value(
+                                          QStringLiteral("machineAngle")).toDouble(),
+                                      'f', 3))
+                : tr("机械角度:未配置");
+        return tr("%1 | %2 | %3 | 物理X:%4 | 物理Y:%5 | %6 | %7ms")
                 .arg(sourceLabel,
                      state,
                      status,
@@ -1784,8 +1791,7 @@ QString MainWindow::toolSnapshotStatusLine(const ToolPreviewSnapshot &snapshot,
                                      'f', 3),
                      QString::number(payload.value(QStringLiteral("machineY")).toDouble(),
                                      'f', 3),
-                     QString::number(payload.value(QStringLiteral("convertedAngleDeg")).toDouble(),
-                                     'f', 3),
+                     angleText,
                      QString::number(snapshot.result.elapsedMs));
     }
     return tr("%1 | %2 | %3 | score:%4 | count:%5")

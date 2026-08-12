@@ -22,7 +22,9 @@ struct CalibrationTransformHalconResult
     bool coordinateAvailable = false;
     CalibrationRegion region = CalibrationRegion::Invalid;
     CalibrationRotationCoverage rotationCoverage =
-            CalibrationRotationCoverage::Unverified;
+            CalibrationRotationCoverage::NotConfigured;
+    bool angleVerified = false;
+    bool angleProductionAllowed = false;
     QString status;
     QString message;
     double outputX = 0.0;
@@ -49,5 +51,9 @@ public:
             const CalibrationTransformPose &runPose = CalibrationTransformPose(),
             bool allowBoundaryForProduction = false) const;
 };
+
+// DynamicMechanicalAxisCompensationExtension is intentionally not consumed
+// here.  It is a future-only hook declared by CalibrationModel.h; the current
+// fixed-camera transform has no external mechanical-axis runtime input.
 
 #endif // ALGORITHMS_LOCATION_CALIBRATIONTRANSFORMHALCONRUNNER_H

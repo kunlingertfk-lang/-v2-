@@ -59,6 +59,7 @@ public:
     virtual QString captureImageProducerId() const = 0;
     virtual bool captureCurrentSample(QString *errorMessage = nullptr) = 0;
     virtual QVector<QLineF> completedTranslationSegments() const { return {}; }
+    virtual QVector<QLineF> completedRotationSegments() const { return {}; }
     virtual int completedTranslationSampleCount() const { return 0; }
     virtual int translationSampleCount() const { return 0; }
 

@@ -76,6 +76,7 @@ private:
     void addExternalImageFiles(const QStringList &filePaths);
     void showExternalImage(int index);
     void rebuildExternalImageList(int currentIndex = -1);
+    void moveExternalImage(int sourceRow, int insertionIndex);
     void removeCurrentExternalImage();
     void clearExternalImages();
     void updateImageModeUi();

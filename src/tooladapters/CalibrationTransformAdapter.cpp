@@ -123,6 +123,7 @@ bool readPose(const QJsonObject &config,
 
 bool resolveMainInputs(const QJsonObject &params,
                        const ToolRequest &request,
+                       bool angleRequired,
                        double *inputX,
                        double *inputY,
                        double *inputAngle,
@@ -135,13 +136,13 @@ bool resolveMainInputs(const QJsonObject &params,
     const QJsonObject xBinding = params.value(QStringLiteral("inputX")).toObject();
     const QJsonObject yBinding = params.value(QStringLiteral("inputY")).toObject();
     const QJsonObject angleBinding = params.value(QStringLiteral("inputAngle")).toObject();
-    const std::array<QJsonObject, 3> bindings{{xBinding, yBinding, angleBinding}};
+    const std::array<QJsonObject, 2> bindings{{xBinding, yBinding}};
     for (const QJsonObject &binding : bindings) {
         if (binding.value(QStringLiteral("mode")).toString() != QStringLiteral("binding")) {
             if (status)
                 *status = QStringLiteral("input_binding_required");
             if (error)
-                *error = QStringLiteral("标定转换 X/Y/Angle 必须订阅前序图像坐标，不能使用常量");
+                *error = QStringLiteral("标定转换 X/Y 必须订阅前序图像坐标，不能使用常量");
             return false;
         }
     }
@@ -149,11 +150,17 @@ bool resolveMainInputs(const QJsonObject &params,
     const QString sourceId = xBinding.value(QStringLiteral("producerId")).toString().trimmed();
     if (sourceId.isEmpty()
             || yBinding.value(QStringLiteral("producerId")).toString().trimmed() != sourceId
-            || angleBinding.value(QStringLiteral("producerId")).toString().trimmed() != sourceId) {
+            || (angleRequired
+                && (angleBinding.value(QStringLiteral("mode")).toString()
+                    != QStringLiteral("binding")
+                    || angleBinding.value(QStringLiteral("producerId"))
+                       .toString().trimmed() != sourceId))) {
         if (status)
             *status = QStringLiteral("mixed_binding_producers");
         if (error)
-            *error = QStringLiteral("标定转换 X/Y/Angle 必须来自同一个前序节点");
+            *error = angleRequired
+                    ? QStringLiteral("姿态映射的 X/Y/Angle 必须来自同一个前序节点")
+                    : QStringLiteral("标定转换 X/Y 必须来自同一个前序节点");
         return false;
     }
 
@@ -182,16 +189,22 @@ bool resolveMainInputs(const QJsonObject &params,
             ? QStringList{QStringLiteral("x"), QStringLiteral("y"), QStringLiteral("angle")}
             : QStringList{QStringLiteral("runPose.x"), QStringLiteral("runPose.y"),
                           QStringLiteral("runPose.angleDeg")};
-    const QStringList actualKeys{
+    QStringList actualKeys{
         xBinding.value(QStringLiteral("outputKey")).toString(),
-        yBinding.value(QStringLiteral("outputKey")).toString(),
-        angleBinding.value(QStringLiteral("outputKey")).toString()
+        yBinding.value(QStringLiteral("outputKey")).toString()
     };
-    if (actualKeys != expectedKeys) {
+    if (angleRequired)
+        actualKeys.append(angleBinding.value(QStringLiteral("outputKey")).toString());
+    QStringList requiredKeys{expectedKeys.at(0), expectedKeys.at(1)};
+    if (angleRequired)
+        requiredKeys.append(expectedKeys.at(2));
+    if (actualKeys != requiredKeys) {
         if (status)
             *status = QStringLiteral("input_binding_contract_invalid");
         if (error)
-            *error = QStringLiteral("订阅字段不符合该前序节点的 X/Y/Angle 坐标合同");
+            *error = angleRequired
+                    ? QStringLiteral("订阅字段不符合该前序节点的 X/Y/Angle 坐标合同")
+                    : QStringLiteral("订阅字段不符合该前序节点的 X/Y 坐标合同");
         return false;
     }
     if (!source.value(QStringLiteral("success")).toBool(false)
@@ -224,23 +237,31 @@ bool resolveMainInputs(const QJsonObject &params,
         const QString angleUnit = payload.value(QStringLiteral("angleUnit"))
                 .toString().trimmed();
         if (coordinateSystem != QStringLiteral("image_pixel")
-                || angleUnit != QStringLiteral("degree")) {
+                || (angleRequired && angleUnit != QStringLiteral("degree"))) {
             if (status)
                 *status = QStringLiteral("source_coordinate_contract_invalid");
             if (error)
-                *error = QStringLiteral("前序输出不是图像像素坐标或角度单位不是 degree");
+                *error = angleRequired
+                        ? QStringLiteral("前序输出不是图像像素坐标或角度单位不是 degree")
+                        : QStringLiteral("前序输出不是图像像素坐标");
             return false;
         }
     }
     if (!finiteNumber(valueAtObjectPath(payload, expectedKeys.at(0)), inputX)
             || !finiteNumber(valueAtObjectPath(payload, expectedKeys.at(1)), inputY)
-            || !finiteNumber(valueAtObjectPath(payload, expectedKeys.at(2)), inputAngle)) {
+            || (angleRequired
+                && !finiteNumber(valueAtObjectPath(payload, expectedKeys.at(2)),
+                                 inputAngle))) {
         if (status)
             *status = QStringLiteral("input_binding_invalid");
         if (error)
-            *error = QStringLiteral("前序坐标来源缺少有限的 X/Y/Angle 输出");
+            *error = angleRequired
+                    ? QStringLiteral("前序坐标来源缺少有限的 X/Y/Angle 输出")
+                    : QStringLiteral("前序坐标来源缺少有限的 X/Y 输出");
         return false;
     }
+    if (!angleRequired)
+        *inputAngle = 0.0;
     if (producerId)
         *producerId = sourceId;
     if (producerType)
@@ -363,10 +384,18 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
     else if (hikXmlLoader.canLoad(filePath))
         loader = &hikXmlLoader;
     if (!loader || !loader->load(filePath, &model, &loadError)) {
+        QString loadStatus = QStringLiteral("calibration_file_invalid");
+        if (loadError.startsWith(
+                    QStringLiteral("unsupported_calibration_schema"))) {
+            loadStatus = QStringLiteral("unsupported_calibration_schema");
+        } else if (loadError.startsWith(
+                       QStringLiteral("invalid_calibration_structure"))) {
+            loadStatus = QStringLiteral("invalid_calibration_structure");
+        } else if (loadError.startsWith(QStringLiteral("unsupported_format"))) {
+            loadStatus = QStringLiteral("unsupported_format");
+        }
         return failure(config,
-                       loadError.startsWith(QStringLiteral("unsupported_format"))
-                       ? QStringLiteral("unsupported_format")
-                       : QStringLiteral("calibration_file_invalid"),
+                       loadStatus,
                        loadError.isEmpty() ? QStringLiteral("无法识别标定文件") : loadError);
     }
     const QString coordinateType = params.value(QStringLiteral("coordinateType"))
@@ -412,6 +441,8 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
     QString inputProducerId;
     ToolType inputProducerType = ToolType::Unknown;
     QJsonObject inputProducerPayload;
+    const bool inputAngleRequired = model.mode
+            == NPointCalibrationMode::TwelvePointPoseMapping;
     if (!singleProducerBinding(params.value(QStringLiteral("calibrationPose")).toObject(),
                                       {QStringLiteral("x"), QStringLiteral("y"),
                                        QStringLiteral("joint0Angle"), QStringLiteral("joint1Angle")},
@@ -422,7 +453,7 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
                                       &inputError)) {
         return failure(config, QStringLiteral("mixed_binding_producers"), inputError);
     }
-    if (!resolveMainInputs(params, request,
+    if (!resolveMainInputs(params, request, inputAngleRequired,
                            &inputX, &inputY, &inputAngle,
                            &inputProducerId, &inputProducerType,
                            &inputProducerPayload,
@@ -495,8 +526,9 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
                         .value(QStringLiteral("outputKey")).toString());
             directOutputContract.insert(
                         QStringLiteral("angle"),
-                        params.value(QStringLiteral("inputAngle")).toObject()
-                        .value(QStringLiteral("outputKey")).toString());
+                        inputProducerType == ToolType::PositionCorrection
+                        ? QStringLiteral("runPose.angleDeg")
+                        : QStringLiteral("angle"));
             const QJsonObject actualSourceFingerprint =
                     effectiveCoordinateSourceFingerprint(
                         inputProducerId,
@@ -584,6 +616,8 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
     result.payload.insert(QStringLiteral("inputProducerId"), inputProducerId);
     result.payload.insert(QStringLiteral("inputProducerType"),
                           toolTypeToString(inputProducerType));
+    result.payload.insert(QStringLiteral("inputAngleRequired"),
+                          inputAngleRequired);
     annotateBindingValidation(&result,
                               calibrationBindingVerified,
                               calibrationBindingStatus,

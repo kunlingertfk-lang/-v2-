@@ -32,6 +32,7 @@
 #include <QVBoxLayout>
 
 #include <cmath>
+#include <utility>
 
 namespace {
 
@@ -41,6 +42,67 @@ const QString kImageAngle = QStringLiteral("imageAngle");
 const QString kPhysicalPointX = QStringLiteral("physicalPointX");
 const QString kPhysicalPointY = QStringLiteral("physicalPointY");
 const QString kPhysicalAngle = QStringLiteral("physicalAngle");
+const QString kNinePointXY = QStringLiteral("nine_point_xy");
+const QString kTwelvePointAxisTrace = QStringLiteral("twelve_point_axis_trace");
+const QString kTwelvePointPoseMapping = QStringLiteral("twelve_point_pose_mapping");
+
+bool isKnownCalibrationMode(const QString &mode)
+{
+    return mode == kNinePointXY || mode == kTwelvePointAxisTrace
+            || mode == kTwelvePointPoseMapping;
+}
+
+QString calibrationModeForCounts(int translationCount, int rotationCount)
+{
+    if (translationCount == 9 && rotationCount == 0)
+        return kNinePointXY;
+    if (translationCount == 9 && rotationCount == 3)
+        return kTwelvePointAxisTrace;
+    return QString();
+}
+
+double wrappedAngleDelta(double fromDeg, double toDeg)
+{
+    double delta = std::fmod(toDeg - fromDeg, 360.0);
+    if (delta >= 180.0)
+        delta -= 360.0;
+    else if (delta < -180.0)
+        delta += 360.0;
+    return delta;
+}
+
+bool anglesAreObservable(const QVector<double> &anglesDeg,
+                         double minimumSpanDeg = 5.0)
+{
+    if (anglesDeg.size() < 3)
+        return false;
+    QVector<double> unwrapped;
+    unwrapped.reserve(anglesDeg.size());
+    unwrapped.append(anglesDeg.first());
+    for (int index = 1; index < anglesDeg.size(); ++index) {
+        unwrapped.append(unwrapped.last()
+                         + wrappedAngleDelta(anglesDeg.at(index - 1),
+                                             anglesDeg.at(index)));
+    }
+    double minimum = unwrapped.first();
+    double maximum = unwrapped.first();
+    QVector<double> independent;
+    for (double angle : std::as_const(unwrapped)) {
+        minimum = qMin(minimum, angle);
+        maximum = qMax(maximum, angle);
+        bool duplicate = false;
+        for (double existing : std::as_const(independent)) {
+            if (std::abs(angle - existing) < 0.01) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate)
+            independent.append(angle);
+    }
+    return independent.size() >= 3
+            && maximum - minimum >= minimumSpanDeg;
+}
 
 QTableWidgetItem *numberItem(double value)
 {
@@ -190,8 +252,11 @@ void NPointCalibrationConfigWidget::setParameterMode(bool showAll)
 {
     m_basicButton->setChecked(!showAll);
     m_allButton->setChecked(showAll);
-    m_physicalCoordinateCard->setVisible(showAll);
-    m_runtimeParametersCard->setVisible(showAll);
+    // These two cards are retained for persisted-configuration compatibility,
+    // but their values are not consumed by the current HALCON solver.  Keep
+    // them hidden until robot path planning / robust fitting is implemented.
+    m_physicalCoordinateCard->setVisible(false);
+    m_runtimeParametersCard->setVisible(false);
     m_qualityCard->setVisible(showAll);
     m_effectiveRegionCard->setVisible(showAll);
 }
@@ -351,7 +416,8 @@ void NPointCalibrationConfigWidget::editPoints()
     });
     connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
     connect(confirm, &QPushButton::clicked, &dialog,
-            [editor, &dialog]() {
+            [this, editor, &dialog, &editorTranslationCount,
+             &editorRotationCount]() {
         for (int row = 0; row < editor->rowCount(); ++row) {
             for (int column = 2; column <= 7; ++column) {
                 bool ok = false;
@@ -373,6 +439,48 @@ void NPointCalibrationConfigWidget::editPoints()
                                 .arg(row + 1).arg(column + 1));
                     return;
                 }
+            }
+        }
+        const QString mode = calibrationMode();
+        const int expectedRotationCount = mode == kNinePointXY ? 0 : 3;
+        if (editorTranslationCount != 9
+                || editorRotationCount != expectedRotationCount
+                || editor->rowCount() != 9 + expectedRotationCount) {
+            QMessageBox::warning(
+                        &dialog, tr("标定点无效"),
+                        tr("当前标定模式的点数必须固定为 %1")
+                        .arg(mode == kNinePointXY ? tr("9平移+0旋转")
+                                                  : tr("9平移+3旋转")));
+            return;
+        }
+        if (expectedRotationCount > 0) {
+            QVector<double> imageAngles;
+            QVector<double> machineAngles;
+            int completedRotations = 0;
+            for (int row = editorTranslationCount;
+                 row < editor->rowCount(); ++row) {
+                const QTableWidgetItem *completion = editor->item(row, 8);
+                if (!completion || completion->checkState() != Qt::Checked)
+                    continue;
+                ++completedRotations;
+                machineAngles.append(editor->item(row, 7)->text().toDouble());
+                if (mode == kTwelvePointPoseMapping)
+                    imageAngles.append(editor->item(row, 4)->text().toDouble());
+            }
+            if (completedRotations == expectedRotationCount
+                    && !anglesAreObservable(machineAngles)) {
+                QMessageBox::warning(
+                            &dialog, tr("旋转角度无效"),
+                            tr("3个旋转点的机械角度不可区分或跨度不足5°，请重新录入"));
+                return;
+            }
+            if (completedRotations == expectedRotationCount
+                    && mode == kTwelvePointPoseMapping
+                    && !anglesAreObservable(imageAngles)) {
+                QMessageBox::warning(
+                            &dialog, tr("图像角度不可观测"),
+                            tr("位置与姿态模式需要3个独立图像角度且跨度不少于5°；不会自动降级为轴轨迹模式"));
+                return;
             }
         }
         dialog.accept();
@@ -457,20 +565,37 @@ NPointCalibrationConfigWidget::NPointCalibrationConfigWidget(QWidget *parent)
     m_imageProducer->addItem(tr("手动输入图像坐标"), QJsonObject{
                                  {QStringLiteral("mode"), QStringLiteral("manual")}});
     m_imageProducer->hide();
+    m_calibrationMode = new QComboBox(movement.content);
+    m_calibrationMode->setObjectName(QStringLiteral("nPointCalibrationMode"));
+    m_calibrationMode->addItem(tr("9点 XY标定"), kNinePointXY);
+    m_calibrationMode->addItem(tr("12点 旋转中心/轴轨迹标定"),
+                               kTwelvePointAxisTrace);
+    m_calibrationMode->addItem(tr("12点 位置与姿态标定"),
+                               kTwelvePointPoseMapping);
+    m_calibrationMode->setToolTip(
+                tr("模式必须在采样前明确选择；系统不会根据导入文件或求解结果自动切换模式"));
     m_translationCount = new QSpinBox(movement.content);
     m_translationCount->setObjectName(QStringLiteral("nPointTranslationCount"));
     m_translationCount->setRange(3, 99);
     m_translationCount->setValue(9);
+    m_translationCount->setReadOnly(true);
+    m_translationCount->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    m_translationCount->setToolTip(tr("由标定模式固定为 9 个平移点"));
     m_rotationCount = new QSpinBox(movement.content);
     m_rotationCount->setObjectName(QStringLiteral("nPointRotationCount"));
     m_rotationCount->setRange(0, 99);
-    m_rotationCount->setValue(3);
+    m_rotationCount->setValue(0);
+    m_rotationCount->setReadOnly(true);
+    m_rotationCount->setButtonSymbols(QAbstractSpinBox::NoButtons);
     m_rotationCount->setToolTip(
-                tr("旋转点排列在平移点之后并进入点表与草稿；当前二维仿射求解只使用平移点"));
+                tr("由标定模式固定为 0 或 3；两种12点模式均为9个平移点+3个旋转点"));
+    QLabel *calibrationModeLabel = new QLabel(tr("标定模式"), movement.content);
     QLabel *translationLabel = new QLabel(tr("平移次数"), movement.content);
     QLabel *rotationLabel = new QLabel(tr("旋转次数"), movement.content);
+    calibrationModeLabel->setProperty("role", QStringLiteral("rowField"));
     translationLabel->setProperty("role", QStringLiteral("rowField"));
     rotationLabel->setProperty("role", QStringLiteral("rowField"));
+    movementForm->addRow(calibrationModeLabel, m_calibrationMode);
     movementForm->addRow(translationLabel, m_translationCount);
     movementForm->addRow(rotationLabel, m_rotationCount);
     QPushButton *editButton = new QPushButton(tr("编辑"), movement.content);
@@ -735,12 +860,40 @@ NPointCalibrationConfigWidget::NPointCalibrationConfigWidget(QWidget *parent)
     m_maxErrorLimit->setDecimals(4);
     m_maxErrorLimit->setRange(0.0001, 1000.0);
     m_maxErrorLimit->setValue(0.25);
-    QLabel *rmseLabel = new QLabel(tr("RMSE门限(mm)"), quality.content);
-    QLabel *maxLabel = new QLabel(tr("最大误差门限(mm)"), quality.content);
+    m_rotationRmseLimit = new QDoubleSpinBox(quality.content);
+    m_rotationRmseLimit->setObjectName(
+                QStringLiteral("nPointRotationRmseLimit"));
+    m_rotationRmseLimit->setDecimals(4);
+    m_rotationRmseLimit->setRange(0.0001, 1000.0);
+    m_rotationRmseLimit->setValue(0.10);
+    m_rotationRmseLimit->setToolTip(
+                tr("旋转轴迹的机械角与圆周相位关系位置RMSE门限，"
+                   "与9点XY拟合RMSE门限独立"));
+    m_rotationMaxErrorLimit = new QDoubleSpinBox(quality.content);
+    m_rotationMaxErrorLimit->setObjectName(
+                QStringLiteral("nPointRotationMaxErrorLimit"));
+    m_rotationMaxErrorLimit->setDecimals(4);
+    m_rotationMaxErrorLimit->setRange(0.0001, 1000.0);
+    m_rotationMaxErrorLimit->setValue(0.25);
+    m_rotationMaxErrorLimit->setToolTip(
+                tr("旋转轴迹的机械角与圆周相位关系最大位置误差门限，"
+                   "与9点XY拟合最大误差门限独立"));
+    QLabel *rmseLabel = new QLabel(tr("XY RMSE门限(mm)"), quality.content);
+    QLabel *maxLabel = new QLabel(tr("XY最大误差门限(mm)"), quality.content);
+    m_rotationRmseLimitLabel = new QLabel(
+                tr("轴迹RMSE门限(mm)"), quality.content);
+    m_rotationMaxErrorLimitLabel = new QLabel(
+                tr("轴迹最大误差门限(mm)"), quality.content);
     rmseLabel->setProperty("role", QStringLiteral("rowField"));
     maxLabel->setProperty("role", QStringLiteral("rowField"));
+    m_rotationRmseLimitLabel->setProperty("role", QStringLiteral("rowField"));
+    m_rotationMaxErrorLimitLabel->setProperty("role",
+                                               QStringLiteral("rowField"));
     thresholds->addRow(rmseLabel, m_rmseLimit);
     thresholds->addRow(maxLabel, m_maxErrorLimit);
+    thresholds->addRow(m_rotationRmseLimitLabel, m_rotationRmseLimit);
+    thresholds->addRow(m_rotationMaxErrorLimitLabel,
+                       m_rotationMaxErrorLimit);
     quality.contentLayout->addLayout(thresholds);
     layout->addWidget(m_qualityCard);
 
@@ -796,19 +949,130 @@ NPointCalibrationConfigWidget::NPointCalibrationConfigWidget(QWidget *parent)
     connect(m_allButton, &QPushButton::clicked, this, [this]() { setParameterMode(true); });
     connect(m_manualCaptureButton, &QPushButton::toggled,
             this, [this](bool) { updateCaptureModeUi(); });
-    connect(m_translationCount, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, [this](int) { fillDefaultGrid(); });
-    connect(m_rotationCount, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, [this](int) { fillDefaultGrid(); });
+    connect(m_calibrationMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &NPointCalibrationConfigWidget::handleCalibrationModeChanged);
     connect(m_safeMarginPx, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, [this](double) {
         setRegionSummary(0, 0, tr("安全内缩距离已改变，请重新执行"),
                          QStringLiteral("warning"));
         emit sampleDataChanged();
     });
+    updateCalibrationModeUi();
     fillDefaultGrid();
     updateCaptureModeUi();
     setParameterMode(false);
+}
+
+QString NPointCalibrationConfigWidget::calibrationMode() const
+{
+    return m_calibrationMode
+            ? m_calibrationMode->currentData().toString() : kNinePointXY;
+}
+
+bool NPointCalibrationConfigWidget::requiresImageAngle() const
+{
+    return calibrationMode() == kTwelvePointPoseMapping;
+}
+
+void NPointCalibrationConfigWidget::handleCalibrationModeChanged(int)
+{
+    const QString selectedMode = calibrationMode();
+    if (!isKnownCalibrationMode(selectedMode)
+            || selectedMode == m_lastCalibrationMode) {
+        return;
+    }
+    if (completedSampleCount() > 0) {
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+                    this, tr("切换标定模式"),
+                    tr("切换标定模式会按固定点数重建点表，并清空当前已完成数据。是否继续？"),
+                    QMessageBox::Yes | QMessageBox::No,
+                    QMessageBox::No);
+        if (answer != QMessageBox::Yes) {
+            const QSignalBlocker blocker(m_calibrationMode);
+            const int previousIndex = comboIndexForData(
+                        m_calibrationMode, m_lastCalibrationMode);
+            if (previousIndex >= 0)
+                m_calibrationMode->setCurrentIndex(previousIndex);
+            return;
+        }
+    }
+    applyCalibrationMode(selectedMode, true);
+}
+
+void NPointCalibrationConfigWidget::applyCalibrationMode(
+        const QString &mode, bool resetPoints)
+{
+    if (!isKnownCalibrationMode(mode))
+        return;
+    const int modeIndex = comboIndexForData(m_calibrationMode, mode);
+    {
+        const QSignalBlocker modeBlocker(m_calibrationMode);
+        const QSignalBlocker translationBlocker(m_translationCount);
+        const QSignalBlocker rotationBlocker(m_rotationCount);
+        if (modeIndex >= 0)
+            m_calibrationMode->setCurrentIndex(modeIndex);
+        m_translationCount->setValue(9);
+        m_rotationCount->setValue(mode == kNinePointXY ? 0 : 3);
+    }
+    m_lastCalibrationMode = mode;
+    updateCalibrationModeUi();
+    if (resetPoints)
+        fillDefaultGrid();
+}
+
+void NPointCalibrationConfigWidget::updateCalibrationModeUi()
+{
+    const QString mode = calibrationMode();
+    const bool poseMapping = mode == kTwelvePointPoseMapping;
+    const bool hasRotation = mode != kNinePointXY;
+    for (QWidget *widget : {static_cast<QWidget *>(m_rotationRmseLimitLabel),
+                            static_cast<QWidget *>(m_rotationRmseLimit),
+                            static_cast<QWidget *>(m_rotationMaxErrorLimitLabel),
+                            static_cast<QWidget *>(m_rotationMaxErrorLimit)}) {
+        if (widget)
+            widget->setVisible(hasRotation);
+    }
+    if (QLineEdit *imageAngle = m_captureBindingEdits.value(kImageAngle, nullptr)) {
+        imageAngle->setProperty("requiredField", poseMapping);
+        imageAngle->setPlaceholderText(poseMapping
+                                       ? tr("必填：同一前置工具的图像角度")
+                                       : tr("可选：当前模式不使用图像角度映射"));
+        imageAngle->setToolTip(poseMapping
+                               ? tr("位置与姿态模式必须取得可观测的图像角度")
+                               : tr("当前模式允许记录图像角度，但不参与角度映射"));
+    }
+    if (QToolButton *imageAngleButton =
+            m_captureBindingButtons.value(kImageAngle, nullptr)) {
+        imageAngleButton->setProperty("requiredField", poseMapping);
+    }
+    if (QLineEdit *physicalAngle =
+            m_captureBindingEdits.value(kPhysicalAngle, nullptr)) {
+        physicalAngle->setProperty("requiredField", hasRotation);
+        physicalAngle->setPlaceholderText(hasRotation
+                                          ? tr("旋转点必填：机械角度 A")
+                                          : tr("可选：9点XY不使用机械角度"));
+        physicalAngle->setToolTip(hasRotation
+                                  ? tr("3个旋转点必须记录同一采样时刻的机械角度 A")
+                                  : tr("9点XY只使用机械X/Y"));
+    }
+    if (QToolButton *physicalAngleButton =
+            m_captureBindingButtons.value(kPhysicalAngle, nullptr)) {
+        physicalAngleButton->setProperty("requiredField", hasRotation);
+    }
+    for (QWidget *widget : {static_cast<QWidget *>(
+                                m_captureBindingEdits.value(kImageAngle, nullptr)),
+                            static_cast<QWidget *>(
+                                m_captureBindingButtons.value(kImageAngle, nullptr)),
+                            static_cast<QWidget *>(
+                                m_captureBindingEdits.value(kPhysicalAngle, nullptr)),
+                            static_cast<QWidget *>(
+                                m_captureBindingButtons.value(kPhysicalAngle, nullptr))}) {
+        if (!widget)
+            continue;
+        widget->style()->unpolish(widget);
+        widget->style()->polish(widget);
+    }
+    syncLegacyImageProducer();
 }
 
 void NPointCalibrationConfigWidget::fillDefaultGrid()
@@ -817,10 +1081,17 @@ void NPointCalibrationConfigWidget::fillDefaultGrid()
     fillZeroPointTable(m_sampleTable, count);
     m_sampleCompleted = QVector<bool>(count, false);
     m_nextCaptureRow = 0;
+    m_physicalSampleValid = false;
     if (m_sampleStatus) {
-        m_sampleStatus->setText(tr("点表已重置：平移 %1 点，旋转 %2 点；当前仿射求解仅使用平移点")
-                                .arg(m_translationCount->value())
-                                .arg(m_rotationCount->value()));
+        if (calibrationMode() == kNinePointXY) {
+            m_sampleStatus->setText(tr("点表已重置：9点 XY标定；角度不参与求解"));
+        } else if (calibrationMode() == kTwelvePointAxisTrace) {
+            m_sampleStatus->setText(
+                        tr("点表已重置：9平移+3旋转；图像角度可忽略，机械角度用于轴轨迹诊断"));
+        } else {
+            m_sampleStatus->setText(
+                        tr("点表已重置：9平移+3旋转；旋转点必须包含可观测图像角度和机械角度"));
+        }
     }
     emit sampleDataChanged();
 }
@@ -836,6 +1107,37 @@ QVector<QLineF> NPointCalibrationConfigWidget::completedTranslationSegments() co
     QVector<QLineF> segments;
     const int count = qMin(m_translationCount->value(), m_sampleTable->rowCount());
     for (int row = 1; row < count; ++row) {
+        if (row >= m_sampleCompleted.size()
+                || !m_sampleCompleted.at(row) || !m_sampleCompleted.at(row - 1)) {
+            continue;
+        }
+        bool x1Ok = false;
+        bool y1Ok = false;
+        bool x2Ok = false;
+        bool y2Ok = false;
+        const double x1 = m_sampleTable->item(row - 1, 1)
+                ? m_sampleTable->item(row - 1, 1)->text().toDouble(&x1Ok) : 0.0;
+        const double y1 = m_sampleTable->item(row - 1, 2)
+                ? m_sampleTable->item(row - 1, 2)->text().toDouble(&y1Ok) : 0.0;
+        const double x2 = m_sampleTable->item(row, 1)
+                ? m_sampleTable->item(row, 1)->text().toDouble(&x2Ok) : 0.0;
+        const double y2 = m_sampleTable->item(row, 2)
+                ? m_sampleTable->item(row, 2)->text().toDouble(&y2Ok) : 0.0;
+        if (x1Ok && y1Ok && x2Ok && y2Ok
+                && std::isfinite(x1) && std::isfinite(y1)
+                && std::isfinite(x2) && std::isfinite(y2)) {
+            segments.append(QLineF(QPointF(x1, y1), QPointF(x2, y2)));
+        }
+    }
+    return segments;
+}
+
+QVector<QLineF> NPointCalibrationConfigWidget::completedRotationSegments() const
+{
+    QVector<QLineF> segments;
+    const int first = qMin(m_translationCount->value(), m_sampleTable->rowCount());
+    const int end = qMin(first + m_rotationCount->value(), m_sampleTable->rowCount());
+    for (int row = first + 1; row < end; ++row) {
         if (row >= m_sampleCompleted.size()
                 || !m_sampleCompleted.at(row) || !m_sampleCompleted.at(row - 1)) {
             continue;
@@ -942,12 +1244,93 @@ QVector<CalibrationSample> NPointCalibrationConfigWidget::samplesFromTable(
     return samples;
 }
 
+bool NPointCalibrationConfigWidget::validateCompletedRotationAngles(
+        QString *errorMessage) const
+{
+    const QString mode = calibrationMode();
+    if (mode == kNinePointXY)
+        return true;
+    const int firstRotationRow = m_translationCount->value();
+    const int rotationCount = m_rotationCount->value();
+    int completedRotationCount = 0;
+    QVector<double> imageAngles;
+    QVector<double> machineAngles;
+    for (int row = firstRotationRow;
+         row < firstRotationRow + rotationCount
+         && row < m_sampleTable->rowCount(); ++row) {
+        if (row >= m_sampleCompleted.size() || !m_sampleCompleted.at(row))
+            continue;
+        ++completedRotationCount;
+        bool imageOk = false;
+        bool machineOk = false;
+        const double imageAngle = m_sampleTable->item(row, 3)
+                ? m_sampleTable->item(row, 3)->text().toDouble(&imageOk) : 0.0;
+        const double machineAngle = m_sampleTable->item(row, 6)
+                ? m_sampleTable->item(row, 6)->text().toDouble(&machineOk) : 0.0;
+        if (!machineOk || !std::isfinite(machineAngle)) {
+            if (errorMessage) {
+                *errorMessage = tr("第 %1 个旋转点缺少有效机械角度 A")
+                        .arg(row - firstRotationRow + 1);
+            }
+            return false;
+        }
+        if (mode == kTwelvePointPoseMapping
+                && (!imageOk || !std::isfinite(imageAngle))) {
+            if (errorMessage) {
+                *errorMessage = tr("第 %1 个旋转点缺少有效图像角度；位置与姿态模式不能降级为轴轨迹模式")
+                        .arg(row - firstRotationRow + 1);
+            }
+            return false;
+        }
+        machineAngles.append(machineAngle);
+        if (mode == kTwelvePointPoseMapping)
+            imageAngles.append(imageAngle);
+    }
+    // Partial point tables must remain saveable as recoverable drafts.  Full
+    // mode validation is applied as soon as all three rotation rows complete.
+    if (completedRotationCount < rotationCount)
+        return true;
+    if (!anglesAreObservable(machineAngles)) {
+        if (errorMessage) {
+            *errorMessage = tr("3个旋转点的机械角度不可区分或跨度不足5°，请重新采集；系统不会自动切换标定模式");
+        }
+        return false;
+    }
+    if (mode == kTwelvePointPoseMapping
+            && !anglesAreObservable(imageAngles)) {
+        if (errorMessage) {
+            *errorMessage = tr("旋转样本的图像角度不可观测（需3个独立角度且跨度不少于5°）；请使用有明确方向的模板，或手动改选轴轨迹模式");
+        }
+        return false;
+    }
+    return true;
+}
+
 CalibrationDraft NPointCalibrationConfigWidget::draft(QString *errorMessage) const
 {
+    if (errorMessage)
+        errorMessage->clear();
+    const QString mode = calibrationMode();
+    const int expectedRotationCount = mode == kNinePointXY ? 0 : 3;
+    if (!isKnownCalibrationMode(mode)
+            || m_translationCount->value() != 9
+            || m_rotationCount->value() != expectedRotationCount
+            || m_sampleTable->rowCount() != 9 + expectedRotationCount) {
+        if (errorMessage)
+            *errorMessage = tr("标定模式与固定点数不一致，请重新选择标定模式");
+        return CalibrationDraft();
+    }
     CalibrationDraft result;
     result.samples = samplesFromTable(errorMessage);
+    if (errorMessage && !errorMessage->isEmpty())
+        return CalibrationDraft();
+    result.parameters.insert(QStringLiteral("calibrationMode"), mode);
     result.parameters.insert(QStringLiteral("rmseLimit"), m_rmseLimit->value());
     result.parameters.insert(QStringLiteral("maxErrorLimit"), m_maxErrorLimit->value());
+    result.parameters.insert(QStringLiteral("rotationRmseLimitMm"),
+                             m_rotationRmseLimit->value());
+    result.parameters.insert(QStringLiteral("rotationMaxErrorLimitMm"),
+                             m_rotationMaxErrorLimit->value());
     result.parameters.insert(QStringLiteral("safeMarginPx"), m_safeMarginPx->value());
     result.parameters.insert(QStringLiteral("translationCount"), m_translationCount->value());
     result.parameters.insert(QStringLiteral("rotationCount"), m_rotationCount->value());
@@ -979,6 +1362,8 @@ CalibrationDraft NPointCalibrationConfigWidget::draft(QString *errorMessage) con
         rotationSamples.append(sample);
     }
     result.parameters.insert(QStringLiteral("rotationSamples"), rotationSamples);
+    if (!validateCompletedRotationAngles(errorMessage))
+        return CalibrationDraft();
     result.parameters.insert(
                 QStringLiteral("imageBinding"),
                 m_manualCaptureButton && m_manualCaptureButton->isChecked()
@@ -1026,6 +1411,7 @@ QJsonObject NPointCalibrationConfigWidget::persistentSettings() const
         {QStringLiteral("parameterMode"),
          m_allButton && m_allButton->isChecked()
             ? QStringLiteral("all") : QStringLiteral("basic")},
+        {QStringLiteral("calibrationMode"), calibrationMode()},
         {QStringLiteral("translationCount"), m_translationCount->value()},
         {QStringLiteral("rotationCount"), m_rotationCount->value()},
         {QStringLiteral("captureBindings"), captureBindings()},
@@ -1048,7 +1434,11 @@ QJsonObject NPointCalibrationConfigWidget::persistentSettings() const
          }},
         {QStringLiteral("qualityParameters"), QJsonObject{
              {QStringLiteral("rmseLimit"), m_rmseLimit->value()},
-             {QStringLiteral("maxErrorLimit"), m_maxErrorLimit->value()}
+             {QStringLiteral("maxErrorLimit"), m_maxErrorLimit->value()},
+             {QStringLiteral("rotationRmseLimitMm"),
+              m_rotationRmseLimit->value()},
+             {QStringLiteral("rotationMaxErrorLimitMm"),
+              m_rotationMaxErrorLimit->value()}
          }},
         {QStringLiteral("regionParameters"), QJsonObject{
              {QStringLiteral("safeMarginPx"), m_safeMarginPx->value()}
@@ -1073,12 +1463,17 @@ bool NPointCalibrationConfigWidget::restorePersistentSettings(
             .toInt(m_translationCount->value());
     const int rotationCount = settings.value(QStringLiteral("rotationCount"))
             .toInt(m_rotationCount->value());
-    if (translationCount < m_translationCount->minimum()
-            || translationCount > m_translationCount->maximum()
-            || rotationCount < m_rotationCount->minimum()
-            || rotationCount > m_rotationCount->maximum()) {
+    const QString storedMode = settings.value(QStringLiteral("calibrationMode"))
+            .toString();
+    const QString mode = storedMode.isEmpty()
+            ? calibrationModeForCounts(translationCount, rotationCount)
+            : storedMode;
+    const int expectedRotationCount = mode == kNinePointXY ? 0 : 3;
+    if (!isKnownCalibrationMode(mode)
+            || translationCount != 9
+            || rotationCount != expectedRotationCount) {
         if (errorMessage)
-            *errorMessage = tr("N点平移或旋转次数超出范围");
+            *errorMessage = tr("N点标定模式与点数无效；仅支持9+0或9+3");
         return false;
     }
 
@@ -1120,6 +1515,11 @@ bool NPointCalibrationConfigWidget::restorePersistentSettings(
             || !validDouble(quality, QStringLiteral("rmseLimit"), m_rmseLimit)
             || !validDouble(quality, QStringLiteral("maxErrorLimit"),
                             m_maxErrorLimit)
+            || !validDouble(quality, QStringLiteral("rotationRmseLimitMm"),
+                            m_rotationRmseLimit)
+            || !validDouble(quality,
+                            QStringLiteral("rotationMaxErrorLimitMm"),
+                            m_rotationMaxErrorLimit)
             || !validDouble(region, QStringLiteral("safeMarginPx"),
                             m_safeMarginPx)) {
         if (errorMessage)
@@ -1145,11 +1545,17 @@ bool NPointCalibrationConfigWidget::restorePersistentSettings(
     }
 
     {
+        const QSignalBlocker modeBlocker(m_calibrationMode);
         const QSignalBlocker translationBlocker(m_translationCount);
         const QSignalBlocker rotationBlocker(m_rotationCount);
+        const int modeIndex = comboIndexForData(m_calibrationMode, mode);
+        if (modeIndex >= 0)
+            m_calibrationMode->setCurrentIndex(modeIndex);
         m_translationCount->setValue(translationCount);
         m_rotationCount->setValue(rotationCount);
     }
+    m_lastCalibrationMode = mode;
+    updateCalibrationModeUi();
     fillDefaultGrid();
     const auto setDouble = [](const QJsonObject &object, const QString &key,
                               QDoubleSpinBox *spin) {
@@ -1184,6 +1590,10 @@ bool NPointCalibrationConfigWidget::restorePersistentSettings(
     setInt(runtime, QStringLiteral("weightCoefficient"), m_weightCoefficient);
     setDouble(quality, QStringLiteral("rmseLimit"), m_rmseLimit);
     setDouble(quality, QStringLiteral("maxErrorLimit"), m_maxErrorLimit);
+    setDouble(quality, QStringLiteral("rotationRmseLimitMm"),
+              m_rotationRmseLimit);
+    setDouble(quality, QStringLiteral("rotationMaxErrorLimitMm"),
+              m_rotationMaxErrorLimit);
     {
         const QSignalBlocker safeMarginBlocker(m_safeMarginPx);
         setDouble(region, QStringLiteral("safeMarginPx"), m_safeMarginPx);
@@ -1233,7 +1643,8 @@ QJsonObject NPointCalibrationConfigWidget::draftState() const
         samples.append(sample);
     }
     return QJsonObject{
-        {QStringLiteral("version"), 2},
+        {QStringLiteral("version"), 3},
+        {QStringLiteral("calibrationMode"), calibrationMode()},
         {QStringLiteral("translationCount"), m_translationCount->value()},
         {QStringLiteral("rotationCount"), m_rotationCount->value()},
         {QStringLiteral("sampleCount"), m_sampleTable->rowCount()},
@@ -1249,7 +1660,7 @@ bool NPointCalibrationConfigWidget::restoreDraftState(
     if (errorMessage)
         errorMessage->clear();
     const int version = state.value(QStringLiteral("version")).toInt();
-    if (version != 1 && version != 2) {
+    if (version != 1 && version != 2 && version != 3) {
         if (errorMessage)
             *errorMessage = tr("N点草稿版本不兼容");
         return false;
@@ -1259,15 +1670,21 @@ bool NPointCalibrationConfigWidget::restoreDraftState(
             ? count : state.value(QStringLiteral("translationCount")).toInt();
     const int rotationCount = version == 1
             ? 0 : state.value(QStringLiteral("rotationCount")).toInt();
+    const QString mode = version >= 3
+            ? state.value(QStringLiteral("calibrationMode")).toString()
+            : calibrationModeForCounts(translationCount, rotationCount);
+    const int expectedRotationCount = mode == kNinePointXY ? 0 : 3;
     const QJsonArray samples = state.value(QStringLiteral("samples")).toArray();
-    if (translationCount < m_translationCount->minimum()
-            || translationCount > m_translationCount->maximum()
-            || rotationCount < m_rotationCount->minimum()
-            || rotationCount > m_rotationCount->maximum()
+    if ((version >= 3 && mode != calibrationMode())
+            || !isKnownCalibrationMode(mode)
+            || translationCount != 9
+            || rotationCount != expectedRotationCount
             || count != translationCount + rotationCount
             || samples.size() != count) {
         if (errorMessage)
-            *errorMessage = tr("N点草稿行数无效");
+            *errorMessage = version >= 3 && mode != calibrationMode()
+                    ? tr("N点草稿标定模式与当前稳定配置不一致")
+                    : tr("N点草稿行数无效");
         return false;
     }
     const QStringList keys{QStringLiteral("column"), QStringLiteral("row"),
@@ -1303,11 +1720,17 @@ bool NPointCalibrationConfigWidget::restoreDraftState(
     }
 
     {
+        const QSignalBlocker modeBlocker(m_calibrationMode);
         const QSignalBlocker translationBlocker(m_translationCount);
         const QSignalBlocker rotationBlocker(m_rotationCount);
+        const int modeIndex = comboIndexForData(m_calibrationMode, mode);
+        if (modeIndex >= 0)
+            m_calibrationMode->setCurrentIndex(modeIndex);
         m_translationCount->setValue(translationCount);
         m_rotationCount->setValue(rotationCount);
     }
+    m_lastCalibrationMode = mode;
+    updateCalibrationModeUi();
     m_sampleTable->setRowCount(count);
     m_sampleCompleted = completed;
     for (int row = 0; row < count; ++row) {
@@ -1453,7 +1876,10 @@ void NPointCalibrationConfigWidget::applyPhysicalCommunicationBinding(
 void NPointCalibrationConfigWidget::syncLegacyImageProducer()
 {
     QString producerId;
-    for (const QString &fieldKey : {kImagePointX, kImagePointY, kImageAngle}) {
+    QStringList requiredFields{kImagePointX, kImagePointY};
+    if (requiresImageAngle())
+        requiredFields.append(kImageAngle);
+    for (const QString &fieldKey : std::as_const(requiredFields)) {
         const QJsonObject binding = m_captureBindingValues.value(fieldKey);
         if (binding.value(QStringLiteral("mode")).toString()
                 != QStringLiteral("binding")) {
@@ -1517,11 +1943,17 @@ void NPointCalibrationConfigWidget::setProducerSnapshots(
 void NPointCalibrationConfigWidget::setLatestPhysicalSample(
         bool valid, double x, double y, double angleDeg)
 {
+    const bool currentPointIsRotation = m_nextCaptureRow >= 0
+            && m_translationCount
+            && m_nextCaptureRow >= m_translationCount->value();
+    const bool angleRequired = calibrationMode() != kNinePointXY
+            && currentPointIsRotation;
+    const bool angleFinite = std::isfinite(angleDeg);
     m_physicalSampleValid = valid && std::isfinite(x) && std::isfinite(y)
-            && std::isfinite(angleDeg);
+            && (!angleRequired || angleFinite);
     m_physicalX = x;
     m_physicalY = y;
-    m_physicalAngle = angleDeg;
+    m_physicalAngle = angleFinite ? angleDeg : 0.0;
 }
 
 QString NPointCalibrationConfigWidget::captureImageProducerId() const
@@ -1530,7 +1962,10 @@ QString NPointCalibrationConfigWidget::captureImageProducerId() const
         return QString();
 
     QString producerId;
-    for (const QString &fieldKey : {kImagePointX, kImagePointY, kImageAngle}) {
+    QStringList requiredFields{kImagePointX, kImagePointY};
+    if (requiresImageAngle())
+        requiredFields.append(kImageAngle);
+    for (const QString &fieldKey : std::as_const(requiredFields)) {
         const QJsonObject binding = m_captureBindingValues.value(fieldKey);
         if (binding.value(QStringLiteral("mode")).toString()
                 != QStringLiteral("binding")) {
@@ -1579,14 +2014,19 @@ bool NPointCalibrationConfigWidget::captureCurrentSample(QString *errorMessage)
     const CalibrationProducerSnapshot &snapshot = m_snapshots.at(selected);
     const double imageX = snapshot.payload.value(QStringLiteral("x")).toDouble();
     const double imageY = snapshot.payload.value(QStringLiteral("y")).toDouble();
-    const double imageAngle = snapshot.payload.value(QStringLiteral("angle")).toDouble();
+    const bool imageAngleAvailable =
+            snapshot.payload.value(QStringLiteral("angle")).isDouble()
+            && std::isfinite(snapshot.payload.value(QStringLiteral("angle")).toDouble());
+    const double imageAngle = imageAngleAvailable
+            ? snapshot.payload.value(QStringLiteral("angle")).toDouble() : 0.0;
     if (!snapshot.valid || !snapshot.payload.value(QStringLiteral("x")).isDouble()
             || !snapshot.payload.value(QStringLiteral("y")).isDouble()
-            || !snapshot.payload.value(QStringLiteral("angle")).isDouble()
             || !std::isfinite(imageX) || !std::isfinite(imageY)
-            || !std::isfinite(imageAngle)) {
+            || (requiresImageAngle() && !imageAngleAvailable)) {
         if (errorMessage)
-            *errorMessage = tr("所选前序工具尚无有效运行位姿");
+            *errorMessage = requiresImageAngle()
+                    ? tr("位置与姿态模式要求前序工具返回有效 X、Y 和图像角度")
+                    : tr("所选前序工具尚无有效图像 X、Y");
         emit sampleStateChanged(errorMessage ? *errorMessage : tr("前序运行位姿无效"), false);
         return false;
     }
@@ -1607,7 +2047,7 @@ bool NPointCalibrationConfigWidget::captureCurrentSample(QString *errorMessage)
                             .arg(row + 1)
                             .arg(imageX, 0, 'f', 3)
                             .arg(imageY, 0, 'f', 3)
-                            .arg(m_physicalSampleValid ? tr("，已合并通信物理坐标")
+                            .arg(m_physicalSampleValid ? tr("，已合并通信物理 X/Y/A")
                                                        : tr("，物理坐标沿用表格值")));
     emit sampleStateChanged(m_sampleStatus->text(), true);
     emit sampleDataChanged();
@@ -1638,6 +2078,7 @@ bool NPointCalibrationConfigWidget::importPoints(
     QVector<QStringList> rows;
     QVector<QString> rowTypes;
     QVector<bool> rowCompleted;
+    QVector<bool> rowHasAngleColumns;
     bool hasExplicitPointType = false;
     bool hasUntypedPoint = false;
     QTextStream stream(&file);
@@ -1692,11 +2133,13 @@ bool NPointCalibrationConfigWidget::importPoints(
                 return false;
             }
         }
+        const bool hasAngleColumns = values.size() == 6;
         if (!rowHasExplicitPointType)
             hasUntypedPoint = true;
         rows.append(values);
         rowTypes.append(type);
         rowCompleted.append(completed);
+        rowHasAngleColumns.append(hasAngleColumns);
     }
     file.close();
     if (hasExplicitPointType && hasUntypedPoint) {
@@ -1740,7 +2183,7 @@ bool NPointCalibrationConfigWidget::importPoints(
                             tr("标定点数量不一致"),
                             tr("当前已选择：平移 %1 点、旋转 %2 点，共 %3 点。\n"
                                "导入文件：%4。\n\n"
-                               "导入未生效。请选择重新导入，或返回配置页重新选择标定点数。")
+                               "导入未生效。请选择重新导入，或返回配置页重新选择标定模式。")
                             .arg(expectedTranslationCount)
                             .arg(expectedRotationCount)
                             .arg(expectedPointCount)
@@ -1749,7 +2192,7 @@ bool NPointCalibrationConfigWidget::importPoints(
         QPushButton *reimportButton = warning.addButton(
                     tr("重新导入"), QMessageBox::AcceptRole);
         QPushButton *reselectButton = warning.addButton(
-                    tr("重新选择点数"), QMessageBox::ActionRole);
+                    tr("重新选择标定模式"), QMessageBox::ActionRole);
         QPushButton *cancelButton = warning.addButton(
                     tr("取消"), QMessageBox::RejectRole);
         warning.setDefaultButton(reimportButton);
@@ -1784,8 +2227,20 @@ bool NPointCalibrationConfigWidget::importPoints(
     }
     QVector<QStringList> normalizedRows;
     normalizedRows.reserve(rows.size());
+    QVector<double> importedImageAngles;
+    QVector<double> importedMachineAngles;
     for (int row = 0; row < rows.size(); ++row) {
         const QStringList &values = rows.at(row);
+        const bool rotationRow = rowTypes.at(row) == QStringLiteral("rotation");
+        if (rotationRow && calibrationMode() != kNinePointXY
+                && !rowHasAngleColumns.at(row)) {
+            QMessageBox::warning(
+                        this, tr("导入失败"),
+                        calibrationMode() == kTwelvePointPoseMapping
+                        ? tr("位置与姿态模式的旋转点必须包含图像角度和机械角度；导入未生效")
+                        : tr("轴轨迹模式的旋转点必须包含机械角度 A；导入未生效"));
+            return false;
+        }
         const QStringList normalized = values.size() >= 6
                 ? values.mid(0, 6)
                 : QStringList{values.at(0), values.at(1), QStringLiteral("0"),
@@ -1801,7 +2256,26 @@ bool NPointCalibrationConfigWidget::importPoints(
                 return false;
             }
         }
+        if (rotationRow) {
+            importedMachineAngles.append(normalized.at(5).toDouble());
+            if (calibrationMode() == kTwelvePointPoseMapping)
+                importedImageAngles.append(normalized.at(2).toDouble());
+        }
         normalizedRows.append(normalized);
+    }
+    if (calibrationMode() != kNinePointXY
+            && !anglesAreObservable(importedMachineAngles)) {
+        QMessageBox::warning(
+                    this, tr("导入失败"),
+                    tr("3个旋转点的机械角度不可区分或跨度不足5°；导入未生效，请重新导入或重新选择标定模式"));
+        return false;
+    }
+    if (calibrationMode() == kTwelvePointPoseMapping
+            && !anglesAreObservable(importedImageAngles)) {
+        QMessageBox::warning(
+                    this, tr("导入失败"),
+                    tr("旋转点的图像角度不可观测（需3个独立角度且跨度不少于5°）；导入未生效，不会自动降级为轴轨迹模式"));
+        return false;
     }
     *editorCompleted = rowCompleted;
     editor->setRowCount(normalizedRows.size());
