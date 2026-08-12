@@ -1,6 +1,7 @@
 #ifndef ALGORITHMS_OCR_OCRHALCONRUNNER_H
 #define ALGORITHMS_OCR_OCRHALCONRUNNER_H
 
+#include "toolcore/PositionCorrectionConsumer.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -18,6 +19,9 @@ struct OcrHalconConfig
     QStringList ocrModelPathCandidates;
 
     QRectF roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    bool enablePositionCorrection = false;
+    QString positionCorrectionSource;
+    PositionCorrectionContext positionCorrection;
 
     int binaryThreshold = 128;
     QString objectPolarity = QStringLiteral("dark");

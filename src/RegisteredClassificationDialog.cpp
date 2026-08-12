@@ -1,10 +1,12 @@
 #include "RegisteredClassificationDialog.h"
+#include "ui_RegisteredClassificationDialog.h"
 
 #include "PlanDialogUtils.h"
 #include "RegisteredClassificationModelManagementDialog.h"
 #include "RegisteredClassificationTrainingDialog.h"
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
 #include "frame/CameraFrameProvider.h"
+#include "frame/FrameInputMetadata.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
@@ -14,8 +16,10 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -39,6 +43,7 @@
 #include <QtGlobal>
 
 #include <cmath>
+#include <opencv2/imgcodecs.hpp>
 
 namespace {
 
@@ -88,37 +93,6 @@ QRectF normalizedRoiOrDefault(const QRectF &source)
             : QRectF(0.0, 0.0, 1.0, 1.0);
 }
 
-QFrame *card(QWidget *parent, const QString &title)
-{
-    QFrame *frame = new QFrame(parent);
-    frame->setProperty("panelRole", QStringLiteral("configCard"));
-    frame->setStyleSheet(QStringLiteral(
-        "QFrame[panelRole=\"configCard\"]{background:#ffffff;border:1px solid #d8dee8;border-radius:6px;}"
-        "QLabel[role=\"cardTitle\"]{font-weight:600;color:#111827;}"
-        "QLabel[role=\"rowField\"]{color:#4b5563;}"));
-
-    QVBoxLayout *layout = new QVBoxLayout(frame);
-    layout->setContentsMargins(14, 12, 14, 12);
-    layout->setSpacing(10);
-    QLabel *titleLabel = new QLabel(title, frame);
-    titleLabel->setProperty("role", QStringLiteral("cardTitle"));
-    layout->addWidget(titleLabel);
-    return frame;
-}
-
-QHBoxLayout *row(const QString &label, QWidget *field)
-{
-    QHBoxLayout *layout = new QHBoxLayout;
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(10);
-    QLabel *labelWidget = new QLabel(label);
-    labelWidget->setProperty("role", QStringLiteral("rowField"));
-    labelWidget->setMinimumWidth(118);
-    layout->addWidget(labelWidget);
-    layout->addWidget(field, 1);
-    return layout;
-}
-
 void applyActionButtonMetrics(QPushButton *button)
 {
     if (!button)
@@ -163,6 +137,38 @@ void setComboBoxText(QComboBox *comboBox, const QString &text)
         if (allIndex >= 0)
             comboBox->setCurrentIndex(allIndex);
     }
+}
+
+void populatePositionCorrectionCombo(
+        QComboBox *comboBox,
+        const QVector<PositionCorrectionSource> &sources,
+        const QString &selectedId,
+        const QString &selectedText)
+{
+    if (!comboBox)
+        return;
+
+    const QSignalBlocker blocker(comboBox);
+    comboBox->clear();
+    int selectedIndex = -1;
+    for (const PositionCorrectionSource &source : sources) {
+        comboBox->addItem(source.displayText, source.sourceId);
+        if (source.sourceId == selectedId)
+            selectedIndex = comboBox->count() - 1;
+    }
+    if (selectedIndex < 0 && !selectedId.trimmed().isEmpty()) {
+        comboBox->insertItem(
+                    0,
+                    QObject::tr("来源不可用：%1").arg(
+                        selectedText.trimmed().isEmpty()
+                        ? selectedId : selectedText),
+                    selectedId);
+        selectedIndex = 0;
+    }
+    if (selectedIndex < 0 && comboBox->count() > 0)
+        selectedIndex = 0;
+    if (selectedIndex >= 0)
+        comboBox->setCurrentIndex(selectedIndex);
 }
 
 bool copyDirectoryRecursively(const QString &sourcePath,
@@ -210,16 +216,23 @@ bool copyDirectoryRecursively(const QString &sourcePath,
 
 RegisteredClassificationDialog::RegisteredClassificationDialog(QWidget *parent)
     : QDialog(parent)
+    , ui(new Ui::RegisteredClassificationDialog)
     , m_toolId(QStringLiteral("registered_classification_%1")
                        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)))
 {
+    m_testToolEngine.registerAdapter(&m_testTemplateLocationAdapter);
+    m_testToolEngine.registerAdapter(&m_testPositionCorrectionAdapter);
+    m_testToolEngine.registerAdapter(&m_testRegisteredClassificationAdapter);
     buildUi();
     connectControls();
     refreshUiState();
     refreshPreview();
 }
 
-RegisteredClassificationDialog::~RegisteredClassificationDialog() = default;
+RegisteredClassificationDialog::~RegisteredClassificationDialog()
+{
+    delete ui;
+}
 
 ToolConfig RegisteredClassificationDialog::toToolConfig() const
 {
@@ -230,8 +243,14 @@ ToolConfig RegisteredClassificationDialog::toToolConfig() const
     config.category = ToolCategory::Recognition;
     config.enabled = m_enabled;
     config.roiNormalized = effectiveRoiNormalized();
+    const QJsonObject classificationParams = registeredClassificationParams();
     config.params.insert(QStringLiteral("registeredClassification"),
-                         registeredClassificationParams());
+                         classificationParams);
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(classificationParams);
+    PositionCorrection::writeParams(correction, &config.params);
+    config.params.insert(QStringLiteral("showPositionCorrectionMatchContour"),
+                         m_showPositionCorrectionMatchContour);
     config.judgeRule = judgeRule();
     config.displayName = tr("注册分类");
     config.summary = summaryText();
@@ -274,8 +293,16 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
                              config.roiNormalized.isNull()
                              ? QRectF(0.0, 0.0, 1.0, 1.0)
                              : config.roiNormalized));
-    m_positionCorrectionEnabled = false;
-    m_positionCorrectionSource = PositionCorrection::fromParams(params).source;
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(params);
+    m_positionCorrectionEnabled = correction.enabled;
+    m_positionCorrectionSource = correction.source;
+    m_positionCorrectionSourceId = correction.sourceId;
+    m_showPositionCorrectionMatchContour = params.value(
+                QStringLiteral("showPositionCorrectionMatchContour"))
+            .toBool(config.params.value(
+                        QStringLiteral("showPositionCorrectionMatchContour"))
+                    .toBool(true));
 
     const bool allMode = params.value(QStringLiteral("paramMode")).toString()
             == QStringLiteral("all");
@@ -318,6 +345,33 @@ void RegisteredClassificationDialog::loadFromConfig(const ToolConfig &config)
     refreshPreview();
 }
 
+void RegisteredClassificationDialog::setToolChainTestContext(
+        const QVector<ToolConfig> &toolConfigs,
+        int currentToolIndex,
+        const ReferencePositionCorrectionConfig &referencePositionCorrection)
+{
+    m_toolChainTestConfigs = toolConfigs;
+    m_toolChainTestIndex = qBound(0, currentToolIndex, toolConfigs.size());
+    m_referencePositionCorrection = referencePositionCorrection;
+    const QVector<PositionCorrectionSource> sources =
+            PositionCorrection::sourcesBefore(
+                m_toolChainTestConfigs,
+                m_toolChainTestIndex,
+                m_referencePositionCorrection.enabled);
+    populatePositionCorrectionCombo(
+                m_positionSourceComboBox,
+                sources,
+                m_positionCorrectionSourceId,
+                m_positionCorrectionSource);
+    if (m_positionSourceComboBox
+            && m_positionSourceComboBox->currentIndex() >= 0) {
+        m_positionCorrectionSourceId =
+                m_positionSourceComboBox->currentData().toString().trimmed();
+        m_positionCorrectionSource =
+                m_positionSourceComboBox->currentText();
+    }
+}
+
 QString RegisteredClassificationDialog::summaryText() const
 {
     const QString modelText = m_modelName.trimmed().isEmpty() ? tr("未导入模型") : m_modelName;
@@ -346,6 +400,10 @@ void RegisteredClassificationDialog::resizeEvent(QResizeEvent *event)
 
 void RegisteredClassificationDialog::finishConfiguration()
 {
+    if (m_importedTestActive) {
+        runTest();
+        return;
+    }
     accept();
 }
 
@@ -365,8 +423,13 @@ void RegisteredClassificationDialog::runReferenceTest()
     refreshUiState();
     if (m_referenceTestMode)
         executeReferenceTest();
-    else
+    else {
+        if (m_previewHelper) {
+            m_previewHelper->clearToolOverlays();
+            refreshRoiOverlay();
+        }
         setViewerStatusText(roiStatusText());
+    }
 }
 
 void RegisteredClassificationDialog::executeReferenceTest()
@@ -388,13 +451,13 @@ void RegisteredClassificationDialog::executeReferenceTest()
         refreshRoiOverlay();
     }
 
-    ToolRequest request;
-    request.config = toToolConfig();
-    request.image = frame.clone();
-    request.referenceImage = frame.clone();
-    const ToolResult result = m_placeholderAdapter.run(request);
+    const ToolConfig config = toToolConfig();
+    const ToolResult result = runOnFrame(
+                frame,
+                frame,
+                QStringLiteral("reference"));
     m_referencePreviewSnapshot =
-            makeReferenceToolPreviewSnapshot(request.config, result, effectiveRoiNormalized());
+            makeReferenceToolPreviewSnapshot(config, result, effectiveRoiNormalized());
     displayResult(result);
     if (m_referenceTestMode)
         setViewerStatusText(resultStatusText(result) + tr(" | 基准图持续测试已启用"));
@@ -402,7 +465,9 @@ void RegisteredClassificationDialog::executeReferenceTest()
 
 void RegisteredClassificationDialog::runTest()
 {
-    const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
+    const cv::Mat frame = m_importedTestActive
+            ? m_importedTestFrame.clone()
+            : CameraFrameProvider::instance().currentFrame();
     if (frame.empty()) {
         setViewerStatusText(tr("注册分类: image_empty | 当前相机帧为空"));
         if (m_previewHelper)
@@ -413,17 +478,153 @@ void RegisteredClassificationDialog::runTest()
     const QImage image = MatImageConverter::matToDisplayImage(
                 frame, QStringLiteral("RegisteredClassificationDialog"));
     if (!image.isNull() && m_previewHelper) {
-        m_viewerTitleLabel->setText(tr("测试图像"));
+        m_viewerTitleLabel->setText(
+                    m_importedTestActive
+                    ? (m_importedTestImageTitle.trimmed().isEmpty()
+                       ? tr("PC导入图片") : m_importedTestImageTitle)
+                    : tr("测试图像"));
         m_previewHelper->setImage(image);
         refreshRoiOverlay();
     }
 
-    ToolRequest request;
-    request.config = toToolConfig();
-    request.image = frame.clone();
-    request.referenceImage = ReferenceImageProvider::instance().referenceFrame();
-    const ToolResult result = m_placeholderAdapter.run(request);
+    const ToolResult result = runOnFrame(
+                frame,
+                ReferenceImageProvider::instance().referenceFrame(),
+                m_importedTestActive
+                ? QStringLiteral("file")
+                : QStringLiteral("camera"));
     displayResult(result);
+}
+
+void RegisteredClassificationDialog::importTestImageFromPc()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this,
+                tr("PC导入注册分类测试图片"),
+                QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+    const cv::Mat frame = cv::imread(
+                fileName.toLocal8Bit().constData(),
+                cv::IMREAD_UNCHANGED);
+    if (frame.empty()) {
+        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
+        return;
+    }
+    m_importedTestFrame = frame.clone();
+    m_importedTestImageTitle = QFileInfo(fileName).fileName();
+    m_importedTestActive = true;
+    m_referenceTestMode = false;
+    updateTestButtons();
+    runTest();
+}
+
+void RegisteredClassificationDialog::exitTestMode()
+{
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    m_referenceTestMode = false;
+    updateTestButtons();
+    refreshPreview();
+    if (m_previewHelper)
+        m_previewHelper->clearToolOverlays();
+    refreshRoiOverlay();
+    setViewerStatusText(tr("已退出离线测试，可使用相机执行测试运行"));
+}
+
+ToolResult RegisteredClassificationDialog::runOnFrame(
+        const cv::Mat &frame,
+        const cv::Mat &referenceImage,
+        const QString &inputSource)
+{
+    ToolConfig config = toToolConfig();
+    config.enabled = true;
+    const QString frameId = QStringLiteral("registered-classification-dialog-%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    QJsonObject runtimeContext;
+    runtimeContext.insert(QStringLiteral("frameId"), frameId);
+    runtimeContext.insert(
+                QStringLiteral("input"),
+                FrameInputMetadata::fromMat(frame, inputSource).toJson());
+    runtimeContext.insert(
+                QStringLiteral("referencePositionCorrection"),
+                PositionCorrection::referenceToJson(
+                    m_referencePositionCorrection));
+
+    if (m_previewHelper) {
+        m_previewHelper->clearToolOverlays();
+        refreshRoiOverlay();
+    }
+    const PositionCorrectionConfig correction =
+            PositionCorrection::fromParams(
+                config.params.value(
+                    QStringLiteral("registeredClassification")).toObject());
+    setViewerStatusText(
+                correction.enabled
+                ? tr("正在重新执行模板定位、位置修正和注册分类…")
+                : tr("正在重新执行注册分类…"));
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+    if (correction.enabled) {
+        if (m_toolChainTestIndex < 0
+                || m_toolChainTestIndex > m_toolChainTestConfigs.size()) {
+            return ToolResult::error(
+                        config.toolId,
+                        config.toolType,
+                        tr("位置修正测试缺少当前方案的前置工具配置"),
+                        QStringLiteral("position_correction_test_context_missing"));
+        }
+        QVector<ToolConfig> prefix;
+        prefix.reserve(m_toolChainTestIndex + 1);
+        for (int index = 0; index < m_toolChainTestIndex; ++index) {
+            if (m_toolChainTestConfigs.at(index).enabled)
+                prefix.append(m_toolChainTestConfigs.at(index));
+        }
+        prefix.append(config);
+        ToolResult referenceCorrectionResult;
+        const QVector<ToolResult> results = m_testToolEngine.runTools(
+                    prefix,
+                    frame.clone(),
+                    referenceImage.empty() ? cv::Mat() : referenceImage.clone(),
+                    runtimeContext,
+                    &referenceCorrectionResult);
+        for (auto it = results.crbegin(); it != results.crend(); ++it) {
+            if (it->toolId == config.toolId)
+                return *it;
+        }
+        return ToolResult::error(
+                    config.toolId,
+                    config.toolType,
+                    tr("前置工具链没有返回注册分类结果"),
+                    QStringLiteral("tool_chain_result_missing"));
+    }
+
+    ToolRequest request;
+    request.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    request.frameId = frameId;
+    request.config = config;
+    request.image = frame.clone();
+    request.referenceImage =
+            referenceImage.empty() ? cv::Mat() : referenceImage.clone();
+    request.runtimeContext = runtimeContext;
+    return m_testToolEngine.runTool(request);
+}
+
+void RegisteredClassificationDialog::updateTestButtons()
+{
+    const bool imported =
+            m_importedTestActive && !m_importedTestFrame.empty();
+    if (m_referenceTestButton)
+        m_referenceTestButton->setVisible(!imported);
+    if (m_testRunButton)
+        m_testRunButton->setText(
+                    imported ? tr("测试运行（导入图）") : tr("测试运行"));
+    if (m_finishButton)
+        m_finishButton->setText(imported ? tr("运行一次") : tr("完成"));
+    if (m_exitTestButton)
+        m_exitTestButton->setVisible(imported);
 }
 
 void RegisteredClassificationDialog::importModel()
@@ -538,6 +739,10 @@ void RegisteredClassificationDialog::startGlobalDetection()
         m_previewHelper->setRoiDrawingEnabled(false);
     refreshUiState();
     refreshRoiOverlay();
+    if (m_importedTestActive) {
+        runTest();
+        return;
+    }
     if (m_referenceTestMode)
         executeReferenceTest();
 }
@@ -563,6 +768,8 @@ void RegisteredClassificationDialog::finishRoiEditing()
     refreshRoiOverlay();
     setViewerStatusText(roiStatusText()
                         + (m_referenceTestMode ? tr(" | 基准图持续测试已启用") : QString()));
+    if (m_importedTestActive)
+        runTest();
 }
 
 void RegisteredClassificationDialog::handleRoiChanged(const QRectF &roi)
@@ -570,7 +777,9 @@ void RegisteredClassificationDialog::handleRoiChanged(const QRectF &roi)
     m_roiNormalized = normalizedRoiOrDefault(roi);
     m_detectRegionType = QStringLiteral("rectangle");
     refreshUiState();
-    if (m_referenceTestMode)
+    if (m_importedTestActive)
+        runTest();
+    else if (m_referenceTestMode)
         executeReferenceTest();
     else
         setViewerStatusText(roiStatusText());
@@ -581,7 +790,8 @@ void RegisteredClassificationDialog::handleRoiSelectionRejected()
     setViewerStatusText(tr("检测区域无效，请重新绘制矩形 ROI。"));
 }
 
-void RegisteredClassificationDialog::buildUi()
+#if 0
+void RegisteredClassificationDialog::buildLegacyUi()
 {
     setWindowTitle(tr("方案编辑 - 注册分类"));
     setWindowModality(Qt::WindowModal);
@@ -597,14 +807,15 @@ void RegisteredClassificationDialog::buildUi()
     root->setSpacing(0);
 
     QFrame *header = new QFrame(this);
-    header->setStyleSheet(QStringLiteral("background:#3f444e;color:#ffffff;"));
+    header->setObjectName(QStringLiteral("setupTopBar"));
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
     headerLayout->setContentsMargins(28, 0, 22, 0);
     QLabel *headerTitle = new QLabel(tr("方案编辑"), header);
+    headerTitle->setObjectName(QStringLiteral("setupWindowTitleLabel"));
     QToolButton *closeButton = new QToolButton(header);
     closeButton->setObjectName(QStringLiteral("registeredClassificationCloseButton"));
+    closeButton->setProperty("actionRole", QStringLiteral("windowClose"));
     closeButton->setText(QStringLiteral("×"));
-    closeButton->setStyleSheet(QStringLiteral("color:#ffffff;font-size:24px;border:0;"));
     headerLayout->addWidget(headerTitle);
     headerLayout->addStretch(1);
     headerLayout->addWidget(closeButton);
@@ -616,9 +827,9 @@ void RegisteredClassificationDialog::buildUi()
     root->addLayout(content, 1);
 
     QFrame *leftPanel = new QFrame(this);
-    leftPanel->setMinimumWidth(420);
-    leftPanel->setMaximumWidth(500);
-    leftPanel->setStyleSheet(QStringLiteral("background:#eef1f5;color:#111827;"));
+    leftPanel->setObjectName(QStringLiteral("setupEditorPanel"));
+    leftPanel->setMinimumWidth(610);
+    leftPanel->setMaximumWidth(610);
     QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->setContentsMargins(24, 18, 24, 18);
     leftLayout->setSpacing(14);
@@ -626,14 +837,21 @@ void RegisteredClassificationDialog::buildUi()
 
     QHBoxLayout *titleLayout = new QHBoxLayout;
     QLabel *dialogTitle = new QLabel(tr("注册分类"), leftPanel);
-    dialogTitle->setStyleSheet(QStringLiteral("font-size:18px;font-weight:600;color:#111827;"));
+    dialogTitle->setObjectName(QStringLiteral("editorTitleLabel"));
     m_basicButton = new QPushButton(tr("基础"), leftPanel);
     m_allButton = new QPushButton(tr("全部"), leftPanel);
+    m_basicButton->setObjectName(QStringLiteral("basicSegmentButton"));
+    m_allButton->setObjectName(QStringLiteral("allSegmentButton"));
+    m_pcImportButton = new QPushButton(tr("PC导入图片"), leftPanel);
+    m_pcImportButton->setObjectName(
+                QStringLiteral("registeredClassificationPcImportButton"));
+    m_pcImportButton->setProperty("actionRole", QStringLiteral("secondary"));
     m_basicButton->setCheckable(true);
     m_allButton->setCheckable(true);
     m_segmentGroup->addButton(m_basicButton, 0);
     m_segmentGroup->addButton(m_allButton, 1);
     titleLayout->addWidget(dialogTitle);
+    titleLayout->addWidget(m_pcImportButton);
     titleLayout->addStretch(1);
     titleLayout->addWidget(m_basicButton);
     titleLayout->addWidget(m_allButton);
@@ -659,16 +877,19 @@ void RegisteredClassificationDialog::buildUi()
     m_globalRegionButton->setText(QStringLiteral("▣"));
     m_globalRegionButton->setToolTip(tr("全屏检测"));
     m_globalRegionButton->setCheckable(true);
+    m_globalRegionButton->setProperty("actionRole", QStringLiteral("toolbarIcon"));
     m_rectRegionButton = new QToolButton(regionButtons);
     m_rectRegionButton->setObjectName(QStringLiteral("registeredClassificationRectRegionButton"));
     m_rectRegionButton->setText(QStringLiteral("□"));
     m_rectRegionButton->setToolTip(tr("矩形检测区域"));
     m_rectRegionButton->setCheckable(true);
+    m_rectRegionButton->setProperty("actionRole", QStringLiteral("toolbarIcon"));
     m_regionGroup->setExclusive(true);
     m_regionGroup->addButton(m_globalRegionButton, 0);
     m_regionGroup->addButton(m_rectRegionButton, 1);
     m_roiFinishButton = new QPushButton(tr("完成"), regionButtons);
     m_roiFinishButton->setObjectName(QStringLiteral("registeredClassificationRoiFinishButton"));
+    m_roiFinishButton->setProperty("actionRole", QStringLiteral("secondary"));
     regionLayout->addWidget(new QLabel(tr("检测区"), regionButtons));
     regionLayout->addStretch(1);
     regionLayout->addWidget(m_globalRegionButton);
@@ -693,10 +914,27 @@ void RegisteredClassificationDialog::buildUi()
     positionLabel->setProperty("role", QStringLiteral("rowField"));
     positionLabel->setMinimumWidth(118);
     m_positionSourceComboBox = new QComboBox(m_positionSourceRow);
-    m_positionSourceComboBox->addItem(QStringLiteral("1 基准图.位置修正信息"));
+    m_positionSourceComboBox->setObjectName(
+                QStringLiteral("registeredClassificationPositionCorrectionSourceComboBox"));
+    m_positionSourceComboBox->addItem(PositionCorrection::defaultSource(),
+                                      PositionCorrection::defaultSourceId());
     positionSourceLayout->addWidget(positionLabel);
     positionSourceLayout->addWidget(m_positionSourceComboBox, 1);
     detectLayout->addWidget(m_positionSourceRow);
+
+    m_positionContourRow = new QWidget(detectCard);
+    QHBoxLayout *positionContourLayout =
+            new QHBoxLayout(m_positionContourRow);
+    positionContourLayout->setContentsMargins(0, 0, 0, 0);
+    positionContourLayout->addWidget(
+                new QLabel(tr("显示匹配轮廓"), m_positionContourRow));
+    positionContourLayout->addStretch(1);
+    m_positionContourCheckBox = new QCheckBox(m_positionContourRow);
+    m_positionContourCheckBox->setObjectName(
+                QStringLiteral("registeredClassificationPositionCorrectionContourSwitch"));
+    m_positionContourCheckBox->setChecked(true);
+    positionContourLayout->addWidget(m_positionContourCheckBox);
+    detectLayout->addWidget(m_positionContourRow);
 
     QFrame *modelCard = card(scrollContent, tr("模型训练"));
     QVBoxLayout *modelLayout = qobject_cast<QVBoxLayout *>(modelCard->layout());
@@ -768,14 +1006,17 @@ void RegisteredClassificationDialog::buildUi()
     m_referenceTestButton = new QPushButton(tr("基准图测试"), leftPanel);
     m_testRunButton = new QPushButton(tr("测试运行"), leftPanel);
     m_finishButton = new QPushButton(tr("完成"), leftPanel);
+    m_exitTestButton = new QPushButton(tr("退出测试"), leftPanel);
     m_referenceTestButton->setCheckable(true);
     applyActionButtonMetrics(m_referenceTestButton);
     applyActionButtonMetrics(m_testRunButton);
     applyActionButtonMetrics(m_finishButton);
+    applyActionButtonMetrics(m_exitTestButton);
     m_finishButton->setProperty("actionRole", QStringLiteral("testPrimary"));
     bottomButtons->addStretch(1);
     bottomButtons->addWidget(m_referenceTestButton);
     bottomButtons->addWidget(m_testRunButton);
+    bottomButtons->addWidget(m_exitTestButton);
     bottomButtons->addWidget(m_finishButton);
     leftLayout->addLayout(bottomButtons);
 
@@ -790,16 +1031,21 @@ void RegisteredClassificationDialog::buildUi()
     m_viewerStatusLabel = new QLabel(rightPanel);
     m_viewerStatusLabel->setMinimumHeight(42);
     m_viewerStatusLabel->setContentsMargins(18, 0, 0, 0);
+    QLabel *viewerCursorLabel = new QLabel(rightPanel);
+    viewerCursorLabel->setObjectName(QStringLiteral("viewerCursorLabel"));
+    viewerCursorLabel->setMinimumHeight(32);
+    viewerCursorLabel->setContentsMargins(18, 0, 18, 0);
+    viewerCursorLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     rightLayout->addWidget(m_viewerTitleLabel);
     rightLayout->addWidget(m_previewGraphicsView, 1);
     rightLayout->addWidget(m_viewerStatusLabel);
+    rightLayout->addWidget(viewerCursorLabel);
     content->addWidget(rightPanel, 1);
 
     m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(viewerCursorLabel);
 
     setStyleSheet(styleSheet() + QStringLiteral(
-        "QPushButton,QToolButton,QComboBox,QSpinBox,QLineEdit{background:#ffffff;color:#111827;border:1px solid #cfd6df;border-radius:4px;padding:6px;}"
-        "QPushButton:checked,QToolButton:checked{background:#fff3e6;color:#ff7a00;border-color:#ff7a00;}"
         "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;}"
         "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000000;border-color:#000000;}"
         "QCheckBox{color:#111827;}"));
@@ -807,8 +1053,104 @@ void RegisteredClassificationDialog::buildUi()
     m_basicButton->setChecked(true);
     m_globalRegionButton->setChecked(true);
     m_positionCorrectionCheckBox->setChecked(false);
-    m_positionCorrectionCheckBox->setEnabled(false);
-    m_positionCorrectionCheckBox->setToolTip(tr("位置修正补偿尚未实现，当前版本默认关闭。"));
+    m_positionCorrectionCheckBox->setEnabled(true);
+    m_positionCorrectionCheckBox->setToolTip(
+                tr("启用后按所选稳定来源执行前置位置修正工具链。"));
+    m_exitTestButton->hide();
+}
+
+#endif
+
+void RegisteredClassificationDialog::buildUi()
+{
+    ui->setupUi(this);
+    setWindowTitle(tr("方案编辑 - 注册分类"));
+    setWindowModality(Qt::WindowModal);
+    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+    PlanDialogUtils::applyLargeWindow(this);
+
+    m_segmentGroup = new QButtonGroup(this);
+    m_regionGroup = new QButtonGroup(this);
+    m_judgeGroup = new QButtonGroup(this);
+
+    m_basicButton = ui->basicSegmentButton;
+    m_allButton = ui->allSegmentButton;
+    m_pcImportButton = ui->registeredClassificationPcImportButton;
+    m_globalRegionButton = ui->registeredClassificationGlobalRegionButton;
+    m_rectRegionButton = ui->registeredClassificationRectRegionButton;
+    m_roiFinishButton = ui->registeredClassificationRoiFinishButton;
+    m_positionCorrectionCheckBox = ui->positionCorrectionSwitch;
+    m_positionSourceRow = ui->positionSourceRow;
+    m_positionSourceComboBox = ui->registeredClassificationPositionCorrectionSourceComboBox;
+    m_positionContourRow = ui->positionContourRow;
+    m_positionContourCheckBox = ui->registeredClassificationPositionCorrectionContourSwitch;
+    m_modelNameLabel = ui->modelNameLabel;
+    m_modelPathLabel = ui->modelPathLabel;
+    m_importModelButton = ui->importModelButton;
+    m_exportModelButton = ui->exportModelButton;
+    m_deleteModelButton = ui->deleteModelButton;
+    m_registerTrainingButton = ui->registerTrainingButton;
+    m_modelManagementButton = ui->modelManagementButton;
+    for (QPushButton *button : {m_importModelButton,
+                                m_exportModelButton,
+                                m_deleteModelButton,
+                                m_registerTrainingButton,
+                                m_modelManagementButton}) {
+        button->setProperty("actionRole", QStringLiteral("secondary"));
+    }
+    m_advancedCard = ui->advancedCard;
+    m_modelTypeComboBox = ui->modelTypeComboBox;
+    m_topKSpinBox = ui->topKSpinBox;
+    m_minSimilaritySpinBox = ui->minSimilaritySpinBox;
+    m_minMarginSpinBox = ui->registeredClassificationMinMarginSpinBox;
+    m_resultBasisComboBox = ui->resultBasisComboBox;
+    m_expectedLabelLineEdit = ui->expectedLabelLineEdit;
+    m_minScoreSpinBox = ui->minScoreSpinBox;
+    m_judgeTypeComboBox = ui->judgeTypeComboBox;
+    m_referenceTestButton = ui->referenceTestButton;
+    m_testRunButton = ui->testRunButton;
+    m_exitTestButton = ui->exitTestButton;
+    m_finishButton = ui->finishButton;
+    m_viewerTitleLabel = ui->viewerTitleLabel;
+    m_viewerStatusLabel = ui->viewerStatusLabel;
+    m_previewGraphicsView = ui->previewGraphicsView;
+
+    m_segmentGroup->addButton(m_basicButton, 0);
+    m_segmentGroup->addButton(m_allButton, 1);
+    m_regionGroup->setExclusive(true);
+    m_regionGroup->addButton(m_globalRegionButton, 0);
+    m_regionGroup->addButton(m_rectRegionButton, 1);
+
+    m_positionSourceComboBox->addItem(PositionCorrection::defaultSource(),
+                                      PositionCorrection::defaultSourceId());
+    m_modelTypeComboBox->addItem(tr("HALCON KNN 注册分类"),
+                                 registeredClassificationKnnModelType());
+    m_resultBasisComboBox->addItem(tr("类别判断"), QStringLiteral("class_match"));
+    m_resultBasisComboBox->addItem(tr("最低得分"), QStringLiteral("min_score"));
+    m_judgeTypeComboBox->addItem(tr("所有检测区域输出结果为 OK"));
+    m_judgeTypeComboBox->addItem(tr("任意检测区域输出结果为 OK"));
+
+    applyActionButtonMetrics(m_referenceTestButton);
+    applyActionButtonMetrics(m_testRunButton);
+    applyActionButtonMetrics(m_finishButton);
+    applyActionButtonMetrics(m_exitTestButton);
+
+    m_previewHelper = new FrameViewHelper(m_previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
+
+    setStyleSheet(styleSheet() + QStringLiteral(
+        "QPushButton[actionRole=\"testPrimary\"]{background:#111827;color:#ffffff;border:1px solid #111827;}"
+        "QPushButton[actionRole=\"testPrimary\"]:hover{background:#000000;border-color:#000000;}"
+        "QCheckBox{color:#111827;}"));
+    PlanDialogUtils::applyToolLevelStyle(this);
+
+    m_basicButton->setChecked(true);
+    m_globalRegionButton->setChecked(true);
+    m_positionCorrectionCheckBox->setChecked(false);
+    m_positionCorrectionCheckBox->setEnabled(true);
+    m_positionCorrectionCheckBox->setToolTip(
+                tr("启用后按所选稳定来源执行前置位置修正工具链。"));
+    m_exitTestButton->hide();
 }
 
 void RegisteredClassificationDialog::connectControls()
@@ -819,6 +1161,10 @@ void RegisteredClassificationDialog::connectControls()
     }
     connect(m_basicButton, &QPushButton::clicked, this, [this]() { setAllParamsMode(false); });
     connect(m_allButton, &QPushButton::clicked, this, [this]() { setAllParamsMode(true); });
+    connect(m_pcImportButton, &QPushButton::clicked,
+            this, &RegisteredClassificationDialog::importTestImageFromPc);
+    connect(m_exitTestButton, &QPushButton::clicked,
+            this, &RegisteredClassificationDialog::exitTestMode);
     connect(m_globalRegionButton, &QToolButton::clicked, this, &RegisteredClassificationDialog::startGlobalDetection);
     connect(m_rectRegionButton, &QToolButton::clicked, this, &RegisteredClassificationDialog::startRectangleRoiEditing);
     connect(m_roiFinishButton, &QPushButton::clicked, this, &RegisteredClassificationDialog::finishRoiEditing);
@@ -828,6 +1174,12 @@ void RegisteredClassificationDialog::connectControls()
     });
     connect(m_positionSourceComboBox, &QComboBox::currentTextChanged, this, [this](const QString &text) {
         m_positionCorrectionSource = text;
+        m_positionCorrectionSourceId =
+                m_positionSourceComboBox->currentData().toString().trimmed();
+    });
+    connect(m_positionContourCheckBox, &QCheckBox::toggled,
+            this, [this](bool checked) {
+        m_showPositionCorrectionMatchContour = checked;
     });
     connect(m_importModelButton, &QPushButton::clicked, this, &RegisteredClassificationDialog::importModel);
     connect(m_exportModelButton, &QPushButton::clicked, this, &RegisteredClassificationDialog::exportModel);
@@ -866,23 +1218,33 @@ void RegisteredClassificationDialog::refreshUiState()
     m_rectRegionButton->setChecked(m_roiEditing);
     m_regionGroup->setExclusive(true);
     m_positionCorrectionCheckBox->setChecked(m_positionCorrectionEnabled);
-    m_positionCorrectionCheckBox->setEnabled(false);
+    m_positionCorrectionCheckBox->setEnabled(true);
     if (m_positionSourceRow)
-        m_positionSourceRow->setVisible(false);
+        m_positionSourceRow->setVisible(m_positionCorrectionEnabled);
+    if (m_positionContourRow)
+        m_positionContourRow->setVisible(m_positionCorrectionEnabled);
+    if (m_positionContourCheckBox) {
+        const QSignalBlocker contourBlocker(m_positionContourCheckBox);
+        m_positionContourCheckBox->setChecked(
+                    m_showPositionCorrectionMatchContour);
+    }
     const bool classMode = judgeMode() == QStringLiteral("class_match");
     m_expectedLabelLineEdit->setVisible(classMode);
     m_minScoreSpinBox->setVisible(!classMode);
     updateModelLabels();
+    updateTestButtons();
 }
 
 void RegisteredClassificationDialog::refreshPreview()
 {
     const QImage reference = ReferenceImageProvider::instance().referenceImage();
     if (m_previewHelper) {
-        if (!reference.isNull())
+        if (!reference.isNull()) {
             m_previewHelper->setImage(reference);
-        else
+            m_previewHelper->clearToolOverlays();
+        } else {
             m_previewHelper->clear();
+        }
     }
     refreshRoiOverlay();
     setViewerStatusText(roiStatusText());
@@ -907,10 +1269,21 @@ void RegisteredClassificationDialog::displayResult(const ToolResult &result)
     setViewerStatusText(resultStatusText(result));
     if (m_previewHelper) {
         m_previewHelper->clearToolOverlays();
-        if (!result.overlays.isEmpty())
-            m_previewHelper->setToolOverlays(result.overlays);
+        bool hasRuntimeDetectRoi = false;
+        for (const ToolOverlay &overlay : result.overlays) {
+            if (overlay.extra.value(QStringLiteral("role")).toString()
+                    == QStringLiteral("detect_roi")
+                    || overlay.label == QStringLiteral("detect_roi")) {
+                hasRuntimeDetectRoi = true;
+                break;
+            }
+        }
+        if (hasRuntimeDetectRoi)
+            m_previewHelper->clearRoi();
         else
             refreshRoiOverlay();
+        if (!result.overlays.isEmpty())
+            m_previewHelper->setToolOverlays(result.overlays);
     }
 }
 
@@ -989,8 +1362,14 @@ QJsonObject RegisteredClassificationDialog::registeredClassificationParams() con
     params.insert(QStringLiteral("roiNormalized"), rectToJson(effectiveRoiNormalized()));
     PositionCorrection::writeParams(PositionCorrectionConfig{
                                         m_positionCorrectionEnabled,
-                                        m_positionCorrectionSource},
+                                        m_positionCorrectionSource,
+                                        m_positionSourceComboBox
+                                        ? m_positionSourceComboBox
+                                          ->currentData().toString().trimmed()
+                                        : m_positionCorrectionSourceId},
                                     &params);
+    params.insert(QStringLiteral("showPositionCorrectionMatchContour"),
+                  m_showPositionCorrectionMatchContour);
     params.insert(QStringLiteral("topK"), m_topKSpinBox->value());
     params.insert(QStringLiteral("minSimilarity"), m_minSimilaritySpinBox->value());
     params.insert(QStringLiteral("minMargin"), m_minMarginSpinBox->value());

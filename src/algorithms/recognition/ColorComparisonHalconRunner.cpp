@@ -1,5 +1,7 @@
 #include "algorithms/recognition/ColorComparisonHalconRunner.h"
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "algorithms/location/PositionCorrectionHalconTransform.h"
+#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
@@ -7,6 +9,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QPolygonF>
 #include <QtGlobal>
 
 #include <algorithm>
@@ -239,6 +242,14 @@ QJsonArray stringsToJson(const QStringList &strings)
     return array;
 }
 
+QJsonArray doublesToJson(const QVector<double> &values)
+{
+    QJsonArray array;
+    for (double value : values)
+        array.append(value);
+    return array;
+}
+
 QJsonObject brightnessConstantsJson()
 {
     return {
@@ -283,13 +294,11 @@ QJsonObject templateExtractParams(const ColorComparisonHalconConfig &config)
         {QStringLiteral("templateGeometry"), geometry},
         {QStringLiteral("templateMaskPolygon"),
          pointsToJson(config.templateMaskPolygonNormalized)},
+        {QStringLiteral("maskOwnershipContract"),
+         QStringLiteral("independent_template_and_detection_v1")},
         {QStringLiteral("brightnessCompensation"), config.brightnessCompensation},
         {QStringLiteral("brightnessConstants"), brightnessConstantsJson()}
     };
-    if (mode == QStringLiteral("sync")) {
-        params.insert(QStringLiteral("syncDetectionMaskPolygon"),
-                      pointsToJson(config.detectMaskPolygonNormalized));
-    }
     return params;
 }
 
@@ -336,18 +345,35 @@ QJsonObject detectionRoiJson(const ColorComparisonHalconConfig &config,
 
 QJsonObject positionCorrectionJson(const ColorComparisonHalconConfig &config)
 {
-    return {
-        {QStringLiteral("requested"), config.positionCorrectionRequested},
-        {QStringLiteral("applied"), false},
-        {QStringLiteral("sourceId"), config.positionCorrectionSourceId}
+    const PositionCorrectionContext &correction = config.positionCorrection;
+    QJsonObject json = {
+        {QStringLiteral("requested"), correction.requested},
+        {QStringLiteral("applied"), correction.applied},
+        {QStringLiteral("showMatchContour"),
+         correction.showMatchContour},
+        {QStringLiteral("matchContourAvailable"),
+         !correction.matchContours.isEmpty()},
+        {QStringLiteral("matchOriginAvailable"),
+         !correction.matchOrigins.isEmpty()},
+        {QStringLiteral("sourceId"), correction.sourceId},
+        {QStringLiteral("referenceScale"), correction.referenceScale},
+        {QStringLiteral("runScale"), correction.runScale},
+        {QStringLiteral("scaleRatio"), correction.scaleRatio}
     };
+    if (correction.applied)
+        json.insert(QStringLiteral("referenceToRunHomMat2D"),
+                    doublesToJson(correction.referenceToRunHomMat2D));
+    return json;
 }
 
 QJsonObject emptyBrightnessDiagnostics(const ColorComparisonHalconConfig &config)
 {
     return {
         {QStringLiteral("enabled"), config.brightnessCompensation},
+        {QStringLiteral("requested"), config.brightnessCompensation},
         {QStringLiteral("applied"), false},
+        {QStringLiteral("fallback"), false},
+        {QStringLiteral("fallbackReason"), QString()},
         {QStringLiteral("templateMean"), config.model.brightnessReference.mean},
         {QStringLiteral("detectMeanBefore"), 0.0},
         {QStringLiteral("detectMeanAfter"), 0.0},
@@ -378,6 +404,12 @@ QJsonObject baseRunPayload(const ColorComparisonHalconConfig &config,
         {QStringLiteral("positionCorrection"), positionCorrectionJson(config)},
         {QStringLiteral("detectionRoi"),
          detectionRoiJson(config, imageWidth, imageHeight)},
+        {QStringLiteral("histogramDiagnostics"), QJsonObject{
+             {QStringLiteral("available"), false},
+             {QStringLiteral("hueBins"), kHistogramBins},
+             {QStringLiteral("saturationBins"), kHistogramBins},
+             {QStringLiteral("layout"), QStringLiteral("hue_major")}
+         }},
         {QStringLiteral("warnings"), stringsToJson(warnings)}
     };
 }
@@ -451,6 +483,14 @@ RunnerFailure validateGeometry(const ColorComparisonHalconConfig &config,
                                int imageWidth,
                                int imageHeight)
 {
+    if (config.positionCorrection.applied) {
+        if (!PositionCorrectionTransform::isValidHomMat2D(
+                config.positionCorrection.referenceToRunHomMat2D)) {
+            return {QStringLiteral("invalid_position_correction_matrix"),
+                    QStringLiteral("referenceToRunHomMat2D must contain six finite values.")};
+        }
+    }
+
     const QString templateMode = normalizedTemplateRegionMode(config.templateRegionMode);
     if (templateMode != QStringLiteral("custom")
             && templateMode != QStringLiteral("sync")) {
@@ -519,6 +559,10 @@ struct HalconCApi
     using GenRectangle1Fn = Herror (*)(Hobject *, double, double, double, double);
     using GenCircleFn = Herror (*)(Hobject *, double, double, double);
     using GenRegionPolygonFilledFn = Herror (*)(Hobject *, const Htuple, const Htuple);
+    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple,
+                                           const Htuple);
+    using ClipRegionFn = Herror (*)(const Hobject, Hobject *, const Htuple,
+                                    const Htuple, const Htuple, const Htuple);
     using DifferenceFn = Herror (*)(const Hobject, const Hobject, Hobject *);
     using AreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
     using Histo2DimFn = Herror (*)(const Hobject, const Hobject, const Hobject, Hobject *);
@@ -555,6 +599,8 @@ struct HalconCApi
     GenRectangle1Fn genRectangle1 = nullptr;
     GenCircleFn genCircle = nullptr;
     GenRegionPolygonFilledFn genRegionPolygonFilled = nullptr;
+    AffineTransRegionFn affineTransRegion = nullptr;
+    ClipRegionFn clipRegion = nullptr;
     DifferenceFn difference = nullptr;
     AreaCenterFn areaCenter = nullptr;
     Histo2DimFn histo2Dim = nullptr;
@@ -572,6 +618,21 @@ struct HalconCApi
     ConvolFftFn convolFft = nullptr;
     ClearObjFn clearObj = nullptr;
 };
+
+PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
+        const HalconCApi &api)
+{
+    PositionCorrectionHalconRegionApi transformApi;
+    transformApi.createTuple = api.createTuple;
+    transformApi.setDouble = api.setDouble;
+    transformApi.setString = api.setString;
+    transformApi.destroyTuple = api.destroyTuple;
+    transformApi.getDouble = api.getDouble;
+    transformApi.affineTransRegion = api.affineTransRegion;
+    transformApi.clipRegion = api.clipRegion;
+    transformApi.areaCenter = api.areaCenter;
+    return transformApi;
+}
 
 template <typename Function>
 bool resolveRequired(void *handle,
@@ -641,6 +702,10 @@ public:
                 || !resolveRequired(m_handle, api.genCircle, "gen_circle", message)
                 || !resolveRequired(m_handle, api.genRegionPolygonFilled,
                                     "T_gen_region_polygon_filled", message)
+                || !resolveRequired(m_handle, api.affineTransRegion,
+                                    "T_affine_trans_region", message)
+                || !resolveRequired(m_handle, api.clipRegion,
+                                    "T_clip_region", message)
                 || !resolveRequired(m_handle, api.difference, "difference", message)
                 || !resolveRequired(m_handle, api.areaCenter, "T_area_center", message)
                 || !resolveRequired(m_handle, api.histo2Dim, "T_histo_2dim", message)
@@ -980,8 +1045,6 @@ void createEffectiveRegion(HalconCApi *api,
                            HalconObject *baseRegion,
                            HalconObject *maskRegion,
                            HalconObject *differenceRegion,
-                           HalconObject *additionalMaskRegion,
-                           HalconObject *additionalDifferenceRegion,
                            Hobject *effectiveRegion,
                            bool *maskApplied)
 {
@@ -1008,10 +1071,12 @@ void createEffectiveRegion(HalconCApi *api,
 
     *effectiveRegion = baseRegion->value();
     *maskApplied = false;
-    if (templateRegion && templateMode == QStringLiteral("sync")
-            && !config.detectMaskPolygonNormalized.isEmpty()) {
+    const QVector<QPointF> &ownerMask = templateRegion
+            ? config.templateMaskPolygonNormalized
+            : config.detectMaskPolygonNormalized;
+    if (!ownerMask.isEmpty()) {
         createPolygonRegion(api,
-                            config.detectMaskPolygonNormalized,
+                            ownerMask,
                             image.cols,
                             image.rows,
                             maskRegion,
@@ -1022,28 +1087,6 @@ void createEffectiveRegion(HalconCApi *api,
                                     differenceRegion->ptr()),
                     stage + QStringLiteral(".difference"));
         *effectiveRegion = differenceRegion->value();
-        *maskApplied = true;
-    }
-
-    const QVector<QPointF> &finalMask = templateRegion
-            ? config.templateMaskPolygonNormalized
-            : config.detectMaskPolygonNormalized;
-    if (!finalMask.isEmpty()) {
-        HalconObject *finalMaskRegion = *maskApplied ? additionalMaskRegion : maskRegion;
-        HalconObject *finalDifferenceRegion = *maskApplied
-                ? additionalDifferenceRegion : differenceRegion;
-        createPolygonRegion(api,
-                            finalMask,
-                            image.cols,
-                            image.rows,
-                            finalMaskRegion,
-                            stage);
-        checkHalcon(api,
-                    api->difference(*effectiveRegion,
-                                    finalMaskRegion->value(),
-                                    finalDifferenceRegion->ptr()),
-                    stage + QStringLiteral(".difference"));
-        *effectiveRegion = finalDifferenceRegion->value();
         *maskApplied = true;
     }
 
@@ -1079,6 +1122,8 @@ struct ExtractedFeature
     double scale = 1.0;
     double clippedRatio = 0.0;
     bool compensationApplied = false;
+    bool compensationFallback = false;
+    QString compensationFallbackReason;
 };
 
 RunnerFailure illuminationFailure(const QString &message,
@@ -1096,7 +1141,11 @@ RunnerFailure illuminationFailure(const QString &message,
                 QStringLiteral("brightnessCompensation"),
                 QJsonObject{
                     {QStringLiteral("enabled"), config.brightnessCompensation},
+                    {QStringLiteral("requested"), config.brightnessCompensation},
                     {QStringLiteral("applied"), extracted.compensationApplied},
+                    {QStringLiteral("fallback"), extracted.compensationFallback},
+                    {QStringLiteral("fallbackReason"),
+                     extracted.compensationFallbackReason},
                     {QStringLiteral("templateMean"),
                      templateRegion ? extracted.meanBefore : templateMean},
                     {QStringLiteral("detectMeanBefore"),
@@ -1304,8 +1353,8 @@ ExtractedFeature extractFeature(HalconCApi *api,
     HalconObject baseRegion(api);
     HalconObject maskRegion(api);
     HalconObject differenceRegion(api);
-    HalconObject additionalMaskRegion(api);
-    HalconObject additionalDifferenceRegion(api);
+    HalconObject transformedRegion(api);
+    HalconObject clippedRegion(api);
     Hobject effectiveRegion = NO_OBJECTS;
     bool maskApplied = false;
     createEffectiveRegion(api,
@@ -1315,11 +1364,42 @@ ExtractedFeature extractFeature(HalconCApi *api,
                           &baseRegion,
                           &maskRegion,
                           &differenceRegion,
-                          &additionalMaskRegion,
-                          &additionalDifferenceRegion,
                           &effectiveRegion,
                           &maskApplied);
     Q_UNUSED(maskApplied)
+
+    if (!templateRegion && config.positionCorrection.applied) {
+        const PositionCorrectionHalconTransformResult transformed =
+                PositionCorrectionHalconTransform::transformAndClipRegion(
+                    positionCorrectionRegionApi(*api),
+                    effectiveRegion,
+                    transformedRegion.ptr(),
+                    clippedRegion.ptr(),
+                    config.positionCorrection.referenceToRunHomMat2D,
+                    continuous.cols,
+                    continuous.rows);
+        if (!transformed.success) {
+            if (transformed.halconStatus != H_MSG_OK) {
+                checkHalcon(api,
+                            transformed.halconStatus,
+                            QStringLiteral("detect_region.%1")
+                            .arg(transformed.operation));
+            }
+            throw RunnerFailure{
+                transformed.status,
+                QStringLiteral("Failed to transform the corrected detection ROI (%1).")
+                .arg(transformed.operation)
+            };
+        }
+        effectiveRegion = clippedRegion.value();
+        if (transformed.area < static_cast<double>(
+                    kColorComparisonMinimumEffectivePixels)) {
+            throw RunnerFailure{
+                QStringLiteral("corrected_detect_roi_empty"),
+                QStringLiteral("Corrected detection ROI is outside the current image.")
+            };
+        }
+    }
 
     ExtractedFeature extracted;
     extracted.effectivePixelCount = qRound64(regionArea(
@@ -1363,73 +1443,69 @@ ExtractedFeature extractFeature(HalconCApi *api,
         if (!finiteValue(extracted.scale)
                 || extracted.scale < kMinBrightnessScale
                 || extracted.scale > kMaxBrightnessScale) {
-            throw illuminationFailure(
-                        QStringLiteral("Brightness compensation scale is outside the safe range."),
-                        config,
-                        extracted,
-                        templateRegion,
-                        templateMean);
+            extracted.compensationFallback = true;
+            extracted.compensationFallbackReason =
+                    QStringLiteral("scale_out_of_range");
+        } else {
+            extracted.clippedRatio = compensationClippedRatio(
+                        api,
+                        effectiveRegion,
+                        value.value(),
+                        extracted.scale,
+                        static_cast<double>(extracted.effectivePixelCount));
+            if (extracted.clippedRatio > kMaxClippedRatio) {
+                extracted.compensationFallback = true;
+                extracted.compensationFallbackReason =
+                        QStringLiteral("clip_ratio_exceeded");
+            }
         }
 
-        extracted.clippedRatio = compensationClippedRatio(
-                    api,
-                    effectiveRegion,
-                    value.value(),
-                    extracted.scale,
-                    static_cast<double>(extracted.effectivePixelCount));
-        if (extracted.clippedRatio > kMaxClippedRatio) {
-            throw illuminationFailure(
-                        QStringLiteral("Brightness compensation would clip too many effective pixels."),
-                        config,
-                        extracted,
-                        templateRegion,
-                        templateMean);
-        }
-
-        HalconTuple multiplier = scalarTuple(api, extracted.scale);
-        HalconTuple add = scalarTuple(api, 0.0);
-        checkHalcon(api,
-                    api->scaleImage(red.value(),
-                                    scaledRed.ptr(),
-                                    multiplier.value(),
-                                    add.value()),
-                    QStringLiteral("brightness.scale_red.scale_image"));
-        checkHalcon(api,
-                    api->scaleImage(green.value(),
-                                    scaledGreen.ptr(),
-                                    multiplier.value(),
-                                    add.value()),
-                    QStringLiteral("brightness.scale_green.scale_image"));
-        checkHalcon(api,
-                    api->scaleImage(blue.value(),
-                                    scaledBlue.ptr(),
-                                    multiplier.value(),
-                                    add.value()),
-                    QStringLiteral("brightness.scale_blue.scale_image"));
-        checkHalcon(api,
-                    api->compose3(scaledRed.value(),
-                                  scaledGreen.value(),
-                                  scaledBlue.value(),
-                                  composed.ptr()),
-                    QStringLiteral("brightness.compose3"));
-        checkHalcon(api,
-                    api->transFromRgb(scaledRed.value(),
+        if (!extracted.compensationFallback) {
+            HalconTuple multiplier = scalarTuple(api, extracted.scale);
+            HalconTuple add = scalarTuple(api, 0.0);
+            checkHalcon(api,
+                        api->scaleImage(red.value(),
+                                        scaledRed.ptr(),
+                                        multiplier.value(),
+                                        add.value()),
+                        QStringLiteral("brightness.scale_red.scale_image"));
+            checkHalcon(api,
+                        api->scaleImage(green.value(),
+                                        scaledGreen.ptr(),
+                                        multiplier.value(),
+                                        add.value()),
+                        QStringLiteral("brightness.scale_green.scale_image"));
+            checkHalcon(api,
+                        api->scaleImage(blue.value(),
+                                        scaledBlue.ptr(),
+                                        multiplier.value(),
+                                        add.value()),
+                        QStringLiteral("brightness.scale_blue.scale_image"));
+            checkHalcon(api,
+                        api->compose3(scaledRed.value(),
                                       scaledGreen.value(),
                                       scaledBlue.value(),
-                                      compensatedHue.ptr(),
-                                      compensatedSaturation.ptr(),
-                                      compensatedValue.ptr(),
-                                      "hsv"),
-                    QStringLiteral("brightness.trans_from_rgb"));
-        featureHue = compensatedHue.value();
-        featureSaturation = compensatedSaturation.value();
-        featureValue = compensatedValue.value();
-        extracted.compensationApplied = true;
-        extracted.meanAfter = intensityStatistics(
-                    api,
-                    effectiveRegion,
-                    featureValue,
-                    QStringLiteral("brightness.after")).first;
+                                      composed.ptr()),
+                        QStringLiteral("brightness.compose3"));
+            checkHalcon(api,
+                        api->transFromRgb(scaledRed.value(),
+                                          scaledGreen.value(),
+                                          scaledBlue.value(),
+                                          compensatedHue.ptr(),
+                                          compensatedSaturation.ptr(),
+                                          compensatedValue.ptr(),
+                                          "hsv"),
+                        QStringLiteral("brightness.trans_from_rgb"));
+            featureHue = compensatedHue.value();
+            featureSaturation = compensatedSaturation.value();
+            featureValue = compensatedValue.value();
+            extracted.compensationApplied = true;
+            extracted.meanAfter = intensityStatistics(
+                        api,
+                        effectiveRegion,
+                        featureValue,
+                        QStringLiteral("brightness.after")).first;
+        }
     }
 
     extracted.hsHistogram = hsHistogram(api,
@@ -1604,7 +1680,11 @@ QJsonObject brightnessDiagnostics(const ColorComparisonHalconConfig &config,
 {
     return {
         {QStringLiteral("enabled"), config.brightnessCompensation},
+        {QStringLiteral("requested"), config.brightnessCompensation},
         {QStringLiteral("applied"), extracted.compensationApplied},
+        {QStringLiteral("fallback"), extracted.compensationFallback},
+        {QStringLiteral("fallbackReason"),
+         extracted.compensationFallbackReason},
         {QStringLiteral("templateMean"), config.model.brightnessReference.mean},
         {QStringLiteral("detectMeanBefore"), extracted.meanBefore},
         {QStringLiteral("detectMeanAfter"), extracted.meanAfter},
@@ -1612,6 +1692,59 @@ QJsonObject brightnessDiagnostics(const ColorComparisonHalconConfig &config,
         {QStringLiteral("clippedRatio"), extracted.clippedRatio}
     };
 }
+
+} // namespace
+
+ColorComparisonScoreBreakdown ColorComparisonHalconRunner::scoreBreakdown(
+        double hsScore,
+        double templateBrightnessMean,
+        double detectBrightnessMean,
+        double templateMeanSaturation,
+        double detectMeanSaturation)
+{
+    ColorComparisonScoreBreakdown breakdown;
+    breakdown.hsScore = qBound(0.0, hsScore, 100.0);
+    breakdown.brightnessDifference = qBound(
+                0.0,
+                std::abs(templateBrightnessMean - detectBrightnessMean) / 255.0,
+                1.0);
+    if (breakdown.brightnessDifference > 0.10
+            && breakdown.brightnessDifference < 0.40) {
+        breakdown.brightnessFactor = 1.10 - breakdown.brightnessDifference;
+    } else if (breakdown.brightnessDifference >= 0.40) {
+        breakdown.brightnessFactor = 0.70;
+    }
+
+    const double colorScore = breakdown.hsScore * breakdown.brightnessFactor;
+    breakdown.grayScore = 100.0 * qMax(
+                0.0, 1.0 - breakdown.brightnessDifference / 0.50);
+    const double minimumSaturation = qMin(templateMeanSaturation,
+                                          detectMeanSaturation);
+    const double maximumSaturation = qMax(templateMeanSaturation,
+                                          detectMeanSaturation);
+    breakdown.grayWeight = qBound(
+                0.0, (0.20 - maximumSaturation) / 0.10, 1.0);
+    breakdown.baseScoreBeforeSaturationPenalty =
+            breakdown.grayWeight * breakdown.grayScore
+            + (1.0 - breakdown.grayWeight) * colorScore;
+
+    if (minimumSaturation <= 0.10) {
+        const double linearProgress = qBound(
+                    0.0, (maximumSaturation - 0.10) / 0.10, 1.0);
+        breakdown.saturationMismatchProgress = linearProgress * linearProgress
+                * (3.0 - 2.0 * linearProgress);
+        breakdown.saturationFactor =
+                1.0 - 0.60 * breakdown.saturationMismatchProgress;
+    }
+    breakdown.finalScore = qBound(
+                0.0,
+                breakdown.baseScoreBeforeSaturationPenalty
+                * breakdown.saturationFactor,
+                100.0);
+    return breakdown;
+}
+
+namespace {
 
 QRectF normalizedRectToPixels(const QRectF &rect, const cv::Mat &image)
 {
@@ -1659,6 +1792,7 @@ QVector<ToolOverlay> detectionOverlays(const ColorComparisonHalconConfig &config
     QVector<ToolOverlay> overlays;
     ToolOverlay roi;
     QRectF anchorRect;
+    const PositionCorrectionContext &correction = config.positionCorrection;
     if (normalizedDetectRegionType(config.detectRegionType)
             == QStringLiteral("circle")) {
         const CirclePixelGeometry geometry = circlePixelGeometry(
@@ -1669,26 +1803,61 @@ QVector<ToolOverlay> detectionOverlays(const ColorComparisonHalconConfig &config
         roi.type = ToolOverlayType::Circle;
         roi.center = geometry.center;
         roi.radius = geometry.radius;
-        anchorRect = QRectF(geometry.center.x() - geometry.radius,
-                            geometry.center.y() - geometry.radius,
-                            geometry.radius * 2.0,
-                            geometry.radius * 2.0);
+        if (correction.applied) {
+            roi = PositionCorrectionTransform::transformOverlay(
+                        roi, correction.referenceToRunHomMat2D);
+        }
+        anchorRect = QRectF(roi.center.x() - roi.radius,
+                            roi.center.y() - roi.radius,
+                            roi.radius * 2.0,
+                            roi.radius * 2.0);
     } else {
+        const QRectF referenceRect = normalizedRectToPixels(
+                    config.detectRoiNormalized, image);
         roi.type = ToolOverlayType::Rect;
-        roi.rect = normalizedRectToPixels(config.detectRoiNormalized, image);
-        anchorRect = roi.rect;
+        roi.rect = referenceRect;
+        if (correction.applied) {
+            roi = PositionCorrectionTransform::transformOverlay(
+                        roi, correction.referenceToRunHomMat2D);
+        }
+        anchorRect = roi.type == ToolOverlayType::Polygon
+                ? QPolygonF(roi.points).boundingRect() : roi.rect;
     }
     roi.label = QStringLiteral("Detection ROI");
     roi.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
+    roi.extra.insert(QStringLiteral("positionCorrectionApplied"),
+                     correction.applied);
+    if (correction.applied)
+        roi.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                         correction.sourceId);
     overlays.append(roi);
 
     if (!config.detectMaskPolygonNormalized.isEmpty()) {
         ToolOverlay mask;
         mask.type = ToolOverlayType::Polygon;
-        mask.points = normalizedPointsToPixels(config.detectMaskPolygonNormalized, image);
+        mask.points = normalizedPointsToPixels(
+                    config.detectMaskPolygonNormalized, image);
+        if (correction.applied) {
+            mask = PositionCorrectionTransform::transformOverlay(
+                        mask, correction.referenceToRunHomMat2D);
+        }
         mask.label = QStringLiteral("Detection Mask");
         mask.extra.insert(QStringLiteral("role"), QStringLiteral("detect_mask"));
         overlays.append(mask);
+    }
+    if (correction.applied && correction.showMatchContour) {
+        const QVector<ToolOverlay> contours =
+                PositionCorrectionTransform::matchContourOverlays(
+                    correction.matchContours, correction.sourceId);
+        for (const ToolOverlay &contour : contours)
+            overlays.append(contour);
+    }
+    if (correction.applied) {
+        const QVector<ToolOverlay> origins =
+                PositionCorrectionTransform::matchOriginOverlays(
+                    correction.matchOrigins, correction.sourceId);
+        for (const ToolOverlay &origin : origins)
+            overlays.append(origin);
     }
     overlays.append(resultTextOverlay(anchorRect, score, passed));
     return overlays;
@@ -1852,6 +2021,12 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
     timer.start();
     QStringList warnings;
 
+    if (config.positionCorrection.applied
+            && config.positionCorrection.showMatchContour
+            && config.positionCorrection.matchContours.isEmpty()) {
+        warnings.append(QStringLiteral("position_correction_contour_unavailable"));
+    }
+
     if (image.empty()) {
         return runFailure(QStringLiteral("image_empty"),
                           QStringLiteral("Input image is empty."),
@@ -1935,9 +2110,6 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                           image.cols,
                           image.rows);
     }
-    if (config.positionCorrectionRequested)
-        warnings.append(QStringLiteral("position_correction_not_implemented"));
-
     if (!runtimeExists(config)) {
         return runFailure(QStringLiteral("halcon_so_not_found"),
                           runtimeNotFoundMessage(config),
@@ -1970,6 +2142,8 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
                     false,
                     config.brightnessCompensation,
                     config.model.brightnessReference.mean);
+        if (extracted.compensationFallback)
+            warnings.append(QStringLiteral("brightness_compensation_skipped"));
         const double rawIntersection = histogramIntersection(
                     &library.api, config.model.values, extracted.hsHistogram);
         const QVector<double> smoothedTemplate = smoothHsHistogram(
@@ -1981,34 +2155,13 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         const double hsScore = smoothedIntersection * 100.0;
         const double templateMeanSaturation = meanSaturation(config.model.values);
         const double detectMeanSaturation = meanSaturation(extracted.hsHistogram);
-        const double brightnessDifference = qBound(
-                    0.0,
-                    std::abs(config.model.brightnessReference.mean
-                             - extracted.meanAfter) / 255.0,
-                    1.0);
-        double brightnessFactor = 1.0;
-        if (brightnessDifference > 0.10 && brightnessDifference < 0.40)
-            brightnessFactor = 1.10 - brightnessDifference;
-        else if (brightnessDifference >= 0.40)
-            brightnessFactor = 0.70;
-
-        const double colorScore = hsScore * brightnessFactor;
-        const double grayScore = 100.0 * qMax(
-                    0.0, 1.0 - brightnessDifference / 0.50);
-        const double minimumSaturation = qMin(templateMeanSaturation,
-                                              detectMeanSaturation);
-        const double maximumSaturation = qMax(templateMeanSaturation,
-                                              detectMeanSaturation);
-        const double grayWeight = qBound(
-                    0.0, (0.20 - maximumSaturation) / 0.10, 1.0);
-        double score = grayWeight * grayScore
-                + (1.0 - grayWeight) * colorScore;
-        if (minimumSaturation <= 0.10) {
-            const double mismatchProgress = qBound(
-                        0.0, (maximumSaturation - 0.10) / 0.10, 1.0);
-            score = qMin(score, 100.0 - 60.0 * mismatchProgress);
-        }
-        score = qBound(0.0, score, 100.0);
+        const ColorComparisonScoreBreakdown scoreParts = scoreBreakdown(
+                    hsScore,
+                    config.model.brightnessReference.mean,
+                    extracted.meanAfter,
+                    templateMeanSaturation,
+                    detectMeanSaturation);
+        const double score = scoreParts.finalScore;
         const double similarity = score / 100.0;
         const bool passed = score >= static_cast<double>(config.minScore);
 
@@ -2021,6 +2174,7 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.similarity = similarity;
         result.elapsedMs = timer.elapsed();
         result.detectFeature = extracted.hsHistogram;
+        result.detectValueHistogram = extracted.valueHistogram;
         result.overlays = detectionOverlays(config, image, score, passed);
         result.payload = baseRunPayload(config, warnings, image.cols, image.rows);
         result.payload.insert(QStringLiteral("status"), result.status);
@@ -2030,6 +2184,17 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.payload.insert(QStringLiteral("score"), score);
         result.payload.insert(QStringLiteral("similarity"), similarity);
         result.payload.insert(QStringLiteral("rawIntersection"), rawIntersection);
+        result.payload.insert(QStringLiteral("histogramDiagnostics"), QJsonObject{
+            {QStringLiteral("available"), true},
+            {QStringLiteral("hueBins"), kHistogramBins},
+            {QStringLiteral("saturationBins"), kHistogramBins},
+            {QStringLiteral("layout"), QStringLiteral("hue_major")},
+            {QStringLiteral("detectHsHistogram"),
+             featureToJson(extracted.hsHistogram)},
+            {QStringLiteral("detectValueHistogram"),
+             featureToJson(extracted.valueHistogram)},
+            {QStringLiteral("rawIntersection"), rawIntersection}
+        });
         result.payload.insert(QStringLiteral("smoothedIntersection"),
                               smoothedIntersection);
         result.payload.insert(QStringLiteral("hsScore"), hsScore);
@@ -2038,9 +2203,20 @@ ColorComparisonHalconResult ColorComparisonHalconRunner::run(
         result.payload.insert(QStringLiteral("detectMeanSaturation"),
                               detectMeanSaturation);
         result.payload.insert(QStringLiteral("brightnessDifference"),
-                              brightnessDifference);
+                              scoreParts.brightnessDifference);
         result.payload.insert(QStringLiteral("brightnessFactor"),
-                              brightnessFactor);
+                              scoreParts.brightnessFactor);
+        result.payload.insert(QStringLiteral("grayScore"),
+                              scoreParts.grayScore);
+        result.payload.insert(QStringLiteral("grayWeight"),
+                              scoreParts.grayWeight);
+        result.payload.insert(QStringLiteral("baseScoreBeforeSaturationPenalty"),
+                              scoreParts.baseScoreBeforeSaturationPenalty);
+        result.payload.insert(QStringLiteral("saturationMismatchProgress"),
+                              scoreParts.saturationMismatchProgress);
+        result.payload.insert(QStringLiteral("saturationFactor"),
+                              scoreParts.saturationFactor);
+        result.payload.insert(QStringLiteral("finalScore"), scoreParts.finalScore);
         result.payload.insert(QStringLiteral("smoothingProfile"), QJsonObject{
             {QStringLiteral("sensitivity"), profile.sensitivity},
             {QStringLiteral("hueSigma"), profile.hueSigma},

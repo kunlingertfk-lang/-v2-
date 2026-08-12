@@ -20,13 +20,16 @@ public:
     explicit CameraParamsDialog(QWidget *parent = nullptr);
     ~CameraParamsDialog() override;
 
+public slots:
+    void prepareForDisplay();
+
 private slots:
     void openReferenceImageDialog();
     void openToolsDialog();
     void openOutputDialog();
     void showLiveImage(const QImage &image);
     void editCurrentSchemeName();
-    void saveCurrentScheme();
+    bool saveCurrentScheme();
     void saveCurrentSchemeAs();
 
 private:

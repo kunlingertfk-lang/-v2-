@@ -16,6 +16,7 @@
 
 class QLabel;
 class QPushButton;
+namespace Ui { class RegisteredClassificationTrainingDialog; }
 
 struct RegisteredClassificationTrainingRoiMark
 {
@@ -56,6 +57,7 @@ class RegisteredClassificationTrainingDialog : public QDialog
 
 public:
     explicit RegisteredClassificationTrainingDialog(QWidget *parent = nullptr);
+    ~RegisteredClassificationTrainingDialog() override;
     QJsonObject buildTrainingRequestPreviewForTest() const;
     RegisteredClassificationTrainingResult trainToModelDirForTest(const QString &outputModelDir);
     void setUpdateTargetModelDir(const QString &modelDir);
@@ -83,6 +85,7 @@ private:
     std::function<void(const QString &)> m_showCurrentImage;
     QPushButton *m_trainButton = nullptr;
     QLabel *m_trainStatusLabel = nullptr;
+    Ui::RegisteredClassificationTrainingDialog *ui = nullptr;
 };
 
 #endif // REGISTEREDCLASSIFICATIONTRAININGDIALOG_H

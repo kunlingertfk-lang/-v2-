@@ -1,6 +1,8 @@
 #include "algorithms/presence/ContourPresenceHalconRunner.h"
 
 #include "algorithms/presence/PatternPresenceHalconApi.h"
+#include "algorithms/location/PositionCorrectionHalconTransform.h"
+#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
@@ -25,6 +27,21 @@ constexpr int kMinRoiPixelSize = 2;
 constexpr int kMaxContourOverlayLineSegments = 2048;
 constexpr int kMinTemplateContourPointCount = 6;
 constexpr double kSelectContourMaxLength = 1000000000.0;
+
+PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
+        const PatternPresenceHalconApi &api)
+{
+    PositionCorrectionHalconRegionApi transformApi;
+    transformApi.createTuple = api.createTuple;
+    transformApi.setDouble = api.setDouble;
+    transformApi.setString = api.setString;
+    transformApi.destroyTuple = api.destroyTuple;
+    transformApi.getDouble = api.getDouble;
+    transformApi.affineTransRegion = api.affineTransRegion;
+    transformApi.clipRegion = api.clipRegion;
+    transformApi.areaCenter = api.areaCenter;
+    return transformApi;
+}
 
 struct GrayHalconImage
 {
@@ -703,12 +720,29 @@ void fillPayload(ContourPresenceHalconResult &result,
     result.payload.insert(QStringLiteral("minContrastUsed"), 10);
     result.payload.insert(QStringLiteral("timeoutMsUsed"), config.timeoutMs);
     result.payload.insert(QStringLiteral("timeoutApplied"), false);
-    result.payload.insert(QStringLiteral("coordinateMode"), QStringLiteral("detect_crop_plus_roi_offset"));
+    result.payload.insert(QStringLiteral("coordinateMode"),
+                          config.positionCorrection.applied
+                          ? QStringLiteral("full_image_corrected_region")
+                          : QStringLiteral("detect_crop_plus_roi_offset"));
     result.payload.insert(QStringLiteral("modelContourOverlayApplied"), false);
     result.payload.insert(QStringLiteral("modelContourOverlayRequested"), config.showContourPoints);
     result.payload.insert(QStringLiteral("templateMaskApplied"), false);
     result.payload.insert(QStringLiteral("detectMaskApplied"), false);
-    result.payload.insert(QStringLiteral("positionCorrectionApplied"), false);
+    result.payload.insert(QStringLiteral("positionCorrectionRequested"),
+                          config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"),
+                          config.positionCorrection.applied);
+    result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
+                          config.positionCorrection.sourceId);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"),
+                          config.positionCorrection.applied
+                          ? QStringLiteral("applied") : QStringLiteral("not_requested"));
+    result.payload.insert(QStringLiteral("referenceScale"),
+                          config.positionCorrection.referenceScale);
+    result.payload.insert(QStringLiteral("runScale"),
+                          config.positionCorrection.runScale);
+    result.payload.insert(QStringLiteral("scaleRatio"),
+                          config.positionCorrection.scaleRatio);
     result.payload.insert(QStringLiteral("positionCorrectionSource"), config.positionCorrectionSource);
     result.payload.insert(QStringLiteral("sortModeRequested"), config.sortMode);
     result.payload.insert(QStringLiteral("sortModeApplied"), false);
@@ -838,6 +872,34 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
         result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
         return result;
     }
+    const bool polygonDetectRequested = isPolygonType(config.detectRegionType);
+    if (isUnsupportedDetectType(config.detectRegionType)
+            || (!isRectType(config.detectRegionType)
+                && !polygonDetectRequested)) {
+        ContourPresenceHalconResult result = makeParameterError(
+                    QStringLiteral("unsupported_detect_roi"),
+                    QStringLiteral("detect ROI shape is not supported; no bounding-rectangle fallback was applied"),
+                    image,
+                    referenceImage,
+                    config);
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("elapsedMs"),
+                              static_cast<double>(result.elapsedMs));
+        return result;
+    }
+    if (polygonDetectRequested
+            && config.detectPolygonNormalized.size() < 3) {
+        ContourPresenceHalconResult result = makeParameterError(
+                    QStringLiteral("invalid_detect_polygon"),
+                    QStringLiteral("polygon detect ROI requires at least 3 points"),
+                    image,
+                    referenceImage,
+                    config);
+        result.elapsedMs = timer.elapsed();
+        result.payload.insert(QStringLiteral("elapsedMs"),
+                              static_cast<double>(result.elapsedMs));
+        return result;
+    }
 
     const QRect templateRoiPixels = normalizedRoiToPixels(config.templateRoiNormalized,
                                                           referenceImage.cols,
@@ -884,32 +946,6 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
     fillPayload(result, image, referenceImage, config);
 
     const bool polygonTemplate = isPolygonType(config.templateShapeType);
-    const bool polygonDetectRequested = isPolygonType(config.detectRegionType);
-    const bool unsupportedDetectRequested = isUnsupportedDetectType(config.detectRegionType);
-    if (!isRectType(config.detectRegionType) && !polygonDetectRequested && !unsupportedDetectRequested) {
-        result.success = false;
-        result.ok = false;
-        result.status = QStringLiteral("unsupported_detect_roi");
-        result.message = QStringLiteral("detect ROI shape is not supported");
-        result.text = QStringLiteral("error");
-        result.payload.insert(QStringLiteral("error"), result.message);
-        result.payload.insert(QStringLiteral("okNgReason"), result.message);
-        result.elapsedMs = timer.elapsed();
-        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
-        return result;
-    }
-    if (polygonDetectRequested && config.detectPolygonNormalized.size() < 3) {
-        result.success = false;
-        result.ok = false;
-        result.status = QStringLiteral("invalid_detect_polygon");
-        result.message = QStringLiteral("polygon detect ROI requires at least 3 points");
-        result.text = QStringLiteral("error");
-        result.payload.insert(QStringLiteral("error"), result.message);
-        result.payload.insert(QStringLiteral("okNgReason"), result.message);
-        result.elapsedMs = timer.elapsed();
-        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
-        return result;
-    }
 
     const QVector<QPointF> templatePolygonPixels = polygonTemplate
             ? normalizedPolygonToPixels(config.templatePolygonNormalized,
@@ -925,16 +961,33 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
     result.payload.insert(QStringLiteral("detectRoiPixels"), rectToJson(QRectF(detectRoiPixels)));
     result.payload.insert(QStringLiteral("templatePolygonPixels"), pointsToJson(templatePolygonPixels));
     result.payload.insert(QStringLiteral("detectPolygonPixels"), pointsToJson(detectPolygonPixels));
-    result.payload.insert(QStringLiteral("unsupportedDetectRegionType"), unsupportedDetectRequested);
+    result.payload.insert(QStringLiteral("unsupportedDetectRegionType"), false);
     result.payload.insert(QStringLiteral("detectRegionFallback"),
-                          unsupportedDetectRequested
-                          ? QStringLiteral("unsupported_region_type_bounding_rect")
-                          : QStringLiteral("none"));
+                          QStringLiteral("none"));
 
-    if (polygonDetectRequested)
-        result.overlays.append(polygonOverlay(detectPolygonPixels, QStringLiteral("detect_roi")));
-    else
-        result.overlays.append(rectOverlay(QRectF(detectRoiPixels), QStringLiteral("detect_roi")));
+    const bool correctionApplied = config.positionCorrection.applied;
+    ToolOverlay detectOverlay = polygonDetectRequested
+            ? polygonOverlay(detectPolygonPixels, QStringLiteral("detect_roi"))
+            : rectOverlay(QRectF(detectRoiPixels), QStringLiteral("detect_roi"));
+    if (correctionApplied) {
+        detectOverlay = PositionCorrectionTransform::transformOverlay(
+                    detectOverlay,
+                    config.positionCorrection.referenceToRunHomMat2D);
+        detectOverlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                                   config.positionCorrection.sourceId);
+    }
+    detectOverlay.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
+    result.overlays.append(detectOverlay);
+    if (correctionApplied && config.positionCorrection.showMatchContour) {
+        result.overlays += PositionCorrectionTransform::matchContourOverlays(
+                    config.positionCorrection.matchContours,
+                    config.positionCorrection.sourceId);
+    }
+    if (correctionApplied) {
+        result.overlays += PositionCorrectionTransform::matchOriginOverlays(
+                    config.positionCorrection.matchOrigins,
+                    config.positionCorrection.sourceId);
+    }
     if (config.referenceTest && image.cols == referenceImage.cols && image.rows == referenceImage.rows) {
         if (polygonTemplate)
             result.overlays.append(polygonOverlay(templatePolygonPixels, QStringLiteral("template_roi")));
@@ -946,10 +999,12 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
                                                   templateRoiPixels.y(),
                                                   templateRoiPixels.width(),
                                                   templateRoiPixels.height())).clone();
-    cv::Mat detectMat = image(cv::Rect(detectRoiPixels.x(),
-                                       detectRoiPixels.y(),
-                                       detectRoiPixels.width(),
-                                       detectRoiPixels.height())).clone();
+    cv::Mat detectMat = correctionApplied
+            ? image.clone()
+            : image(cv::Rect(detectRoiPixels.x(),
+                             detectRoiPixels.y(),
+                             detectRoiPixels.width(),
+                             detectRoiPixels.height())).clone();
     if (!templateMat.isContinuous())
         templateMat = templateMat.clone();
     if (!detectMat.isContinuous())
@@ -996,6 +1051,9 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
     Hobject templateSelectedContours = NO_OBJECTS;
     Hobject modelContours = NO_OBJECTS;
     Hobject detectPolygonRegion = NO_OBJECTS;
+    Hobject detectReferenceRegion = NO_OBJECTS;
+    Hobject transformedDetectRegion = NO_OBJECTS;
+    Hobject clippedDetectRegion = NO_OBJECTS;
     Hobject detectReducedImage = NO_OBJECTS;
     Hobject transformedModelContours = NO_OBJECTS;
     Htuple modelIdTuple = HTUPLE_INITIALIZER;
@@ -1132,6 +1190,9 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
         createdTuples.clear();
         clearObject(api, transformedModelContours);
         clearObject(api, detectReducedImage);
+        clearObject(api, clippedDetectRegion);
+        clearObject(api, transformedDetectRegion);
+        clearObject(api, detectReferenceRegion);
         clearObject(api, detectPolygonRegion);
         clearObject(api, modelContours);
         clearObject(api, templateSelectedContours);
@@ -1408,7 +1469,80 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
 
         generateGrayImage(detectMat, detectImage, QStringLiteral("detect"));
         Hobject detectSearchSource = detectImage.graySource;
-        if (polygonDetectRequested) {
+        if (correctionApplied) {
+            if (!api->reduceDomain || !api->genRectangle1
+                    || !api->affineTransRegion || !api->clipRegion
+                    || !api->areaCenter || !api->setString) {
+                HalconFailure failure;
+                failure.status = QStringLiteral("halcon_symbol_missing");
+                failure.message = QStringLiteral("HALCON position-correction ROI symbols are unavailable");
+                failure.stage = QStringLiteral("position_correction");
+                failure.halconMessage = failure.message;
+                throw failure;
+            }
+            if (polygonDetectRequested) {
+                if (!api->genRegionPolygon) {
+                    HalconFailure failure;
+                    failure.status = QStringLiteral("halcon_symbol_missing");
+                    failure.message = QStringLiteral("HALCON polygon ROI symbol is unavailable");
+                    failure.stage = QStringLiteral("position_correction.reference_roi");
+                    failure.halconMessage = failure.message;
+                    throw failure;
+                }
+                QVector<double> rows;
+                QVector<double> columns;
+                rows.reserve(detectPolygonPixels.size());
+                columns.reserve(detectPolygonPixels.size());
+                for (const QPointF &point : detectPolygonPixels) {
+                    rows.append(point.y());
+                    columns.append(point.x());
+                }
+                createDoubleArrayTuple(detectPolygonRowsTuple, rows);
+                createDoubleArrayTuple(detectPolygonColumnsTuple, columns);
+                checkStatus(api->genRegionPolygon(&detectReferenceRegion,
+                                                  detectPolygonRowsTuple,
+                                                  detectPolygonColumnsTuple),
+                            QStringLiteral("gen_region_polygon.reference_detect_roi"));
+            } else {
+                checkStatus(api->genRectangle1(&detectReferenceRegion,
+                                               detectRoiPixels.top(),
+                                               detectRoiPixels.left(),
+                                               detectRoiPixels.bottom(),
+                                               detectRoiPixels.right()),
+                            QStringLiteral("gen_rectangle1.reference_detect_roi"));
+            }
+            const PositionCorrectionHalconTransformResult transformed =
+                    PositionCorrectionHalconTransform::transformAndClipRegion(
+                        positionCorrectionRegionApi(*api),
+                        detectReferenceRegion,
+                        &transformedDetectRegion,
+                        &clippedDetectRegion,
+                        config.positionCorrection.referenceToRunHomMat2D,
+                        image.cols,
+                        image.rows);
+            if (!transformed.success || transformed.area <= 0.0) {
+                HalconFailure failure;
+                failure.status = !transformed.success
+                        ? transformed.status
+                        : QStringLiteral("corrected_roi_out_of_image");
+                failure.message = QStringLiteral("Position-corrected Contour ROI is invalid (%1)")
+                        .arg(transformed.operation);
+                failure.stage = QStringLiteral("position_correction.%1")
+                        .arg(transformed.operation);
+                failure.code = transformed.halconStatus;
+                failure.halconMessage = failure.message;
+                throw failure;
+            }
+            checkStatus(api->reduceDomain(detectImage.graySource,
+                                          clippedDetectRegion,
+                                          &detectReducedImage),
+                        QStringLiteral("reduce_domain.corrected_roi"));
+            detectSearchSource = detectReducedImage;
+            result.payload.insert(QStringLiteral("correctedRoiArea"), transformed.area);
+            result.payload.insert(QStringLiteral("detectMaskApplied"), true);
+            result.payload.insert(QStringLiteral("polygonDetectRoiApplied"),
+                                  polygonDetectRequested);
+        } else if (polygonDetectRequested) {
             QVector<QPointF> detectPolygonLocalPixels =
                     polygonToLocalClamped(detectPolygonPixels,
                                           detectRoiPixels,
@@ -1479,8 +1613,10 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
             const double angle = api->getDouble(&angleTuple, index);
             const double scale = api->getDouble(&scaleTuple, index);
             const double score = api->getDouble(&scoreTuple, index);
-            const double imageRow = localRow + static_cast<double>(detectRoiPixels.y());
-            const double imageColumn = localColumn + static_cast<double>(detectRoiPixels.x());
+            const double imageRow = localRow +
+                    (correctionApplied ? 0.0 : static_cast<double>(detectRoiPixels.y()));
+            const double imageColumn = localColumn +
+                    (correctionApplied ? 0.0 : static_cast<double>(detectRoiPixels.x()));
 
             QJsonObject matchJson;
             matchJson.insert(QStringLiteral("row"), imageRow);
@@ -1641,8 +1777,10 @@ ContourPresenceHalconResult ContourPresenceHalconRunner::run(
             const XldReadResult transformedRead = readXldContours(api, transformedModelContours);
             QVector<QVector<QPointF>> globalContours =
                     translatedContours(transformedRead.contours,
-                                       QPointF(static_cast<double>(detectRoiPixels.x()),
-                                               static_cast<double>(detectRoiPixels.y())));
+                                       correctionApplied
+                                       ? QPointF()
+                                       : QPointF(static_cast<double>(detectRoiPixels.x()),
+                                                 static_cast<double>(detectRoiPixels.y())));
             int displayPointCount = 0;
             const int lineSegmentCount = appendContourLineOverlays(&result.overlays,
                                                                    globalContours,

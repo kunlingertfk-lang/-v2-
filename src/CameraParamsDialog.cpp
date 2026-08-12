@@ -22,6 +22,8 @@ CameraParamsDialog::CameraParamsDialog(QWidget *parent)
     , ui(new Ui::CameraParamsDialog)
 {
     ui->setupUi(this);
+    ui->setupQuickCalibrateButton->setEnabled(false);
+    ui->setupQuickCalibrateButton->setProperty("quickCalibrationState", QStringLiteral("locked"));
     setupUiState();
     connectNavigation();
     setupCameraUI();
@@ -51,10 +53,18 @@ CameraParamsDialog::~CameraParamsDialog()
     delete ui;
 }
 
+void CameraParamsDialog::prepareForDisplay()
+{
+    refreshSchemeHeader();
+    refreshLiveImage();
+    QTimer::singleShot(0, this, &CameraParamsDialog::ensureCameraRunning);
+}
+
 void CameraParamsDialog::setupCameraUI()
 {
     if (!m_previewHelper) {
         m_previewHelper = new FrameViewHelper(ui->camera_1, this);
+        m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     }
 
     ui->viewerTitleLabel->setText(tr("相机图像"));
@@ -67,6 +77,7 @@ void CameraParamsDialog::setupCameraErrorUI()
 {
     if (!m_previewHelper) {
         m_previewHelper = new FrameViewHelper(ui->camera_1, this);
+        m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     }
 
     m_previewHelper->clear();
@@ -175,15 +186,16 @@ void CameraParamsDialog::editCurrentSchemeName()
     saveCurrentScheme();
 }
 
-void CameraParamsDialog::saveCurrentScheme()
+bool CameraParamsDialog::saveCurrentScheme()
 {
     QString error;
     if (!SchemeStore::instance().saveCurrentScheme(&error)) {
         qWarning() << "[CameraParamsDialog] 方案保存失败:" << error;
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
-        return;
+        return false;
     }
     refreshSchemeHeader();
+    return true;
 }
 
 void CameraParamsDialog::saveCurrentSchemeAs()
@@ -209,18 +221,24 @@ void CameraParamsDialog::saveCurrentSchemeAs()
 
 void CameraParamsDialog::openReferenceImageDialog()
 {
-    saveCurrentScheme();
-    PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
+    if (!saveCurrentScheme())
+        return;
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("reference")))
+        qWarning() << "[CameraParamsDialog] 未找到方案编辑宿主窗口";
 }
 
 void CameraParamsDialog::openToolsDialog()
 {
-    saveCurrentScheme();
-    PlanDialogUtils::replaceDialog(this, new ToolsDialog);
+    if (!saveCurrentScheme())
+        return;
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("tools")))
+        qWarning() << "[CameraParamsDialog] 未找到方案编辑宿主窗口";
 }
 
 void CameraParamsDialog::openOutputDialog()
 {
-    saveCurrentScheme();
-    PlanDialogUtils::replaceDialog(this, new OutputDialog);
+    if (!saveCurrentScheme())
+        return;
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("output")))
+        qWarning() << "[CameraParamsDialog] 未找到方案编辑宿主窗口";
 }

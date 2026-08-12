@@ -41,6 +41,7 @@
 
 #include "BlobPresenceDialog.h"
 #include "CameraParamsDialog.h"
+#include "CalibrationTransformDialog.h"
 #include "CharacterRecognitionDialog.h"
 #include "ClassificationDialog.h"
 #include "CirclePresenceDialog.h"
@@ -54,7 +55,9 @@
 #include "PlanDialogUtils.h"
 #include "RegisteredClassificationDialog.h"
 #include "RegisteredClassificationDetectionDialog.h"
+#include "TemplateLocationDialog.h"
 #include "SchemeStore.h"
+#include "SchemeSetupWindow.h"
 #include "ToolsDialog.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
@@ -73,6 +76,7 @@ struct MainWindow::ToolChainRunOutput
     QImage frameImage;
     QVector<ToolConfig> enabledConfigs;
     QVector<ToolResult> results;
+    ToolResult referenceCorrectionResult;
     qint64 elapsedMs = 0;
     qint64 startedWallMs = 0;
     qint64 frameCopyMs = 0;
@@ -364,6 +368,7 @@ bool runToolConfigDialog(QWidget *parent,
                          ToolPreviewSnapshot *snapshot)
 {
     Dialog configDialog(parent);
+    PlanDialogUtils::applyToolLevelStyle(&configDialog);
     configDialog.setWindowModality(Qt::WindowModal);
     configDialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     PlanDialogUtils::applyLargeWindow(&configDialog);
@@ -402,7 +407,11 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolEngine.registerAdapter(&m_linePresenceAdapter);
     m_toolEngine.registerAdapter(&m_aiDetectionAdapter);
     m_toolEngine.registerAdapter(&m_registeredClassificationAdapter);
+    m_toolEngine.registerAdapter(&m_templateLocationAdapter);
+    m_toolEngine.registerAdapter(&m_positionCorrectionAdapter);
+    m_toolEngine.registerAdapter(&m_calibrationTransformAdapter);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->cursorLabel);
     m_toolChainWatcher = new QFutureWatcher<ToolChainRunOutput>(this);
     setupUiState();
     setupSchemeSelector();
@@ -467,6 +476,14 @@ void MainWindow::setSessionInfo(const QString &deviceName, const QString &userNa
 void MainWindow::setSchemeTools(const QVector<ToolConfig> &configs,
                                 const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots)
 {
+    applySavedSchemeTools(configs, referenceSnapshots);
+    persistCurrentSchemeState(QStringLiteral("setSchemeTools"));
+}
+
+void MainWindow::applySavedSchemeTools(
+        const QVector<ToolConfig> &configs,
+        const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots)
+{
     m_schemeToolConfigs = configs;
     m_referencePreviewSnapshots.clear();
 
@@ -489,8 +506,7 @@ void MainWindow::setSchemeTools(const QVector<ToolConfig> &configs,
     else
         refreshLivePreview();
 
-    persistCurrentSchemeState(QStringLiteral("setSchemeTools"));
-    qDebug() << "[MainWindow] 当前方案工具链数量:" << m_schemeToolConfigs.size();
+    qDebug() << "[MainWindow] 已应用方案工具链，数量:" << m_schemeToolConfigs.size();
 }
 
 void MainWindow::updateSchemeToolsFromToolsDialog(const QVector<ToolConfig> &configs,
@@ -550,6 +566,31 @@ void MainWindow::clearSummary()
     ui->runtimeValueLabel->setText(QStringLiteral("0s"));
 }
 
+void MainWindow::registerActiveSetupWindow(QWidget *window)
+{
+    m_activeSetupWindow = window;
+}
+
+bool MainWindow::activateActiveSetupWindow()
+{
+    if (!m_activeSetupWindow)
+        return false;
+
+    QWidget *window = m_activeSetupWindow.data();
+    if (!window->isVisible()) {
+        m_activeSetupWindow.clear();
+        return false;
+    }
+
+    if (window->isMinimized())
+        window->showNormal();
+    else
+        window->show();
+    window->raise();
+    window->activateWindow();
+    return true;
+}
+
 void MainWindow::openCameraParamsDialog()
 {
     if (m_isToolChainRunning) {
@@ -569,12 +610,9 @@ void MainWindow::openCameraParamsDialog()
              << "hasFrame=" << provider.hasFrame()
              << "frameIndex=" << provider.currentFrameIndex();
 
-    persistCurrentSchemeState(QStringLiteral("openCameraParamsDialog"));
-    CameraParamsDialog *dialog = new CameraParamsDialog(this);// 打开相机参数窗口
-    PlanDialogUtils::setSessionInfo(dialog,
-                                    ui->headerDeviceComboBox->currentText(),
-                                    ui->headerUserButton->text());
-    PlanDialogUtils::showDialogFromWidget(this, dialog);
+    if (!persistCurrentSchemeState(QStringLiteral("openCameraParamsDialog")))
+        return;
+    openSchemeSetupPage(QStringLiteral("camera"));
 
     qDebug() << "[SCHEME-OPEN] CameraParamsDialog shown; MainWindow kept alive"
              << "mainWindow=" << this
@@ -595,29 +633,33 @@ void MainWindow::openToolsDialog()
         stopContinuousRun();
 
     applyCurrentSchemeState();
-    ToolsDialog dialog(this);
-    dialog.setAttribute(Qt::WA_DeleteOnClose, false);
-    dialog.setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);
-    PlanDialogUtils::setSessionInfo(&dialog,
+    openSchemeSetupPage(QStringLiteral("tools"));
+}
+
+void MainWindow::openSchemeSetupPage(const QString &pageId)
+{
+    if (SchemeSetupWindow *existing =
+            qobject_cast<SchemeSetupWindow *>(m_activeSetupWindow.data())) {
+        existing->showSetupPage(pageId);
+        existing->show();
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+
+    if (activateActiveSetupWindow())
+        return;
+
+    SchemeSetupWindow *window = new SchemeSetupWindow(this);
+    window->setToolEngine(&m_toolEngine);
+    window->setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);
+    connect(window, &SchemeSetupWindow::toolStateCommitted,
+            this, &MainWindow::applySavedSchemeTools);
+    PlanDialogUtils::setSessionInfo(window,
                                     ui->headerDeviceComboBox->currentText(),
                                     ui->headerUserButton->text());
-
-    dialog.exec();
-
-    updateSchemeToolsFromToolsDialog(dialog.toolConfigs(), dialog.referencePreviewSnapshots());
-
-    qDebug() << "[MainWindow] 已同步工具配置数量:" << m_schemeToolConfigs.size();
-    for (const ToolConfig &config : m_schemeToolConfigs) {
-        qDebug() << "[MainWindow] ToolConfig"
-                 << config.toolId
-                 << toolTypeToString(config.toolType)
-                 << config.summary;
-    }
-
-    if (!dialog.openedOutputDialog()) {
-        raise();
-        activateWindow();
-    }
+    window->showSetupPage(pageId);
+    PlanDialogUtils::showDialogFromWidget(this, window);
 }
 
 void MainWindow::runSingleToolFlow()
@@ -848,6 +890,7 @@ void MainWindow::applyCurrentSchemeState()
     m_schemeToolConfigs = scheme.toolConfigs;
     m_referencePreviewSnapshots = scheme.referencePreviewSnapshots;
     m_lastRunSnapshots.clear();
+    m_lastReferenceCorrectionOverlays.clear();
     m_lastRunImage = QImage();
     m_selectedToolIndex = -1;
     syncSnapshotMapsWithConfigs();
@@ -1134,10 +1177,15 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
     const qint64 referenceCopyMs = referenceCopyTimer.elapsed();
 
     QJsonObject runtimeContext;
+    runtimeContext.insert(QStringLiteral("frameId"),
+                          QString::number(actualFrameIndex));
     runtimeContext.insert(QStringLiteral("input"),
                           cameraSnapshot.metadata.toJson());
     runtimeContext.insert(QStringLiteral("referenceInput"),
                           referenceSnapshot.metadata.toJson());
+    runtimeContext.insert(QStringLiteral("referencePositionCorrection"),
+                          PositionCorrection::referenceToJson(
+                              SchemeStore::instance().currentScheme().referencePositionCorrection));
 
     QElapsedTimer displayImageTimer;
     displayImageTimer.start();
@@ -1195,10 +1243,12 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
         output.results = engine->runTools(enabledConfigs,
                                           image,
                                           referenceImage,
-                                          runtimeContext);
+                                          runtimeContext,
+                                          &output.referenceCorrectionResult);
         output.engineMs = timer.elapsed();
 
         output.overallOk = !output.results.isEmpty();
+        output.overlayCount += output.referenceCorrectionResult.overlays.size();
         for (const ToolResult &result : output.results) {
             output.overlayCount += result.overlays.size();
             if (!result.success || !result.ok)
@@ -1255,6 +1305,8 @@ void MainWindow::applyToolChainRunResult(ToolChainRunOutput output)
     uiTimer.start();
 
     storeLastRunSnapshots(output.enabledConfigs, output.results);
+    m_lastReferenceCorrectionOverlays =
+            output.referenceCorrectionResult.overlays;
     m_lastRunImage = output.frameImage;
 
     if (!m_lastRunImage.isNull()) {
@@ -1593,7 +1645,7 @@ void MainWindow::showToolSnapshot(int row,
 
 void MainWindow::showAllLastRunOverlays()
 {
-    QVector<ToolOverlay> overlays;
+    QVector<ToolOverlay> overlays = m_lastReferenceCorrectionOverlays;
     for (const ToolConfig &config : m_schemeToolConfigs) {
         if (!config.enabled)
             continue;
@@ -1676,6 +1728,10 @@ QString MainWindow::toolDisplayName(const ToolConfig &config) const
         return tr("目标检测");
     case ToolType::AiClassification:
         return tr("分类");
+    case ToolType::TemplateLocation:
+        return tr("模板定位");
+    case ToolType::CalibrationTransform:
+        return tr("标定转换");
     default:
         return toolTypeToString(config.toolType);
     }
@@ -1756,8 +1812,29 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         accepted = runToolConfigDialog<ColorComparisonDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::RegisteredClassification:
-        accepted = runToolConfigDialog<RegisteredClassificationDialog>(this, originalConfig, &editedConfig, &snapshot);
+    {
+        RegisteredClassificationDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+        dialog.loadFromConfig(originalConfig);
+        dialog.setToolChainTestContext(
+                    m_schemeToolConfigs,
+                    row,
+                    SchemeStore::instance().currentScheme()
+                    .referencePositionCorrection);
+        QTimer::singleShot(0, &dialog, [&dialog]() {
+            dialog.raise();
+            dialog.activateWindow();
+        });
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
         break;
+    }
     case ToolType::RegisteredClassificationDetection:
         accepted = runToolConfigDialog<RegisteredClassificationDetectionDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
@@ -1765,11 +1842,59 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         accepted = runToolConfigDialog<PatternPresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
     case ToolType::BlobPresence:
-        accepted = runToolConfigDialog<BlobPresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
+    {
+        BlobPresenceDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+        dialog.loadFromConfig(originalConfig);
+        dialog.setToolChainTestContext(
+                    m_schemeToolConfigs,
+                    row,
+                    &m_toolEngine,
+                    SchemeStore::instance().currentScheme()
+                    .referencePositionCorrection);
+        QTimer::singleShot(0, &dialog, [&dialog]() {
+            dialog.raise();
+            dialog.activateWindow();
+        });
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
         break;
+    }
     case ToolType::CirclePresence:
-        accepted = runToolConfigDialog<CirclePresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
+    {
+        CirclePresenceDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+
+        dialog.loadFromConfig(originalConfig);
+        dialog.setToolChainTestContext(
+                m_schemeToolConfigs,
+                row,
+                &m_toolEngine,
+                SchemeStore::instance()
+                        .currentScheme()
+                        .referencePositionCorrection);
+
+        QTimer::singleShot(0, &dialog, [&dialog]() {
+            dialog.raise();
+            dialog.activateWindow();
+        });
+
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
         break;
+    }
     case ToolType::EdgePresence:
         accepted = runToolConfigDialog<EdgePresenceDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
@@ -1785,6 +1910,25 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
     case ToolType::AiClassification:
         accepted = runToolConfigDialog<ClassificationDialog>(this, originalConfig, &editedConfig, &snapshot);
         break;
+    case ToolType::TemplateLocation:
+        accepted = runToolConfigDialog<TemplateLocationDialog>(this, originalConfig, &editedConfig, &snapshot);
+        break;
+    case ToolType::CalibrationTransform:
+    {
+        CalibrationTransformDialog dialog(this);
+        PlanDialogUtils::applyToolLevelStyle(&dialog);
+        dialog.setWindowModality(Qt::WindowModal);
+        dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        PlanDialogUtils::applyLargeWindow(&dialog);
+        dialog.setProducerTools(m_schemeToolConfigs, row, m_referencePreviewSnapshots);
+        dialog.loadFromConfig(originalConfig);
+        if (dialog.exec() == QDialog::Accepted) {
+            editedConfig = dialog.toolConfig();
+            snapshot = dialog.referencePreviewSnapshot();
+            accepted = true;
+        }
+        break;
+    }
     default:
         qDebug() << "[MainWindow] Unsupported tool edit type:" << toolTypeToString(originalConfig.toolType);
         break;

@@ -7,9 +7,12 @@
 #include <QVector>
 
 #include "tooladapters/ContourPresenceAdapter.h"
+#include "tooladapters/PositionCorrectionAdapter.h"
+#include "tooladapters/TemplateLocationAdapter.h"
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolEngine.h"
 #include "toolcore/ToolPreviewSnapshot.h"
+#include "PositionCorrectionDialogTestHelper.h"
 #include "toolcore/ToolResult.h"
 
 #include <opencv2/core.hpp>
@@ -34,6 +37,8 @@ struct ContourPresenceConfig
     QString templateShapeType = QStringLiteral("rect");
     bool enablePositionCorrection = true;
     QString positionCorrectionSource;
+    QString positionCorrectionSourceId;
+    bool showPositionCorrectionMatchContour = true;
     double minScore = 0.5;
     QString polarity;
     QString thresholdType;
@@ -69,6 +74,10 @@ public:
     ToolConfig toolConfig() const;
     ToolPreviewSnapshot referencePreviewSnapshot() const;
     void loadFromConfig(const ToolConfig &config);
+    void setToolChainTestContext(
+            const QVector<ToolConfig> &toolConfigs,
+            int currentToolIndex,
+            const ReferencePositionCorrectionConfig &referencePositionCorrection);
     QString summaryText() const;
 
 protected:
@@ -78,6 +87,8 @@ private slots:
     void finishConfiguration();
     void runReferenceTest();
     void runCameraTest();
+    void importTestImageFromPc();
+    void exitTestMode();
 
 private:
     enum class RoiEditTarget {
@@ -90,6 +101,8 @@ private:
     void connectControls();
     void applyAdaptiveWindowSize();
     void fitPreview();
+    void updateBottomButtons();
+    void rerunImportedTest();
     void showReferenceImage();
     void showFrameForRoiEditing();
     void startTemplateRoiEditing();
@@ -131,8 +144,13 @@ private:
     QButtonGroup *m_basicResultPresenceGroup;
     QButtonGroup *m_resultPresenceGroup;
     FrameViewHelper *m_previewHelper = nullptr;
+    QPushButton *m_exitTestButton = nullptr;
+    QPushButton *m_pcImportButton = nullptr;
     ContourPresenceAdapter m_testContourPresenceAdapter;
+    TemplateLocationAdapter m_testTemplateLocationAdapter;
+    PositionCorrectionAdapter m_testPositionCorrectionAdapter;
     ToolEngine m_testToolEngine;
+    PositionCorrectionDialogTestContext m_toolChainTestContext;
     QString m_toolId;
     bool m_enabled = true;
     ToolPreviewSnapshot m_referencePreviewSnapshot;
@@ -141,6 +159,9 @@ private:
     QVector<QPointF> m_templatePolygonNormalized;
     QVector<QPointF> m_detectPolygonNormalized;
     RoiEditTarget m_roiEditTarget = RoiEditTarget::None;
+    cv::Mat m_importedTestFrame;
+    QString m_importedTestImageTitle;
+    bool m_importedTestActive = false;
     bool m_contourPresenceRunning = false;
     bool m_hasAcceptedToolConfig = false;
     ToolConfig m_acceptedToolConfig;

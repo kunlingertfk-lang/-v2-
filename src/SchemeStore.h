@@ -79,7 +79,10 @@ private:
     bool loadSchemeFromFile(const QString &schemeJsonPath,
                             SchemeState *state,
                             QString *errorMessage = nullptr) const;
-    bool saveSchemeToFile(const SchemeState &state, QString *errorMessage = nullptr) const;
+    bool saveSchemeToFile(const SchemeState &state,
+                          QString *errorMessage = nullptr,
+                          const cv::Mat *referenceFrame = nullptr,
+                          SchemeState *savedState = nullptr) const;
     bool refreshAvailableSchemes(QString *errorMessage = nullptr);
     bool createDefaultScheme(QString *errorMessage = nullptr);
     QString resolveProjectRootPath() const;

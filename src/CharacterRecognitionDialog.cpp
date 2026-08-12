@@ -2,6 +2,7 @@
 #include "ui_CharacterRecognitionDialog.h"
 
 #include "PlanDialogUtils.h"
+#include "PositionCorrectionDialogTestHelper.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
 
@@ -14,6 +15,7 @@
 #include <QFontMetrics>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSizePolicy>
@@ -23,16 +25,20 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QComboBox>
+#include <QCoreApplication>
+#include <QEventLoop>
 #include <QJsonObject>
 #include <QUuid>
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/MatImageConverter.h"
 #include "frame/ReferenceImageProvider.h"
 #include "toolcore/ToolRequest.h"
+#include "toolcore/PositionCorrection.h"
 
 namespace {
 
@@ -153,11 +159,14 @@ CharacterRecognitionDialog::CharacterRecognitionDialog(QWidget *parent)
     ui->setupUi(this);
     m_toolId = QStringLiteral("ocr_%1")
             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_testToolEngine.registerAdapter(&m_testTemplateLocationAdapter);
+    m_testToolEngine.registerAdapter(&m_testPositionCorrectionAdapter);
     m_testToolEngine.registerAdapter(&m_testOcrAdapter);
     m_continuousTimer = new QTimer(this);
     m_continuousTimer->setInterval(500);
     connect(m_continuousTimer, &QTimer::timeout, this, &CharacterRecognitionDialog::runContinuousTick);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     connectControls();
     setUiMode(OcrUiMode::Edit);
@@ -173,6 +182,8 @@ CharacterRecognitionConfig CharacterRecognitionDialog::configuration() const
     CharacterRecognitionConfig config;
     config.independentPositionCorrection = ui->positionCorrectionSwitch->isChecked();
     config.positionCorrection = ui->positionCorrectionComboBox->currentText();
+    config.positionCorrectionSourceId =
+            ui->positionCorrectionComboBox->currentData().toString().trimmed();
     config.resultBasis = ui->resultBasisComboBox->currentText();
     config.minCount = ui->minCountSpinBox->value();
     config.maxCount = ui->maxCountSpinBox->value();
@@ -211,6 +222,13 @@ ToolConfig CharacterRecognitionDialog::toToolConfig() const
     params.insert(QStringLiteral("maxCharHeight"), ui->maxCharHeightSpinBox->value());
     params.insert(QStringLiteral("minAspectRatio"), ui->minAspectRatioSpinBox->value());
     params.insert(QStringLiteral("maxAspectRatio"), ui->maxAspectRatioSpinBox->value());
+    PositionCorrectionConfig correction;
+    correction.enabled = ocrConfig.independentPositionCorrection;
+    correction.source = ocrConfig.positionCorrection;
+    correction.sourceId = ocrConfig.positionCorrectionSourceId;
+    PositionCorrection::writeParams(correction, &params);
+    params.insert(QStringLiteral("showPositionCorrectionMatchContour"),
+                  ocrConfig.showPositionCorrectionMatchContour);
     params.insert(QStringLiteral("independentPositionCorrection"),
                   ocrConfig.independentPositionCorrection);
     params.insert(QStringLiteral("positionCorrection"), ocrConfig.positionCorrection);
@@ -253,6 +271,10 @@ ToolPreviewSnapshot CharacterRecognitionDialog::referencePreviewSnapshot() const
 
 void CharacterRecognitionDialog::loadFromConfig(const ToolConfig &config)
 {
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
+    updateBottomButtons();
     if (!config.toolId.trimmed().isEmpty())
         m_toolId = config.toolId;
     m_enabled = config.enabled;
@@ -282,8 +304,13 @@ void CharacterRecognitionDialog::loadFromConfig(const ToolConfig &config)
     ui->maxCharHeightSpinBox->setValue(params.value(QStringLiteral("maxCharHeight")).toInt(ui->maxCharHeightSpinBox->value()));
     ui->minAspectRatioSpinBox->setValue(params.value(QStringLiteral("minAspectRatio")).toDouble(ui->minAspectRatioSpinBox->value()));
     ui->maxAspectRatioSpinBox->setValue(params.value(QStringLiteral("maxAspectRatio")).toDouble(ui->maxAspectRatioSpinBox->value()));
-    ui->positionCorrectionSwitch->setChecked(params.value(QStringLiteral("independentPositionCorrection")).toBool(ui->positionCorrectionSwitch->isChecked()));
-    setComboBoxValue(ui->positionCorrectionComboBox, params.value(QStringLiteral("positionCorrection")).toString());
+    const PositionCorrectionConfig correction = PositionCorrection::fromParams(
+                params,
+                params.value(QStringLiteral("independentPositionCorrection"))
+                .toBool(ui->positionCorrectionSwitch->isChecked()),
+                params.value(QStringLiteral("positionCorrection")).toString());
+    ui->positionCorrectionSwitch->setChecked(correction.enabled);
+    setComboBoxValue(ui->positionCorrectionComboBox, correction.source);
 
     m_referencePreviewSnapshot = ToolPreviewSnapshot();
     if (m_previewHelper)
@@ -294,6 +321,18 @@ void CharacterRecognitionDialog::loadFromConfig(const ToolConfig &config)
             .arg(m_roiNormalized.width(), 0, 'f', 3)
             .arg(m_roiNormalized.height(), 0, 'f', 3);
     setViewerStatusText(roiText, roiText);
+}
+
+void CharacterRecognitionDialog::setToolChainTestContext(
+        const QVector<ToolConfig> &toolConfigs,
+        int currentToolIndex,
+        const ReferencePositionCorrectionConfig &referencePositionCorrection)
+{
+    m_toolChainTestContext.toolConfigs = toolConfigs;
+    m_toolChainTestContext.currentToolIndex = currentToolIndex;
+    m_toolChainTestContext.referencePositionCorrection =
+            referencePositionCorrection;
+    m_toolChainTestContext.valid = true;
 }
 
 QString CharacterRecognitionDialog::summaryText() const
@@ -339,6 +378,12 @@ void CharacterRecognitionDialog::setupUiState()
     m_exitTestButton->setMinimumSize(120, 48);
     m_exitTestButton->setProperty("actionRole", QStringLiteral("secondary"));
     ui->horizontalLayout_actions->addWidget(m_exitTestButton);
+    m_pcImportButton = new QPushButton(tr("PC导入图片"), this);
+    m_pcImportButton->setObjectName(QStringLiteral("ocrPcImportButton"));
+    m_pcImportButton->setProperty("actionRole", QStringLiteral("secondary"));
+    m_pcImportButton->setMinimumWidth(130);
+    m_pcImportButton->setMinimumHeight(38);
+    ui->horizontalLayout_editorHeader->insertWidget(2, m_pcImportButton);
 
     ui->ocrConfigScrollArea->setWidgetResizable(true);
     ui->ocrConfigScrollArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -369,6 +414,8 @@ void CharacterRecognitionDialog::connectControls()
     connect(ui->headerCloseButton, &QToolButton::clicked, this, &CharacterRecognitionDialog::reject);
     connect(ui->referenceTestButton, &QPushButton::clicked, this, &CharacterRecognitionDialog::runReferenceTest);
     connect(ui->testRunButton, &QPushButton::clicked, this, &CharacterRecognitionDialog::handleTestRunButton);
+    connect(m_pcImportButton, &QPushButton::clicked,
+            this, &CharacterRecognitionDialog::importTestImageFromPc);
     connect(ui->finishButton, &QPushButton::clicked, this, &CharacterRecognitionDialog::handleFinishButton);
     connect(m_exitTestButton, &QPushButton::clicked, this, &CharacterRecognitionDialog::exitTestMode);
     connect(ui->resultBasisComboBox,
@@ -449,6 +496,7 @@ void CharacterRecognitionDialog::connectControls()
                             .arg(m_roiNormalized.height(), 0, 'f', 3);
                     setViewerStatusText(roiText, roiText);
                     qDebug() << "[CharacterRecognitionDialog] ROI normalized:" << m_roiNormalized;
+                    rerunImportedTest();
                 });
     }
 
@@ -475,6 +523,10 @@ void CharacterRecognitionDialog::connectControls()
 
 void CharacterRecognitionDialog::finishConfiguration()
 {
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     accept();
 }
 
@@ -485,6 +537,10 @@ void CharacterRecognitionDialog::showProviderImage(const QImage &image)
 
 void CharacterRecognitionDialog::handleTestRunButton()
 {
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     if (m_uiMode == OcrUiMode::Edit) {
         setUiMode(OcrUiMode::TestReady);
         return;
@@ -495,6 +551,10 @@ void CharacterRecognitionDialog::handleTestRunButton()
 
 void CharacterRecognitionDialog::handleFinishButton()
 {
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     if (m_uiMode == OcrUiMode::Edit) {
         finishConfiguration();
         return;
@@ -511,11 +571,18 @@ void CharacterRecognitionDialog::enterTestMode()
 void CharacterRecognitionDialog::exitTestMode()
 {
     stopContinuousRun();
+    m_importedTestActive = false;
+    m_importedTestFrame.release();
+    m_importedTestImageTitle.clear();
     setUiMode(OcrUiMode::Edit);
 }
 
 void CharacterRecognitionDialog::runOnceInTestMode()
 {
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     stopContinuousRun();
     setUiMode(OcrUiMode::SingleShot);
 }
@@ -564,15 +631,22 @@ void CharacterRecognitionDialog::showReferenceImage()
         return;
     }
 
-    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    const QImage image = m_importedTestActive && !m_importedTestFrame.empty()
+            ? imageFromFrame(m_importedTestFrame)
+            : ReferenceImageProvider::instance().referenceImage();
     if (image.isNull()) {
         m_previewHelper->clear();
         ui->viewerTitleLabel->setText(tr("请先设置基准图"));
         return;
     }
 
-    ui->viewerTitleLabel->setText(tr("基准图"));
+    ui->viewerTitleLabel->setText(
+                m_importedTestActive
+                ? (m_importedTestImageTitle.isEmpty()
+                   ? tr("PC导入图片") : m_importedTestImageTitle)
+                : tr("基准图"));
     m_previewHelper->setImage(image);
+    m_previewHelper->clearToolOverlays();
     m_previewHelper->setRoiRectNormalized(m_roiNormalized);
 }
 
@@ -599,6 +673,10 @@ void CharacterRecognitionDialog::showSingleShotImage()
         return;
     }
 
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     const cv::Mat frame = CameraFrameProvider::instance().currentFrame();
     if (frame.empty()) {
         displayOcrError(QStringLiteral("image_empty"), tr("当前帧为空"));
@@ -618,6 +696,10 @@ void CharacterRecognitionDialog::showSingleShotImage()
 
 void CharacterRecognitionDialog::startContinuousRun()
 {
+    if (m_importedTestActive) {
+        rerunImportedTest();
+        return;
+    }
     setUiMode(OcrUiMode::Continuous);
     if (m_continuousTimer && !m_continuousTimer->isActive())
         m_continuousTimer->start();
@@ -692,7 +774,12 @@ void CharacterRecognitionDialog::runOcrOnFrame(const cv::Mat &frame,
     request.config = config;
     request.image = frame;
 
-    const ToolResult result = m_testToolEngine.runTool(request);
+    const ToolResult result = runPositionCorrectionAwareDialogTest(
+                m_testToolEngine,
+                request.config,
+                request.image,
+                ReferenceImageProvider::instance().referenceFrame(),
+                &m_toolChainTestContext);
     if (!imageTitle.isEmpty())
         ui->viewerTitleLabel->setText(imageTitle);
     displayOcrResult(result);
@@ -728,8 +815,22 @@ void CharacterRecognitionDialog::displayOcrResult(const ToolResult &result)
     setViewerStatusText(displayText, makeOcrStatusTooltipText(result));
 
     if (m_previewHelper) {
-        m_previewHelper->setRoiRectNormalized(m_roiNormalized);
-        m_previewHelper->setToolOverlays(displayOverlaysWithoutRoi(result.overlays));
+        bool hasRuntimeDetectRoi = false;
+        for (const ToolOverlay &overlay : result.overlays) {
+            if (overlay.extra.value(QStringLiteral("role")).toString()
+                    == QStringLiteral("detect_roi")) {
+                hasRuntimeDetectRoi = true;
+                break;
+            }
+        }
+        if (hasRuntimeDetectRoi) {
+            m_previewHelper->clearRoi();
+            m_previewHelper->clearPolygonRoi();
+            m_previewHelper->clearCircleRoi();
+        } else {
+            m_previewHelper->setRoiRectNormalized(m_roiNormalized);
+        }
+        m_previewHelper->setToolOverlays(result.overlays);
     }
 }
 
@@ -786,6 +887,14 @@ void CharacterRecognitionDialog::updateBottomButtons()
         return;
     }
 
+    if (m_importedTestActive && !m_importedTestFrame.empty()) {
+        ui->referenceTestButton->hide();
+        ui->testRunButton->setText(tr("测试运行（导入图）"));
+        ui->finishButton->setText(tr("运行一次"));
+        m_exitTestButton->show();
+        return;
+    }
+
     if (m_uiMode != OcrUiMode::Edit) {
         ui->referenceTestButton->hide();
         ui->testRunButton->setText(tr("连续运行"));
@@ -798,6 +907,44 @@ void CharacterRecognitionDialog::updateBottomButtons()
     ui->testRunButton->setText(tr("测试运行"));
     ui->finishButton->setText(tr("完成"));
     m_exitTestButton->hide();
+}
+
+void CharacterRecognitionDialog::importTestImageFromPc()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this, tr("PC导入测试图片"), QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All files (*.*)"));
+    if (fileName.trimmed().isEmpty())
+        return;
+
+    const cv::Mat frame = cv::imread(fileName.toLocal8Bit().constData(),
+                                     cv::IMREAD_UNCHANGED);
+    if (frame.empty()) {
+        QMessageBox::warning(this, tr("PC导入图片"), tr("无法读取所选图片"));
+        return;
+    }
+
+    stopContinuousRun();
+    m_importedTestFrame = frame.clone();
+    m_importedTestImageTitle = QFileInfo(fileName).fileName();
+    m_importedTestActive = true;
+    m_uiMode = OcrUiMode::TestReady;
+    updateBottomButtons();
+    rerunImportedTest();
+}
+
+void CharacterRecognitionDialog::rerunImportedTest()
+{
+    if (!m_importedTestActive || m_importedTestFrame.empty() || m_ocrRunning)
+        return;
+
+    showReferenceImage();
+    setViewerStatusText(tr("正在重新执行模板定位、位置修正和 OCR…"));
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    runOcrOnFrame(
+                m_importedTestFrame.clone(),
+                m_importedTestImageTitle.isEmpty()
+                ? tr("PC导入图片") : m_importedTestImageTitle);
 }
 
 

@@ -1,4 +1,6 @@
 #include "algorithms/ocr/OcrHalconRunner.h"
+#include "algorithms/location/PositionCorrectionHalconTransform.h"
+#include "toolcore/PositionCorrectionTransform.h"
 
 #include <HalconC.h>
 
@@ -102,6 +104,7 @@ struct HalconCApi
     using CreateTupleFn = void (*)(Htuple *, Hlong);
     using CreateTupleStringFn = void (*)(Htuple *, const char *);
     using SetDoubleFn = void (*)(Htuple *, double, Hlong);
+    using SetStringFn = void (*)(Htuple *, const char *, Hlong);
     using DestroyTupleFn = void (*)(Htuple *);
     using GetDoubleFn = double (*)(const Htuple *, Hlong);
     using GenImage1Fn = Herror (*)(Hobject *, const char *, Hlong, Hlong, Hlong);
@@ -110,6 +113,12 @@ struct HalconCApi
     using Rgb1ToGrayFn = Herror (*)(const Hobject, Hobject *);
     using GenRegionPolygonFilledFn = Herror (*)(Hobject *, const Htuple, const Htuple);
     using ReduceDomainFn = Herror (*)(const Hobject, const Hobject, Hobject *);
+    using AffineTransRegionFn = Herror (*)(const Hobject, Hobject *,
+                                           const Htuple, const Htuple);
+    using ClipRegionFn = Herror (*)(const Hobject, Hobject *,
+                                    const Htuple, const Htuple,
+                                    const Htuple, const Htuple);
+    using AreaCenterFn = Herror (*)(const Hobject, Htuple *, Htuple *, Htuple *);
     using ThresholdFn = Herror (*)(const Hobject, Hobject *, double, double);
     using ConnectionFn = Herror (*)(const Hobject, Hobject *);
     using CountObjFn = Herror (*)(const Hobject, Hlong *);
@@ -128,6 +137,7 @@ struct HalconCApi
     CreateTupleFn createTuple = nullptr;
     CreateTupleStringFn createTupleString = nullptr;
     SetDoubleFn setDouble = nullptr;
+    SetStringFn setString = nullptr;
     DestroyTupleFn destroyTuple = nullptr;
     GetDoubleFn getDouble = nullptr;
     GenImage1Fn genImage1 = nullptr;
@@ -135,6 +145,9 @@ struct HalconCApi
     Rgb1ToGrayFn rgb1ToGray = nullptr;
     GenRegionPolygonFilledFn genRegionPolygonFilled = nullptr;
     ReduceDomainFn reduceDomain = nullptr;
+    AffineTransRegionFn affineTransRegion = nullptr;
+    ClipRegionFn clipRegion = nullptr;
+    AreaCenterFn areaCenter = nullptr;
     ThresholdFn threshold = nullptr;
     ConnectionFn connection = nullptr;
     CountObjFn countObj = nullptr;
@@ -203,6 +216,7 @@ public:
             !resolveRequired(m_handle, api.createTuple, "F_create_tuple", errorMessage) ||
             !resolveRequired(m_handle, api.createTupleString, "F_create_tuple_s", errorMessage) ||
             !resolveRequired(m_handle, api.setDouble, "F_set_d", errorMessage) ||
+            !resolveRequired(m_handle, api.setString, "F_set_s", errorMessage) ||
             !resolveRequired(m_handle, api.destroyTuple, "F_destroy_tuple", errorMessage) ||
             !resolveRequired(m_handle, api.getDouble, "F_get_d", errorMessage) ||
             !resolveRequired(m_handle, api.genImage1, "gen_image1", errorMessage) ||
@@ -210,6 +224,9 @@ public:
             !resolveRequired(m_handle, api.rgb1ToGray, "rgb1_to_gray", errorMessage) ||
             !resolveRequired(m_handle, api.genRegionPolygonFilled, "T_gen_region_polygon_filled", errorMessage) ||
             !resolveRequired(m_handle, api.reduceDomain, "reduce_domain", errorMessage) ||
+            !resolveRequired(m_handle, api.affineTransRegion, "T_affine_trans_region", errorMessage) ||
+            !resolveRequired(m_handle, api.clipRegion, "T_clip_region", errorMessage) ||
+            !resolveRequired(m_handle, api.areaCenter, "T_area_center", errorMessage) ||
             !resolveRequired(m_handle, api.threshold, "threshold", errorMessage) ||
             !resolveRequired(m_handle, api.connection, "connection", errorMessage) ||
             !resolveRequired(m_handle, api.countObj, "count_obj", errorMessage) ||
@@ -240,6 +257,21 @@ private:
     void *m_handle = nullptr;
 };
 
+PositionCorrectionHalconRegionApi positionCorrectionRegionApi(
+        const HalconCApi &api)
+{
+    PositionCorrectionHalconRegionApi transformApi;
+    transformApi.createTuple = api.createTuple;
+    transformApi.setDouble = api.setDouble;
+    transformApi.setString = api.setString;
+    transformApi.destroyTuple = api.destroyTuple;
+    transformApi.getDouble = api.getDouble;
+    transformApi.affineTransRegion = api.affineTransRegion;
+    transformApi.clipRegion = api.clipRegion;
+    transformApi.areaCenter = api.areaCenter;
+    return transformApi;
+}
+
 } // namespace
 
 OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig &config)
@@ -267,6 +299,23 @@ OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig
     result.payload.insert(QStringLiteral("maxAspectRatio"), config.maxAspectRatio);
     result.payload.insert(QStringLiteral("aspectRatioFeature"), QStringLiteral("ratio_height_width"));
     result.payload.insert(QStringLiteral("minConfidence"), config.minConfidence);
+    result.payload.insert(QStringLiteral("positionCorrectionRequested"),
+                          config.enablePositionCorrection);
+    result.payload.insert(QStringLiteral("positionCorrectionApplied"),
+                          config.positionCorrection.applied);
+    result.payload.insert(QStringLiteral("positionCorrectionSource"),
+                          config.positionCorrectionSource);
+    result.payload.insert(QStringLiteral("positionCorrectionSourceId"),
+                          config.positionCorrection.sourceId);
+    result.payload.insert(QStringLiteral("positionCorrectionReason"),
+                          config.positionCorrection.applied
+                          ? QStringLiteral("applied") : QStringLiteral("not_requested"));
+    result.payload.insert(QStringLiteral("referenceScale"),
+                          config.positionCorrection.referenceScale);
+    result.payload.insert(QStringLiteral("runScale"),
+                          config.positionCorrection.runScale);
+    result.payload.insert(QStringLiteral("scaleRatio"),
+                          config.positionCorrection.scaleRatio);
 
     if (image.empty()) {
         result.status = QStringLiteral("image_empty");
@@ -313,7 +362,27 @@ OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig
 
     result.payload.insert(QStringLiteral("roiPixels"), rectToJson(QRectF(roiPixels)));
     result.payload.insert(QStringLiteral("roiPixelRect"), rectToJson(QRectF(roiPixels)));
-    result.overlays.append(rectOverlay(QRectF(roiPixels), QStringLiteral("ROI")));
+    const bool correctionApplied = config.positionCorrection.applied;
+    ToolOverlay detectOverlay = rectOverlay(QRectF(roiPixels), QStringLiteral("detect_roi"));
+    if (correctionApplied) {
+        detectOverlay = PositionCorrectionTransform::transformOverlay(
+                    detectOverlay,
+                    config.positionCorrection.referenceToRunHomMat2D);
+        detectOverlay.extra.insert(QStringLiteral("positionCorrectionSourceId"),
+                                   config.positionCorrection.sourceId);
+    }
+    detectOverlay.extra.insert(QStringLiteral("role"), QStringLiteral("detect_roi"));
+    result.overlays.append(detectOverlay);
+    if (correctionApplied && config.positionCorrection.showMatchContour) {
+        result.overlays += PositionCorrectionTransform::matchContourOverlays(
+                    config.positionCorrection.matchContours,
+                    config.positionCorrection.sourceId);
+    }
+    if (correctionApplied) {
+        result.overlays += PositionCorrectionTransform::matchOriginOverlays(
+                    config.positionCorrection.matchOrigins,
+                    config.positionCorrection.sourceId);
+    }
 
     HalconLibrary library;
     QString loadMessage;
@@ -330,6 +399,8 @@ OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig
     Hobject inputImage = NO_OBJECTS;
     Hobject grayImage = NO_OBJECTS;
     Hobject roiRegion = NO_OBJECTS;
+    Hobject transformedRoiRegion = NO_OBJECTS;
+    Hobject clippedRoiRegion = NO_OBJECTS;
     Hobject reducedImage = NO_OBJECTS;
     Hobject thresholdRegion = NO_OBJECTS;
     Hobject connectedRegions = NO_OBJECTS;
@@ -382,6 +453,8 @@ OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig
         clearObject(connectedRegions);
         clearObject(thresholdRegion);
         clearObject(reducedImage);
+        clearObject(clippedRoiRegion);
+        clearObject(transformedRoiRegion);
         clearObject(roiRegion);
         clearObject(grayImage);
         clearObject(inputImage);
@@ -480,8 +553,32 @@ OcrHalconResult OcrHalconRunner::run(const cv::Mat &image, const OcrHalconConfig
         const Hobject graySource = channels == 1 ? inputImage : grayImage;
         checkStatus(api->genRegionPolygonFilled(&roiRegion, rowTuple, columnTuple),
                     QStringLiteral("gen_region_polygon_filled"));
-        checkStatus(api->reduceDomain(graySource, roiRegion, &reducedImage),
-                    QStringLiteral("reduce_domain"));
+        Hobject effectiveRoiRegion = roiRegion;
+        if (correctionApplied) {
+            const PositionCorrectionHalconTransformResult transformed =
+                    PositionCorrectionHalconTransform::transformAndClipRegion(
+                        positionCorrectionRegionApi(*api),
+                        roiRegion,
+                        &transformedRoiRegion,
+                        &clippedRoiRegion,
+                        config.positionCorrection.referenceToRunHomMat2D,
+                        image.cols,
+                        image.rows);
+            if (!transformed.success || transformed.area <= 0.0) {
+                throw std::pair<QString, QString>(
+                        !transformed.success
+                        ? transformed.status
+                        : QStringLiteral("corrected_roi_out_of_image"),
+                        QStringLiteral("Position-corrected OCR ROI is invalid (%1)")
+                        .arg(transformed.operation));
+            }
+            effectiveRoiRegion = clippedRoiRegion;
+            result.payload.insert(QStringLiteral("correctedRoiArea"), transformed.area);
+        }
+        checkStatus(api->reduceDomain(graySource, effectiveRoiRegion, &reducedImage),
+                    correctionApplied
+                    ? QStringLiteral("reduce_domain.corrected_roi")
+                    : QStringLiteral("reduce_domain"));
 
         const int thresholdValue = qBound(0, config.binaryThreshold, 255);
         const double minCharArea = std::max(1.0, config.minCharArea);
