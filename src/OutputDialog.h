@@ -29,6 +29,9 @@ public:
     void setSchemeTools(const QVector<ToolConfig> &configs,
                         const QMap<QString, ToolPreviewSnapshot> &referenceSnapshots);
 
+public slots:
+    void prepareForDisplay();
+
 private slots:
     void openCameraParamsDialog();
     void openReferenceImageDialog();

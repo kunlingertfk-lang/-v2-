@@ -1,6 +1,8 @@
 #include "tooladapters/ContourPresenceAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -238,7 +240,21 @@ ToolResult ContourPresenceAdapter::run(const ToolRequest &request)
                                         QStringLiteral("ContourPresenceAdapter only supports ToolType::ContourPresence."));
     }
 
-    const ContourPresenceHalconConfig halconConfig = toHalconConfig(request);
+    ContourPresenceHalconConfig halconConfig = toHalconConfig(request);
+    const PositionCorrectionConfig savedCorrection =
+            PositionCorrection::fromParams(config.params);
+    PositionCorrectionConsumerOptions correctionOptions;
+    correctionOptions.requested = savedCorrection.enabled;
+    correctionOptions.sourceId = savedCorrection.sourceId;
+    correctionOptions.showMatchContour = boolParam(
+                config.params, QStringLiteral("showPositionCorrectionMatchContour"), true);
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, correctionOptions);
+    if (!correction.success)
+        return makeContourPresenceError(config, correction.status, correction.message);
+    halconConfig.enablePositionCorrection = savedCorrection.enabled;
+    halconConfig.positionCorrectionSource = savedCorrection.source;
+    halconConfig.positionCorrection = correction.context;
     const ContourPresenceHalconResult runnerResult = m_runner.run(request.image,
                                                                   request.referenceImage,
                                                                   halconConfig);

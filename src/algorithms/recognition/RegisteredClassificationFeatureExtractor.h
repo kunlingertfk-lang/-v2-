@@ -17,6 +17,7 @@ struct RegisteredClassificationFeatureConfig
     QStringList halconSoPathCandidates;
     bool normalizeGray = true;
     bool smooth = true;
+    QVector<double> referenceToRunHomMat2D;
 };
 
 struct RegisteredClassificationFeatureRegion

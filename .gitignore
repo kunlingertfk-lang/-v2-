@@ -1,16 +1,22 @@
+# 不入库的开发资料
+.superpowers/
+backup/
+projects/
+tests/
+test/
+docs/
+smoke/
+AGENTS.*
+
 *.user
 *.user.*
 *.pro.user
+.vscode/
 build-*
 debug/
 release/
 Debug/
 Release/
-docs/
-backup/
-projects/
-rk_ai_materials/
-smoke/
 Makefile
 *.o
 *.obj
@@ -32,21 +38,26 @@ build/
 moc_predefs.h
 /qt_ui_test
 
-# smoke / tests 子工程的构建产物（可执行、Makefile 变体、对象）
-# 源码 .cpp/.pro 入库，产物一律不入库
+# smoke / tests 子工程源码入库，构建产物继续按通用规则忽略
 *_smoke
 *_smoke.Makefile
 *.Makefile
 *.log
+AGENTS.*
 
 # 手工备份文件不入库，历史走 git 版本管理
 *.bak
 *.bak_*
 
-# 本机依赖路径，由 scripts/install_dependencies.sh 生成
-/scripts/dependencies.env
-
 # Claude Code / superpowers 会话与产物不入库
 .claude/
 .superpowers/
 .worktrees/
+
+
+# 便携化:每开发者本地路径覆盖，不入库
+local_paths.pri
+/scripts/dependencies.env
+
+# AI 训练数据(纯开发资料，非构建/运行所需)，不入库
+rk_ai_materials/

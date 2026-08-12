@@ -1,6 +1,8 @@
 #include "tooladapters/ColorComparisonAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -357,13 +359,14 @@ ToolResult makeError(const ToolConfig &config,
                     position.value(QStringLiteral("sourceId")).toString();
         }
     }
+    const QString stablePositionSource = config.params
+            .value(QStringLiteral("positionCorrectionSourceId"))
+            .toString().trimmed();
+    if (!stablePositionSource.isEmpty())
+        positionSource = stablePositionSource;
+    positionSource = PositionCorrection::normalizedSourceId(positionSource);
 
     QJsonArray warnings;
-    if (positionRequested) {
-        warnings.append(
-                    QStringLiteral("position_correction_not_implemented"));
-    }
-
     QJsonObject detectionRoi{
         {QStringLiteral("type"), QStringLiteral("rectangle")},
         {QStringLiteral("angle"), 0.0},
@@ -829,7 +832,7 @@ ParseResult parseConfig(const ToolRequest &request,
                 return parseFailure(QStringLiteral("invalid_position_correction"),
                                     QStringLiteral("positionCorrection.enabled must be boolean."));
             }
-            config.positionCorrectionRequested =
+            config.positionCorrection.requested =
                     position.value(QStringLiteral("enabled")).toBool();
         }
         if (position.contains(QStringLiteral("sourceId"))) {
@@ -837,8 +840,16 @@ ParseResult parseConfig(const ToolRequest &request,
                 return parseFailure(QStringLiteral("invalid_position_correction"),
                                     QStringLiteral("positionCorrection.sourceId must be a string."));
             }
-            config.positionCorrectionSourceId =
-                    position.value(QStringLiteral("sourceId")).toString();
+            config.positionCorrection.sourceId =
+                    position.value(QStringLiteral("sourceId")).toString().trimmed();
+        }
+        if (position.contains(QStringLiteral("showMatchContour"))) {
+            if (!position.value(QStringLiteral("showMatchContour")).isBool()) {
+                return parseFailure(QStringLiteral("invalid_position_correction"),
+                                    QStringLiteral("positionCorrection.showMatchContour must be boolean."));
+            }
+            config.positionCorrection.showMatchContour =
+                    position.value(QStringLiteral("showMatchContour")).toBool();
         }
         if (position.contains(QStringLiteral("interfaceVersion"))) {
             int interfaceVersion = 0;
@@ -849,6 +860,16 @@ ParseResult parseConfig(const ToolRequest &request,
                                     QStringLiteral("Only position-correction interface version 1 is reserved."));
             }
         }
+    }
+
+    if (config.positionCorrection.requested) {
+        const QString stableSourceId = request.config.params
+                .value(QStringLiteral("positionCorrectionSourceId"))
+                .toString().trimmed();
+        if (!stableSourceId.isEmpty())
+            config.positionCorrection.sourceId = stableSourceId;
+        config.positionCorrection.sourceId =
+                PositionCorrection::normalizedSourceId(config.positionCorrection.sourceId);
     }
 
     const QJsonObject judgeRule = request.config.judgeRule;
@@ -879,6 +900,25 @@ ParseResult parseConfig(const ToolRequest &request,
 
     result.success = true;
     return result;
+}
+
+ParseResult resolvePositionCorrection(const ToolRequest &request,
+                                      ParseResult parsed)
+{
+    ColorComparisonHalconConfig &config = parsed.config;
+    if (!parsed.success)
+        return parsed;
+
+    PositionCorrectionConsumerOptions options;
+    options.requested = config.positionCorrection.requested;
+    options.sourceId = config.positionCorrection.sourceId;
+    options.showMatchContour = config.positionCorrection.showMatchContour;
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, options);
+    if (!correction.success)
+        return parseFailure(correction.status, correction.message);
+    config.positionCorrection = correction.context;
+    return parsed;
 }
 
 } // namespace
@@ -977,12 +1017,16 @@ ToolResult ColorComparisonAdapter::run(const ToolRequest &request)
     if (!parseVersion(request, &colorComparison, &version, &status, &message))
         return makeError(config, status, message, request.image);
 
-    const ParseResult parsed = parseConfig(request,
-                                           false,
-                                           request.image,
-                                           colorComparison,
-                                           version,
-                                           inputSignature);
+    ParseResult parsed = parseConfig(request,
+                                     false,
+                                     request.image,
+                                     colorComparison,
+                                     version,
+                                     inputSignature);
+    if (!parsed.success)
+        return makeError(config, parsed.status, parsed.message, request.image);
+
+    parsed = resolvePositionCorrection(request, parsed);
     if (!parsed.success)
         return makeError(config, parsed.status, parsed.message, request.image);
 
@@ -1007,5 +1051,17 @@ ToolResult ColorComparisonAdapter::run(const ToolRequest &request)
 
     const ColorComparisonHalconResult runnerResult =
             m_runner.run(request.image, parsed.config);
-    return mapRunnerResult(config, runnerResult);
+    ToolResult result = mapRunnerResult(config, runnerResult);
+    if (result.success
+            && parsed.config.positionCorrection.applied
+            && parsed.config.positionCorrection.showMatchContour
+            && parsed.config.positionCorrection.matchContours.isEmpty()) {
+        const QString notice = QStringLiteral(
+                    "位置修正匹配成功，但未获得可显示的匹配轮廓。");
+        result.message = result.message.trimmed().isEmpty()
+                ? notice : QStringLiteral("%1 | %2").arg(result.message, notice);
+        result.payload.insert(QStringLiteral("positionCorrectionContourStatus"),
+                              QStringLiteral("position_correction_contour_unavailable"));
+    }
+    return result;
 }

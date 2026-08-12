@@ -2,6 +2,8 @@
 
 #include "RegisteredClassificationTrainingDialog.h"
 #include "algorithms/recognition/RegisteredClassificationModelPackage.h"
+#include "ui_RegisteredClassificationModelManagementDialog.h"
+#include "ui_CreateDatasetDialog.h"
 
 #include <algorithm>
 #include <QColor>
@@ -43,26 +45,6 @@ struct ModelRecord
     QDateTime lastModified;
     bool hasTrainingSession = false;
 };
-
-QFrame *managementCard(QWidget *parent, const QString &title, QWidget *headerActions = nullptr)
-{
-    QFrame *frame = new QFrame(parent);
-    frame->setProperty("panelRole", QStringLiteral("managementCard"));
-    QVBoxLayout *layout = new QVBoxLayout(frame);
-    layout->setContentsMargins(16, 14, 16, 14);
-    layout->setSpacing(12);
-    QHBoxLayout *titleLayout = new QHBoxLayout;
-    titleLayout->setContentsMargins(0, 0, 0, 0);
-    titleLayout->setSpacing(10);
-    QLabel *titleLabel = new QLabel(title, frame);
-    titleLabel->setProperty("role", QStringLiteral("cardTitle"));
-    titleLayout->addWidget(titleLabel);
-    titleLayout->addStretch(1);
-    if (headerActions)
-        titleLayout->addWidget(headerActions);
-    layout->addLayout(titleLayout);
-    return frame;
-}
 
 QSize initialDialogSize(QWidget *parent, const QSize &fallback)
 {
@@ -138,19 +120,6 @@ QIcon actionIcon(const QString &kind)
     }
 
     return QIcon(pixmap);
-}
-
-QPushButton *iconActionButton(QWidget *parent,
-                              const QString &text,
-                              const QIcon &icon,
-                              const QString &role)
-{
-    QPushButton *button = new QPushButton(icon, text, parent);
-    button->setProperty("actionRole", role);
-    button->setIconSize(QSize(22, 22));
-    button->setMinimumHeight(44);
-    button->setMinimumWidth(role == QStringLiteral("primary") ? 148 : 104);
-    return button;
 }
 
 QFrame *datasetTile(QWidget *parent, const QString &name, const QString &detail)
@@ -303,10 +272,11 @@ QFrame *modelRow(QWidget *parent,
     return row;
 }
 
-class CreateDatasetDialog : public QDialog
+#if 0
+class CreateDatasetLegacyDialog : public QDialog
 {
 public:
-    explicit CreateDatasetDialog(QWidget *parent = nullptr)
+    explicit CreateDatasetLegacyDialog(QWidget *parent = nullptr)
         : QDialog(parent)
     {
         setWindowTitle(QObject::tr("创建数据集"));
@@ -413,72 +383,48 @@ public:
 private:
     QLineEdit *m_nameEdit = nullptr;
 };
+#endif
+
+class CreateDatasetDialog : public QDialog
+{
+public:
+    explicit CreateDatasetDialog(QWidget *parent = nullptr)
+        : QDialog(parent),
+          ui(new Ui::CreateDatasetDialog)
+    {
+        ui->setupUi(this);
+        m_nameEdit = ui->datasetNameLineEdit;
+        ui->datasetTypeIconLabel->setPixmap(datasetTypeIcon().pixmap(72, 48));
+        connect(ui->closeButton, &QToolButton::clicked, this, &QDialog::reject);
+        connect(ui->cancelButton, &QPushButton::clicked, this, &QDialog::reject);
+        connect(ui->okButton, &QPushButton::clicked, this, &QDialog::accept);
+    }
+
+    ~CreateDatasetDialog() override
+    {
+        delete ui;
+    }
+
+private:
+    Ui::CreateDatasetDialog *ui = nullptr;
+    QLineEdit *m_nameEdit = nullptr;
+};
 
 } // namespace
 
 RegisteredClassificationModelManagementDialog::RegisteredClassificationModelManagementDialog(QWidget *parent)
-    : QDialog(parent)
+    : QDialog(parent),
+      ui(new Ui::RegisteredClassificationModelManagementDialog)
 {
-    setWindowTitle(tr("模型训练"));
+    ui->setupUi(this);
     resize(initialDialogSize(parent, QSize(1040, 640)));
-    setMinimumSize(740, 500);
+    ui->createDatasetButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+    ui->importDatasetButton->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+    ui->datasetGrid->addWidget(datasetTile(ui->datasetCard, tr("默认数据集"), tr("0 张图像 / 0 个标注")), 0, 0);
 
-    QVBoxLayout *root = new QVBoxLayout(this);
-    root->setContentsMargins(18, 18, 18, 18);
-    root->setSpacing(14);
-
-    QHBoxLayout *body = new QHBoxLayout;
-    body->setSpacing(14);
-    root->addLayout(body, 1);
-
-    QWidget *datasetActions = new QWidget(this);
-    QHBoxLayout *datasetActionLayout = new QHBoxLayout(datasetActions);
-    datasetActionLayout->setContentsMargins(0, 0, 0, 0);
-    datasetActionLayout->setSpacing(8);
-    QPushButton *createDatasetButton = iconActionButton(
-                datasetActions,
-                tr("创建数据集"),
-                style()->standardIcon(QStyle::SP_FileDialogNewFolder),
-                QStringLiteral("primary"));
-    QPushButton *importDatasetButton = iconActionButton(
-                datasetActions,
-                tr("导入"),
-                style()->standardIcon(QStyle::SP_DialogOpenButton),
-                QStringLiteral("secondary"));
-    datasetActionLayout->addWidget(createDatasetButton);
-    datasetActionLayout->addWidget(importDatasetButton);
-
-    QFrame *datasetCard = managementCard(this, tr("数据集列表"), datasetActions);
-    QVBoxLayout *datasetLayout = qobject_cast<QVBoxLayout *>(datasetCard->layout());
-    QGridLayout *datasetGrid = new QGridLayout;
-    datasetGrid->setContentsMargins(0, 0, 0, 0);
-    datasetGrid->setSpacing(12);
-    datasetGrid->addWidget(datasetTile(datasetCard, tr("默认数据集"), tr("0 张图像 / 0 个标注")), 0, 0);
-    datasetLayout->addLayout(datasetGrid);
-    datasetLayout->addStretch(1);
-    body->addWidget(datasetCard, 1);
-
-    QFrame *modelCard = managementCard(this, tr("模型列表"));
-    QVBoxLayout *modelLayout = qobject_cast<QVBoxLayout *>(modelCard->layout());
-    QHBoxLayout *filterLayout = new QHBoxLayout;
-    QComboBox *typeCombo = new QComboBox(modelCard);
-    typeCombo->addItem(tr("全部模型"));
-    typeCombo->addItem(tr("快速模式"));
-    QLineEdit *searchEdit = new QLineEdit(modelCard);
-    searchEdit->setPlaceholderText(tr("搜索模型"));
-    filterLayout->addWidget(typeCombo);
-    filterLayout->addWidget(searchEdit, 1);
-    modelLayout->addLayout(filterLayout);
-    QVBoxLayout *modelListLayout = new QVBoxLayout;
-    modelListLayout->setContentsMargins(0, 0, 0, 0);
-    modelListLayout->setSpacing(10);
-    modelLayout->addLayout(modelListLayout);
-    modelLayout->addStretch(1);
-    body->addWidget(modelCard, 1);
-
-    QLabel *tipLabel = new QLabel(tr("【提示】注册模型训练对象并将模型用于工具。"), this);
-    tipLabel->setProperty("role", QStringLiteral("tipLabel"));
-    root->addWidget(tipLabel);
+    QPushButton *createDatasetButton = ui->createDatasetButton;
+    QFrame *modelCard = ui->modelCard;
+    QVBoxLayout *modelListLayout = ui->modelListLayout;
 
     auto clearModelList = [modelListLayout]() {
         while (QLayoutItem *item = modelListLayout->takeAt(0)) {
@@ -572,4 +518,9 @@ RegisteredClassificationModelManagementDialog::RegisteredClassificationModelMana
         "QPushButton:hover,QToolButton:hover{background:#e0f2fe;border-color:#0284c7;}"
         "QPushButton[actionRole=\"primary\"]{background:#ff7a00;color:#ffffff;border-color:#ff7a00;font-size:18px;font-weight:800;}"
         "QPushButton[actionRole=\"secondary\"]{background:#0ea5e9;color:#ffffff;border-color:#0ea5e9;font-size:18px;font-weight:800;}"));
+}
+
+RegisteredClassificationModelManagementDialog::~RegisteredClassificationModelManagementDialog()
+{
+    delete ui;
 }

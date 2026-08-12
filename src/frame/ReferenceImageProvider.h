@@ -30,6 +30,7 @@ public:
     QImage referenceImage() const;
     bool hasReferenceFrame() const;
     void clearReferenceFrame();
+    static cv::Mat normalizeReferenceFrame(const cv::Mat &frame);
 
 signals:
     void referenceFrameChanged(const QImage &image);

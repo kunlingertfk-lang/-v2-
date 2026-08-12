@@ -125,6 +125,9 @@ bool PatternPresenceHalconLibrary::load(const QString &path,
     resolveOptional(m_handle, api.genRegionPolygon, "T_gen_region_polygon");
     if (!api.genRegionPolygon)
         resolveOptional(m_handle, api.genRegionPolygon, "gen_region_polygon");
+    resolveOptional(m_handle, api.genRectangle1, "gen_rectangle1");
+    resolveOptional(m_handle, api.affineTransRegion, "T_affine_trans_region");
+    resolveOptional(m_handle, api.clipRegion, "T_clip_region");
     resolveOptional(m_handle, api.reduceDomain, "reduce_domain");
     resolveOptional(m_handle, api.countObj, "count_obj");
     resolveOptional(m_handle, api.selectObj, "select_obj");
@@ -138,6 +141,7 @@ bool PatternPresenceHalconLibrary::load(const QString &path,
     resolveOptional(m_handle, api.areaCenter, "T_area_center");
     resolveOptional(m_handle, api.genContourRegionXld, "gen_contour_region_xld");
     resolveOptional(m_handle, api.getShapeModelContours, "T_get_shape_model_contours");
+    resolveOptional(m_handle, api.getShapeModelParams, "T_get_shape_model_params");
     resolveOptional(m_handle, api.vectorAngleToRigid, "T_vector_angle_to_rigid");
     resolveOptional(m_handle, api.homMat2dScaleLocal, "T_hom_mat2d_scale_local");
     resolveOptional(m_handle, api.affineTransContourXld, "T_affine_trans_contour_xld");
@@ -155,6 +159,7 @@ bool PatternPresenceHalconLibrary::load(const QString &path,
         !resolveRequired(m_handle, api.createTupleDouble, "F_create_tuple_d", errorMessage) ||
         !resolveRequired(m_handle, api.createTupleString, "F_create_tuple_s", errorMessage) ||
         !resolveRequired(m_handle, api.setDouble, "F_set_d", errorMessage) ||
+        !resolveRequired(m_handle, api.setString, "F_set_s", errorMessage) ||
         !resolveRequired(m_handle, api.destroyTuple, "F_destroy_tuple", errorMessage) ||
         !resolveRequired(m_handle, api.getHandle, "F_get_h", errorMessage) ||
         !resolveRequired(m_handle, api.getDouble, "F_get_d", errorMessage) ||

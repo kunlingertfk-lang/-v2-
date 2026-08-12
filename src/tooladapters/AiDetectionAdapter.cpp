@@ -1,5 +1,6 @@
 #include "tooladapters/AiDetectionAdapter.h"
 
+#include <QFileInfo>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QStringList>
@@ -102,13 +103,17 @@ bool envBool(const char *name, const bool defaultValue)
 
 bool isKnownRedBlackModelName(const QString &modelName)
 {
-    const QString lower = modelName.trimmed().toLower();
-    return lower.isEmpty() ||
-           lower.contains(QStringLiteral("yolov8")) ||
-           lower.contains(QStringLiteral("red")) ||
-           lower.contains(QStringLiteral("black")) ||
-           modelName.contains(QStringLiteral("红")) ||
-           modelName.contains(QStringLiteral("黑"));
+    const QString trimmed = modelName.trimmed();
+    if (trimmed.isEmpty())
+        return true;
+
+    const QString fileName = QFileInfo(trimmed).fileName().toLower();
+    return fileName == QStringLiteral("yolov8_red_black")
+            || fileName == QStringLiteral("yolov8_red_black.rknn")
+            || fileName == QStringLiteral("red_black")
+            || fileName == QStringLiteral("red_black.rknn")
+            || trimmed == QStringLiteral("红黑线")
+            || trimmed == QStringLiteral("红黑线检测");
 }
 
 AiDetectionConfig toRunnerConfig(const ToolConfig &config)
@@ -124,10 +129,7 @@ AiDetectionConfig toRunnerConfig(const ToolConfig &config)
     runnerConfig.allowLegacyScriptFallback = envBool("V2_AI_ALLOW_LEGACY_RK_SCRIPT", true);
 
     runnerConfig.modelName = firstString(params, {QStringLiteral("modelName")});
-    if (!isKnownRedBlackModelName(runnerConfig.modelName)) {
-        runnerConfig.warnings << QStringLiteral("modelName=%1 未识别，桥接版 fallback 到 yolov8_red_black.rknn。")
-                                 .arg(runnerConfig.modelName);
-    } else if (runnerConfig.modelName.trimmed().isEmpty()) {
+    if (runnerConfig.modelName.trimmed().isEmpty()) {
         runnerConfig.warnings << QStringLiteral("modelName 为空，桥接版使用默认 yolov8_red_black.rknn。");
     }
     runnerConfig.modelPathOnRK = QStringLiteral("/home/cat/model/yolov8_red_black.rknn");
@@ -206,7 +208,6 @@ AiDetectionConfig toRunnerConfig(const ToolConfig &config)
                                             QStringLiteral("timeout_ms")},
                                            runnerConfig.timeoutMs));
 
-    runnerConfig.warnings << QStringLiteral("NMS 阈值 maxOverlap/nmsIouThreshold 已读取，但旧 run_rknn_demo.sh 当前未提供 NMS 参数。");
     return runnerConfig;
 }
 
@@ -238,6 +239,28 @@ ToolResult AiDetectionAdapter::run(const ToolRequest &request)
         return makeAiDetectionError(config,
                                     QStringLiteral("invalid_tool_type"),
                                     QStringLiteral("AiDetectionAdapter only supports ToolType::AiDetection."));
+    }
+    const QString modelName =
+            firstString(config.params, {QStringLiteral("modelName")});
+    if (!isKnownRedBlackModelName(modelName)) {
+        return makeAiDetectionError(
+                    config,
+                    QStringLiteral("unsupported_model"),
+                    QStringLiteral("当前 RK 桥接不支持模型 %1，未回退到默认模型。")
+                    .arg(modelName));
+    }
+    const double nmsThreshold =
+            normalizeScoreOrRatio(firstDouble(
+                                      config.params,
+                                      {QStringLiteral("maxOverlap"),
+                                       QStringLiteral("nmsIouThreshold")},
+                                      0.5));
+    if (qAbs(nmsThreshold - 0.5) > 0.000001) {
+        return makeAiDetectionError(
+                    config,
+                    QStringLiteral("unsupported_nms_threshold"),
+                    QStringLiteral("当前 RK 脚本仅支持固定 NMS 阈值 0.5，配置值 %1 未被静默忽略。")
+                    .arg(nmsThreshold, 0, 'f', 3));
     }
 
     AiDetectionRunnerResult runnerResult;

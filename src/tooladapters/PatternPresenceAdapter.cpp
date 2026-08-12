@@ -1,6 +1,8 @@
 #include "tooladapters/PatternPresenceAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -219,7 +221,21 @@ ToolResult PatternPresenceAdapter::run(const ToolRequest &request)
                                         QStringLiteral("invalid_tool_type"),
                                         QStringLiteral("PatternPresenceAdapter only supports ToolType::PatternPresence."));
 
-    const PatternPresenceHalconConfig halconConfig = toHalconConfig(config);
+    PatternPresenceHalconConfig halconConfig = toHalconConfig(config);
+    const PositionCorrectionConfig savedCorrection =
+            PositionCorrection::fromParams(config.params);
+    PositionCorrectionConsumerOptions correctionOptions;
+    correctionOptions.requested = savedCorrection.enabled;
+    correctionOptions.sourceId = savedCorrection.sourceId;
+    correctionOptions.showMatchContour = boolParam(
+                config.params, QStringLiteral("showPositionCorrectionMatchContour"), true);
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, correctionOptions);
+    if (!correction.success)
+        return makePatternPresenceError(config, correction.status, correction.message);
+    halconConfig.enablePositionCorrection = savedCorrection.enabled;
+    halconConfig.positionCorrectionSource = savedCorrection.source;
+    halconConfig.positionCorrection = correction.context;
     PatternPresenceHalconResult runnerResult;
     try {
         runnerResult = m_runner.run(request.image,

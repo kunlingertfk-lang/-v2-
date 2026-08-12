@@ -1,6 +1,7 @@
 #ifndef ALGORITHMS_PRESENCE_LINEPRESENCEHALCONRUNNER_H
 #define ALGORITHMS_PRESENCE_LINEPRESENCEHALCONRUNNER_H
 
+#include "toolcore/PositionCorrectionConsumer.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -28,6 +29,7 @@ struct LinePresenceHalconConfig
     bool existOk = true;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
+    PositionCorrectionContext positionCorrection;
     int timeoutMsInternalDefault = 1000;
 };
 

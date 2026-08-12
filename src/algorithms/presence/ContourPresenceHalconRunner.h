@@ -1,6 +1,7 @@
 #ifndef ALGORITHMS_PRESENCE_CONTOURPRESENCEHALCONRUNNER_H
 #define ALGORITHMS_PRESENCE_CONTOURPRESENCEHALCONRUNNER_H
 
+#include "toolcore/PositionCorrectionConsumer.h"
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
@@ -25,6 +26,7 @@ struct ContourPresenceHalconConfig
     QString templateShapeType = QStringLiteral("rect");
     bool enablePositionCorrection = true;
     QString positionCorrectionSource;
+    PositionCorrectionContext positionCorrection;
     double minScore = 0.5;
     QString polarity;
     QString thresholdType;

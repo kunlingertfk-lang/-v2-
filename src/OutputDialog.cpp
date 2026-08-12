@@ -30,6 +30,7 @@ OutputDialog::OutputDialog(QWidget *parent)
 {
     ui->setupUi(this);
     m_previewHelper = new FrameViewHelper(ui->previewGraphicsView, this);
+    m_previewHelper->bindPixelStatusLabel(ui->viewerCursorLabel);
     setupUiState();
     setupOutputScrollArea();
     connectNavigation();
@@ -56,6 +57,13 @@ OutputDialog::~OutputDialog()
     delete ui;
 }
 
+void OutputDialog::prepareForDisplay()
+{
+    loadCurrentSchemeState();
+    refreshSchemeHeader();
+    refreshReferencePreview();
+}
+
 void OutputDialog::setupUiState()
 {
     PlanDialogUtils::configureDialogWindow(this, tr("方案编辑 - 输出"));
@@ -65,6 +73,9 @@ void OutputDialog::setupUiState()
     ui->referenceStepButton->setChecked(false);
     ui->toolsStepButton->setChecked(false);
     ui->outputStepButton->setChecked(true);
+    ui->setupQuickCalibrateButton->setEnabled(false);
+    ui->setupQuickCalibrateButton->setProperty(
+                "quickCalibrationState", QStringLiteral("locked"));
     refreshSchemeHeader();
 }
 
@@ -199,6 +210,12 @@ bool OutputDialog::commitOutputStateToScheme(bool saveToDisk)
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
         return false;
     }
+    if (saveToDisk) {
+        if (MainWindow *mainWindow = sourceMainWindow()) {
+            mainWindow->applySavedSchemeTools(m_schemeToolConfigs,
+                                              m_referencePreviewSnapshots);
+        }
+    }
 
     refreshSchemeHeader();
     return true;
@@ -234,7 +251,8 @@ void OutputDialog::saveCurrentScheme()
 
 void OutputDialog::saveCurrentSchemeAs()
 {
-    commitOutputStateToScheme(false);
+    if (!commitOutputStateToScheme(false))
+        return;
 
     bool ok = false;
     const QString name = QInputDialog::getText(this,
@@ -259,24 +277,26 @@ void OutputDialog::saveCurrentSchemeAs()
 
 void OutputDialog::openCameraParamsDialog()
 {
-    commitOutputStateToScheme(true);
-    PlanDialogUtils::replaceDialog(this, new CameraParamsDialog);
+    if (!commitOutputStateToScheme(true))
+        return;
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("camera")))
+        qWarning() << "[OutputDialog] 未找到方案编辑宿主窗口";
 }
 
 void OutputDialog::openReferenceImageDialog()
 {
-    commitOutputStateToScheme(true);
-    PlanDialogUtils::replaceDialog(this, new ReferenceImageDialog);
+    if (!commitOutputStateToScheme(true))
+        return;
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("reference")))
+        qWarning() << "[OutputDialog] 未找到方案编辑宿主窗口";
 }
 
 void OutputDialog::openToolsDialog()
 {
-    commitOutputStateToScheme(true);
-    MainWindow *mainWindow = sourceMainWindow();
-    ToolsDialog *dialog = new ToolsDialog(mainWindow);
-    dialog->setInitialToolState(m_schemeToolConfigs, m_referencePreviewSnapshots);
-    PlanDialogUtils::showDialogFromWidget(this, dialog);
-    close();
+    if (!commitOutputStateToScheme(true))
+        return;
+    if (!PlanDialogUtils::switchEmbeddedSetupPage(this, QStringLiteral("tools")))
+        qWarning() << "[OutputDialog] 未找到方案编辑宿主窗口";
 }
 
 void OutputDialog::finishSetup()
@@ -316,7 +336,7 @@ void OutputDialog::returnToSourceMainWindow()
              << "mainWindow=" << mainWindow
              << "sourceMainWindowValid=" << !m_sourceMainWindow.isNull();
 
-    mainWindow->setSchemeTools(m_schemeToolConfigs, m_referencePreviewSnapshots);
-    PlanDialogUtils::showWindowFromWidget(this, mainWindow);
-    close();
+    mainWindow->applySavedSchemeTools(m_schemeToolConfigs,
+                                      m_referencePreviewSnapshots);
+    PlanDialogUtils::returnToMainWindow(this);
 }

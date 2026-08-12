@@ -10,8 +10,11 @@
 #include "toolcore/ToolConfig.h"
 #include "toolcore/ToolEngine.h"
 #include "toolcore/ToolPreviewSnapshot.h"
+#include "PositionCorrectionDialogTestHelper.h"
 #include "toolcore/ToolResult.h"
 #include "tooladapters/OcrAdapter.h"
+#include "tooladapters/PositionCorrectionAdapter.h"
+#include "tooladapters/TemplateLocationAdapter.h"
 
 #include <opencv2/core.hpp>
 
@@ -31,6 +34,8 @@ struct CharacterRecognitionConfig
 {
     bool independentPositionCorrection = true;
     QString positionCorrection;
+    QString positionCorrectionSourceId;
+    bool showPositionCorrectionMatchContour = true;
     QString resultBasis;
     int minCount = 1;
     int maxCount = 10;
@@ -52,6 +57,10 @@ public:
     ToolConfig toolConfig() const;
     ToolPreviewSnapshot referencePreviewSnapshot() const;
     void loadFromConfig(const ToolConfig &config);
+    void setToolChainTestContext(
+            const QVector<ToolConfig> &toolConfigs,
+            int currentToolIndex,
+            const ReferencePositionCorrectionConfig &referencePositionCorrection);
     QString summaryText() const;
 
 protected:
@@ -65,6 +74,7 @@ private slots:
     void enterTestMode();
     void exitTestMode();
     void runOnceInTestMode();
+    void importTestImageFromPc();
 
 private:
     enum class OcrUiMode {
@@ -86,6 +96,7 @@ private:
     void startContinuousRun();
     void stopContinuousRun();
     void runContinuousTick();
+    void rerunImportedTest();
     void runReferenceTest();
     void runOcrOnFrame(const cv::Mat &frame, const QString &imageTitle, bool referenceTest = false);
     void displayOcrResult(const ToolResult &result);
@@ -98,14 +109,21 @@ private:
     QButtonGroup *m_regionGroup;
     FrameViewHelper *m_previewHelper;
     QPushButton *m_exitTestButton = nullptr;
+    QPushButton *m_pcImportButton = nullptr;
     QTimer *m_continuousTimer = nullptr;
     OcrAdapter m_testOcrAdapter;
+    TemplateLocationAdapter m_testTemplateLocationAdapter;
+    PositionCorrectionAdapter m_testPositionCorrectionAdapter;
     ToolEngine m_testToolEngine;
+    PositionCorrectionDialogTestContext m_toolChainTestContext;
     QMetaObject::Connection m_frameUpdatedConnection;
     QString m_toolId;
     bool m_enabled = true;
     ToolPreviewSnapshot m_referencePreviewSnapshot;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    cv::Mat m_importedTestFrame;
+    QString m_importedTestImageTitle;
+    bool m_importedTestActive = false;
     OcrUiMode m_uiMode = OcrUiMode::Edit;
     bool m_ocrRunning = false;
 };

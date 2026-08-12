@@ -1,6 +1,8 @@
 #include "tooladapters/CirclePresenceAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "toolcore/PositionCorrection.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -168,11 +170,33 @@ ToolResult CirclePresenceAdapter::run(const ToolRequest &request)
     const ToolConfig &config = request.config;
     if (config.toolType != ToolType::CirclePresence) {
         return makeCirclePresenceError(config,
-                                       QStringLiteral("invalid_tool_type"),
-                                       QStringLiteral("CirclePresenceAdapter only supports ToolType::CirclePresence."));
+            QStringLiteral("invalid_tool_type"),
+            QStringLiteral("CirclePresenceAdapter only supports ToolType::CirclePresence."));
     }
 
-    const CirclePresenceHalconConfig halconConfig = toHalconConfig(config);
+    CirclePresenceHalconConfig halconConfig = toHalconConfig(config);
+    const PositionCorrectionConfig savedCorrection = PositionCorrection::fromParams(config.params);
+
+    PositionCorrectionConsumerOptions correctionOptions;
+    correctionOptions.requested = savedCorrection.enabled;
+    correctionOptions.sourceId = savedCorrection.sourceId;
+    correctionOptions.showMatchContour = boolParam(
+            config.params,
+            QStringLiteral("showPositionCorrectionMatchContour"),
+            true);
+    const PositionCorrectionResolveResult correction =
+            PositionCorrectionConsumer::resolve(request, correctionOptions);
+
+    if (!correction.success) {
+        return makeCirclePresenceError(config,
+                                       correction.status,
+                                       correction.message);
+    }
+
+    halconConfig.enablePositionCorrection = savedCorrection.enabled;
+    halconConfig.positionCorrectionSource = savedCorrection.source;
+    halconConfig.positionCorrection = correction.context;
+
     const CirclePresenceHalconResult runnerResult = m_runner.run(request.image, halconConfig);
 
     ToolResult result;

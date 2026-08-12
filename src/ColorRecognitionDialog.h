@@ -10,6 +10,7 @@
 #include <opencv2/core.hpp>
 
 #include "ColorTemplateDialog.h"
+#include "frame/FrameInputMetadata.h"
 #include "frame/FrameViewHelper.h"
 #include "tooladapters/ColorRecognitionAdapter.h"
 #include "toolcore/ToolConfig.h"
@@ -38,6 +39,9 @@ struct ColorRecognitionDialogConfig
     QString activeTemplateId;
     QString judgeMode = QStringLiteral("min_score");
     int minScore = 80;
+    int minCategoryConfidence = 80;
+    int minClassifiedCoverage = 90;
+    int expectedClassId = -1;
     QString expectedLabel;
 };
 
@@ -73,8 +77,17 @@ private slots:
     void runTest();
     // 退出测试态并恢复编辑态按钮和预览状态。
     void exitTestMode();
+    // 从 PC 导入单张图片，并立即执行完整颜色识别测试链。
+    void importTestImageFromPc();
 
 private:
+    enum class EditState {
+        None,
+        DetectRect,
+        DetectCircle,
+        DetectMaskPolygon
+    };
+
     enum class TestUiMode {
         Edit,
         Continuous,
@@ -85,7 +98,8 @@ private:
     enum class LiveTestSource {
         None,       // 编辑态，不触发自动重测
         Reference,  // 基准图测试：始终在基准图上重测
-        Camera      // 相机测试：连续态用最新帧，单次态用进入时缓存的快照帧
+        Camera,     // 相机测试：连续态用最新帧，单次态用进入时缓存的快照帧
+        Imported    // PC 导入图片：始终复用当前 Dialog 会话缓存
     };
 
     void setupUiState();                         // 初始化控件状态、按钮组、预览 helper 和测试态辅助控件。
@@ -101,6 +115,7 @@ private:
     void updateActiveTemplateSummary();          // 刷新当前模板的标签、样本和参数摘要。
     void updateExpectedLabelCombo();             // 根据当前模板标签刷新“期望类别”下拉框。
     void updateJudgementControls();              // 根据判定模式切换分数阈值和类别控件可用状态。
+    void updateGmmRejectionHint(double value);   // 显示 K-sigma 语义和过高阈值警告。
     void handleTemplateListItemClicked(QListWidgetItem *item); // 响应模板列表点击并切换当前模板。
     int currentTemplateIndex() const;            // 返回当前活动模板在数组中的索引。
     ColorRecognitionTemplateData *activeTemplate(); // 返回可编辑的当前模板指针。
@@ -113,7 +128,9 @@ private:
     // 依据当前 m_liveTestSource 取源帧（基准图 / 相机最新帧 / 单次快照）并立即重跑检测。
     void rerunLiveTest();
     // 统一的检测发射入口：处理 busy 排队、回显标题、generation 标记与异步执行。
-    void launchDetection(const cv::Mat &frame, bool referenceSource);
+    void launchDetection(const cv::Mat &frame,
+                         const FrameInputMetadata &metadata,
+                         bool referenceSource);
     void updateBottomButtons();                  // 按编辑/连续/暂停测试态刷新底部动作按钮。
     void fitPreview();                           // 将预览图适配到当前画布尺寸。
     void showPreviewImage();                     // 显示基准图或默认预览图，并同步 ROI overlay。
@@ -122,7 +139,10 @@ private:
     void startRectangleRoiEditing();             // 启动矩形检测 ROI 绘制。
     void startCircleRoiEditing();                // 启动圆形检测 ROI 绘制。
     void showUnsupportedRegionMessage();         // 提示当前暂不支持的检测区域模式。
-    void syncRegionButtons(bool rectangleRegion); // 同步矩形/圆形 ROI 按钮 checked 状态。
+    void setEditState(EditState state);           // 统一切换活动绘制态，不修改已保存 ROI 数据。
+    void toggleEditState(EditState state);        // 再次点击当前绘制工具时退出绘制态。
+    void refreshRegionButtons();                  // 仅按活动绘制态和全图配置刷新按钮。
+    void updateViewerZoomLabel(qreal scale);      // 同步右侧视图倍率文本。
     void handleRoiChanged(const QRectF &roi);    // 接收矩形 ROI 编辑结果并触发测试态重跑。
     void handleRoiSelectionRejected();           // 处理矩形 ROI 绘制取消。
     void handleCircleRoiChanged(const CircleRoi &roi); // 接收圆形 ROI 编辑结果并触发测试态重跑。
@@ -146,11 +166,14 @@ private:
     QButtonGroup *m_regionGroup;
     FrameViewHelper *m_previewHelper = nullptr;
     QString m_toolId;
+    QString m_loadedPositionCorrectionSourceId =
+            QStringLiteral("reference.positionCorrection");
     bool m_enabled = true;
     QRectF m_roiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
     QString m_detectRegionType = QStringLiteral("rectangle");
     CircleRoi m_circleRoiNormalized;
     bool m_globalDetection = false;
+    EditState m_editState = EditState::None;
     QVector<ColorRecognitionTemplateData> m_templates;
     QString m_activeTemplateId;
     int m_displayedSampleIndex = -1;
@@ -169,6 +192,8 @@ private:
     TestUiMode m_testUiMode = TestUiMode::Edit;
     LiveTestSource m_liveTestSource = LiveTestSource::None;
     cv::Mat m_liveTestFrameSnapshot;       // 单次态锁定的相机帧快照
+    FrameInputMetadata m_liveTestFrameMetadata; // 与单次快照成对锁定的原始输入格式元数据
+    QString m_liveTestImageTitle;
     bool m_liveTestRunning = false;
     QFutureWatcher<ToolResult> *m_testRunWatcher = nullptr;
     bool m_testRunBusy = false;

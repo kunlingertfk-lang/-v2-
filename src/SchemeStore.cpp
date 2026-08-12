@@ -23,7 +23,8 @@ namespace {
 
 constexpr auto kProjectsDirName = "projects";
 constexpr auto kSchemeJsonName = "scheme.json";
-constexpr auto kReferenceImageName = "reference.png";
+constexpr auto kReferenceImageSlotA = "reference_a.png";
+constexpr auto kReferenceImageSlotB = "reference_b.png";
 
 QJsonArray toolConfigsToJson(const QVector<ToolConfig> &configs)
 {
@@ -43,6 +44,59 @@ QVector<ToolConfig> toolConfigsFromJson(const QJsonArray &array)
             configs.append(config);
     }
     return configs;
+}
+
+bool copyCalibrationAssetsForScheme(const QString &sourceSchemeDir,
+                                    SchemeState *targetScheme,
+                                    QString *errorMessage)
+{
+    if (!targetScheme)
+        return false;
+    const QString sourceRoot = QDir(sourceSchemeDir).absolutePath() + QDir::separator();
+    QDir targetAssetDir(QDir(targetScheme->schemeDir).filePath(QStringLiteral("calibrations")));
+    QMap<QString, QString> copiedPaths;
+    for (ToolConfig &tool : targetScheme->toolConfigs) {
+        if (tool.toolType != ToolType::CalibrationTransform)
+            continue;
+        QJsonObject transform = tool.params.value(QStringLiteral("calibrationTransform")).toObject();
+        QJsonArray rewrittenFiles;
+        const QJsonArray files = transform.value(QStringLiteral("calibrationFiles")).toArray();
+        for (const QJsonValue &value : files) {
+            const QString sourceValue = value.toString().trimmed();
+            if (sourceValue.isEmpty())
+                continue;
+            const QString sourcePath = QFileInfo(sourceValue).absoluteFilePath();
+            QString targetPath = sourcePath;
+            if (sourcePath.startsWith(sourceRoot)) {
+                if (!targetAssetDir.exists() && !targetAssetDir.mkpath(QStringLiteral("."))) {
+                    if (errorMessage)
+                        *errorMessage = QStringLiteral("无法创建方案副本的标定资产目录");
+                    return false;
+                }
+                targetPath = copiedPaths.value(sourcePath);
+                if (targetPath.isEmpty()) {
+                    targetPath = targetAssetDir.filePath(QFileInfo(sourcePath).fileName());
+                    if (!QFile::copy(sourcePath, targetPath)) {
+                        if (errorMessage)
+                            *errorMessage = QStringLiteral("无法复制标定资产: %1").arg(sourcePath);
+                        return false;
+                    }
+                    copiedPaths.insert(sourcePath, targetPath);
+                }
+            }
+            rewrittenFiles.append(targetPath);
+        }
+        const QString activeValue = transform.value(
+                    QStringLiteral("activeCalibrationFile")).toString().trimmed();
+        const QString activeSource = activeValue.isEmpty()
+                ? QString() : QFileInfo(activeValue).absoluteFilePath();
+        transform.insert(QStringLiteral("calibrationFiles"), rewrittenFiles);
+        transform.insert(QStringLiteral("activeCalibrationFile"),
+                         activeSource.isEmpty() ? QString()
+                                                : copiedPaths.value(activeSource, activeSource));
+        tool.params.insert(QStringLiteral("calibrationTransform"), transform);
+    }
+    return true;
 }
 
 QJsonObject previewSnapshotsToJson(const QMap<QString, ToolPreviewSnapshot> &snapshots)
@@ -78,6 +132,108 @@ QString sanitizedSchemeId(QString id)
             ch = QLatin1Char('_');
     }
     return id;
+}
+
+QString nextReferenceImageSlot(const QString &currentPath)
+{
+    return QFileInfo(currentPath).fileName() == QString::fromLatin1(kReferenceImageSlotA)
+            ? QString::fromLatin1(kReferenceImageSlotB)
+            : QString::fromLatin1(kReferenceImageSlotA);
+}
+
+QString cleanAbsolutePath(const QString &path)
+{
+    return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+}
+
+bool isSafeReferenceFileName(const QString &path)
+{
+    const QString trimmed = path.trimmed();
+    if (trimmed.isEmpty())
+        return true;
+    if (QFileInfo(trimmed).isAbsolute())
+        return false;
+
+    const QString cleaned = QDir::cleanPath(trimmed);
+    return cleaned != QStringLiteral(".")
+            && cleaned != QStringLiteral("..")
+            && !cleaned.startsWith(QStringLiteral("../"))
+            && QFileInfo(cleaned).fileName() == cleaned;
+}
+
+bool validateSchemeDirectory(const QString &rootPath,
+                             const QString &schemeId,
+                             const QString &schemeDir,
+                             bool mustExist,
+                             QString *error)
+{
+    const QString expected =
+            cleanAbsolutePath(QDir(rootPath).filePath(schemeId));
+    const QString actual = cleanAbsolutePath(schemeDir);
+    if (actual != expected) {
+        if (error) {
+            *error = QStringLiteral("方案目录越界: %1（应为 %2）")
+                    .arg(actual, expected);
+        }
+        return false;
+    }
+
+    const QFileInfo dirInfo(actual);
+    if (mustExist && (!dirInfo.exists() || !dirInfo.isDir())) {
+        if (error)
+            *error = QStringLiteral("方案目录不存在: %1").arg(actual);
+        return false;
+    }
+    if (dirInfo.exists() && dirInfo.isSymLink()) {
+        if (error)
+            *error = QStringLiteral("方案目录不允许使用符号链接: %1").arg(actual);
+        return false;
+    }
+
+    const QFileInfo rootInfo(rootPath);
+    if (rootInfo.exists() && dirInfo.exists()
+            && cleanAbsolutePath(dirInfo.dir().absolutePath())
+                    != cleanAbsolutePath(rootInfo.absoluteFilePath())) {
+        if (error)
+            *error = QStringLiteral("方案目录不在项目根目录内: %1").arg(actual);
+        return false;
+    }
+    return true;
+}
+
+bool validateReferencePath(const QString &schemeDir,
+                           const QString &referencePath,
+                           bool mustExist,
+                           QString *error)
+{
+    if (!isSafeReferenceFileName(referencePath)) {
+        if (error)
+            *error = QStringLiteral("基准图路径越界或格式非法: %1").arg(referencePath);
+        return false;
+    }
+    if (referencePath.trimmed().isEmpty())
+        return true;
+
+    const QString absolutePath =
+            cleanAbsolutePath(QDir(schemeDir).filePath(referencePath));
+    const QString expectedParent = cleanAbsolutePath(schemeDir);
+    const QFileInfo referenceInfo(absolutePath);
+    if (cleanAbsolutePath(referenceInfo.dir().absolutePath()) != expectedParent) {
+        if (error)
+            *error = QStringLiteral("基准图不在方案目录内: %1").arg(absolutePath);
+        return false;
+    }
+    if (mustExist && (!referenceInfo.exists() || !referenceInfo.isFile())) {
+        if (error)
+            *error = QStringLiteral("方案基准图不存在: %1").arg(absolutePath);
+        return false;
+    }
+    if (referenceInfo.exists() && referenceInfo.isSymLink()) {
+        if (error)
+            *error = QStringLiteral("基准图不允许使用符号链接: %1").arg(absolutePath);
+        return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -123,8 +279,10 @@ bool SchemeStore::setCurrentScheme(const QString &schemeId, QString *errorMessag
         return true;
 
     QString saveError;
-    if (!saveCurrentScheme(&saveError))
-        qWarning() << "[SchemeStore] 切换方案前保存当前方案失败:" << saveError;
+    if (!saveCurrentScheme(&saveError)) {
+        setError(errorMessage, QStringLiteral("切换方案前保存当前方案失败: %1").arg(saveError));
+        return false;
+    }
 
     SchemeState target;
     bool found = false;
@@ -192,8 +350,18 @@ bool SchemeStore::saveCurrentScheme(QString *errorMessage)
     if (!ensureLoaded(errorMessage))
         return false;
 
-    if (!saveSchemeToFile(m_currentScheme, errorMessage))
+    SchemeState persistedState;
+    QString rollbackLoadError;
+    const bool hasPersistedState =
+            loadSchemeFromFile(schemeJsonPath(m_currentScheme),
+                               &persistedState,
+                               &rollbackLoadError);
+
+    if (!saveSchemeToFile(m_currentScheme, errorMessage)) {
+        if (hasPersistedState)
+            m_currentScheme = persistedState;
         return false;
+    }
 
     refreshAvailableSchemes(nullptr);
     return true;
@@ -227,17 +395,32 @@ bool SchemeStore::saveCurrentSchemeAs(const QString &schemeName, QString *errorM
     copy.schemeName = newName;
     copy.schemeDir = QDir(projectsRootPath()).filePath(copy.schemeId);
     copy.updatedAt = QDateTime::currentDateTime();
-    if (!copy.referenceImagePath.trimmed().isEmpty())
-        copy.referenceImagePath = QString::fromLatin1(kReferenceImageName);
-
-    const SchemeState previous = m_currentScheme;
-    m_currentScheme = copy;
-
-    if (!saveSchemeToFile(m_currentScheme, errorMessage)) {
-        m_currentScheme = previous;
-        return false;
+    cv::Mat referenceFrame;
+    if (!copy.referenceImagePath.trimmed().isEmpty()) {
+        const QString sourceReferencePath = currentReferenceImageAbsolutePath();
+        referenceFrame = cv::imread(sourceReferencePath.toStdString(), cv::IMREAD_UNCHANGED);
+        if (referenceFrame.empty()) {
+            setError(errorMessage,
+                     QStringLiteral("无法读取待复制的基准图: %1").arg(sourceReferencePath));
+            return false;
+        }
+        copy.referenceImagePath = QString::fromLatin1(kReferenceImageSlotA);
     }
+    if (!copyCalibrationAssetsForScheme(m_currentScheme.schemeDir, &copy, errorMessage))
+        return false;
 
+    SchemeState savedCopy;
+    const cv::Mat *referenceFramePtr = referenceFrame.empty() ? nullptr : &referenceFrame;
+    if (!saveSchemeToFile(copy, errorMessage, referenceFramePtr, &savedCopy))
+        return false;
+
+    m_currentScheme = savedCopy;
+    if (referenceFrame.empty()) {
+        ReferenceImageProvider::instance().clearReferenceFrame();
+    } else {
+        ReferenceImageProvider::instance().setReferenceFrame(
+                    referenceFrame, savedCopy.referenceInputMetadata);
+    }
     refreshAvailableSchemes(nullptr);
     return true;
 }
@@ -343,6 +526,19 @@ QString SchemeStore::currentReferenceImageAbsolutePath() const
 {
     if (m_currentScheme.referenceImagePath.trimmed().isEmpty())
         return QString();
+    QString validationError;
+    if (!validateSchemeDirectory(projectsRootPath(),
+                                 m_currentScheme.schemeId,
+                                 m_currentScheme.schemeDir,
+                                 true,
+                                 &validationError)
+            || !validateReferencePath(m_currentScheme.schemeDir,
+                                      m_currentScheme.referenceImagePath,
+                                      true,
+                                      &validationError)) {
+        qWarning() << "[SchemeStore]" << validationError;
+        return QString();
+    }
 
     QDir dir(m_currentScheme.schemeDir);
     return dir.filePath(m_currentScheme.referenceImagePath);
@@ -413,12 +609,36 @@ bool SchemeStore::setReferenceFrame(const cv::Mat &frame,
         return false;
     }
 
-    ReferenceImageProvider::instance().setReferenceFrame(frame, metadata);
-    m_currentScheme.referenceInputMetadata =
-            ReferenceImageProvider::instance().referenceFrameMetadata();
-    m_currentScheme.referenceImagePath = QString::fromLatin1(kReferenceImageName);
-    m_currentScheme.updatedAt = QDateTime::currentDateTime();
-    return saveCurrentScheme(errorMessage);
+    const cv::Mat normalizedFrame =
+            ReferenceImageProvider::normalizeReferenceFrame(frame);
+    if (normalizedFrame.empty()) {
+        setError(errorMessage, QStringLiteral("基准图格式不受支持"));
+        return false;
+    }
+
+    SchemeState candidate = m_currentScheme;
+    candidate.referenceImagePath =
+            nextReferenceImageSlot(m_currentScheme.referenceImagePath);
+    const QString source = metadata.source.trimmed().isEmpty()
+            ? QStringLiteral("reference")
+            : metadata.source;
+    candidate.referenceInputMetadata =
+            FrameInputMetadata::fromMat(normalizedFrame, source);
+    candidate.updatedAt = QDateTime::currentDateTime();
+
+    SchemeState savedState;
+    if (!saveSchemeToFile(candidate,
+                          errorMessage,
+                          &normalizedFrame,
+                          &savedState)) {
+        return false;
+    }
+
+    m_currentScheme = savedState;
+    ReferenceImageProvider::instance().setReferenceFrame(
+                normalizedFrame, savedState.referenceInputMetadata);
+    refreshAvailableSchemes(nullptr);
+    return true;
 }
 
 bool SchemeStore::loadCurrentReferenceIntoProvider(QString *errorMessage)
@@ -428,26 +648,31 @@ bool SchemeStore::loadCurrentReferenceIntoProvider(QString *errorMessage)
 
     const QString path = currentReferenceImageAbsolutePath();
     if (path.trimmed().isEmpty()) {
+        if (!m_currentScheme.referenceImagePath.trimmed().isEmpty()) {
+            ReferenceImageProvider::instance().clearReferenceFrame();
+            setError(errorMessage, QStringLiteral("方案基准图路径校验失败"));
+            return false;
+        }
         ReferenceImageProvider::instance().clearReferenceFrame();
         return true;
     }
 
-    const cv::Mat frame = cv::imread(path.toStdString(), cv::IMREAD_COLOR);
+    const cv::Mat frame = cv::imread(path.toStdString(), cv::IMREAD_UNCHANGED);
     if (frame.empty()) {
         ReferenceImageProvider::instance().clearReferenceFrame();
         setError(errorMessage, QStringLiteral("无法加载方案基准图: %1").arg(path));
         return false;
     }
 
-    FrameInputMetadata metadata = m_currentScheme.referenceInputMetadata;
-    if (metadata.colorMode == QStringLiteral("unknown")
-            && metadata.pixelFormat.isEmpty()
-            && metadata.originalChannels == 0
-            && metadata.originalDepth < 0
-            && metadata.source.isEmpty()) {
-        metadata.source = QStringLiteral("reference");
-    }
+    // The persisted PNG may be 8-bit or 16-bit. Do not reuse acquisition metadata
+    // (for example RGBX8/BGRA16) as the runtime contract after decoding/normalization.
+    const QString source = m_currentScheme.referenceInputMetadata.source.trimmed().isEmpty()
+            ? QStringLiteral("reference")
+            : m_currentScheme.referenceInputMetadata.source;
+    const FrameInputMetadata metadata = FrameInputMetadata::fromMat(frame, source);
     ReferenceImageProvider::instance().setReferenceFrame(frame, metadata);
+    m_currentScheme.referenceInputMetadata =
+            ReferenceImageProvider::instance().referenceFrameMetadata();
     return true;
 }
 
@@ -457,6 +682,27 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
 {
     if (!state) {
         setError(errorMessage, QStringLiteral("方案状态指针为空"));
+        return false;
+    }
+
+    const QFileInfo jsonInfo(schemeJsonPath);
+    if (jsonInfo.fileName() != QString::fromLatin1(kSchemeJsonName)) {
+        setError(errorMessage, QStringLiteral("方案文件名非法: %1").arg(schemeJsonPath));
+        return false;
+    }
+    const QString directoryId = jsonInfo.dir().dirName();
+    QString pathError;
+    if (!validateSchemeDirectory(projectsRootPath(),
+                                 directoryId,
+                                 jsonInfo.absolutePath(),
+                                 true,
+                                 &pathError)) {
+        setError(errorMessage, pathError);
+        return false;
+    }
+    if (jsonInfo.isSymLink()) {
+        setError(errorMessage, QStringLiteral("方案文件不允许使用符号链接: %1")
+                 .arg(schemeJsonPath));
         return false;
     }
 
@@ -479,8 +725,21 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
     loaded.schemeId = sanitizedSchemeId(json.value(QStringLiteral("schemeId")).toString());
     if (loaded.schemeId.isEmpty())
         loaded.schemeId = QFileInfo(loaded.schemeDir).fileName();
+    if (loaded.schemeId != directoryId) {
+        setError(errorMessage,
+                 QStringLiteral("方案 id 与目录名不一致: %1 / %2")
+                 .arg(loaded.schemeId, directoryId));
+        return false;
+    }
     loaded.schemeName = json.value(QStringLiteral("schemeName")).toString(loaded.schemeId);
     loaded.referenceImagePath = json.value(QStringLiteral("referenceImage")).toString();
+    if (!validateReferencePath(loaded.schemeDir,
+                               loaded.referenceImagePath,
+                               !loaded.referenceImagePath.trimmed().isEmpty(),
+                               &pathError)) {
+        setError(errorMessage, pathError);
+        return false;
+    }
     loaded.referenceInputMetadata = FrameInputMetadata::fromJson(
                 json.value(QStringLiteral("referenceInputMetadata")).toObject());
     loaded.referencePositionCorrection = PositionCorrection::referenceFromJson(
@@ -496,22 +755,82 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
     return true;
 }
 
-bool SchemeStore::saveSchemeToFile(const SchemeState &state, QString *errorMessage) const
+bool SchemeStore::saveSchemeToFile(const SchemeState &state,
+                                   QString *errorMessage,
+                                   const cv::Mat *referenceFrame,
+                                   SchemeState *savedState) const
 {
     SchemeState normalized = normalizedStateForSave(state);
+
+    QDir root(projectsRootPath());
+    if (!root.exists() && !root.mkpath(QStringLiteral("."))) {
+        setError(errorMessage,
+                 QStringLiteral("无法创建方案根目录: %1").arg(root.absolutePath()));
+        return false;
+    }
+    QString pathError;
+    if (!validateSchemeDirectory(root.absolutePath(),
+                                 normalized.schemeId,
+                                 normalized.schemeDir,
+                                 false,
+                                 &pathError)) {
+        setError(errorMessage, pathError);
+        return false;
+    }
+    if (!validateReferencePath(normalized.schemeDir,
+                               normalized.referenceImagePath,
+                               false,
+                               &pathError)) {
+        setError(errorMessage, pathError);
+        return false;
+    }
 
     QDir schemeDir(normalized.schemeDir);
     if (!schemeDir.exists() && !schemeDir.mkpath(QStringLiteral("."))) {
         setError(errorMessage, QStringLiteral("无法创建方案目录: %1").arg(normalized.schemeDir));
         return false;
     }
+    if (!validateSchemeDirectory(root.absolutePath(),
+                                 normalized.schemeId,
+                                 normalized.schemeDir,
+                                 true,
+                                 &pathError)) {
+        setError(errorMessage, pathError);
+        return false;
+    }
 
-    cv::Mat referenceFrame = ReferenceImageProvider::instance().referenceFrame();
-    if (!normalized.referenceImagePath.trimmed().isEmpty() && !referenceFrame.empty()) {
-        normalized.referenceImagePath = QString::fromLatin1(kReferenceImageName);
-        const QString referencePath = schemeDir.filePath(normalized.referenceImagePath);
-        if (!cv::imwrite(referencePath.toStdString(), referenceFrame)) {
-            setError(errorMessage, QStringLiteral("无法写入基准图: %1").arg(referencePath));
+    QString newlyWrittenReferencePath;
+    if (referenceFrame) {
+        if (referenceFrame->empty() || normalized.referenceImagePath.trimmed().isEmpty()) {
+            setError(errorMessage, QStringLiteral("基准图保存参数无效"));
+            return false;
+        }
+
+        newlyWrittenReferencePath =
+                schemeDir.filePath(normalized.referenceImagePath);
+        try {
+            if (!cv::imwrite(newlyWrittenReferencePath.toStdString(), *referenceFrame)) {
+                QFile::remove(newlyWrittenReferencePath);
+                setError(errorMessage,
+                         QStringLiteral("无法写入基准图: %1")
+                         .arg(newlyWrittenReferencePath));
+                return false;
+            }
+        } catch (const cv::Exception &exception) {
+            QFile::remove(newlyWrittenReferencePath);
+            setError(errorMessage,
+                     QStringLiteral("写入基准图异常: %1")
+                     .arg(QString::fromLocal8Bit(exception.what())));
+            return false;
+        }
+    } else if (!normalized.referenceImagePath.trimmed().isEmpty()) {
+        const QString existingReferencePath =
+                schemeDir.filePath(normalized.referenceImagePath);
+        if (!validateReferencePath(normalized.schemeDir,
+                                   normalized.referenceImagePath,
+                                   true,
+                                   &pathError)) {
+            setError(errorMessage, pathError);
             return false;
         }
     }
@@ -532,16 +851,31 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state, QString *errorMessa
 
     QSaveFile file(schemeDir.filePath(QString::fromLatin1(kSchemeJsonName)));
     if (!file.open(QIODevice::WriteOnly)) {
+        if (!newlyWrittenReferencePath.isEmpty())
+            QFile::remove(newlyWrittenReferencePath);
         setError(errorMessage, QStringLiteral("无法写入方案文件: %1").arg(file.fileName()));
         return false;
     }
 
-    file.write(QJsonDocument(json).toJson(QJsonDocument::Indented));
+    const QByteArray jsonBytes =
+            QJsonDocument(json).toJson(QJsonDocument::Indented);
+    if (file.write(jsonBytes) != jsonBytes.size()) {
+        file.cancelWriting();
+        if (!newlyWrittenReferencePath.isEmpty())
+            QFile::remove(newlyWrittenReferencePath);
+        setError(errorMessage,
+                 QStringLiteral("方案文件写入不完整: %1").arg(file.fileName()));
+        return false;
+    }
     if (!file.commit()) {
+        if (!newlyWrittenReferencePath.isEmpty())
+            QFile::remove(newlyWrittenReferencePath);
         setError(errorMessage, QStringLiteral("方案文件提交失败: %1").arg(file.fileName()));
         return false;
     }
 
+    if (savedState)
+        *savedState = normalized;
     if (normalized.schemeId == m_currentScheme.schemeId)
         const_cast<SchemeStore *>(this)->m_currentScheme = normalized;
 
@@ -644,6 +978,7 @@ SchemeState SchemeStore::normalizedStateForSave(SchemeState state) const
         state.schemeName = state.schemeId;
     if (state.schemeDir.trimmed().isEmpty())
         state.schemeDir = QDir(projectsRootPath()).filePath(state.schemeId);
+    state.schemeDir = cleanAbsolutePath(state.schemeDir);
     state.updatedAt = QDateTime::currentDateTime();
     return state;
 }

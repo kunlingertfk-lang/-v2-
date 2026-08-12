@@ -1,7 +1,7 @@
 #ifndef ALGORITHMS_PRESENCE_BLOBPRESENCEHALCONRUNNER_H
 #define ALGORITHMS_PRESENCE_BLOBPRESENCEHALCONRUNNER_H
 
-#include "toolcore/ToolOverlay.h"
+#include "toolcore/PositionCorrectionConsumer.h"
 
 #include <QJsonObject>
 #include <QPointF>
@@ -24,6 +24,7 @@ struct BlobPresenceHalconConfig
     QRectF detectCircleBoundingRectNormalized;
     bool enablePositionCorrection = false;
     QString positionCorrectionSource;
+    PositionCorrectionContext positionCorrection;
     int grayMin = 0;
     int grayMax = 255;
     bool invertRange = false;
