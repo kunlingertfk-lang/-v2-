@@ -38,7 +38,7 @@ build/
 moc_predefs.h
 /qt_ui_test
 
-# smoke / tests 子工程源码入库，构建产物继续按通用规则忽略
+# 当前公司仓库策略下 smoke / tests 为本地验证资料；以下规则继续兜底忽略其构建产物
 *_smoke
 *_smoke.Makefile
 *.Makefile
