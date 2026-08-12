@@ -2,6 +2,8 @@
 
 基于 Qt 的工业视觉工具配置与运行工程。视觉核心算法基于 HALCON，OpenCV 仅作图像容器/采集/格式桥接。
 
+团队分支管理、GitLab MR、历史迁移、回滚和提交边界统一遵循 [`GIT_WORKFLOW.md`](GIT_WORKFLOW.md)。
+
 ## 前置条件
 
 | 依赖 | 版本 | 获取方式 |
