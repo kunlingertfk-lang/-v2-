@@ -483,12 +483,41 @@ git switch -c tfk/hotfix/<bug-name> gitlab/main
 
 ### 7.3 当前 `.gitignore` 的特殊约束
 
-当前公司仓库忽略整个 `docs/`、`smoke/`、`tests/` 和 `projects/`。因此：
+当前公司仓库忽略根目录 `AGENTS.*`，以及整个 `docs/`、`smoke/`、`tests/` 和 `projects/`。因此：
 
 - 本文档使用根目录 `GIT_WORKFLOW.md`，不能依赖 `git add -f docs/...` 绕过团队策略。
+- 当前 `AGENTS.md` 仅作为个人本地参考，不是公司仓库中的团队规则载体；需要团队共同执行的约束必须写入已跟踪的治理文档，或通过专项治理 MR 调整忽略策略后再纳入版本控制。
 - 功能文档、smoke 源码或测试源码是否纳入公司仓库，需要单独形成治理 MR，明确修改 `.gitignore` 和目录规范。
 - 历史 `.gitignore` 曾出现“测试源码入库”的注释与目录级忽略规则相反的问题；本次只修正误导注释，没有改变忽略行为。
 - 后续如要启用测试源码入库，应通过专门治理 MR 修改实际规则，禁止在普通功能 MR 中临时强制添加。
+
+#### 7.3.1 忽略规则不等于文件保护
+
+`.gitignore` 只决定未跟踪文件是否出现在默认状态和暂存候选中；它不影响已跟踪文件，也不保证文件在切换分支时保留。
+
+如果旧分支跟踪了 `AGENTS.md`、`docs/`、`tests/` 或 `smoke/`，而目标 `tfk/develop` 的提交树不包含这些路径，那么执行 `git switch tfk/develop` 时，Git 会按照目标提交树移除它们。即使目标分支的 `.gitignore` 同时忽略这些路径，也不会阻止移除。
+
+因此，不能把“已经写入 `.gitignore`”理解为本地资料已经备份或受到保护。切换分支前必须先确认这些资料在另一个 worktree、受控备份或其他可恢复位置中仍然存在。
+
+#### 7.3.2 本地参考资料的安全迁移顺序
+
+从旧历史迁移到公司基线时，必须遵守以下顺序：
+
+1. 保留旧分支和旧 worktree，不在唯一保存资料的工作树上直接切换基线。
+2. 在独立 worktree 或新克隆中先检出并确认公司 `tfk/develop` 基线；分支已被其他 worktree 占用时，先用 `git worktree list` 定位，禁止强制绕过。
+3. 基线检出完成后，再从旧 worktree 按审核白名单复制 `AGENTS.md`、`docs/`、`tests/`、`smoke/` 等确需本地保留的资料。
+4. 不使用 `rsync --delete` 覆盖含有额外本地资料的目录；复制后同时验证文件存在、未被追踪并命中忽略规则。
+5. 禁止使用 `git add -f` 把本地参考资料塞入普通功能 MR；需要团队共享时必须另开治理 MR。
+
+复制后的验证命令：
+
+```bash
+git ls-files -- AGENTS.md docs tests smoke
+git check-ignore -v -- AGENTS.md docs tests smoke
+git status --ignored --short -- AGENTS.md docs tests smoke
+```
+
+其中 `git ls-files` 应无输出，`git status --ignored` 应显示 `!!`。若路径不存在或未命中忽略规则，必须先处理，不能继续开发或清理旧 worktree。
 
 ### 7.4 提交前卫生检查
 
@@ -1014,6 +1043,7 @@ git rev-parse <commit-a>^{tree} <commit-b>^{tree}
 | 误解“领先 7/8” | 功能只有 6 个提交，分支却领先 7 或 8 | `--no-ff` 合并提交和后续格式修复也计入 | 用图形日志和范围日志分别解释 |
 | MR 显示源分支落后目标 | 因“落后 4 个提交”准备盲目 rebase | ahead/behind 只统计提交图，目标 tree 可能仍等于共同基点 | 同时检查 merge-base、目标变化、冲突和 tree |
 | 把仓库差异当源码差异 | 两个基线显示数百文件差异，误判生产代码差异巨大 | 文档、测试、方案和备份占多数 | 使用限定路径 diff，并单独核对 tree |
+| 把 `.gitignore` 当成本地文件保护 | 切换到 `tfk/develop` 后 `AGENTS.md`、`docs/`、`tests/` 消失 | 这些路径在旧分支被跟踪，但目标提交树不包含；ignore 不影响已跟踪文件和分支切换 | 保留旧 worktree，先检出公司基线，再复制成本地忽略副本并验证 `git ls-files` 无输出、状态为 `!!` |
 | 把相似文件树当同一历史 | `43c1dc4` 与 `958a106` 生产源码接近，就认为有父子关系 | 文件内容与提交拓扑是两件事 | 同时检查 `merge-base` 和限定路径 diff |
 | 认为父提交内容仍被保留 | `db98559` 有 `43c1dc4` 作为父节点，却大量删除源码 | 合并提交的最终 tree 可以改变父节点任意内容 | 检查合并提交 tree，不根据父节点名称推断 |
 | 直接 cherry-pick 合并提交 | 出现大量修改/删除和内容冲突 | 在错误基线使用 `cherry-pick -m 1` | 先核对父节点、基线和预期 tree；优先逐段重放 |
@@ -1050,10 +1080,12 @@ git rev-parse <commit-a>^{tree} <commit-b>^{tree}
 ### 开始开发前
 
 - [ ] 已确认当前目录和 worktree。
+- [ ] 切换公司基线前，旧分支中的本地参考资料已保存在独立 worktree 或其他可恢复位置。
 - [ ] 已确认当前分支不是旧本地 `develop`。
 - [ ] 已确认公司远程为 `gitlab`。
 - [ ] `git status` 干净。
 - [ ] `tfk/develop` 已通过 `--ff-only` 更新。
+- [ ] 仅在公司基线检出完成后复制本地参考资料，并确认 `git ls-files` 无输出、`git status --ignored` 显示 `!!`。
 - [ ] 已创建语义清晰的功能或修复分支。
 
 ### 每次提交前
