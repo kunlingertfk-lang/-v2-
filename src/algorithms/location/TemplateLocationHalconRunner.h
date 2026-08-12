@@ -65,10 +65,13 @@ struct TemplateLocationHalconResult
     QJsonObject payload;
 };
 
+/// 基于 HALCON 形状模板定位目标，输出快速标定采点所需的位置与方向。
 class TemplateLocationHalconRunner
 {
 public:
+    /// 清理指定模板配置对应的持久化 HALCON 模型缓存。
     static bool clearPersistentCache(const QString &modelCacheKey);
+    /// 在当前图像中匹配参考模板，返回 X/Y/Angle、质量状态与叠加结果。
     TemplateLocationHalconResult run(const cv::Mat &image,
                                      const cv::Mat &referenceImage,
                                      const TemplateLocationHalconConfig &config);

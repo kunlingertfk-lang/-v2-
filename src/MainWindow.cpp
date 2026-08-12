@@ -450,6 +450,13 @@ MainWindow::MainWindow(QWidget *parent)
             [](const QString &message) {
                 qWarning() << "[MainWindow]" << message;
             });
+    connect(&ReferenceImageProvider::instance(),
+            &ReferenceImageProvider::referenceFrameChanged,
+            this,
+            [this](const QImage &) {
+        m_referencePreviewSnapshots.clear();
+        refreshLivePreview();
+    });
     refreshLivePreview();
     QTimer::singleShot(0, this, &MainWindow::ensureCameraRunning);
 }
@@ -495,6 +502,8 @@ void MainWindow::applySavedSchemeTools(
         ToolPreviewSnapshot normalized = snapshot;
         normalized.toolId = config.toolId;
         normalized.toolType = config.toolType;
+        normalized.result.toolId = config.toolId;
+        normalized.result.toolType = config.toolType;
         m_referencePreviewSnapshots.insert(config.toolId, normalized);
     }
 
@@ -922,6 +931,8 @@ bool MainWindow::persistCurrentSchemeState(const QString &context)
         return false;
     }
 
+    m_schemeToolConfigs = store.currentScheme().toolConfigs;
+    m_referencePreviewSnapshots = store.currentScheme().referencePreviewSnapshots;
     refreshSchemeSelector();
     return true;
 }
@@ -1109,6 +1120,7 @@ bool MainWindow::tryRunToolChainOnLatestFrame(qint64 frameIndex)
 
 bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex)
 {
+    // 运行帧、参考图和配置在入队前复制；后序标定转换只消费本次 frameId 的前序结果。
     if (m_isToolChainRunning) {
         if (continuousRun)
             ++m_continuousDroppedFrames;
@@ -1761,6 +1773,28 @@ QString MainWindow::toolSnapshotStatusLine(const ToolPreviewSnapshot &snapshot,
     const QString status = snapshot.statusText.trimmed().isEmpty()
             ? snapshot.result.status
             : snapshot.statusText;
+    if (snapshot.result.success
+            && (snapshot.toolType == ToolType::CalibrationTransform
+                || snapshot.result.toolType == ToolType::CalibrationTransform)) {
+        const QJsonObject payload = snapshot.result.payload;
+        const QString angleText = payload.value(QStringLiteral("angleValid")).toBool()
+                && payload.value(QStringLiteral("machineAngle")).isDouble()
+                ? tr("机械角度:%1°").arg(
+                      QString::number(payload.value(
+                                          QStringLiteral("machineAngle")).toDouble(),
+                                      'f', 3))
+                : tr("机械角度:未配置");
+        return tr("%1 | %2 | %3 | 物理X:%4 | 物理Y:%5 | %6 | %7ms")
+                .arg(sourceLabel,
+                     state,
+                     status,
+                     QString::number(payload.value(QStringLiteral("machineX")).toDouble(),
+                                     'f', 3),
+                     QString::number(payload.value(QStringLiteral("machineY")).toDouble(),
+                                     'f', 3),
+                     angleText,
+                     QString::number(snapshot.result.elapsedMs));
+    }
     return tr("%1 | %2 | %3 | score:%4 | count:%5")
             .arg(sourceLabel,
                  state,
@@ -1921,6 +1955,12 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         dialog.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
         PlanDialogUtils::applyLargeWindow(&dialog);
         dialog.setProducerTools(m_schemeToolConfigs, row, m_referencePreviewSnapshots);
+        dialog.setToolChainTestContext(
+                    m_schemeToolConfigs,
+                    row,
+                    &m_toolEngine,
+                    SchemeStore::instance().currentScheme()
+                    .referencePositionCorrection);
         dialog.loadFromConfig(originalConfig);
         if (dialog.exec() == QDialog::Accepted) {
             editedConfig = dialog.toolConfig();
@@ -1937,6 +1977,9 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
     if (!accepted)
         return false;
 
+    const QVector<ToolConfig> configsBefore = m_schemeToolConfigs;
+    const QMap<QString, ToolPreviewSnapshot> previewsBefore = m_referencePreviewSnapshots;
+    const int selectedBefore = m_selectedToolIndex;
     editedConfig.toolId = originalConfig.toolId;
     editedConfig.toolType = originalConfig.toolType;
     editedConfig.category = originalConfig.category;
@@ -1946,7 +1989,22 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
         ToolPreviewSnapshot normalized = snapshot;
         normalized.toolId = editedConfig.toolId;
         normalized.toolType = editedConfig.toolType;
+        normalized.result.toolId = editedConfig.toolId;
+        normalized.result.toolType = editedConfig.toolType;
         m_referencePreviewSnapshots.insert(editedConfig.toolId, normalized);
+    } else if (editedConfig.toolType == ToolType::CalibrationTransform) {
+        m_referencePreviewSnapshots.remove(editedConfig.toolId);
+    }
+
+    if (!persistCurrentSchemeState(QStringLiteral("editSchemeTool"))) {
+        m_schemeToolConfigs = configsBefore;
+        m_referencePreviewSnapshots = previewsBefore;
+        m_selectedToolIndex = selectedBefore;
+        refreshToolConfigTable();
+        if (selectedBefore >= 0 && selectedBefore < m_schemeToolConfigs.size())
+            selectSchemeTool(selectedBefore);
+        showStatusText(tr("方案保存失败，工具参数已恢复为保存前状态"));
+        return false;
     }
 
     m_lastRunSnapshots.remove(editedConfig.toolId);
@@ -1954,6 +2012,5 @@ bool MainWindow::openToolConfigDialogForEdit(int row)
     refreshToolConfigTable();
     selectSchemeTool(row);
     showStatusText(tr("工具参数已更新，主界面运行结果已标记为未运行"));
-    persistCurrentSchemeState(QStringLiteral("editSchemeTool"));
     return true;
 }

@@ -1,6 +1,8 @@
 QWidget {
-    color: #f3f5f7;
-    background: #2f323b;
+    /* Global foreground/background colors are intentionally disabled.
+       Dark surfaces must opt in through a page-scoped selector. */
+    /* color: #f3f5f7; */
+    /* background: #2f323b; */
     font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
     font-size: 14px;
 }
@@ -2272,6 +2274,55 @@ QDialog#CalibrationTransformDialog QFrame[panelRole="configCard"] {
     border-radius: 8px;
 }
 
+/* N-point calibration uses code-created QWidget content containers. Keep
+   those containers transparent so the light configuration card stays visible. */
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget,
+QDialog#QuickCalibrationWizard QWidget#nPointMovementCardContent,
+QDialog#QuickCalibrationWizard QWidget#nPointCalibrationParametersCardContent,
+QDialog#QuickCalibrationWizard QWidget#nPointEffectiveRegionCardContent,
+QDialog#QuickCalibrationWizard QWidget#nPointCaptureSubscriptionWidget {
+    background: transparent;
+    color: #314968;
+    border: 0;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLabel[role="rowField"],
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLabel[role="cardHint"] {
+    background: transparent;
+    color: #314968;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="idle"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="idle"] {
+    color: #64748b;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="ok"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="ok"] {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="warning"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="warning"] {
+    color: #d97706;
+    font-weight: 700;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget
+QLabel#nPointRegionGenerationStatus[regionState="error"],
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QLabel#regionGenerationValue[regionState="error"] {
+    color: #dc2626;
+    font-weight: 700;
+}
+
 QDialog#QuickCalibrationWizard QLabel,
 QDialog#CalibrationPointEditorDialog QLabel,
 QDialog#CalibrationTransformDialog QScrollArea QLabel,
@@ -2307,6 +2358,36 @@ QDialog#CalibrationTransformDialog QComboBox:focus,
 QDialog#CalibrationTransformDialog QSpinBox:focus,
 QDialog#CalibrationTransformDialog QDoubleSpinBox:focus {
     border: 2px solid #ff830f;
+}
+
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo {
+    padding: 0 40px 0 10px;
+    font-size: 15px;
+    font-weight: 400;
+}
+
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::drop-down {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 36px;
+    background: transparent;
+    border: 0;
+}
+
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::drop-down:hover,
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::drop-down:on {
+    background: #f3f6f9;
+}
+
+QDialog#QuickCalibrationWizard QWidget#calibrationCommunicationPage
+QComboBox#calibrationCommunicationTypeCombo::down-arrow {
+    image: url(:/icons/arrow-down.svg);
+    width: 14px;
+    height: 14px;
 }
 
 QDialog#QuickCalibrationWizard QPushButton[actionRole="secondary"],
@@ -2367,6 +2448,28 @@ QDialog#CalibrationTransformDialog QPushButton[segmentRole="mode"]:checked {
     color: #ff7900;
 }
 
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QFrame#nPointCaptureModeFrame {
+    background: #eef1f5;
+    border: 1px solid #cfd5de;
+    border-radius: 3px;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QFrame#nPointCaptureModeFrame QPushButton {
+    min-height: 38px;
+    background: transparent;
+    color: #657183;
+    border: 0;
+    border-radius: 2px;
+    padding: 0 14px;
+    font-size: 15px;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QFrame#nPointCaptureModeFrame QPushButton:checked {
+    background: #ffffff;
+    color: #ff7900;
+    font-weight: 700;
+}
+
 QDialog#QuickCalibrationWizard QFrame#calibrationPreviewPanel,
 QDialog#CalibrationTransformDialog QFrame#calibrationTransformPreview {
     background: #1f2227;
@@ -2392,6 +2495,34 @@ QDialog#CalibrationTransformDialog QLabel#viewerCursorLabel {
 QDialog#CalibrationTransformDialog QGraphicsView#previewGraphicsView {
     background: #15171a;
     border: 0;
+}
+
+QDialog#CalibrationTransformDialog QFrame#viewerCanvasContainer,
+QDialog#CalibrationTransformDialog QWidget#conversionResultOverlay {
+    background: transparent;
+    border: 0;
+}
+
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel {
+    background: #15171a;
+    border: 1px solid #3a404a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #edf1f5;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="ok"] {
+    color: #20c933;
+}
+
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="warning"] {
+    color: #ff9d18;
+}
+
+QDialog#CalibrationTransformDialog QLabel#conversionResultLabel[resultState="ng"] {
+    color: #ff2020;
 }
 
 QDialog#QuickCalibrationWizard QFrame#calibrationPreviewToolbar,
@@ -2554,6 +2685,20 @@ QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox {
     color: #314968;
 }
 
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup
+QCheckBox#allowBoundaryForProductionCheck {
+    min-height: 32px;
+    padding: 0;
+    spacing: 10px;
+    background: transparent;
+    border: 0;
+    color: #314968;
+}
+
+QDialog#CalibrationTransformDialog QGroupBox#regionGroup QLabel[role="rowField"] {
+    min-width: 126px;
+}
+
 QDialog#QuickCalibrationWizard QCheckBox::indicator,
 QDialog#CalibrationTransformDialog QCheckBox::indicator {
     background: #ffffff;
@@ -2574,6 +2719,7 @@ QDialog#CalibrationTransformDialog QTextEdit#resultText {
     font-size: 15px;
 }
 
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QToolButton[actionRole="bindingLink"],
 QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"] {
     min-width: 38px;
     max-width: 38px;
@@ -2585,14 +2731,21 @@ QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"] {
     border-radius: 3px;
 }
 
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QToolButton[actionRole="bindingLink"]:hover,
 QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"]:hover {
     background: #f6f8fb;
     border-color: #ff830f;
 }
 
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QToolButton[actionRole="bindingLink"][bindingActive="true"],
 QDialog#CalibrationTransformDialog QToolButton[actionRole="bindingLink"][bindingActive="true"] {
     background: #fff2e6;
     border: 2px solid #ff830f;
+}
+
+QDialog#QuickCalibrationWizard QWidget#NPointCalibrationConfigWidget QLineEdit[bindingField="true"][bindingState="active"] {
+    border: 1px solid #ff830f;
+    color: #314968;
 }
 
 QDialog#CalibrationTransformDialog QGroupBox#poseGroup QCheckBox::indicator {

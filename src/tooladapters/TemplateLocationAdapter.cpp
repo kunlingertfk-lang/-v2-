@@ -1,6 +1,7 @@
 #include "tooladapters/TemplateLocationAdapter.h"
 
 #include "algorithms/halcon/HalconRuntimePaths.h"
+#include "calibration/CalibrationSourceFingerprint.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -197,5 +198,9 @@ ToolResult TemplateLocationAdapter::run(const ToolRequest &request)
     result.text = matched.status;
     result.overlays = matched.overlays;
     result.payload = matched.payload;
+    result.payload.insert(
+                QStringLiteral("coordinateSourceReferenceSignature"),
+                CalibrationSourceFingerprint::imageSignature(request.referenceImage));
+    CalibrationSourceFingerprint::enrichTemplatePayload(config, &result.payload);
     return result;
 }
