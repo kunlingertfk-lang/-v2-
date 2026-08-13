@@ -110,6 +110,7 @@ SOURCES += \
     src/algorithms/presence/PatternPresenceHalconApi.cpp \
     src/algorithms/presence/PatternPresenceAutoModelDomain.cpp \
     src/algorithms/presence/PatternPresenceHalconRunner.cpp \
+    src/algorithms/location/TemplateLocationConfig.cpp \
     src/algorithms/location/TemplateLocationHalconRunner.cpp \
     src/algorithms/location/PositionCorrectionHalconRunner.cpp \
     src/algorithms/location/PositionCorrectionHalconTransform.cpp \
@@ -212,6 +213,8 @@ HEADERS += \
     src/algorithms/presence/PatternPresenceHalconApi.h \
     src/algorithms/presence/PatternPresenceAutoModelDomain.h \
     src/algorithms/presence/PatternPresenceHalconRunner.h \
+    src/algorithms/location/ReferenceTemplateLocationConfig.h \
+    src/algorithms/location/TemplateLocationConfig.h \
     src/algorithms/location/TemplateLocationHalconRunner.h \
     src/algorithms/location/PositionCorrectionHalconTransform.h \
     src/algorithms/location/CalibrationTransformHalconRunner.h \

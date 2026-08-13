@@ -1,6 +1,6 @@
 #include "ToolEngine.h"
 
-#include "algorithms/halcon/HalconRuntimePaths.h"
+#include "algorithms/location/ReferenceTemplateLocationConfig.h"
 #include "algorithms/location/PositionCorrectionHalconRunner.h"
 #include "algorithms/location/TemplateLocationHalconRunner.h"
 #include "toolcore/PositionCorrection.h"
@@ -8,7 +8,6 @@
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QRectF>
 
 #include <cmath>
 
@@ -96,16 +95,19 @@ bool validNormalizedPoint(const QPointF &point)
             && point.y() >= 0.0 && point.y() <= 1.0;
 }
 
-QVector<QPointF> polygonPoints(const QJsonArray &values)
+bool normalizedPointFromJson(const QJsonValue &value, QPointF *point)
 {
-    QVector<QPointF> points;
-    points.reserve(values.size());
-    for (const QJsonValue &value : values) {
-        const QJsonObject point = value.toObject();
-        points.append(QPointF(point.value(QStringLiteral("x")).toDouble(),
-                              point.value(QStringLiteral("y")).toDouble()));
+    if (!point || !value.isObject())
+        return false;
+    const QJsonObject object = value.toObject();
+    double x = 0.0;
+    double y = 0.0;
+    if (!finiteJsonNumber(object.value(QStringLiteral("x")), &x)
+            || !finiteJsonNumber(object.value(QStringLiteral("y")), &y)) {
+        return false;
     }
-    return points;
+    *point = QPointF(x, y);
+    return validNormalizedPoint(*point);
 }
 
 ToolResult referencePositionCorrectionError(const QString &status,
@@ -130,11 +132,22 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
                                           const cv::Mat &referenceImage,
                                           const QJsonObject &runtimeContext)
 {
+    const QJsonObject referenceJson = runtimeContext.value(
+                QStringLiteral("referencePositionCorrection")).toObject();
     const ReferencePositionCorrectionConfig referenceConfig =
-            PositionCorrection::referenceFromJson(
-                runtimeContext.value(QStringLiteral("referencePositionCorrection")).toObject());
+            PositionCorrection::referenceFromJson(referenceJson);
     if (!referenceConfig.enabled)
         return ToolResult();
+    const ReferenceTemplateLocationConfigResult resolved =
+            ReferenceTemplateLocationConfig::fromJson(referenceJson,
+                                                      referenceConfig);
+    if (!resolved.supported)
+        return referencePositionCorrectionError(resolved.status,
+                                                resolved.message);
+    if (!resolved.valid)
+        return referencePositionCorrectionError(resolved.status,
+                                                resolved.message);
+    const TemplateLocationModelBankConfig &locatorConfig = resolved.bank;
     if (!referenceConfig.referenceCreated)
         return referencePositionCorrectionError(
                     QStringLiteral("reference_pose_missing"),
@@ -145,55 +158,101 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
     if (referenceImage.empty())
         return referencePositionCorrectionError(QStringLiteral("no_reference_image"),
                                                 QStringLiteral("reference image is empty"));
-    if (referenceConfig.referencePose.isEmpty())
-        return referencePositionCorrectionError(QStringLiteral("reference_pose_missing"),
-                                                QStringLiteral("reference position pose is missing"));
-    if (referenceConfig.originMode != QStringLiteral("centroid")
-            && referenceConfig.originMode != QStringLiteral("custom")) {
-        return referencePositionCorrectionError(QStringLiteral("invalid_custom_origin"),
-                                                QStringLiteral("reference origin mode is invalid"));
-    }
-    if (referenceConfig.originMode == QStringLiteral("custom")
-            && !validNormalizedPoint(referenceConfig.customOriginNormalized)) {
-        return referencePositionCorrectionError(QStringLiteral("invalid_custom_origin"),
-                                                QStringLiteral("reference custom origin is invalid"));
-    }
 
-    TemplateLocationHalconConfig locatorConfig;
-    locatorConfig.toolId = PositionCorrection::defaultSourceId();
-    locatorConfig.modelCacheKey = referenceConfig.modelCacheKey.trimmed().isEmpty()
-            ? QStringLiteral("reference.positionCorrection.private_template")
-            : referenceConfig.modelCacheKey.trimmed();
-    locatorConfig.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
-                QString(), &locatorConfig.halconSoPathCandidates);
-    locatorConfig.templateRegionType = referenceConfig.templateRegionType;
-    locatorConfig.templateRoiNormalized = referenceConfig.templateRoiNormalized;
-    locatorConfig.templatePolygonNormalized =
-            polygonPoints(referenceConfig.templatePolygonNormalized);
-    locatorConfig.templateMaskRegionType =
-            referenceConfig.templateMaskRegionType;
-    locatorConfig.templateMaskRoiNormalized =
-            referenceConfig.templateMaskRoiNormalized;
-    locatorConfig.templateMaskPolygonNormalized =
-            polygonPoints(referenceConfig.templateMaskPolygonNormalized);
-    locatorConfig.templateMaskCircleCenterNormalized =
-            referenceConfig.templateMaskCircleCenterNormalized;
-    locatorConfig.templateMaskCircleRadiusNormalized =
-            referenceConfig.templateMaskCircleRadiusNormalized;
-    locatorConfig.searchRegionType = QStringLiteral("full");
-    locatorConfig.searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
-    locatorConfig.minScore = 50;
-    locatorConfig.angleStart = -45;
-    locatorConfig.angleExtent = 90;
-    locatorConfig.scaleMin = 100;
-    locatorConfig.scaleMax = 100;
-    locatorConfig.maxMatches = 1;
-    locatorConfig.minMatchCount = 1;
-    locatorConfig.maxMatchCount = 1;
-    locatorConfig.maxOverlap = 0.5;
-    locatorConfig.originMode = referenceConfig.originMode;
-    locatorConfig.customOriginNormalized = referenceConfig.customOriginNormalized;
-    locatorConfig.timeoutMs = 2000;
+    QJsonObject frozenPose;
+    bool hasIdentityVersion = false;
+    bool versionedIdentity = false;
+    QString frozenModelSignature;
+    QString frozenTemplateId;
+    QString frozenOriginMode;
+    QPointF frozenCustomOrigin;
+    bool hasFrozenCustomOrigin = false;
+    bool validFrozenCustomOrigin = false;
+    if (resolved.bankEnvelope) {
+        QStringList notReadyTemplateIds;
+        if (!TemplateLocationConfig::allEnabledModelsReady(
+                    locatorConfig, &notReadyTemplateIds)) {
+            return referencePositionCorrectionError(
+                        QStringLiteral("reference_pose_bank_incomplete"),
+                        QStringLiteral("Enabled reference template model(s) are not ready: %1")
+                        .arg(notReadyTemplateIds.join(QStringLiteral(", "))));
+        }
+        for (const TemplateLocationTemplateConfig &item : locatorConfig.templates) {
+            if (!item.enabled)
+                continue;
+            if (!resolved.referencePosesByTemplateId.value(
+                    item.templateId).isObject()) {
+                return referencePositionCorrectionError(
+                            QStringLiteral("reference_pose_bank_incomplete"),
+                            QStringLiteral("Enabled template '%1' has no frozen reference pose.")
+                            .arg(item.templateId));
+            }
+        }
+        QString invalidTemplateId;
+        QString identityMessage;
+        if (!ReferenceTemplateLocationConfig::validateAllEnabledFrozenPoses(
+                    locatorConfig, resolved.referencePosesByTemplateId,
+                    &invalidTemplateId, &identityMessage)) {
+            return referencePositionCorrectionError(
+                        QStringLiteral("invalid_reference_locator_identity"),
+                        identityMessage.trimmed().isEmpty()
+                        ? QStringLiteral("Enabled template '%1' has an invalid frozen pose identity.")
+                          .arg(invalidTemplateId)
+                        : identityMessage);
+        }
+    } else {
+        if (referenceConfig.referencePose.isEmpty()) {
+            return referencePositionCorrectionError(
+                        QStringLiteral("reference_pose_missing"),
+                        QStringLiteral("reference position pose is missing"));
+        }
+        if (referenceConfig.originMode != QStringLiteral("centroid")
+                && referenceConfig.originMode != QStringLiteral("custom")) {
+            return referencePositionCorrectionError(
+                        QStringLiteral("invalid_custom_origin"),
+                        QStringLiteral("reference origin mode is invalid"));
+        }
+        if (referenceConfig.originMode == QStringLiteral("custom")
+                && !validNormalizedPoint(referenceConfig.customOriginNormalized)) {
+            return referencePositionCorrectionError(
+                        QStringLiteral("invalid_custom_origin"),
+                        QStringLiteral("reference custom origin is invalid"));
+        }
+
+        frozenPose = referenceConfig.referencePose;
+        hasIdentityVersion = frozenPose.contains(
+                QStringLiteral("locatorIdentityVersion"));
+        const QJsonValue identityVersionValue = frozenPose.value(
+                QStringLiteral("locatorIdentityVersion"));
+        versionedIdentity = hasIdentityVersion &&
+                identityVersionValue.isDouble() &&
+                identityVersionValue.toInt(-1) == 1 &&
+                identityVersionValue.toDouble() == 1.0;
+        frozenModelSignature = frozenPose.value(
+                QStringLiteral("locatorModelSignature")).toString().trimmed();
+        frozenTemplateId = frozenPose.value(
+                QStringLiteral("locatorTemplateId")).toString().trimmed();
+        frozenOriginMode = frozenPose.value(
+                QStringLiteral("locatorOriginMode")).toString().trimmed();
+        hasFrozenCustomOrigin = frozenPose.contains(
+                QStringLiteral("locatorCustomOriginNormalized"));
+        validFrozenCustomOrigin = hasFrozenCustomOrigin &&
+                normalizedPointFromJson(
+                    frozenPose.value(
+                        QStringLiteral("locatorCustomOriginNormalized")),
+                    &frozenCustomOrigin);
+        if (hasIdentityVersion &&
+                (!versionedIdentity || frozenModelSignature.isEmpty()
+                 || frozenTemplateId.isEmpty()
+                 || (frozenOriginMode != QStringLiteral("centroid") &&
+                     frozenOriginMode != QStringLiteral("custom"))
+                 || (frozenOriginMode == QStringLiteral("custom") &&
+                     !validFrozenCustomOrigin))) {
+            return referencePositionCorrectionError(
+                        QStringLiteral("invalid_reference_locator_identity"),
+                        QStringLiteral("The versioned reference locator identity is incomplete or invalid."));
+        }
+    }
 
     TemplateLocationHalconRunner locator;
     const TemplateLocationHalconResult located =
@@ -209,10 +268,153 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
         return result;
     }
 
+    const QString currentTemplateId = located.payload.value(
+                QStringLiteral("selectedTemplateId")).toString().trimmed();
+    QJsonObject currentPoseJson = located.payload.value(
+                QStringLiteral("pose")).toObject();
+    if (resolved.bankEnvelope) {
+        const QJsonValue templateResultsValue = located.payload.value(
+                    QStringLiteral("templateResults"));
+        QJsonObject currentSignaturesByTemplateId;
+        bool validTemplateResults = templateResultsValue.isArray();
+        if (validTemplateResults) {
+            const QJsonArray templateResults = templateResultsValue.toArray();
+            for (const QJsonValue &value : templateResults) {
+                if (!value.isObject()) {
+                    validTemplateResults = false;
+                    break;
+                }
+                const QJsonObject templateResult = value.toObject();
+                const QString templateId = templateResult.value(
+                            QStringLiteral("templateId")).toString().trimmed();
+                const QString modelSignature = templateResult.value(
+                            QStringLiteral("modelSignature")).toString().trimmed();
+                const TemplateLocationTemplateConfig *item =
+                        TemplateLocationConfig::findTemplate(
+                            locatorConfig, templateId);
+                if (templateId.isEmpty() || modelSignature.isEmpty()
+                        || currentSignaturesByTemplateId.contains(templateId)
+                        || !item || !item->enabled) {
+                    validTemplateResults = false;
+                    break;
+                }
+                currentSignaturesByTemplateId.insert(templateId,
+                                                     modelSignature);
+            }
+        }
+        if (!validTemplateResults ||
+                currentSignaturesByTemplateId.size() !=
+                TemplateLocationConfig::enabledTemplateCount(locatorConfig)) {
+            ToolResult result = referencePositionCorrectionError(
+                        QStringLiteral("invalid_reference_locator_identity"),
+                        QStringLiteral("The locator result does not contain one model signature for every enabled reference template."));
+            result.elapsedMs = located.elapsedMs;
+            result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
+            return result;
+        }
+        for (const TemplateLocationTemplateConfig &item : locatorConfig.templates) {
+            if (!item.enabled)
+                continue;
+            const QString currentSignature = currentSignaturesByTemplateId.value(
+                        item.templateId).toString().trimmed();
+            if (currentSignature.isEmpty()) {
+                ToolResult result = referencePositionCorrectionError(
+                            QStringLiteral("invalid_reference_locator_identity"),
+                            QStringLiteral("Enabled template '%1' has no runtime model signature.")
+                            .arg(item.templateId));
+                result.elapsedMs = located.elapsedMs;
+                result.payload.insert(QStringLiteral("locatorPayload"),
+                                      located.payload);
+                return result;
+            }
+            const QString frozenSignature =
+                    resolved.referencePosesByTemplateId.value(item.templateId)
+                    .toObject().value(QStringLiteral("locatorModelSignature"))
+                    .toString().trimmed();
+            if (frozenSignature != currentSignature) {
+                ToolResult result = referencePositionCorrectionError(
+                            QStringLiteral("reference_locator_changed"),
+                            QStringLiteral("Enabled reference template '%1' no longer matches its frozen reference pose.")
+                            .arg(item.templateId));
+                result.elapsedMs = located.elapsedMs;
+                result.payload.insert(QStringLiteral("locatorPayload"),
+                                      located.payload);
+                return result;
+            }
+        }
+
+        const QString poseTemplateId = currentPoseJson.value(
+                    QStringLiteral("templateId")).toString().trimmed();
+        if (currentTemplateId.isEmpty() || poseTemplateId != currentTemplateId) {
+            ToolResult result = referencePositionCorrectionError(
+                        QStringLiteral("reference_pose_template_mismatch"),
+                        QStringLiteral("The locator primary pose and selected template ID do not match."));
+            result.elapsedMs = located.elapsedMs;
+            result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
+            return result;
+        }
+        frozenPose = resolved.referencePosesByTemplateId.value(
+                    currentTemplateId).toObject();
+        const QString currentTemplateSignature = currentPoseJson.value(
+                    QStringLiteral("templateModelSignature"))
+                .toString().trimmed();
+        if (currentTemplateSignature.isEmpty() ||
+                currentSignaturesByTemplateId.value(currentTemplateId)
+                .toString().trimmed() != currentTemplateSignature) {
+            ToolResult result = referencePositionCorrectionError(
+                        QStringLiteral("invalid_reference_locator_identity"),
+                        QStringLiteral("The locator primary pose model signature is missing or inconsistent with its template result."));
+            result.elapsedMs = located.elapsedMs;
+            result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
+            return result;
+        }
+        if (frozenPose.value(QStringLiteral("locatorModelSignature"))
+                .toString().trimmed() != currentTemplateSignature) {
+            ToolResult result = referencePositionCorrectionError(
+                        QStringLiteral("reference_locator_changed"),
+                        QStringLiteral("The selected reference template model no longer matches its frozen reference pose."));
+            result.elapsedMs = located.elapsedMs;
+            result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
+            return result;
+        }
+    } else {
+        const QString currentModelSignature = located.payload.value(
+                    QStringLiteral("modelSignature")).toString().trimmed();
+        const QString currentOriginMode = located.payload.value(
+                    QStringLiteral("originMode")).toString().trimmed();
+        bool originIdentityChanged =
+                (versionedIdentity || !frozenOriginMode.isEmpty())
+                && frozenOriginMode != currentOriginMode;
+        if ((versionedIdentity && frozenOriginMode == QStringLiteral("custom")) ||
+                (!versionedIdentity && hasFrozenCustomOrigin)) {
+            QPointF currentOrigin;
+            const bool validCurrent = normalizedPointFromJson(
+                        located.payload.value(
+                            QStringLiteral("customOriginNormalized")),
+                        &currentOrigin);
+            originIdentityChanged = originIdentityChanged
+                    || !validFrozenCustomOrigin || !validCurrent
+                    || std::abs(frozenCustomOrigin.x() - currentOrigin.x()) > 1e-9
+                    || std::abs(frozenCustomOrigin.y() - currentOrigin.y()) > 1e-9;
+        }
+        if (((versionedIdentity || !frozenModelSignature.isEmpty()) &&
+             frozenModelSignature != currentModelSignature) ||
+                ((versionedIdentity || !frozenTemplateId.isEmpty()) &&
+                 frozenTemplateId != currentTemplateId) ||
+                originIdentityChanged) {
+            ToolResult result = referencePositionCorrectionError(
+                        QStringLiteral("reference_locator_changed"),
+                        QStringLiteral("The reference locator no longer matches the model, template, or origin identity frozen with the reference pose."));
+            result.elapsedMs = located.elapsedMs;
+            result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
+            return result;
+        }
+        currentPoseJson = located.payload;
+    }
+
     PositionPose referencePose;
     bool invalidReferenceScale = false;
-    if (!poseFromJson(referenceConfig.referencePose,
-                      &referencePose,
+    if (!poseFromJson(frozenPose, &referencePose,
                       &invalidReferenceScale)) {
         return referencePositionCorrectionError(
                     invalidReferenceScale
@@ -224,7 +426,7 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
     }
     PositionPose runPose;
     bool invalidRunScale = false;
-    if (!poseFromJson(located.payload, &runPose, &invalidRunScale)) {
+    if (!poseFromJson(currentPoseJson, &runPose, &invalidRunScale)) {
         ToolResult result = referencePositionCorrectionError(
                     invalidRunScale
                     ? QStringLiteral("invalid_pose_scale")
@@ -275,6 +477,14 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
     result.payload.insert(QStringLiteral("locatorStatus"), located.status);
     result.payload.insert(QStringLiteral("locatorScore"), located.score);
     result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
+    result.payload.insert(QStringLiteral("selectedTemplateId"),
+                          currentTemplateId);
+    result.payload.insert(QStringLiteral("referencePoseTemplateId"),
+                          resolved.bankEnvelope
+                          ? frozenPose.value(QStringLiteral("locatorTemplateId"))
+                          : QJsonValue(currentTemplateId));
+    result.payload.insert(QStringLiteral("referencePoseBankVersion"),
+                          resolved.bankEnvelope ? 4 : referenceConfig.version);
     result.payload.insert(QStringLiteral("x"), runPose.x);
     result.payload.insert(QStringLiteral("y"), runPose.y);
     result.payload.insert(QStringLiteral("angle"), runPose.angleDeg);

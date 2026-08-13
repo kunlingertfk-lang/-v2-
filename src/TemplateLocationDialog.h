@@ -3,9 +3,12 @@
 
 #include <QDialog>
 #include <QJsonArray>
+#include <QJsonObject>
+#include <QList>
 #include <QMetaObject>
 #include <QPointF>
 #include <QRectF>
+#include <QStringList>
 #include <QVector>
 
 #include "tooladapters/TemplateLocationAdapter.h"
@@ -16,6 +19,9 @@
 
 class QButtonGroup;
 class QFrame;
+class QLabel;
+class QListWidget;
+class QListWidgetItem;
 class QPushButton;
 class QTableWidget;
 class QToolButton;
@@ -38,6 +44,25 @@ public:
     ToolPreviewSnapshot referencePreviewSnapshot() const;
 
 private:
+    struct TemplateItemState {
+        QString templateId;
+        QString name;
+        bool enabled = true;
+        int priority = 0;
+        QString regionType = QStringLiteral("rectangle");
+        QRectF roi;
+        QVector<QPointF> polygon;
+        QString maskRegionType = QStringLiteral("none");
+        QRectF maskRoi;
+        QVector<QPointF> maskPolygon;
+        CircleRoi maskCircle;
+        QString modelCacheKey;
+        bool modelCreated = false;
+        QJsonObject extra;
+        QString modelError;
+        QVector<ToolOverlay> displayOverlays;
+    };
+
     enum class EditTarget {
         None,
         TemplateRect,
@@ -52,13 +77,36 @@ private:
     };
 
     void setupUiState();
+    void setupTemplateBankUi();
     void connectControls();
     void setAdvancedVisible(bool visible);
     void startEditing(EditTarget target);
     void stopEditing();
     void showReferenceImage();
     void markModelDirty();
+    void markAllModelsDirty();
+    void invalidateRunPreview();
     void deleteTemplate();
+    void addTemplateItem();
+    void renameActiveTemplateItem();
+    void deleteActiveTemplateItem();
+    void handleTemplateItemChanged(QListWidgetItem *item);
+    void switchActiveTemplate(const QString &templateId);
+    void flushActiveTemplateEditor();
+    void loadActiveTemplateEditor();
+    void refreshTemplateList();
+    void refreshActiveTemplateUi();
+    int activeTemplateIndex() const;
+    TemplateItemState activeTemplateForOutput() const;
+    TemplateItemState templateItemFromJson(const QJsonObject &json,
+                                           int fallbackIndex) const;
+    QJsonObject templateItemToJson(const TemplateItemState &item) const;
+    bool validateTemplateItem(const TemplateItemState &item,
+                              QString *message = nullptr) const;
+    bool validateTemplateBank(bool requireModels,
+                              QString *message = nullptr) const;
+    ToolConfig activeTemplateToolConfig() const;
+    void commitPendingCacheDeletes();
     bool validateParameters(QString *message = nullptr) const;
     bool validateTemplate(QString *message = nullptr) const;
     void createTemplate();
@@ -84,6 +132,14 @@ private:
     QMetaObject::Connection m_frameConnection;
     ToolConfig m_config;
     ToolPreviewSnapshot m_snapshot;
+    QList<TemplateItemState> m_templates;
+    QString m_activeTemplateId;
+    bool m_usesTemplateBankSchema = false;
+    bool m_configReadOnly = false;
+    QString m_configReadOnlyStatus;
+    QString m_configReadOnlyMessage;
+    bool m_updatingTemplateList = false;
+    QStringList m_pendingCacheDeletes;
     QRectF m_templateRoi;
     QVector<QPointF> m_templatePolygon;
     QString m_templateMaskRegionType = QStringLiteral("none");
@@ -112,6 +168,12 @@ private:
     QToolButton *m_templateMaskCircleButton = nullptr;
     QToolButton *m_templateMaskPolygonButton = nullptr;
     QPushButton *m_templateMaskClearButton = nullptr;
+    QFrame *m_templateBankCard = nullptr;
+    QListWidget *m_templateBankList = nullptr;
+    QLabel *m_templateBankSummaryLabel = nullptr;
+    QPushButton *m_addTemplateItemButton = nullptr;
+    QPushButton *m_renameTemplateItemButton = nullptr;
+    QPushButton *m_deleteTemplateItemButton = nullptr;
     bool m_matchResultsExpanded = false;
     ToolResult m_lastDisplayResult;
 };

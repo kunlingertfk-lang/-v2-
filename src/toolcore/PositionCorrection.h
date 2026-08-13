@@ -78,6 +78,13 @@ struct ReferencePositionCorrectionConfig
 {
     int version = 3;
     bool enabled = false;
+    // Version 4 reference envelopes keep the complete template-location
+    // contract below.  The nested object uses the public v4/v5 locator codec;
+    // a v5 templates[] array is the only template source for a bank.
+    QJsonObject locator;
+    // Stable templateId -> frozen reference pose.  Values use the existing
+    // locatorIdentityVersion/locatorTemplateId/locatorModelSignature fields.
+    QJsonObject referencePosesByTemplateId;
     QString templateRegionType = QStringLiteral("rectangle");
     QRectF templateRoiNormalized;
     QJsonArray templatePolygonNormalized;
@@ -95,6 +102,9 @@ struct ReferencePositionCorrectionConfig
     QString message;
     double score = 0.0;
     qint64 elapsedMs = 0;
+    // Preserve extension fields (notably a future locator bank) across normal
+    // scheme load/save even while the current reference editor cannot use them.
+    QJsonObject extra;
 };
 
 namespace PositionCorrection {

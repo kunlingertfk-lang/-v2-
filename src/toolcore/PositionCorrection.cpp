@@ -1,5 +1,7 @@
 #include "toolcore/PositionCorrection.h"
 
+#include "algorithms/location/TemplateLocationConfig.h"
+
 #include <QJsonValue>
 #include <QStringList>
 
@@ -18,6 +20,18 @@ bool boolParam(const QJsonObject &object, const QString &key, bool defaultValue)
     if (text == QStringLiteral("false") || text == QStringLiteral("0") || text == QStringLiteral("no"))
         return false;
     return defaultValue;
+}
+
+bool exactReferenceBankVersion(const QJsonValue &value, int *version = nullptr)
+{
+    if (!value.isDouble())
+        return false;
+    const double number = value.toDouble();
+    if (number != 4.0 && number != 5.0)
+        return false;
+    if (version)
+        *version = static_cast<int>(number);
+    return true;
 }
 
 // 读取并清理字符串参数；字段缺失或为空时返回调用方提供的默认值。
@@ -329,8 +343,12 @@ ReferencePositionCorrectionConfig PositionCorrection::referenceFromJson(
         const QJsonObject &json)
 {
     ReferencePositionCorrectionConfig config;
+    config.extra = json;
     config.version = json.value(QStringLiteral("version")).toInt(1);
     config.enabled = json.value(QStringLiteral("enabled")).toBool(false);
+    config.locator = json.value(QStringLiteral("locator")).toObject();
+    config.referencePosesByTemplateId = json.value(
+                QStringLiteral("referencePosesByTemplateId")).toObject();
     config.templateRegionType = stringParam(json,
                                             QStringLiteral("templateRegionType"),
                                             QStringLiteral("rectangle"));
@@ -397,9 +415,105 @@ QJsonObject PositionCorrection::referenceToJson(
     roi.insert(QStringLiteral("width"), config.templateRoiNormalized.width());
     roi.insert(QStringLiteral("height"), config.templateRoiNormalized.height());
 
-    QJsonObject json;
+    const bool locatorFieldPresent = config.extra.contains(
+                QStringLiteral("locator")) || !config.locator.isEmpty();
+    bool outerVersionEncodingSupported = true;
+    if (config.extra.contains(QStringLiteral("version"))) {
+        outerVersionEncodingSupported = exactReferenceBankVersion(
+                    config.extra.value(QStringLiteral("version")));
+    }
+    const TemplateLocationConfig::EnvelopeInspection locatorEnvelope =
+            TemplateLocationConfig::inspectEnvelope(config.locator);
+    const bool poseMapEncodingSupported =
+            !config.extra.contains(QStringLiteral("referencePosesByTemplateId"))
+            || config.extra.value(QStringLiteral("referencePosesByTemplateId"))
+            .isObject();
+    const bool bankEnvelope = (config.version == 4 || config.version == 5)
+            && outerVersionEncodingSupported
+            && !config.locator.isEmpty()
+            && locatorEnvelope.supported
+            && poseMapEncodingSupported;
+
+    // A locator field outside the explicitly supported outer/nested version
+    // pair is a forward or malformed contract.  It is read-only and must be
+    // serialized from its raw envelope rather than falling through the legacy
+    // writer, which would otherwise delete the locator or synthesize v3 fields.
+    if (locatorFieldPresent && !bankEnvelope) {
+        if (!config.extra.isEmpty())
+            return config.extra;
+
+        // Programmatically constructed unknown envelopes have no raw object to
+        // return.  Preserve every representable bank field without pretending
+        // that the contract is executable.
+        QJsonObject unknown;
+        unknown.insert(QStringLiteral("version"), config.version);
+        unknown.insert(QStringLiteral("enabled"), config.enabled);
+        if (!config.locator.isEmpty())
+            unknown.insert(QStringLiteral("locator"), config.locator);
+        if (!config.referencePosesByTemplateId.isEmpty()) {
+            unknown.insert(QStringLiteral("referencePosesByTemplateId"),
+                           config.referencePosesByTemplateId);
+        }
+        unknown.insert(QStringLiteral("referenceCreated"),
+                       config.referenceCreated);
+        unknown.insert(QStringLiteral("referencePose"), config.referencePose);
+        if (!config.status.trimmed().isEmpty())
+            unknown.insert(QStringLiteral("status"), config.status.trimmed());
+        if (!config.message.trimmed().isEmpty())
+            unknown.insert(QStringLiteral("message"), config.message);
+        unknown.insert(QStringLiteral("score"), config.score);
+        unknown.insert(QStringLiteral("elapsedMs"),
+                       static_cast<double>(config.elapsedMs));
+        return unknown;
+    }
+
+    QJsonObject json = config.extra;
     json.insert(QStringLiteral("version"), config.version);
     json.insert(QStringLiteral("enabled"), config.enabled);
+    if (bankEnvelope) {
+        // A known v4 envelope has exactly one template source: locator.  Do
+        // not retain stale v3 mirrors that could later be interpreted instead.
+        const QStringList legacyKeys{
+            QStringLiteral("templateRegionType"),
+            QStringLiteral("templateRoiNormalized"),
+            QStringLiteral("templatePolygonNormalized"),
+            QStringLiteral("templateMaskRegionType"),
+            QStringLiteral("templateMaskRoiNormalized"),
+            QStringLiteral("templateMaskPolygonNormalized"),
+            QStringLiteral("templateMaskCircleCenterNormalized"),
+            QStringLiteral("templateMaskCircleRadiusNormalized"),
+            QStringLiteral("originMode"),
+            QStringLiteral("customOriginNormalized"),
+            QStringLiteral("referencePose"),
+            QStringLiteral("modelCacheKey")
+        };
+        for (const QString &key : legacyKeys)
+            json.remove(key);
+        json.insert(QStringLiteral("version"), 4);
+        json.insert(QStringLiteral("locator"), config.locator);
+        json.insert(QStringLiteral("referencePosesByTemplateId"),
+                    config.referencePosesByTemplateId);
+        json.insert(QStringLiteral("referenceCreated"), config.referenceCreated);
+        if (!config.status.trimmed().isEmpty())
+            json.insert(QStringLiteral("status"), config.status.trimmed());
+        else
+            json.remove(QStringLiteral("status"));
+        if (!config.message.trimmed().isEmpty())
+            json.insert(QStringLiteral("message"), config.message);
+        else
+            json.remove(QStringLiteral("message"));
+        json.insert(QStringLiteral("score"), config.score);
+        json.insert(QStringLiteral("elapsedMs"),
+                    static_cast<double>(config.elapsedMs));
+        return json;
+    }
+
+    // Legacy v1..v3 remains byte-compatible and must not accidentally acquire
+    // a half-populated bank contract.
+    if (config.version <= 3) {
+        json.remove(QStringLiteral("locator"));
+        json.remove(QStringLiteral("referencePosesByTemplateId"));
+    }
     json.insert(QStringLiteral("templateRegionType"),
                 config.templateRegionType.trimmed().isEmpty()
                     ? QStringLiteral("rectangle")
@@ -440,10 +554,16 @@ QJsonObject PositionCorrection::referenceToJson(
     json.insert(QStringLiteral("referencePose"), config.referencePose);
     if (!config.modelCacheKey.trimmed().isEmpty())
         json.insert(QStringLiteral("modelCacheKey"), config.modelCacheKey.trimmed());
+    else
+        json.remove(QStringLiteral("modelCacheKey"));
     if (!config.status.trimmed().isEmpty())
         json.insert(QStringLiteral("status"), config.status.trimmed());
+    else
+        json.remove(QStringLiteral("status"));
     if (!config.message.trimmed().isEmpty())
         json.insert(QStringLiteral("message"), config.message);
+    else
+        json.remove(QStringLiteral("message"));
     json.insert(QStringLiteral("score"), config.score);
     json.insert(QStringLiteral("elapsedMs"), static_cast<double>(config.elapsedMs));
     return json;

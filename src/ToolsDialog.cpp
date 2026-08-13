@@ -56,6 +56,7 @@
 #include "RegisteredClassificationDetectionDialog.h"
 #include "SchemeStore.h"
 #include "ToolLibraryDialog.h"
+#include "algorithms/location/TemplateLocationConfig.h"
 #include "calibration/CalibrationFileLoader.h"
 #include "calibration/CalibrationSourceFingerprint.h"
 #include "frame/FrameViewHelper.h"
@@ -1030,6 +1031,16 @@ void ToolsDialog::copySelectedTool()
     const int selectedIndexBefore = m_selectedToolIndex;
     const ToolConfig &sourceConfig = m_toolConfigs.at(m_selectedToolIndex);
 
+    if (sourceConfig.toolType == ToolType::TemplateLocation) {
+        const TemplateLocationModelBankConfig sourceBank =
+                TemplateLocationConfig::fromToolConfig(sourceConfig);
+        if (!sourceBank.decodeSupported || sourceBank.rawPassthrough) {
+            qWarning() << "[ToolsDialog] Refusing to copy read-only template locator:"
+                       << sourceBank.decodeStatus;
+            return;
+        }
+    }
+
     ToolConfig copiedConfig = sourceConfig;
     do {
         copiedConfig.toolId = QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -1038,11 +1049,27 @@ void ToolsDialog::copySelectedTool()
         return config.toolId == copiedConfig.toolId;
     }));
 
+    // Shape-model files are mutable cache artifacts owned by one tool. A
+    // copied locator keeps stable template identities and geometry, but gets
+    // independent cache keys and explicitly requires a rebuild.
+    if (copiedConfig.toolType == ToolType::TemplateLocation) {
+        TemplateLocationModelBankConfig bank =
+                TemplateLocationConfig::fromToolConfig(copiedConfig);
+        bank.toolId = copiedConfig.toolId;
+        TemplateLocationConfig::ensureStableTemplateIds(&bank);
+        for (TemplateLocationTemplateConfig &item : bank.templates) {
+            item.modelCacheKey = QStringLiteral("template_location_%1")
+                    .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+            item.modelCreated = false;
+        }
+        copiedConfig.params = TemplateLocationConfig::toToolParams(bank);
+    }
+
     const int copiedIndex = m_selectedToolIndex + 1;
     m_toolConfigs.insert(copiedIndex, copiedConfig);
     const ToolPreviewSnapshot sourceSnapshot =
             m_toolPreviewSnapshots.value(sourceConfig.toolId);
-    if (sourceSnapshot.valid) {
+    if (sourceSnapshot.valid && copiedConfig.toolType != ToolType::TemplateLocation) {
         ToolPreviewSnapshot copiedSnapshot = sourceSnapshot;
         copiedSnapshot.toolId = copiedConfig.toolId;
         copiedSnapshot.toolType = copiedConfig.toolType;
@@ -1520,7 +1547,16 @@ void ToolsDialog::updateToolbarActionState()
 {
     const bool hasSelection = m_selectedToolIndex >= 0
             && m_selectedToolIndex < m_toolConfigs.size();
-    ui->copyToolButton->setEnabled(hasSelection);
+    bool copySupported = hasSelection;
+    if (hasSelection) {
+        const ToolConfig &selected = m_toolConfigs.at(m_selectedToolIndex);
+        if (selected.toolType == ToolType::TemplateLocation) {
+            const TemplateLocationModelBankConfig bank =
+                    TemplateLocationConfig::fromToolConfig(selected);
+            copySupported = bank.decodeSupported && !bank.rawPassthrough;
+        }
+    }
+    ui->copyToolButton->setEnabled(copySupported);
     ui->deleteToolButton->setEnabled(hasSelection);
     ui->deleteAllToolsButton->setEnabled(!m_toolConfigs.isEmpty());
 }

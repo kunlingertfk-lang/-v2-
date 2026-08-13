@@ -95,16 +95,42 @@ inline QJsonObject normalizedPoint(const QJsonObject &point,
     };
 }
 
+/// 递归移除模板库中的运行环境、持久缓存和建模生命周期字段。
+inline QJsonValue stripTemplateLifecycleFields(const QJsonValue &value)
+{
+    if (value.isArray()) {
+        QJsonArray output;
+        for (const QJsonValue &entry : value.toArray())
+            output.append(stripTemplateLifecycleFields(entry));
+        return output;
+    }
+    if (!value.isObject())
+        return value;
+
+    const QJsonObject source = value.toObject();
+    const bool templateItem = source.contains(QStringLiteral("templateId")) ||
+            (source.contains(QStringLiteral("templateRegionType")) &&
+             source.contains(QStringLiteral("modelCacheKey")));
+    QJsonObject output;
+    for (auto it = source.constBegin(); it != source.constEnd(); ++it) {
+        if (it.key() == QStringLiteral("halconSoPath") ||
+                it.key() == QStringLiteral("timeoutMs") ||
+                it.key() == QStringLiteral("modelCacheKey") ||
+                it.key() == QStringLiteral("modelCreated") ||
+                (templateItem &&
+                 (it.key() == QStringLiteral("name") ||
+                  it.key() == QStringLiteral("templateName")))) {
+            continue;
+        }
+        output.insert(it.key(), stripTemplateLifecycleFields(it.value()));
+    }
+    return output;
+}
+
 /// 提取会影响模板图像坐标语义的稳定配置，排除运行环境和缓存生命周期字段。
 inline QJsonObject templateConfigContract(const ToolConfig &config)
 {
-    QJsonObject params = config.params;
-    // These values control execution environment/cache lifecycle, not the
-    // image-space coordinate produced by a successful match.
-    params.remove(QStringLiteral("halconSoPath"));
-    params.remove(QStringLiteral("timeoutMs"));
-    params.remove(QStringLiteral("modelCacheKey"));
-    params.remove(QStringLiteral("modelCreated"));
+    QJsonObject params = stripTemplateLifecycleFields(config.params).toObject();
     // Origin semantics are represented explicitly in the fingerprint.  Keep
     // them out of the config hash so an inactive custom point in centroid mode
     // does not invalidate an otherwise identical calibration.
@@ -183,6 +209,16 @@ inline QJsonObject makeFingerprint(const QString &producerId,
     if (!referenceSignature.isEmpty()) {
         fingerprint.insert(QStringLiteral("referenceImageSignature"),
                            referenceSignature);
+    }
+    const QStringList optionalIdentityFields{
+        QStringLiteral("modelSetSignature"),
+        QStringLiteral("selectedTemplateId"),
+        QStringLiteral("primaryMatchStrategy"),
+        QStringLiteral("lockedTemplateId")
+    };
+    for (const QString &field : optionalIdentityFields) {
+        if (payload.contains(field) && !payload.value(field).toString().trimmed().isEmpty())
+            fingerprint.insert(field, payload.value(field));
     }
     fingerprint.insert(QStringLiteral("coordinateSourceSignature"),
                        coordinateSourceSignature(fingerprint));
@@ -272,6 +308,20 @@ inline bool matches(const QJsonObject &expected,
             *mismatchField = QStringLiteral("referenceImageSignature");
         return false;
     }
+    const QStringList optionalIdentityFields{
+        QStringLiteral("modelSetSignature"),
+        QStringLiteral("selectedTemplateId"),
+        QStringLiteral("primaryMatchStrategy"),
+        QStringLiteral("lockedTemplateId")
+    };
+    for (const QString &field : optionalIdentityFields) {
+        if (expected.contains(field) &&
+                canonicalJson(expected.value(field)) != canonicalJson(actual.value(field))) {
+            if (mismatchField)
+                *mismatchField = field;
+            return false;
+        }
+    }
     if (mismatchField)
         mismatchField->clear();
     return true;
@@ -303,6 +353,11 @@ inline void propagateIdentityFields(const QJsonObject &source, QJsonObject *targ
         QStringLiteral("originMode"),
         QStringLiteral("customOriginNormalized"),
         QStringLiteral("modelSignature"),
+        QStringLiteral("modelSetSignature"),
+        QStringLiteral("selectedTemplateId"),
+        QStringLiteral("selectedTemplateName"),
+        QStringLiteral("primaryMatchStrategy"),
+        QStringLiteral("lockedTemplateId"),
         QStringLiteral("coordinateSystem"),
         QStringLiteral("angleUnit")
     };

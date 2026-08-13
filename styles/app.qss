@@ -3671,3 +3671,59 @@ QDialog#SchemeSetupWindow QStackedWidget#pageStack {
     background: #eef2f6;
     border: 0;
 }
+
+/* Reference-image template bank only; do not leak this setup-page treatment
+   into tool-level lists that reuse generic semantic properties. */
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget {
+    background: #f8fafc;
+    color: #314968;
+    border: 1px solid #d6dde7;
+    border-radius: 5px;
+    outline: 0;
+    padding: 3px;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget::item {
+    min-height: 32px;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget::item:selected {
+    background: #fff3e8;
+    color: #e96f00;
+    border: 1px solid #ffb66f;
+}
+
+QDialog#ReferenceImageDialog QLabel#referenceFixedOutputCountLabel,
+QDialog#ReferenceImageDialog QLabel#referenceTemplateBankSummaryLabel {
+    color: #7b8797;
+    background: transparent;
+}
+
+/* Dynamic numeric fields on the reference page are not present in the .ui
+   stylesheet. Keep their treatment local to this setup page. */
+QDialog#ReferenceImageDialog QFrame#referenceBasicMatchingCard QSpinBox,
+QDialog#ReferenceImageDialog QFrame#referenceAdvancedMatchingCard QSpinBox,
+QDialog#ReferenceImageDialog QFrame#referenceAdvancedMatchingCard QDoubleSpinBox {
+    min-height: 38px;
+    border: 1px solid #d1d8e1;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #536274;
+    padding: 0 8px;
+    font-size: 15px;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceBasicMatchingCard QSpinBox:focus,
+QDialog#ReferenceImageDialog QFrame#referenceAdvancedMatchingCard QSpinBox:focus,
+QDialog#ReferenceImageDialog QFrame#referenceAdvancedMatchingCard QDoubleSpinBox:focus {
+    border-color: #ff830f;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceBasicMatchingCard QSpinBox:disabled,
+QDialog#ReferenceImageDialog QFrame#referenceAdvancedMatchingCard QSpinBox:disabled,
+QDialog#ReferenceImageDialog QFrame#referenceAdvancedMatchingCard QDoubleSpinBox:disabled {
+    background: #eef2f6;
+    color: #9aa5b4;
+}

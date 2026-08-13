@@ -2,6 +2,7 @@
 
 #include "PlanDialogUtils.h"
 #include "UiStyleRoles.h"
+#include "algorithms/location/TemplateLocationConfig.h"
 #include "frame/CameraFrameProvider.h"
 #include "frame/FrameViewHelper.h"
 #include "frame/ReferenceImageProvider.h"
@@ -15,7 +16,12 @@
 #include <QMessageBox>
 #include <QHeaderView>
 #include <QIcon>
+#include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QSet>
 #include <QSignalBlocker>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -26,6 +32,10 @@
 #include <cmath>
 
 namespace {
+
+constexpr int kTemplateIdRole = Qt::UserRole + 1;
+constexpr int kMatchIdRole = Qt::UserRole + 2;
+constexpr int kMaximumTemplateCount = 8;
 
 QJsonObject rectToJson(const QRectF &rect)
 {
@@ -81,6 +91,27 @@ QRectF boundingRect(const QVector<QPointF> &points)
         bottom = qMax(bottom, point.y());
     }
     return QRectF(QPointF(left, top), QPointF(right, bottom));
+}
+
+QPointF polygonCentroid(const QVector<QPointF> &points)
+{
+    if (points.size() < 3)
+        return boundingRect(points).center();
+    double twiceArea = 0.0;
+    double weightedX = 0.0;
+    double weightedY = 0.0;
+    for (int index = 0; index < points.size(); ++index) {
+        const QPointF &current = points.at(index);
+        const QPointF &next = points.at((index + 1) % points.size());
+        const double cross = current.x() * next.y() - next.x() * current.y();
+        twiceArea += cross;
+        weightedX += (current.x() + next.x()) * cross;
+        weightedY += (current.y() + next.y()) * cross;
+    }
+    if (std::abs(twiceArea) < 1e-12)
+        return boundingRect(points).center();
+    return QPointF(weightedX / (3.0 * twiceArea),
+                   weightedY / (3.0 * twiceArea));
 }
 
 bool validRect(const QRectF &rect)
@@ -195,6 +226,8 @@ void TemplateLocationDialog::setupUiState()
     m_searchGroup->addButton(ui->searchPolygonButton, 2);
     m_searchGroup->addButton(ui->searchGlobalButton, 3);
     ui->searchGlobalButton->setChecked(true);
+
+    setupTemplateBankUi();
 
     ui->templateLayout->removeWidget(ui->createTemplateButton);
     ui->templateLayout->removeWidget(ui->deleteTemplateButton);
@@ -323,9 +356,10 @@ void TemplateLocationDialog::setupUiState()
 
     m_matchResultTable = new QTableWidget(m_matchResultDrawer);
     m_matchResultTable->setObjectName(QStringLiteral("matchResultTable"));
-    m_matchResultTable->setColumnCount(6);
+    m_matchResultTable->setColumnCount(7);
     m_matchResultTable->setHorizontalHeaderLabels(
-                QStringList{tr("序号"), tr("X"), tr("Y"), tr("角度"), tr("缩放"), tr("得分")});
+                QStringList{tr("序号"), tr("模板"), tr("X"), tr("Y"),
+                            tr("角度"), tr("缩放"), tr("得分")});
     m_matchResultTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_matchResultTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_matchResultTable->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -360,12 +394,92 @@ void TemplateLocationDialog::setupUiState()
     updateOriginControls();
 }
 
+void TemplateLocationDialog::setupTemplateBankUi()
+{
+    m_templateBankCard = new QFrame(ui->parameterScrollContents);
+    m_templateBankCard->setObjectName(QStringLiteral("templateBankCard"));
+    m_templateBankCard->setProperty("panelRole", QStringLiteral("configCard"));
+
+    auto *cardLayout = new QVBoxLayout(m_templateBankCard);
+    cardLayout->setContentsMargins(12, 12, 12, 12);
+    cardLayout->setSpacing(8);
+
+    auto *title = new QLabel(tr("模板库"), m_templateBankCard);
+    title->setObjectName(QStringLiteral("templateBankTitle"));
+    title->setProperty("role", QStringLiteral("cardTitle"));
+    cardLayout->addWidget(title);
+
+    m_templateBankList = new QListWidget(m_templateBankCard);
+    m_templateBankList->setObjectName(QStringLiteral("templateBankListWidget"));
+    m_templateBankList->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_templateBankList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    m_templateBankList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_templateBankList->setMinimumHeight(116);
+    m_templateBankList->setMaximumHeight(116);
+    m_templateBankList->setUniformItemSizes(true);
+    cardLayout->addWidget(m_templateBankList);
+
+    m_templateBankSummaryLabel = new QLabel(m_templateBankCard);
+    m_templateBankSummaryLabel->setObjectName(
+                QStringLiteral("templateBankSummaryLabel"));
+    m_templateBankSummaryLabel->setProperty("hint", true);
+    cardLayout->addWidget(m_templateBankSummaryLabel);
+
+    auto *buttonLayout = new QHBoxLayout;
+    buttonLayout->setContentsMargins(0, 0, 0, 0);
+    buttonLayout->setSpacing(6);
+    m_addTemplateItemButton = new QPushButton(tr("+ 添加模板"), m_templateBankCard);
+    m_addTemplateItemButton->setObjectName(
+                QStringLiteral("addTemplateItemButton"));
+    m_addTemplateItemButton->setProperty("actionRole", QStringLiteral("secondary"));
+    m_renameTemplateItemButton = new QPushButton(tr("重命名"), m_templateBankCard);
+    m_renameTemplateItemButton->setObjectName(
+                QStringLiteral("renameTemplateItemButton"));
+    m_renameTemplateItemButton->setProperty("actionRole", QStringLiteral("plain"));
+    m_deleteTemplateItemButton = new QPushButton(tr("删除模板项"), m_templateBankCard);
+    m_deleteTemplateItemButton->setObjectName(
+                QStringLiteral("deleteTemplateItemButton"));
+    m_deleteTemplateItemButton->setProperty("actionRole", QStringLiteral("plain"));
+    buttonLayout->addWidget(m_addTemplateItemButton, 1);
+    buttonLayout->addWidget(m_renameTemplateItemButton);
+    buttonLayout->addWidget(m_deleteTemplateItemButton);
+    cardLayout->addLayout(buttonLayout);
+
+    ui->parameterLayout->insertWidget(0, m_templateBankCard);
+    ui->templateTitle->setText(tr("当前模板设置"));
+    ui->createTemplateButton->setText(tr("创建当前模型"));
+    ui->deleteTemplateButton->setText(tr("清除当前模型"));
+
+    TemplateItemState initial;
+    initial.templateId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    initial.name = tr("模板1");
+    initial.modelCacheKey = m_modelCacheKey;
+    m_templates.append(initial);
+    m_activeTemplateId = initial.templateId;
+    refreshTemplateList();
+    refreshActiveTemplateUi();
+}
+
 void TemplateLocationDialog::connectControls()
 {
     connect(ui->closeButton, &QToolButton::clicked, this, &QDialog::reject);
     connect(ui->basicModeButton, &QPushButton::clicked, this, [this]() { setAdvancedVisible(false); });
     connect(ui->allModeButton, &QPushButton::clicked, this, [this]() { setAdvancedVisible(true); });
     connect(ui->fitViewButton, &QPushButton::clicked, m_previewHelper, &FrameViewHelper::fitToView);
+    connect(m_addTemplateItemButton, &QPushButton::clicked,
+            this, &TemplateLocationDialog::addTemplateItem);
+    connect(m_renameTemplateItemButton, &QPushButton::clicked,
+            this, &TemplateLocationDialog::renameActiveTemplateItem);
+    connect(m_deleteTemplateItemButton, &QPushButton::clicked,
+            this, &TemplateLocationDialog::deleteActiveTemplateItem);
+    connect(m_templateBankList, &QListWidget::currentItemChanged,
+            this, [this](QListWidgetItem *current, QListWidgetItem *) {
+        if (m_updatingTemplateList || !current)
+            return;
+        switchActiveTemplate(current->data(kTemplateIdRole).toString());
+    });
+    connect(m_templateBankList, &QListWidget::itemChanged,
+            this, &TemplateLocationDialog::handleTemplateItemChanged);
 
     connect(ui->originModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int index) {
@@ -503,7 +617,7 @@ void TemplateLocationDialog::connectControls()
             [this]() { ui->statusLabel->setText(tr("圆形区域半径至少需要 2 像素")); });
 
     connect(ui->contrastModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this]() { updateContrastControls(); markModelDirty(); });
+            this, [this]() { updateContrastControls(); markAllModelsDirty(); });
 
     connect(ui->maxMatchesSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
             this, [this](int value) {
@@ -529,12 +643,22 @@ void TemplateLocationDialog::connectControls()
             [this](int row, int) {
         if (m_lastDisplayResult.overlays.isEmpty())
             return;
+        const QTableWidgetItem *identityItem = m_matchResultTable->item(row, 0);
+        const QString selectedMatchId = identityItem
+                ? identityItem->data(kMatchIdRole).toString() : QString();
         QVector<ToolOverlay> overlays = m_lastDisplayResult.overlays;
         for (ToolOverlay &overlay : overlays) {
-            if (!overlay.extra.contains(QStringLiteral("matchIndex")))
+            const QString overlayMatchId = overlay.extra.value(
+                        QStringLiteral("matchId")).toString();
+            const bool hasStableIdentity = !selectedMatchId.isEmpty() &&
+                    !overlayMatchId.isEmpty();
+            if (!hasStableIdentity &&
+                    !overlay.extra.contains(QStringLiteral("matchIndex")))
                 continue;
             overlay.extra.insert(QStringLiteral("emphasis"),
-                                 overlay.extra.value(QStringLiteral("matchIndex")).toInt() == row
+                                 (hasStableIdentity
+                                  ? overlayMatchId == selectedMatchId
+                                  : overlay.extra.value(QStringLiteral("matchIndex")).toInt() == row)
                                  ? QStringLiteral("active") : QStringLiteral("muted"));
         }
         m_previewHelper->setToolOverlays(overlays);
@@ -546,10 +670,10 @@ void TemplateLocationDialog::connectControls()
                                            ui->numLevelsSpinBox};
     for (QSpinBox *spinBox : modelSpinBoxes) {
         connect(spinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-                this, [this]() { markModelDirty(); });
+                this, [this]() { markAllModelsDirty(); });
     }
     connect(ui->polarityComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this]() { markModelDirty(); });
+            this, [this]() { markAllModelsDirty(); });
 
     connect(ui->createTemplateButton, &QPushButton::clicked,
             this, &TemplateLocationDialog::createTemplate);
@@ -560,13 +684,14 @@ void TemplateLocationDialog::connectControls()
     connect(ui->testRunButton, &QPushButton::clicked,
             this, &TemplateLocationDialog::toggleContinuousTest);
     connect(ui->finishButton, &QPushButton::clicked, this, [this]() {
+        stopEditing();
+        flushActiveTemplateEditor();
         QString message;
-        if (!validateTemplate(&message) || !validateParameters(&message) || !m_modelCreated) {
-            if (message.isEmpty())
-                message = tr("模板参数已改变，请重新创建模板");
+        if (!validateTemplateBank(true, &message) || !validateParameters(&message)) {
             ui->statusLabel->setText(message);
             return;
         }
+        commitPendingCacheDeletes();
         accept();
     });
 }
@@ -699,6 +824,361 @@ void TemplateLocationDialog::stopEditing()
         ui->searchGlobalButton->setChecked(true);
 }
 
+int TemplateLocationDialog::activeTemplateIndex() const
+{
+    for (int index = 0; index < m_templates.size(); ++index) {
+        if (m_templates.at(index).templateId == m_activeTemplateId)
+            return index;
+    }
+    return -1;
+}
+
+TemplateLocationDialog::TemplateItemState
+TemplateLocationDialog::activeTemplateForOutput() const
+{
+    const int index = activeTemplateIndex();
+    if (index < 0)
+        return TemplateItemState();
+
+    TemplateItemState item = m_templates.at(index);
+    item.regionType = m_templateRegionType;
+    item.roi = m_templateRoi;
+    item.polygon = m_templatePolygon;
+    item.maskRegionType = m_templateMaskRegionType;
+    item.maskRoi = m_templateMaskRoi;
+    item.maskPolygon = m_templateMaskPolygon;
+    item.maskCircle = m_templateMaskCircle;
+    item.modelCacheKey = m_modelCacheKey;
+    item.modelCreated = m_modelCreated;
+    item.displayOverlays = m_templateDisplayOverlays;
+    return item;
+}
+
+void TemplateLocationDialog::flushActiveTemplateEditor()
+{
+    const int index = activeTemplateIndex();
+    if (index < 0)
+        return;
+    TemplateItemState item = m_templates.at(index);
+    item.regionType = m_templateRegionType;
+    item.roi = m_templateRoi;
+    item.polygon = m_templatePolygon;
+    item.maskRegionType = m_templateMaskRegionType;
+    item.maskRoi = m_templateMaskRoi;
+    item.maskPolygon = m_templateMaskPolygon;
+    item.maskCircle = m_templateMaskCircle;
+    item.modelCacheKey = m_modelCacheKey;
+    item.modelCreated = m_modelCreated;
+    item.displayOverlays = m_templateDisplayOverlays;
+    m_templates.replace(index, item);
+}
+
+void TemplateLocationDialog::loadActiveTemplateEditor()
+{
+    const int index = activeTemplateIndex();
+    if (index < 0)
+        return;
+    TemplateItemState &item = m_templates[index];
+    if (item.modelCacheKey.trimmed().isEmpty()) {
+        item.modelCacheKey = QStringLiteral("template_location_%1")
+                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    }
+    m_templateRegionType = item.regionType;
+    m_templateRoi = item.roi;
+    m_templatePolygon = item.polygon;
+    m_templateMaskRegionType = item.maskRegionType;
+    m_templateMaskRoi = item.maskRoi;
+    m_templateMaskPolygon = item.maskPolygon;
+    m_templateMaskCircle = item.maskCircle;
+    m_modelCacheKey = item.modelCacheKey;
+    m_modelCreated = item.modelCreated;
+    m_templateDisplayOverlays = item.displayOverlays;
+    refreshActiveTemplateUi();
+    showReferenceImage();
+}
+
+void TemplateLocationDialog::refreshActiveTemplateUi()
+{
+    const int index = activeTemplateIndex();
+    const bool hasActive = index >= 0;
+    ui->templateRectButton->setEnabled(hasActive);
+    ui->templatePolygonButton->setEnabled(hasActive);
+    if (m_templateMaskRectButton)
+        m_templateMaskRectButton->setEnabled(hasActive);
+    if (m_templateMaskCircleButton)
+        m_templateMaskCircleButton->setEnabled(hasActive);
+    if (m_templateMaskPolygonButton)
+        m_templateMaskPolygonButton->setEnabled(hasActive);
+    if (!hasActive) {
+        ui->modelStatusLabel->setText(tr("未选择模板"));
+        ui->createTemplateButton->setEnabled(false);
+        ui->deleteTemplateButton->setEnabled(false);
+        if (m_templateMaskClearButton)
+            m_templateMaskClearButton->setEnabled(false);
+        return;
+    }
+
+    const TemplateItemState item = activeTemplateForOutput();
+    ui->createTemplateButton->setEnabled(true);
+    ui->createTemplateButton->setText(item.modelCreated
+                                      ? tr("重新创建模板") : tr("创建模板"));
+    ui->deleteTemplateButton->setEnabled(item.modelCreated);
+    if (!item.modelError.trimmed().isEmpty())
+        ui->modelStatusLabel->setText(tr("模板错误：%1").arg(item.modelError));
+    else if (item.modelCreated)
+        ui->modelStatusLabel->setText(tr("模板已创建"));
+    else if (validRect(item.roi))
+        ui->modelStatusLabel->setText(tr("需要创建模板"));
+    else
+        ui->modelStatusLabel->setText(tr("未创建模板"));
+    if (m_templateMaskClearButton) {
+        m_templateMaskClearButton->setEnabled(
+                    item.maskRegionType != QStringLiteral("none"));
+    }
+}
+
+void TemplateLocationDialog::refreshTemplateList()
+{
+    if (!m_templateBankList)
+        return;
+    m_updatingTemplateList = true;
+    const QSignalBlocker blocker(m_templateBankList);
+    m_templateBankList->clear();
+
+    int enabledCount = 0;
+    int readyCount = 0;
+    int selectedRow = -1;
+    for (int index = 0; index < m_templates.size(); ++index) {
+        TemplateItemState item = m_templates.at(index);
+        if (item.templateId == m_activeTemplateId)
+            item = activeTemplateForOutput();
+        if (item.enabled)
+            ++enabledCount;
+        if (item.enabled && item.modelCreated)
+            ++readyCount;
+
+        QString status;
+        if (!item.enabled)
+            status = tr("已禁用");
+        else if (!item.modelError.trimmed().isEmpty())
+            status = tr("错误");
+        else if (item.modelCreated)
+            status = tr("已创建");
+        else if (validRect(item.roi))
+            status = tr("需重建");
+        else
+            status = tr("未定义区域");
+
+        auto *listItem = new QListWidgetItem(
+                    tr("%1  · P%2 · %3")
+                    .arg(item.name)
+                    .arg(item.priority + 1)
+                    .arg(status), m_templateBankList);
+        listItem->setData(kTemplateIdRole, item.templateId);
+        listItem->setToolTip(tr("模板 ID：%1").arg(item.templateId));
+        listItem->setFlags(listItem->flags() | Qt::ItemIsUserCheckable);
+        listItem->setCheckState(item.enabled ? Qt::Checked : Qt::Unchecked);
+        if (item.templateId == m_activeTemplateId)
+            selectedRow = index;
+    }
+
+    if (selectedRow < 0 && !m_templates.isEmpty()) {
+        selectedRow = 0;
+        m_activeTemplateId = m_templates.first().templateId;
+    }
+    if (selectedRow >= 0)
+        m_templateBankList->setCurrentRow(selectedRow);
+
+    m_templateBankSummaryLabel->setText(
+                tr("共 %1 项，启用 %2 项，已就绪 %3 项")
+                .arg(m_templates.size()).arg(enabledCount).arg(readyCount));
+    m_addTemplateItemButton->setEnabled(
+                m_templates.size() < kMaximumTemplateCount);
+    m_renameTemplateItemButton->setEnabled(selectedRow >= 0);
+    m_deleteTemplateItemButton->setEnabled(m_templates.size() > 1);
+    m_updatingTemplateList = false;
+}
+
+void TemplateLocationDialog::switchActiveTemplate(const QString &templateId)
+{
+    if (templateId.trimmed().isEmpty() || templateId == m_activeTemplateId)
+        return;
+    int targetIndex = -1;
+    for (int index = 0; index < m_templates.size(); ++index) {
+        if (m_templates.at(index).templateId == templateId) {
+            targetIndex = index;
+            break;
+        }
+    }
+    if (targetIndex < 0)
+        return;
+    if (m_running)
+        toggleContinuousTest();
+    stopEditing();
+    flushActiveTemplateEditor();
+    m_activeTemplateId = templateId;
+    loadActiveTemplateEditor();
+    updateMatchResultTable(QJsonArray());
+    ui->resultLabel->setText(tr("尚未运行"));
+    refreshTemplateList();
+    ui->statusLabel->setText(
+                tr("已切换到 %1").arg(m_templates.at(targetIndex).name));
+}
+
+void TemplateLocationDialog::addTemplateItem()
+{
+    if (m_templates.size() >= kMaximumTemplateCount) {
+        ui->statusLabel->setText(tr("模板数量最多为 %1 个").arg(kMaximumTemplateCount));
+        return;
+    }
+    if (m_running)
+        toggleContinuousTest();
+    stopEditing();
+    flushActiveTemplateEditor();
+
+    // Once a bank contains alternative ROIs, a centroid that silently follows
+    // the selected item is not a common output anchor. Freeze the legacy first
+    // item's current anchor before promotion so all items share one image point.
+    if (m_templates.size() == 1 &&
+            m_originMode == QStringLiteral("centroid")) {
+        const TemplateItemState first = m_templates.first();
+        if (validRect(first.roi)) {
+            m_originMode = QStringLiteral("custom");
+            m_customOriginNormalized = first.regionType == QStringLiteral("polygon") &&
+                    !first.polygon.isEmpty()
+                    ? polygonCentroid(first.polygon)
+                    : first.roi.center();
+            const QSignalBlocker blocker(ui->originModeComboBox);
+            ui->originModeComboBox->setCurrentIndex(1);
+            updateOriginControls();
+        }
+    }
+
+    QSet<QString> names;
+    int maximumPriority = -1;
+    for (const TemplateItemState &item : qAsConst(m_templates)) {
+        names.insert(item.name);
+        maximumPriority = qMax(maximumPriority, item.priority);
+    }
+    int suffix = m_templates.size() + 1;
+    QString name;
+    do {
+        name = tr("模板%1").arg(suffix++);
+    } while (names.contains(name));
+
+    TemplateItemState item;
+    item.templateId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    item.name = name;
+    item.priority = maximumPriority + 1;
+    item.modelCacheKey = QStringLiteral("template_location_%1")
+            .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_templates.append(item);
+    if (m_templates.size() > 1)
+        m_usesTemplateBankSchema = true;
+    m_activeTemplateId = item.templateId;
+    loadActiveTemplateEditor();
+    invalidateRunPreview();
+    refreshTemplateList();
+    ui->statusLabel->setText(tr("已添加 %1，请绘制模板区域").arg(item.name));
+}
+
+void TemplateLocationDialog::renameActiveTemplateItem()
+{
+    const int index = activeTemplateIndex();
+    if (index < 0)
+        return;
+    bool accepted = false;
+    const QString name = QInputDialog::getText(
+                this, tr("重命名模板"), tr("模板名称"), QLineEdit::Normal,
+                m_templates.at(index).name, &accepted).trimmed();
+    if (!accepted)
+        return;
+    if (name.isEmpty()) {
+        ui->statusLabel->setText(tr("模板名称不能为空"));
+        return;
+    }
+    for (int other = 0; other < m_templates.size(); ++other) {
+        if (other != index && m_templates.at(other).name == name) {
+            ui->statusLabel->setText(tr("模板名称不能重复"));
+            return;
+        }
+    }
+    m_templates[index].name = name;
+    refreshTemplateList();
+    ui->statusLabel->setText(tr("模板已重命名为 %1").arg(name));
+}
+
+void TemplateLocationDialog::deleteActiveTemplateItem()
+{
+    if (m_templates.size() <= 1) {
+        ui->statusLabel->setText(tr("至少保留一个模板"));
+        return;
+    }
+    const int index = activeTemplateIndex();
+    if (index < 0)
+        return;
+    const TemplateItemState item = activeTemplateForOutput();
+    if (QMessageBox::question(
+                this, tr("删除模板项"),
+                tr("确定删除“%1”及其区域和模型状态吗？").arg(item.name),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
+        return;
+    }
+    if (m_running)
+        toggleContinuousTest();
+    stopEditing();
+    flushActiveTemplateEditor();
+    if (!item.modelCacheKey.trimmed().isEmpty())
+        m_pendingCacheDeletes.append(item.modelCacheKey);
+    m_templates.removeAt(index);
+    const int nextIndex = qMin(index, m_templates.size() - 1);
+    m_activeTemplateId = m_templates.at(nextIndex).templateId;
+    loadActiveTemplateEditor();
+    invalidateRunPreview();
+    refreshTemplateList();
+    ui->statusLabel->setText(tr("模板项已删除"));
+}
+
+void TemplateLocationDialog::handleTemplateItemChanged(QListWidgetItem *listItem)
+{
+    if (m_updatingTemplateList || !listItem)
+        return;
+    const QString templateId = listItem->data(kTemplateIdRole).toString();
+    int index = -1;
+    int enabledCount = 0;
+    for (int candidate = 0; candidate < m_templates.size(); ++candidate) {
+        if (m_templates.at(candidate).enabled)
+            ++enabledCount;
+        if (m_templates.at(candidate).templateId == templateId)
+            index = candidate;
+    }
+    if (index < 0)
+        return;
+    const bool enabled = listItem->checkState() == Qt::Checked;
+    if (!enabled && m_templates.at(index).enabled && enabledCount <= 1) {
+        const QSignalBlocker blocker(m_templateBankList);
+        listItem->setCheckState(Qt::Checked);
+        ui->statusLabel->setText(tr("至少保留一个启用模板"));
+        return;
+    }
+    if (m_templates.at(index).enabled == enabled)
+        return;
+    m_templates[index].enabled = enabled;
+    invalidateRunPreview();
+    refreshTemplateList();
+    ui->statusLabel->setText(enabled
+                            ? tr("模板已启用") : tr("模板已禁用"));
+}
+
+void TemplateLocationDialog::invalidateRunPreview()
+{
+    m_snapshot = ToolPreviewSnapshot();
+    m_lastDisplayResult = ToolResult();
+    updateMatchResultTable(QJsonArray());
+    ui->resultLabel->setText(tr("尚未运行"));
+    ui->elapsedLabel->setText(tr("算法耗时: 0ms"));
+}
+
 void TemplateLocationDialog::showReferenceImage()
 {
     const QImage image = ReferenceImageProvider::instance().referenceImage();
@@ -754,6 +1234,34 @@ void TemplateLocationDialog::markModelDirty()
     ui->deleteTemplateButton->setEnabled(false);
     m_previewHelper->clearToolOverlays();
     ui->modelStatusLabel->setText(tr("参数已改变，需要重新创建模板"));
+    const int index = activeTemplateIndex();
+    if (index >= 0)
+        m_templates[index].modelError.clear();
+    flushActiveTemplateEditor();
+    refreshTemplateList();
+    showReferenceImage();
+}
+
+void TemplateLocationDialog::markAllModelsDirty()
+{
+    flushActiveTemplateEditor();
+    bool hadCreatedModel = false;
+    for (TemplateItemState &item : m_templates) {
+        hadCreatedModel = hadCreatedModel || item.modelCreated;
+        item.modelCreated = false;
+        item.modelError.clear();
+        item.displayOverlays.clear();
+    }
+    m_modelCreated = false;
+    m_templateDisplayOverlays.clear();
+    invalidateRunPreview();
+    ui->createTemplateButton->setText(tr("创建模板"));
+    ui->deleteTemplateButton->setEnabled(false);
+    ui->modelStatusLabel->setText(hadCreatedModel
+                                  ? tr("共享参数已改变，需要重新创建全部模板")
+                                  : tr("需要创建模板"));
+    flushActiveTemplateEditor();
+    refreshTemplateList();
     showReferenceImage();
 }
 
@@ -766,7 +1274,8 @@ void TemplateLocationDialog::deleteTemplate()
     m_creatingTemplate = false;
     m_templateDisplayOverlays.clear();
     m_snapshot = ToolPreviewSnapshot();
-    TemplateLocationHalconRunner::clearPersistentCache(m_modelCacheKey);
+    if (!m_modelCacheKey.trimmed().isEmpty())
+        m_pendingCacheDeletes.append(m_modelCacheKey);
     m_modelCacheKey = QStringLiteral("template_location_%1")
             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     m_previewHelper->clearToolOverlays();
@@ -778,7 +1287,24 @@ void TemplateLocationDialog::deleteTemplate()
     ui->elapsedLabel->setText(tr("算法耗时: 0ms"));
     updateMatchResultTable(QJsonArray());
     ui->statusLabel->setText(tr("模板已删除，模板区域已保留"));
+    const int index = activeTemplateIndex();
+    if (index >= 0)
+        m_templates[index].modelError.clear();
+    flushActiveTemplateEditor();
+    refreshTemplateList();
     showReferenceImage();
+}
+
+void TemplateLocationDialog::commitPendingCacheDeletes()
+{
+    QSet<QString> uniqueKeys;
+    for (const QString &key : qAsConst(m_pendingCacheDeletes)) {
+        if (!key.trimmed().isEmpty())
+            uniqueKeys.insert(key);
+    }
+    for (const QString &key : qAsConst(uniqueKeys))
+        TemplateLocationHalconRunner::clearPersistentCache(key);
+    m_pendingCacheDeletes.clear();
 }
 
 bool TemplateLocationDialog::validateTemplate(QString *message) const
@@ -811,6 +1337,111 @@ bool TemplateLocationDialog::validateTemplate(QString *message) const
         return false;
     }
     return valid;
+}
+
+bool TemplateLocationDialog::validateTemplateItem(
+        const TemplateItemState &item, QString *message) const
+{
+    const bool valid = item.regionType == QStringLiteral("polygon")
+            ? item.polygon.size() >= 3 && validRect(item.roi)
+            : validRect(item.roi);
+    if (!valid) {
+        if (message)
+            *message = tr("模板“%1”的模板区域无效").arg(item.name);
+        return false;
+    }
+    if (item.maskRegionType == QStringLiteral("rectangle") &&
+            !validRect(item.maskRoi)) {
+        if (message)
+            *message = tr("模板“%1”的矩形屏蔽区域无效").arg(item.name);
+        return false;
+    }
+    if (item.maskRegionType == QStringLiteral("circle") &&
+            !item.maskCircle.valid) {
+        if (message)
+            *message = tr("模板“%1”的圆形屏蔽区域无效").arg(item.name);
+        return false;
+    }
+    if (item.maskRegionType == QStringLiteral("polygon") &&
+            item.maskPolygon.size() < 3) {
+        if (message)
+            *message = tr("模板“%1”的屏蔽多边形至少需要 3 个点").arg(item.name);
+        return false;
+    }
+    return true;
+}
+
+bool TemplateLocationDialog::validateTemplateBank(
+        bool requireModels, QString *message) const
+{
+    if (m_configReadOnly) {
+        if (message) {
+            *message = tr("当前模板定位配置只读（%1）：%2")
+                    .arg(m_configReadOnlyStatus.trimmed().isEmpty()
+                         ? QStringLiteral("invalid_config")
+                         : m_configReadOnlyStatus,
+                         m_configReadOnlyMessage.trimmed().isEmpty()
+                         ? tr("请使用支持该配置合同的版本编辑")
+                         : m_configReadOnlyMessage);
+        }
+        return false;
+    }
+    if (!ReferenceImageProvider::instance().hasReferenceFrame()) {
+        if (message)
+            *message = tr("请先设置基准图");
+        return false;
+    }
+    if (m_templates.isEmpty() || m_templates.size() > kMaximumTemplateCount) {
+        if (message)
+            *message = tr("模板数量必须为 1~%1 个").arg(kMaximumTemplateCount);
+        return false;
+    }
+
+    int enabledCount = 0;
+    QSet<QString> ids;
+    for (int index = 0; index < m_templates.size(); ++index) {
+        TemplateItemState item = m_templates.at(index);
+        if (item.templateId == m_activeTemplateId)
+            item = activeTemplateForOutput();
+        if (item.templateId.trimmed().isEmpty() || ids.contains(item.templateId)) {
+            if (message)
+                *message = tr("模板 ID 为空或重复");
+            return false;
+        }
+        ids.insert(item.templateId);
+        if (!item.enabled)
+            continue;
+        ++enabledCount;
+        if (!validateTemplateItem(item, message))
+            return false;
+        if (requireModels && !item.modelCreated) {
+            if (message)
+                *message = tr("模板“%1”尚未创建或需要重建").arg(item.name);
+            return false;
+        }
+    }
+    if (enabledCount == 0) {
+        if (message)
+            *message = tr("至少启用一个模板");
+        return false;
+    }
+
+    // Keep Dialog validation and the Adapter/Runner contract identical.  This
+    // catches fields not directly editable on the current page (for example a
+    // locked primary template or fusion values retained from a newer config).
+    const ToolConfig candidate = toolConfig();
+    const TemplateLocationModelBankConfig bank =
+            TemplateLocationConfig::fromToolConfig(candidate);
+    const TemplateLocationConfigValidationResult validation =
+            TemplateLocationConfig::validateModelBank(bank, requireModels);
+    if (!validation.valid) {
+        if (message) {
+            *message = tr("模板库配置无效（%1）：%2")
+                    .arg(validation.code, validation.message);
+        }
+        return false;
+    }
+    return true;
 }
 
 bool TemplateLocationDialog::validateParameters(QString *message) const
@@ -864,6 +1495,7 @@ void TemplateLocationDialog::createTemplate()
         return;
     }
     stopEditing();
+    flushActiveTemplateEditor();
     m_modelCreated = true;
     m_creatingTemplate = true;
     runOnFrame(ReferenceImageProvider::instance().referenceFrame(), tr("基准图建模"));
@@ -874,6 +1506,11 @@ void TemplateLocationDialog::createTemplate()
         m_templateDisplayOverlays.clear();
         ui->deleteTemplateButton->setEnabled(false);
         ui->modelStatusLabel->setText(tr("模板创建失败"));
+        const int index = activeTemplateIndex();
+        if (index >= 0)
+            m_templates[index].modelError = m_snapshot.result.message;
+        flushActiveTemplateEditor();
+        refreshTemplateList();
         return;
     }
     ui->createTemplateButton->setText(tr("重新创建模板"));
@@ -890,17 +1527,22 @@ void TemplateLocationDialog::createTemplate()
             : tr("自动");
     ui->autoContrastValueLabel->setText(tr("Contrast %1 / MinContrast %2")
                                         .arg(contrast, minContrast));
+    const int index = activeTemplateIndex();
+    if (index >= 0)
+        m_templates[index].modelError.clear();
+    flushActiveTemplateEditor();
+    refreshTemplateList();
 }
 
 void TemplateLocationDialog::runReferenceTest()
 {
+    stopEditing();
+    flushActiveTemplateEditor();
     QString message;
-    if (!validateTemplate(&message) || !validateParameters(&message) || !m_modelCreated) {
-        if (message.isEmpty()) message = tr("请先创建模板");
+    if (!validateTemplateBank(true, &message) || !validateParameters(&message)) {
         ui->statusLabel->setText(message);
         return;
     }
-    stopEditing();
     runOnFrame(ReferenceImageProvider::instance().referenceFrame(), tr("基准图测试"));
 }
 
@@ -917,9 +1559,10 @@ void TemplateLocationDialog::toggleContinuousTest()
         return;
     }
 
+    stopEditing();
+    flushActiveTemplateEditor();
     QString message;
-    if (!validateTemplate(&message) || !validateParameters(&message) || !m_modelCreated) {
-        if (message.isEmpty()) message = tr("请先创建模板");
+    if (!validateTemplateBank(true, &message) || !validateParameters(&message)) {
         ui->statusLabel->setText(message);
         return;
     }
@@ -927,7 +1570,6 @@ void TemplateLocationDialog::toggleContinuousTest()
         ui->statusLabel->setText(tr("当前没有相机图像"));
         return;
     }
-    stopEditing();
     m_running = true;
     ui->testRunButton->setText(tr("退出测试"));
     m_frameConnection = connect(&CameraFrameProvider::instance(),
@@ -949,7 +1591,7 @@ void TemplateLocationDialog::runOnFrame(const cv::Mat &frame, const QString &tit
     }
     m_processing = true;
     ToolRequest request;
-    request.config = toolConfig();
+    request.config = m_creatingTemplate ? activeTemplateToolConfig() : toolConfig();
     request.config.params.insert(QStringLiteral("modelCreated"), true);
     if (m_creatingTemplate) {
         request.config.params.insert(QStringLiteral("minMatchCount"), 1);
@@ -999,12 +1641,23 @@ void TemplateLocationDialog::displayResult(const ToolResult &result)
     if (m_creatingTemplate) {
         QVector<ToolOverlay> templateOverlays;
         for (ToolOverlay overlay : result.overlays) {
-            if (overlay.label != QStringLiteral("match_result") ||
-                    overlay.extra.value(QStringLiteral("matchIndex")).toInt(-1) != 0)
+            if (overlay.label != QStringLiteral("match_result"))
+                continue;
+            const QString overlayTemplateId = overlay.extra.value(
+                        QStringLiteral("templateId")).toString();
+            if ((!overlayTemplateId.isEmpty() &&
+                 overlayTemplateId != m_activeTemplateId) ||
+                    (overlayTemplateId.isEmpty() &&
+                     overlay.extra.value(QStringLiteral("matchIndex")).toInt(-1) != 0))
                 continue;
             overlay.label = QStringLiteral("template_model");
             overlay.extra.insert(QStringLiteral("displayRole"),
                                  QStringLiteral("template_location_model"));
+            overlay.extra.insert(QStringLiteral("templateId"), m_activeTemplateId);
+            if (!overlay.extra.contains(QStringLiteral("matchId"))) {
+                overlay.extra.insert(QStringLiteral("matchId"),
+                                     QStringLiteral("build:%1").arg(m_activeTemplateId));
+            }
             templateOverlays.append(overlay);
         }
         m_templateDisplayOverlays = templateOverlays;
@@ -1073,8 +1726,13 @@ void TemplateLocationDialog::updateMatchResultTable(const QJsonArray &matches)
     m_matchResultTable->setRowCount(matches.size());
     for (int row = 0; row < matches.size(); ++row) {
         const QJsonObject match = matches.at(row).toObject();
+        QString templateName = match.value(QStringLiteral("templateName"))
+                .toString().trimmed();
+        if (templateName.isEmpty())
+            templateName = match.value(QStringLiteral("templateId")).toString();
         const QStringList values{
             QString::number(row + 1),
+            templateName,
             QString::number(match.value(QStringLiteral("x")).toDouble(), 'f', 2),
             QString::number(match.value(QStringLiteral("y")).toDouble(), 'f', 2),
             QString::number(match.value(QStringLiteral("angleDeg")).toDouble(), 'f', 2) + tr("°"),
@@ -1084,6 +1742,8 @@ void TemplateLocationDialog::updateMatchResultTable(const QJsonArray &matches)
         for (int column = 0; column < values.size(); ++column) {
             auto *item = new QTableWidgetItem(values.at(column));
             item->setTextAlignment(Qt::AlignCenter);
+            item->setData(kMatchIdRole,
+                          match.value(QStringLiteral("matchId")).toString());
             m_matchResultTable->setItem(row, column, item);
         }
     }
@@ -1113,8 +1773,95 @@ void TemplateLocationDialog::setMatchResultsExpanded(bool expanded)
     m_matchResultDrawer->setFixedHeight(expanded ? 152 : 36);
 }
 
+TemplateLocationDialog::TemplateItemState
+TemplateLocationDialog::templateItemFromJson(const QJsonObject &json,
+                                             int fallbackIndex) const
+{
+    TemplateItemState item;
+    item.extra = json;
+    item.templateId = json.value(QStringLiteral("templateId")).toString().trimmed();
+    if (item.templateId.isEmpty())
+        item.templateId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    item.name = json.value(QStringLiteral("name")).toString().trimmed();
+    if (item.name.isEmpty())
+        item.name = tr("模板%1").arg(fallbackIndex + 1);
+    item.enabled = json.value(QStringLiteral("enabled")).toBool(true);
+    item.priority = json.value(QStringLiteral("priority")).toInt(fallbackIndex);
+    item.regionType = json.value(QStringLiteral("templateRegionType"))
+            .toString(QStringLiteral("rectangle"));
+    item.roi = rectFromJson(
+                json.value(QStringLiteral("templateRoiNormalized")).toObject(),
+                QRectF());
+    item.polygon = pointsFromJson(
+                json.value(QStringLiteral("templatePolygonNormalized")).toArray());
+    item.maskRegionType = json.value(QStringLiteral("templateMaskRegionType"))
+            .toString(json.value(QStringLiteral("templateMaskPolygonNormalized"))
+                      .toArray().isEmpty()
+                      ? QStringLiteral("none") : QStringLiteral("polygon"));
+    item.maskRoi = rectFromJson(
+                json.value(QStringLiteral("templateMaskRoiNormalized")).toObject(),
+                QRectF());
+    item.maskPolygon = pointsFromJson(
+                json.value(QStringLiteral("templateMaskPolygonNormalized")).toArray());
+    const QJsonObject circleCenter = json.value(
+                QStringLiteral("templateMaskCircleCenterNormalized")).toObject();
+    item.maskCircle.centerNormalized = QPointF(
+                circleCenter.value(QStringLiteral("x")).toDouble(
+                    item.maskRoi.center().x()),
+                circleCenter.value(QStringLiteral("y")).toDouble(
+                    item.maskRoi.center().y()));
+    item.maskCircle.radiusNormalized = json.value(
+                QStringLiteral("templateMaskCircleRadiusNormalized")).toDouble(
+                    qMin(item.maskRoi.width(), item.maskRoi.height()) / 2.0);
+    item.maskCircle.boundingRectNormalized = QRectF(
+                item.maskCircle.centerNormalized.x() -
+                    item.maskCircle.radiusNormalized,
+                item.maskCircle.centerNormalized.y() -
+                    item.maskCircle.radiusNormalized,
+                item.maskCircle.radiusNormalized * 2.0,
+                item.maskCircle.radiusNormalized * 2.0);
+    item.maskCircle.valid = item.maskRegionType == QStringLiteral("circle") &&
+            item.maskCircle.radiusNormalized > 0.0 &&
+            validRect(item.maskCircle.boundingRectNormalized);
+    item.modelCacheKey = json.value(QStringLiteral("modelCacheKey"))
+            .toString().trimmed();
+    if (item.modelCacheKey.isEmpty()) {
+        item.modelCacheKey = QStringLiteral("template_location_%1")
+                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    }
+    item.modelCreated = json.value(QStringLiteral("modelCreated")).toBool(false);
+    return item;
+}
+
+QJsonObject TemplateLocationDialog::templateItemToJson(
+        const TemplateItemState &item) const
+{
+    QJsonObject json = item.extra;
+    json.insert(QStringLiteral("templateId"), item.templateId);
+    json.insert(QStringLiteral("name"), item.name);
+    json.insert(QStringLiteral("enabled"), item.enabled);
+    json.insert(QStringLiteral("priority"), item.priority);
+    json.insert(QStringLiteral("templateRegionType"), item.regionType);
+    json.insert(QStringLiteral("templateRoiNormalized"), rectToJson(item.roi));
+    json.insert(QStringLiteral("templatePolygonNormalized"), pointsToJson(item.polygon));
+    json.insert(QStringLiteral("templateMaskRegionType"), item.maskRegionType);
+    json.insert(QStringLiteral("templateMaskRoiNormalized"), rectToJson(item.maskRoi));
+    json.insert(QStringLiteral("templateMaskPolygonNormalized"), pointsToJson(item.maskPolygon));
+    json.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
+                QJsonObject{{QStringLiteral("x"), item.maskCircle.centerNormalized.x()},
+                            {QStringLiteral("y"), item.maskCircle.centerNormalized.y()}});
+    json.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
+                item.maskCircle.radiusNormalized);
+    json.insert(QStringLiteral("modelCacheKey"), item.modelCacheKey);
+    json.insert(QStringLiteral("modelCreated"), item.modelCreated);
+    return json;
+}
+
 ToolConfig TemplateLocationDialog::toolConfig() const
 {
+    if (m_configReadOnly)
+        return m_config;
+
     ToolConfig config = m_config;
     config.toolType = ToolType::TemplateLocation;
     config.category = ToolCategory::Location;
@@ -1122,25 +1869,12 @@ ToolConfig TemplateLocationDialog::toolConfig() const
     config.displayName = tr("模板定位");
     config.roiNormalized = m_searchRoi;
 
-    QJsonObject params;
-    params.insert(QStringLiteral("version"), 4);
-    params.insert(QStringLiteral("templateRegionType"), m_templateRegionType);
-    params.insert(QStringLiteral("templateRoiNormalized"), rectToJson(m_templateRoi));
-    params.insert(QStringLiteral("templatePolygonNormalized"), pointsToJson(m_templatePolygon));
-    params.insert(QStringLiteral("templateMaskRegionType"),
-                  m_templateMaskRegionType);
-    params.insert(QStringLiteral("templateMaskRoiNormalized"),
-                  rectToJson(m_templateMaskRoi));
-    params.insert(QStringLiteral("templateMaskPolygonNormalized"),
-                  pointsToJson(m_templateMaskPolygon));
-    params.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
-                  QJsonObject{
-                      {QStringLiteral("x"),
-                       m_templateMaskCircle.centerNormalized.x()},
-                      {QStringLiteral("y"),
-                       m_templateMaskCircle.centerNormalized.y()}});
-    params.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
-                  m_templateMaskCircle.radiusNormalized);
+    QList<TemplateItemState> items = m_templates;
+    const int activeIndex = activeTemplateIndex();
+    if (activeIndex >= 0 && activeIndex < items.size())
+        items.replace(activeIndex, activeTemplateForOutput());
+
+    QJsonObject params = m_config.params;
     params.insert(QStringLiteral("searchRegionType"), m_searchRegionType);
     params.insert(QStringLiteral("searchRoiNormalized"), rectToJson(m_searchRoi));
     params.insert(QStringLiteral("searchPolygonNormalized"), pointsToJson(m_searchPolygon));
@@ -1170,10 +1904,68 @@ ToolConfig TemplateLocationDialog::toolConfig() const
     params.insert(QStringLiteral("customOriginNormalized"),
                   QJsonObject{{QStringLiteral("x"), m_customOriginNormalized.x()},
                               {QStringLiteral("y"), m_customOriginNormalized.y()}});
-    params.insert(QStringLiteral("modelCacheKey"), m_modelCacheKey);
-    params.insert(QStringLiteral("modelCreated"), m_modelCreated);
-    config.params = params;
-    config.summary = tr("模板定位，查找 %1 个，数量 %2~%3，最低得分 %4%，角度 %5°~%6°")
+    if (m_config.params.contains(QStringLiteral("halconSoPath"))) {
+        params.insert(QStringLiteral("halconSoPath"),
+                      m_config.params.value(QStringLiteral("halconSoPath")));
+    }
+
+    int enabledCount = 0;
+    bool allEnabledCreated = true;
+    for (const TemplateItemState &item : qAsConst(items)) {
+        if (!item.enabled)
+            continue;
+        ++enabledCount;
+        allEnabledCreated = allEnabledCreated && item.modelCreated;
+    }
+    if (m_usesTemplateBankSchema || items.size() > 1) {
+        params.insert(QStringLiteral("version"), 5);
+        params.insert(QStringLiteral("templateMode"),
+                      QStringLiteral("alternatives"));
+        QJsonArray templates;
+        for (const TemplateItemState &item : qAsConst(items))
+            templates.append(templateItemToJson(item));
+        params.insert(QStringLiteral("templates"), templates);
+        params.insert(QStringLiteral("modelCreated"),
+                      enabledCount > 0 && allEnabledCreated);
+        params.insert(QStringLiteral("primaryMatchStrategy"),
+                      m_config.params.value(QStringLiteral("primaryMatchStrategy"))
+                      .toString(QStringLiteral("best_score")));
+        params.insert(QStringLiteral("primaryTemplateId"),
+                      m_config.params.value(QStringLiteral("primaryTemplateId")));
+        if (m_config.params.contains(QStringLiteral("fusion")))
+            params.insert(QStringLiteral("fusion"),
+                          m_config.params.value(QStringLiteral("fusion")));
+    } else {
+        params.insert(QStringLiteral("version"), 4);
+        const TemplateItemState item = items.isEmpty()
+                ? TemplateItemState() : items.first();
+        params.insert(QStringLiteral("templateRegionType"), item.regionType);
+        params.insert(QStringLiteral("templateRoiNormalized"), rectToJson(item.roi));
+        params.insert(QStringLiteral("templatePolygonNormalized"),
+                      pointsToJson(item.polygon));
+        params.insert(QStringLiteral("templateMaskRegionType"), item.maskRegionType);
+        params.insert(QStringLiteral("templateMaskRoiNormalized"),
+                      rectToJson(item.maskRoi));
+        params.insert(QStringLiteral("templateMaskPolygonNormalized"),
+                      pointsToJson(item.maskPolygon));
+        params.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
+                      QJsonObject{
+                          {QStringLiteral("x"), item.maskCircle.centerNormalized.x()},
+                          {QStringLiteral("y"), item.maskCircle.centerNormalized.y()}});
+        params.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
+                      item.maskCircle.radiusNormalized);
+        params.insert(QStringLiteral("modelCacheKey"), item.modelCacheKey);
+        params.insert(QStringLiteral("modelCreated"), item.modelCreated);
+    }
+    TemplateLocationModelBankConfig normalizedBank =
+            TemplateLocationConfig::fromToolParams(params, config.toolId);
+    normalizedBank.version = (m_usesTemplateBankSchema || items.size() > 1)
+            ? TemplateLocationConfig::ModelBankParamsVersion
+            : TemplateLocationConfig::LegacyParamsVersion;
+    config.params = TemplateLocationConfig::toToolParams(normalizedBank);
+    config.summary = tr("模板定位，启用 %1/%2 个模板，查找 %3 个，数量 %4~%5，最低得分 %6%，角度 %7°~%8°")
+            .arg(enabledCount)
+            .arg(items.size())
             .arg(ui->maxMatchesSpinBox->value())
             .arg(ui->minMatchCountSpinBox->value())
             .arg(ui->maxMatchCountSpinBox->value())
@@ -1183,47 +1975,102 @@ ToolConfig TemplateLocationDialog::toolConfig() const
     return config;
 }
 
+ToolConfig TemplateLocationDialog::activeTemplateToolConfig() const
+{
+    if (m_configReadOnly)
+        return m_config;
+
+    ToolConfig config = toolConfig();
+    QJsonObject params = config.params;
+    const TemplateItemState item = activeTemplateForOutput();
+    TemplateItemState buildItem = item;
+    buildItem.enabled = true;
+    buildItem.modelCreated = true;
+    params.insert(QStringLiteral("version"), 5);
+    params.insert(QStringLiteral("templateMode"),
+                  QStringLiteral("alternatives"));
+    params.insert(QStringLiteral("templates"),
+                  QJsonArray{templateItemToJson(buildItem)});
+    params.insert(QStringLiteral("primaryMatchStrategy"),
+                  QStringLiteral("best_score"));
+    params.insert(QStringLiteral("primaryTemplateId"), item.templateId);
+    params.remove(QStringLiteral("templateRegionType"));
+    params.remove(QStringLiteral("templateRoiNormalized"));
+    params.remove(QStringLiteral("templatePolygonNormalized"));
+    params.remove(QStringLiteral("templateMaskRegionType"));
+    params.remove(QStringLiteral("templateMaskRoiNormalized"));
+    params.remove(QStringLiteral("templateMaskPolygonNormalized"));
+    params.remove(QStringLiteral("templateMaskCircleCenterNormalized"));
+    params.remove(QStringLiteral("templateMaskCircleRadiusNormalized"));
+    params.remove(QStringLiteral("modelCacheKey"));
+    params.insert(QStringLiteral("modelCreated"), true);
+    config.params = params;
+    return config;
+}
+
 void TemplateLocationDialog::loadFromConfig(const ToolConfig &config)
 {
+    if (m_running)
+        toggleContinuousTest();
+    stopEditing();
     m_config = config;
     m_config.toolType = ToolType::TemplateLocation;
     m_config.category = ToolCategory::Location;
     const QJsonObject params = config.params;
-    m_templateRegionType = params.value(QStringLiteral("templateRegionType")).toString(QStringLiteral("rectangle"));
-    m_templateRoi = rectFromJson(params.value(QStringLiteral("templateRoiNormalized")).toObject(), QRectF());
-    m_templatePolygon = pointsFromJson(params.value(QStringLiteral("templatePolygonNormalized")).toArray());
-    m_templateMaskRegionType = params.value(
-                QStringLiteral("templateMaskRegionType")).toString(
-                params.value(QStringLiteral("templateMaskPolygonNormalized"))
-                    .toArray().isEmpty()
-                    ? QStringLiteral("none") : QStringLiteral("polygon"));
-    m_templateMaskRoi = rectFromJson(
-                params.value(QStringLiteral("templateMaskRoiNormalized")).toObject(),
-                QRectF());
-    m_templateMaskPolygon = pointsFromJson(
-                params.value(QStringLiteral("templateMaskPolygonNormalized")).toArray());
-    const QJsonObject maskCircleCenter = params.value(
-                QStringLiteral("templateMaskCircleCenterNormalized")).toObject();
-    m_templateMaskCircle.centerNormalized = QPointF(
-                maskCircleCenter.value(QStringLiteral("x")).toDouble(
-                    m_templateMaskRoi.center().x()),
-                maskCircleCenter.value(QStringLiteral("y")).toDouble(
-                    m_templateMaskRoi.center().y()));
-    m_templateMaskCircle.radiusNormalized = params.value(
-                QStringLiteral("templateMaskCircleRadiusNormalized")).toDouble(
-                qMin(m_templateMaskRoi.width(),
-                     m_templateMaskRoi.height()) / 2.0);
-    m_templateMaskCircle.boundingRectNormalized = QRectF(
-                m_templateMaskCircle.centerNormalized.x() -
-                    m_templateMaskCircle.radiusNormalized,
-                m_templateMaskCircle.centerNormalized.y() -
-                    m_templateMaskCircle.radiusNormalized,
-                m_templateMaskCircle.radiusNormalized * 2.0,
-                m_templateMaskCircle.radiusNormalized * 2.0);
-    m_templateMaskCircle.valid =
-            m_templateMaskRegionType == QStringLiteral("circle") &&
-            m_templateMaskCircle.radiusNormalized > 0.0 &&
-            validRect(m_templateMaskCircle.boundingRectNormalized);
+    const TemplateLocationModelBankConfig decoded =
+            TemplateLocationConfig::fromToolParams(params, config.toolId);
+    m_configReadOnly = !decoded.decodeSupported || decoded.rawPassthrough;
+    m_configReadOnlyStatus = decoded.decodeStatus;
+    m_configReadOnlyMessage = decoded.decodeMessage;
+    m_pendingCacheDeletes.clear();
+    m_templates.clear();
+    const QJsonArray templateArray = params.value(QStringLiteral("templates")).toArray();
+    m_usesTemplateBankSchema = params.value(QStringLiteral("version")).toInt() >= 5 ||
+            params.contains(QStringLiteral("templates"));
+    if (m_usesTemplateBankSchema) {
+        QSet<QString> ids;
+        for (int index = 0; index < templateArray.size(); ++index) {
+            TemplateItemState item = templateItemFromJson(
+                        templateArray.at(index).toObject(), index);
+            if (ids.contains(item.templateId)) {
+                item.templateId = QUuid::createUuid()
+                        .toString(QUuid::WithoutBraces);
+                item.modelCreated = false;
+                item.modelError = tr("原配置包含重复模板 ID");
+            }
+            ids.insert(item.templateId);
+            m_templates.append(item);
+        }
+    } else {
+        QJsonObject legacyItem = params;
+        legacyItem.insert(QStringLiteral("templateId"),
+                          QStringLiteral("legacy-template"));
+        legacyItem.insert(QStringLiteral("name"), tr("模板1"));
+        legacyItem.insert(QStringLiteral("enabled"), true);
+        legacyItem.insert(QStringLiteral("priority"), 0);
+        TemplateItemState item = templateItemFromJson(legacyItem, 0);
+        // Flat v4 extension fields belong to the top-level contract. They are
+        // retained by m_config.params, but must not be duplicated into the
+        // first templates[] item when the user promotes the config to v5.
+        item.extra = QJsonObject();
+        m_templates.append(item);
+    }
+    if (m_templates.isEmpty()) {
+        m_activeTemplateId.clear();
+        m_templateRegionType = QStringLiteral("rectangle");
+        m_templateRoi = QRectF();
+        m_templatePolygon.clear();
+        m_templateMaskRegionType = QStringLiteral("none");
+        m_templateMaskRoi = QRectF();
+        m_templateMaskPolygon.clear();
+        m_templateMaskCircle = CircleRoi();
+        m_modelCacheKey.clear();
+        m_modelCreated = false;
+        m_templateDisplayOverlays.clear();
+    } else {
+        m_activeTemplateId = m_templates.first().templateId;
+    }
+
     m_searchRegionType = params.value(QStringLiteral("searchRegionType")).toString(QStringLiteral("full"));
     m_searchRoi = rectFromJson(params.value(QStringLiteral("searchRoiNormalized")).toObject(),
                                QRectF(0.0, 0.0, 1.0, 1.0));
@@ -1243,8 +2090,6 @@ void TemplateLocationDialog::loadFromConfig(const ToolConfig &config)
                 m_searchCircle.radiusNormalized * 2.0);
     m_searchCircle.valid = m_searchRegionType == QStringLiteral("circle") &&
             m_searchCircle.radiusNormalized > 0.0 && validRect(m_searchCircle.boundingRectNormalized);
-    m_modelCacheKey = params.value(QStringLiteral("modelCacheKey")).toString(m_modelCacheKey);
-    m_modelCreated = params.value(QStringLiteral("modelCreated")).toBool(false);
     m_originMode = params.value(QStringLiteral("originMode")).toString(QStringLiteral("centroid"));
     const QJsonObject customOrigin = params.value(QStringLiteral("customOriginNormalized")).toObject();
     m_customOriginNormalized = QPointF(
@@ -1285,16 +2130,30 @@ void TemplateLocationDialog::loadFromConfig(const ToolConfig &config)
                                        .toInt(ui->maxMatchesSpinBox->value()));
     ui->maxOverlapSpinBox->setValue(params.value(QStringLiteral("maxOverlap")).toInt(50));
     ui->originModeComboBox->setCurrentIndex(m_originMode == QStringLiteral("custom") ? 1 : 0);
-    ui->modelStatusLabel->setText(m_modelCreated ? tr("模板已创建") : tr("未创建模板"));
-    ui->createTemplateButton->setText(m_modelCreated ? tr("重新创建模板") : tr("创建模板"));
-    ui->deleteTemplateButton->setEnabled(m_modelCreated);
-    m_templateMaskClearButton->setEnabled(
-                m_templateMaskRegionType != QStringLiteral("none"));
     updateContrastControls();
     updateOriginControls();
     updateMatchResultTable(QJsonArray());
-    stopEditing();
-    showReferenceImage();
+    m_snapshot = ToolPreviewSnapshot();
+    m_lastDisplayResult = ToolResult();
+    loadActiveTemplateEditor();
+    refreshTemplateList();
+    refreshActiveTemplateUi();
+    if (m_templates.isEmpty()) {
+        showReferenceImage();
+        ui->statusLabel->setText(
+                    tr("配置中的 v5 模板库为空，请添加并创建至少一个模板"));
+    }
+    ui->parameterPanel->setEnabled(!m_configReadOnly);
+    if (m_configReadOnly) {
+        ui->statusLabel->setText(
+                    tr("当前模板定位配置只读（%1）：%2")
+                    .arg(m_configReadOnlyStatus.trimmed().isEmpty()
+                         ? QStringLiteral("invalid_config")
+                         : m_configReadOnlyStatus,
+                         m_configReadOnlyMessage.trimmed().isEmpty()
+                         ? tr("请使用支持该配置合同的版本编辑")
+                         : m_configReadOnlyMessage));
+    }
 }
 
 ToolPreviewSnapshot TemplateLocationDialog::referencePreviewSnapshot() const

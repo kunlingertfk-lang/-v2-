@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "frame/ReferenceImageProvider.h"
+#include "algorithms/location/TemplateLocationConfig.h"
 
 namespace {
 
@@ -26,6 +27,95 @@ constexpr auto kProjectsDirName = "projects";
 constexpr auto kSchemeJsonName = "scheme.json";
 constexpr auto kReferenceImageSlotA = "reference_a.png";
 constexpr auto kReferenceImageSlotB = "reference_b.png";
+constexpr auto kProjectRootOverrideEnvironment =
+        "ZNXJ_SCHEME_STORE_PROJECT_ROOT";
+
+bool exactReferenceBankVersion(const QJsonValue &value, int *version = nullptr)
+{
+    if (!value.isDouble())
+        return false;
+    const double number = value.toDouble();
+    if (number != 4.0 && number != 5.0)
+        return false;
+    if (version)
+        *version = static_cast<int>(number);
+    return true;
+}
+
+void invalidateReferenceLocatorForImageChange(
+        ReferencePositionCorrectionConfig *config)
+{
+    if (!config)
+        return;
+
+    config->referenceCreated = false;
+    config->referencePose = QJsonObject();
+    config->referencePosesByTemplateId = QJsonObject();
+    config->score = 0.0;
+    config->elapsedMs = 0;
+    config->status = QStringLiteral("reference_image_changed");
+    config->message = QStringLiteral(
+                "Reference image changed; rebuild all enabled reference templates.");
+
+    QJsonObject locator = config->locator;
+    const bool locatorObjectWasPresent = config->extra.contains(
+                QStringLiteral("locator"));
+    bool outerVersionEncodingSupported = true;
+    if (config->extra.contains(QStringLiteral("version"))) {
+        outerVersionEncodingSupported = exactReferenceBankVersion(
+                    config->extra.value(QStringLiteral("version")));
+    }
+    const TemplateLocationConfig::EnvelopeInspection locatorEnvelope =
+            TemplateLocationConfig::inspectEnvelope(locator);
+    const int locatorVersion = locatorEnvelope.version;
+    const bool poseMapEncodingSupported =
+            !config->extra.contains(QStringLiteral("referencePosesByTemplateId"))
+            || config->extra.value(QStringLiteral("referencePosesByTemplateId"))
+            .isObject();
+    const bool knownOuterEnvelope = config->version == 4
+            || config->version == 5;
+    const bool knownLocator = knownOuterEnvelope && !locator.isEmpty()
+            && outerVersionEncodingSupported
+            && locatorEnvelope.supported
+            && poseMapEncodingSupported;
+    if (knownLocator) {
+        if (locatorVersion == 5) {
+            QJsonArray templates = locator.value(
+                        QStringLiteral("templates")).toArray();
+            for (int index = 0; index < templates.size(); ++index) {
+                if (!templates.at(index).isObject())
+                    continue;
+                QJsonObject item = templates.at(index).toObject();
+                item.insert(QStringLiteral("modelCreated"), false);
+                templates.replace(index, item);
+            }
+            locator.insert(QStringLiteral("templates"), templates);
+        } else {
+            // A nested v4 locator is a single flat template.
+            locator.insert(QStringLiteral("modelCreated"), false);
+        }
+        config->locator = locator;
+        // A known nested locator is normalized to the public v4 reference
+        // envelope the next time the candidate state is serialized.
+        config->version = 4;
+    }
+
+    // Keep config.extra coherent as well.  This is important for malformed or
+    // future read-only envelopes whose raw fields are otherwise round-tripped.
+    config->extra.insert(QStringLiteral("referenceCreated"), false);
+    config->extra.insert(QStringLiteral("referencePose"), QJsonObject());
+    config->extra.insert(QStringLiteral("referencePosesByTemplateId"),
+                         QJsonObject());
+    config->extra.insert(QStringLiteral("status"), config->status);
+    config->extra.insert(QStringLiteral("message"), config->message);
+    config->extra.insert(QStringLiteral("score"), 0.0);
+    config->extra.insert(QStringLiteral("elapsedMs"), 0.0);
+    if (knownLocator)
+        config->extra.insert(QStringLiteral("locator"), locator);
+    else if (locatorObjectWasPresent)
+        config->locator = config->extra.value(QStringLiteral("locator"))
+                .toObject();
+}
 
 QJsonArray toolConfigsToJson(const QVector<ToolConfig> &configs)
 {
@@ -777,6 +867,11 @@ bool SchemeStore::setReferenceFrame(const cv::Mat &frame,
     // Keeping those snapshots would make source validation trust a stale
     // TemplateLocation model after the reference image changes.
     candidate.referencePreviewSnapshots.clear();
+    // Invalidate the locator inside the same candidate that owns the new
+    // pixels.  A failed image save therefore leaves both the old image and all
+    // old frozen poses untouched in m_currentScheme.
+    invalidateReferenceLocatorForImageChange(
+                &candidate.referencePositionCorrection);
     candidate.updatedAt = QDateTime::currentDateTime();
 
     SchemeState savedState;
@@ -1103,6 +1198,22 @@ bool SchemeStore::createDefaultScheme(QString *errorMessage)
 
 QString SchemeStore::resolveProjectRootPath() const
 {
+    // Integration/UI smokes exercise the real persistence path.  Give those
+    // processes an explicit root instead of relying on the source-tree search,
+    // which could otherwise select a developer's checkout and overwrite a
+    // real scheme.  The marker requirement keeps accidental values harmless.
+    const QString overriddenRoot = qEnvironmentVariable(
+                kProjectRootOverrideEnvironment).trimmed();
+    if (!overriddenRoot.isEmpty()) {
+        const QDir overrideDir(overriddenRoot);
+        if (overrideDir.isAbsolute()
+                && overrideDir.exists(QStringLiteral("qt_ui_test.pro"))) {
+            return overrideDir.absolutePath();
+        }
+        qWarning() << "[SchemeStore] Ignoring invalid project-root override:"
+                   << overriddenRoot;
+    }
+
     const QStringList candidates = {
         QDir::currentPath(),
         QCoreApplication::applicationDirPath()

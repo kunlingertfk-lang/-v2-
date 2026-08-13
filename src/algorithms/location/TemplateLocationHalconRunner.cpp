@@ -14,11 +14,14 @@
 #include <QMutexLocker>
 #include <QRect>
 #include <QSaveFile>
+#include <QSharedPointer>
 #include <QStandardPaths>
 
 #include <opencv2/imgproc.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace {
 
@@ -182,29 +185,6 @@ HTuple localColumnsTuple(const QVector<QPointF> &points, int imageWidth, const Q
     return columns;
 }
 
-bool validNormalizedPolygon(const QVector<QPointF> &points)
-{
-    if (points.size() < 3)
-        return false;
-    for (const QPointF &point : points) {
-        if (!std::isfinite(point.x()) || !std::isfinite(point.y()) ||
-                point.x() < 0.0 || point.x() > 1.0 ||
-                point.y() < 0.0 || point.y() > 1.0)
-            return false;
-    }
-    return true;
-}
-
-QString normalizedTemplateMaskType(const TemplateLocationHalconConfig &config)
-{
-    QString type = config.templateMaskRegionType.trimmed().toLower();
-    if ((type.isEmpty() || type == QStringLiteral("none")) &&
-            !config.templateMaskPolygonNormalized.isEmpty()) {
-        type = QStringLiteral("polygon");
-    }
-    return type.isEmpty() ? QStringLiteral("none") : type;
-}
-
 HObject croppedDomain(const HObject &image,
                       const QRect &crop,
                       const QString &regionType,
@@ -289,8 +269,15 @@ void addMatchOverlays(QVector<ToolOverlay> *overlays,
                       double scale,
                       double score,
                       int index,
-                      const QPointF &searchOffset)
+                      const QPointF &searchOffset,
+                      const QJsonObject &identity = QJsonObject())
 {
+    const auto applyIdentity = [&identity](ToolOverlay *overlay) {
+        if (!overlay)
+            return;
+        for (auto it = identity.constBegin(); it != identity.constEnd(); ++it)
+            overlay->extra.insert(it.key(), it.value());
+    };
     HTuple rigid;
     HTuple scaled;
     HObject transformed;
@@ -314,6 +301,7 @@ void addMatchOverlays(QVector<ToolOverlay> *overlays,
         line.label = QStringLiteral("match_result");
         line.score = score;
         line.extra.insert(QStringLiteral("matchIndex"), index);
+        applyIdentity(&line);
         for (Hlong pointIndex = 0; pointIndex < rows.Length(); ++pointIndex) {
             line.points.append(QPointF(columns[pointIndex].D() + searchOffset.x(),
                                        rows[pointIndex].D() + searchOffset.y()));
@@ -329,6 +317,7 @@ void addMatchOverlays(QVector<ToolOverlay> *overlays,
     horizontal.extra.insert(QStringLiteral("matchIndex"), index);
     horizontal.extra.insert(QStringLiteral("role"),
                             QStringLiteral("match_origin"));
+    applyIdentity(&horizontal);
     horizontal.p1 = QPointF(globalColumn - crossRadius, globalRow);
     horizontal.p2 = QPointF(globalColumn + crossRadius, globalRow);
     overlays->append(horizontal);
@@ -346,7 +335,12 @@ void addMatchOverlays(QVector<ToolOverlay> *overlays,
     scoreText.text = QStringLiteral("#%1  %2%")
             .arg(index + 1)
             .arg(score * 100.0, 0, 'f', 1);
+    const QString templateName = identity.value(
+                QStringLiteral("templateName")).toString().trimmed();
+    if (!templateName.isEmpty())
+        scoreText.text += QStringLiteral("  %1").arg(templateName);
     scoreText.extra.insert(QStringLiteral("matchIndex"), index);
+    applyIdentity(&scoreText);
     overlays->append(scoreText);
 }
 
@@ -387,380 +381,707 @@ TemplateLocationHalconResult TemplateLocationHalconRunner::run(
         const cv::Mat &referenceImage,
         const TemplateLocationHalconConfig &config)
 {
+    return run(image, referenceImage,
+               TemplateLocationConfig::modelBankFromScalar(config));
+}
+
+TemplateLocationHalconResult TemplateLocationHalconRunner::run(
+        const cv::Mat &image,
+        const cv::Mat &referenceImage,
+        const TemplateLocationModelBankConfig &inputConfig)
+{
     QElapsedTimer timer;
     timer.start();
     if (image.empty())
-        return errorResult(QStringLiteral("image_empty"), QStringLiteral("input image is empty"), timer.elapsed());
+        return errorResult(QStringLiteral("image_empty"),
+                           QStringLiteral("input image is empty"), timer.elapsed());
     if (referenceImage.empty())
-        return errorResult(QStringLiteral("no_reference_image"), QStringLiteral("reference image is empty"), timer.elapsed());
+        return errorResult(QStringLiteral("no_reference_image"),
+                           QStringLiteral("reference image is empty"), timer.elapsed());
     if (image.depth() != CV_8U || referenceImage.depth() != CV_8U ||
-        (image.channels() != 1 && image.channels() != 3 && image.channels() != 4) ||
-        (referenceImage.channels() != 1 && referenceImage.channels() != 3 && referenceImage.channels() != 4)) {
+            (image.channels() != 1 && image.channels() != 3 && image.channels() != 4) ||
+            (referenceImage.channels() != 1 && referenceImage.channels() != 3 &&
+             referenceImage.channels() != 4)) {
         return errorResult(QStringLiteral("unsupported_image_type"),
                            QStringLiteral("TemplateLocation supports CV_8UC1, CV_8UC3 and CV_8UC4 images"),
                            timer.elapsed());
     }
+
+    // Execution is strict: v5 identity repair belongs to an editor/migration
+    // path that can persist the change.  Generating UUIDs here would make an
+    // invalid runtime config change identity and cache path on every frame.
+    const TemplateLocationModelBankConfig config = inputConfig;
+    const TemplateLocationConfigValidationResult validation =
+            TemplateLocationConfig::validateModelBank(config, false);
+    if (!validation.valid)
+        return errorResult(validation.code, validation.message, timer.elapsed());
     if (!QFileInfo::exists(config.halconSoPath))
-        return errorResult(QStringLiteral("halcon_runtime_missing"), QStringLiteral("HALCON runtime is unavailable"), timer.elapsed());
-    if (config.templateRegionType == QStringLiteral("polygon") && config.templatePolygonNormalized.size() < 3)
-        return errorResult(QStringLiteral("invalid_template_region"), QStringLiteral("template polygon requires at least 3 points"), timer.elapsed());
-    const QString templateMaskType = normalizedTemplateMaskType(config);
-    if (templateMaskType != QStringLiteral("none") &&
-            templateMaskType != QStringLiteral("rectangle") &&
-            templateMaskType != QStringLiteral("circle") &&
-            templateMaskType != QStringLiteral("polygon")) {
-        return errorResult(QStringLiteral("invalid_template_mask"),
-                           QStringLiteral("template mask type is invalid"),
-                           timer.elapsed());
-    }
-    if (templateMaskType == QStringLiteral("rectangle") &&
-            !validNormalizedRect(config.templateMaskRoiNormalized)) {
-        return errorResult(QStringLiteral("invalid_template_mask"),
-                           QStringLiteral("template rectangle mask is invalid"),
-                           timer.elapsed());
-    }
-    if (templateMaskType == QStringLiteral("circle") &&
-            (!std::isfinite(config.templateMaskCircleCenterNormalized.x()) ||
-             !std::isfinite(config.templateMaskCircleCenterNormalized.y()) ||
-             !std::isfinite(config.templateMaskCircleRadiusNormalized) ||
-             config.templateMaskCircleRadiusNormalized <= 0.0)) {
-        return errorResult(QStringLiteral("invalid_template_mask"),
-                           QStringLiteral("template circle mask is invalid"),
-                           timer.elapsed());
-    }
-    if (templateMaskType == QStringLiteral("polygon") &&
-            !validNormalizedPolygon(config.templateMaskPolygonNormalized)) {
-        return errorResult(QStringLiteral("invalid_template_mask"),
-                           QStringLiteral("template mask polygon is invalid"),
-                           timer.elapsed());
-    }
-    if (config.searchRegionType == QStringLiteral("polygon") && config.searchPolygonNormalized.size() < 3)
-        return errorResult(QStringLiteral("invalid_search_region"), QStringLiteral("search polygon requires at least 3 points"), timer.elapsed());
-    if (config.searchRegionType == QStringLiteral("circle") &&
-            (!std::isfinite(config.searchCircleCenterNormalized.x()) ||
-             !std::isfinite(config.searchCircleCenterNormalized.y()) ||
-             !std::isfinite(config.searchCircleRadiusNormalized) ||
-             config.searchCircleRadiusNormalized <= 0.0)) {
-        return errorResult(QStringLiteral("invalid_search_region"),
-                           QStringLiteral("search circle is invalid"), timer.elapsed());
-    }
-    if (config.minMatchCount < 1 || config.maxMatchCount < config.minMatchCount ||
-            config.maxMatchCount > config.maxMatches ||
-            !std::isfinite(config.maxOverlap) || config.maxOverlap < 0.0 ||
-            config.maxOverlap > 1.0) {
-        return errorResult(QStringLiteral("invalid_parameter"),
-                           QStringLiteral("match count or MaxOverlap is invalid"), timer.elapsed());
-    }
-    if (config.originMode == QStringLiteral("custom") &&
-            (!std::isfinite(config.customOriginNormalized.x()) ||
-             !std::isfinite(config.customOriginNormalized.y()) ||
-             config.customOriginNormalized.x() < 0.0 || config.customOriginNormalized.x() > 1.0 ||
-             config.customOriginNormalized.y() < 0.0 || config.customOriginNormalized.y() > 1.0)) {
-        return errorResult(QStringLiteral("invalid_origin"),
-                           QStringLiteral("custom origin point is invalid"), timer.elapsed());
-    }
+        return errorResult(QStringLiteral("halcon_runtime_missing"),
+                           QStringLiteral("HALCON runtime is unavailable"), timer.elapsed());
 
-    const QRect templateRect = pixelRect(config.templateRoiNormalized,
-                                         referenceImage.cols, referenceImage.rows);
-    const QRect searchRect = pixelRect(config.searchRoiNormalized, image.cols, image.rows);
-    if (templateRect.isEmpty())
-        return errorResult(QStringLiteral("invalid_template_region"), QStringLiteral("template ROI is invalid"), timer.elapsed());
+    const QRect searchRect = pixelRect(config.searchRoiNormalized,
+                                       image.cols, image.rows);
     if (searchRect.isEmpty())
-        return errorResult(QStringLiteral("invalid_search_region"), QStringLiteral("search ROI is invalid"), timer.elapsed());
+        return errorResult(QStringLiteral("invalid_search_region"),
+                           QStringLiteral("search ROI is invalid"), timer.elapsed());
 
-    HTuple modelId;
-    bool modelCreated = false;
+    struct PreparedModel {
+        TemplateLocationTemplateConfig item;
+        int sourceIndex = -1;
+        QRect templateRect;
+        QString maskType;
+        bool maskApplied = false;
+        double baseArea = 0.0;
+        double effectiveArea = 0.0;
+        double originDeltaRow = 0.0;
+        double originDeltaColumn = 0.0;
+        HTuple modelId;
+        QSharedPointer<HObject> contours;
+        QByteArray signature;
+        QString modelPath;
+        bool cacheHit = false;
+        bool cachePersisted = false;
+        int rawMatchCount = 0;
+        HTuple actualLevels;
+        HTuple actualMinContrast;
+    };
+    struct BankMatch {
+        int preparedIndex = -1;
+        int templateMatchIndex = -1;
+        QString matchId;
+        double localRow = 0.0;
+        double localColumn = 0.0;
+        double modelGlobalRow = 0.0;
+        double modelGlobalColumn = 0.0;
+        double row = 0.0;
+        double column = 0.0;
+        double angle = 0.0;
+        double scale = 1.0;
+        double score = 0.0;
+        QStringList sourceTemplateIds;
+        QStringList sourceMatchIds;
+        QVector<int> sourceRawIndices;
+    };
+    class ShapeModelGuard
+    {
+    public:
+        ~ShapeModelGuard()
+        {
+            for (const HTuple &id : m_ids) {
+                try { ClearShapeModel(id); } catch (...) {}
+            }
+        }
+        void add(const HTuple &id) { m_ids.append(id); }
+    private:
+        QVector<HTuple> m_ids;
+    } guard;
+
+    QVector<PreparedModel> prepared;
+    QString activeTemplate;
     try {
         const cv::Mat referenceGray = grayImage(referenceImage);
         const cv::Mat imageGray = grayImage(image);
         const HObject referenceHalcon = halconByteImage(referenceGray);
         const HObject imageHalcon = halconByteImage(imageGray);
-        const HObject templateBaseDomain = croppedDomain(referenceHalcon,
-                                                          templateRect,
-                                                          config.templateRegionType,
-                                                          config.templatePolygonNormalized,
-                                                          QPointF(), 0.0,
-                                                          referenceImage.cols,
-                                                          referenceImage.rows);
-        const HObject searchDomain = croppedDomain(imageHalcon,
-                                                    searchRect,
-                                                    config.searchRegionType,
-                                                    config.searchPolygonNormalized,
-                                                    config.searchCircleCenterNormalized,
-                                                    config.searchCircleRadiusNormalized,
-                                                    image.cols,
-                                                    image.rows);
-
-        HObject templateBaseRegion;
-        HTuple templateBaseArea;
-        HTuple centroidRows;
-        HTuple centroidColumns;
-        GetDomain(templateBaseDomain, &templateBaseRegion);
-        AreaCenter(templateBaseRegion, &templateBaseArea,
-                   &centroidRows, &centroidColumns);
-        if (centroidRows.Length() < 1 || centroidColumns.Length() < 1)
-            return errorResult(QStringLiteral("invalid_template_region"),
-                               QStringLiteral("template region has no centroid"), timer.elapsed());
-        const double templateBaseAreaValue = templateBaseArea.Length() > 0
-                ? templateBaseArea[0].D() : 0.0;
-        const double centroidRow = centroidRows[0].D();
-        const double centroidColumn = centroidColumns[0].D();
-        double modelCentroidRow = centroidRow;
-        double modelCentroidColumn = centroidColumn;
-        HObject templateDomain = templateBaseDomain;
-        double templateEffectiveAreaValue = templateBaseAreaValue;
-        const bool templateMaskApplied =
-                templateMaskType != QStringLiteral("none");
-        if (templateMaskApplied) {
-            HObject templateMaskRegion;
-            if (templateMaskType == QStringLiteral("rectangle")) {
-                GenRectangle1(
-                            &templateMaskRegion,
-                            config.templateMaskRoiNormalized.top() *
-                                referenceImage.rows - templateRect.y(),
-                            config.templateMaskRoiNormalized.left() *
-                                referenceImage.cols - templateRect.x(),
-                            config.templateMaskRoiNormalized.bottom() *
-                                referenceImage.rows - templateRect.y(),
-                            config.templateMaskRoiNormalized.right() *
-                                referenceImage.cols - templateRect.x());
-            } else if (templateMaskType == QStringLiteral("circle")) {
-                GenCircle(
-                            &templateMaskRegion,
-                            config.templateMaskCircleCenterNormalized.y() *
-                                referenceImage.rows - templateRect.y(),
-                            config.templateMaskCircleCenterNormalized.x() *
-                                referenceImage.cols - templateRect.x(),
-                            config.templateMaskCircleRadiusNormalized *
-                                qMax(referenceImage.cols, referenceImage.rows));
-            } else {
-                GenRegionPolygonFilled(
-                            &templateMaskRegion,
-                            localRowsTuple(config.templateMaskPolygonNormalized,
-                                           referenceImage.rows, templateRect),
-                            localColumnsTuple(config.templateMaskPolygonNormalized,
-                                              referenceImage.cols, templateRect));
-            }
-            HObject clippedTemplateMask;
-            Intersection(templateBaseRegion, templateMaskRegion,
-                         &clippedTemplateMask);
-            HTuple clippedMaskArea;
-            HTuple clippedMaskRow;
-            HTuple clippedMaskColumn;
-            AreaCenter(clippedTemplateMask, &clippedMaskArea,
-                       &clippedMaskRow, &clippedMaskColumn);
-            if (clippedMaskArea.Length() < 1 || clippedMaskArea[0].D() < 1.0) {
-                return errorResult(QStringLiteral("invalid_template_mask"),
-                                   QStringLiteral("template mask does not overlap the template region"),
-                                   timer.elapsed());
-            }
-            if (clippedMaskArea[0].D() >= templateBaseAreaValue * 0.95) {
-                return errorResult(QStringLiteral("template_masked_empty"),
-                                   QStringLiteral("template mask leaves too little usable template area"),
-                                   timer.elapsed());
-            }
-
-            HObject effectiveTemplateRegion;
-            Difference(templateBaseRegion, clippedTemplateMask,
-                       &effectiveTemplateRegion);
-            HTuple effectiveArea;
-            HTuple effectiveRow;
-            HTuple effectiveColumn;
-            AreaCenter(effectiveTemplateRegion, &effectiveArea,
-                       &effectiveRow, &effectiveColumn);
-            const double minimumEffectiveArea =
-                    qMax(4.0, templateBaseAreaValue * 0.05);
-            if (effectiveArea.Length() < 1 ||
-                    effectiveArea[0].D() < minimumEffectiveArea) {
-                return errorResult(QStringLiteral("template_masked_empty"),
-                                   QStringLiteral("template mask leaves too little usable template area"),
-                                   timer.elapsed());
-            }
-            templateEffectiveAreaValue = effectiveArea[0].D();
-            modelCentroidRow = effectiveRow[0].D();
-            modelCentroidColumn = effectiveColumn[0].D();
-            ReduceDomain(templateBaseDomain, effectiveTemplateRegion,
-                         &templateDomain);
-        }
-        double originDeltaRow = centroidRow - modelCentroidRow;
-        double originDeltaColumn = centroidColumn - modelCentroidColumn;
-        if (config.originMode == QStringLiteral("custom")) {
-            originDeltaRow = config.customOriginNormalized.y() * referenceImage.rows -
-                    templateRect.y() - modelCentroidRow;
-            originDeltaColumn = config.customOriginNormalized.x() * referenceImage.cols -
-                    templateRect.x() - modelCentroidColumn;
-        }
+        const HObject searchDomain = croppedDomain(
+                    imageHalcon, searchRect, config.searchRegionType,
+                    config.searchPolygonNormalized,
+                    config.searchCircleCenterNormalized,
+                    config.searchCircleRadiusNormalized,
+                    image.cols, image.rows);
 
         const double angleStart = config.angleStart * kPi / 180.0;
         const double angleExtent = config.angleExtent * kPi / 180.0;
         const double scaleMin = config.scaleMin / 100.0;
         const double scaleMax = config.scaleMax / 100.0;
-        const HTuple levels = config.numLevels > 0 ? HTuple(config.numLevels) : HTuple("auto");
+        const HTuple levels = config.numLevels > 0
+                ? HTuple(config.numLevels) : HTuple("auto");
         const HTuple contrast = config.contrastMode == QStringLiteral("manual")
                 ? HTuple(config.contrast) : HTuple("auto");
         const HTuple minContrast = config.contrastMode == QStringLiteral("manual")
                 ? HTuple(config.minContrast) : HTuple("auto");
 
-        const QByteArray signature = modelSignature(referenceGray, config);
-        const QString stem = cacheStem(config.modelCacheKey);
-        const QString modelPath = stem + QStringLiteral(".shm");
-        const QString signaturePath = stem + QStringLiteral(".sha256");
-        bool modelCacheHit = false;
-        bool modelCachePersisted = false;
-        {
-            QMutexLocker cacheLocker(&modelCacheMutex);
-            QFile signatureFile(signaturePath);
-            if (QFileInfo::exists(modelPath) && signatureFile.open(QIODevice::ReadOnly) &&
-                    signatureFile.readAll() == signature) {
-                try {
-                    ReadShapeModel(modelPath.toLocal8Bit().constData(), &modelId);
+        prepared.reserve(TemplateLocationConfig::enabledTemplateCount(config));
+        for (int sourceIndex = 0; sourceIndex < config.templates.size(); ++sourceIndex) {
+            const TemplateLocationTemplateConfig &item = config.templates.at(sourceIndex);
+            if (!item.enabled)
+                continue;
+            activeTemplate = item.name.trimmed().isEmpty()
+                    ? item.templateId : item.name;
+
+            PreparedModel model;
+            model.item = item;
+            model.sourceIndex = sourceIndex;
+            model.maskType = item.templateMaskRegionType.trimmed().toLower();
+            if ((model.maskType.isEmpty() || model.maskType == QStringLiteral("none")) &&
+                    !item.templateMaskPolygonNormalized.isEmpty()) {
+                model.maskType = QStringLiteral("polygon");
+            }
+            if (model.maskType.isEmpty())
+                model.maskType = QStringLiteral("none");
+            model.maskApplied = model.maskType != QStringLiteral("none");
+            model.templateRect = pixelRect(item.templateRoiNormalized,
+                                           referenceImage.cols,
+                                           referenceImage.rows);
+            if (model.templateRect.isEmpty()) {
+                return errorResult(QStringLiteral("invalid_template_region"),
+                                   QStringLiteral("%1: template ROI is invalid")
+                                   .arg(activeTemplate), timer.elapsed());
+            }
+
+            TemplateLocationHalconConfig scalar =
+                    TemplateLocationConfig::scalarConfigForTemplate(config, item);
+            const HObject templateBaseDomain = croppedDomain(
+                        referenceHalcon, model.templateRect,
+                        item.templateRegionType, item.templatePolygonNormalized,
+                        QPointF(), 0.0,
+                        referenceImage.cols, referenceImage.rows);
+            HObject templateBaseRegion;
+            HTuple templateBaseArea;
+            HTuple centroidRows;
+            HTuple centroidColumns;
+            GetDomain(templateBaseDomain, &templateBaseRegion);
+            AreaCenter(templateBaseRegion, &templateBaseArea,
+                       &centroidRows, &centroidColumns);
+            if (centroidRows.Length() < 1 || centroidColumns.Length() < 1) {
+                return errorResult(QStringLiteral("invalid_template_region"),
+                                   QStringLiteral("%1: template region has no centroid")
+                                   .arg(activeTemplate), timer.elapsed());
+            }
+            model.baseArea = templateBaseArea.Length() > 0
+                    ? templateBaseArea[0].D() : 0.0;
+            const double centroidRow = centroidRows[0].D();
+            const double centroidColumn = centroidColumns[0].D();
+            double modelCentroidRow = centroidRow;
+            double modelCentroidColumn = centroidColumn;
+            HObject templateDomain = templateBaseDomain;
+            model.effectiveArea = model.baseArea;
+
+            if (model.maskApplied) {
+                HObject maskRegion;
+                if (model.maskType == QStringLiteral("rectangle")) {
+                    GenRectangle1(&maskRegion,
+                                  item.templateMaskRoiNormalized.top() * referenceImage.rows - model.templateRect.y(),
+                                  item.templateMaskRoiNormalized.left() * referenceImage.cols - model.templateRect.x(),
+                                  item.templateMaskRoiNormalized.bottom() * referenceImage.rows - model.templateRect.y(),
+                                  item.templateMaskRoiNormalized.right() * referenceImage.cols - model.templateRect.x());
+                } else if (model.maskType == QStringLiteral("circle")) {
+                    GenCircle(&maskRegion,
+                              item.templateMaskCircleCenterNormalized.y() * referenceImage.rows - model.templateRect.y(),
+                              item.templateMaskCircleCenterNormalized.x() * referenceImage.cols - model.templateRect.x(),
+                              item.templateMaskCircleRadiusNormalized * qMax(referenceImage.cols, referenceImage.rows));
+                } else {
+                    GenRegionPolygonFilled(
+                                &maskRegion,
+                                localRowsTuple(item.templateMaskPolygonNormalized,
+                                               referenceImage.rows, model.templateRect),
+                                localColumnsTuple(item.templateMaskPolygonNormalized,
+                                                  referenceImage.cols, model.templateRect));
+                }
+                HObject clippedMask;
+                Intersection(templateBaseRegion, maskRegion, &clippedMask);
+                HTuple maskArea;
+                HTuple maskRow;
+                HTuple maskColumn;
+                AreaCenter(clippedMask, &maskArea, &maskRow, &maskColumn);
+                if (maskArea.Length() < 1 || maskArea[0].D() < 1.0) {
+                    return errorResult(QStringLiteral("invalid_template_mask"),
+                                       QStringLiteral("%1: template mask does not overlap the template region")
+                                       .arg(activeTemplate), timer.elapsed());
+                }
+                if (maskArea[0].D() >= model.baseArea * 0.95) {
+                    return errorResult(QStringLiteral("template_masked_empty"),
+                                       QStringLiteral("%1: template mask leaves too little usable template area")
+                                       .arg(activeTemplate), timer.elapsed());
+                }
+                HObject effectiveRegion;
+                Difference(templateBaseRegion, clippedMask, &effectiveRegion);
+                HTuple effectiveArea;
+                HTuple effectiveRow;
+                HTuple effectiveColumn;
+                AreaCenter(effectiveRegion, &effectiveArea,
+                           &effectiveRow, &effectiveColumn);
+                if (effectiveArea.Length() < 1 ||
+                        effectiveArea[0].D() < qMax(4.0, model.baseArea * 0.05)) {
+                    return errorResult(QStringLiteral("template_masked_empty"),
+                                       QStringLiteral("%1: template mask leaves too little usable template area")
+                                       .arg(activeTemplate), timer.elapsed());
+                }
+                model.effectiveArea = effectiveArea[0].D();
+                modelCentroidRow = effectiveRow[0].D();
+                modelCentroidColumn = effectiveColumn[0].D();
+                ReduceDomain(templateBaseDomain, effectiveRegion, &templateDomain);
+            }
+
+            model.originDeltaRow = centroidRow - modelCentroidRow;
+            model.originDeltaColumn = centroidColumn - modelCentroidColumn;
+            if (config.originMode == QStringLiteral("custom")) {
+                model.originDeltaRow = config.customOriginNormalized.y() * referenceImage.rows
+                        - model.templateRect.y() - modelCentroidRow;
+                model.originDeltaColumn = config.customOriginNormalized.x() * referenceImage.cols
+                        - model.templateRect.x() - modelCentroidColumn;
+            }
+
+            model.signature = modelSignature(referenceGray, scalar);
+            const QString stem = cacheStem(item.modelCacheKey);
+            model.modelPath = stem + QStringLiteral(".shm");
+            const QString signaturePath = stem + QStringLiteral(".sha256");
+            bool modelCreated = false;
+            {
+                QMutexLocker cacheLocker(&modelCacheMutex);
+                QFile signatureFile(signaturePath);
+                if (QFileInfo::exists(model.modelPath) &&
+                        signatureFile.open(QIODevice::ReadOnly) &&
+                        signatureFile.readAll() == model.signature) {
+                    try {
+                        ReadShapeModel(model.modelPath.toLocal8Bit().constData(),
+                                       &model.modelId);
+                        modelCreated = true;
+                        model.cacheHit = true;
+                    } catch (const HException &) {
+                        QFile::remove(model.modelPath);
+                        QFile::remove(signaturePath);
+                    }
+                }
+                if (!modelCreated) {
+                    CreateScaledShapeModel(
+                                templateDomain, levels,
+                                angleStart, angleExtent, HTuple("auto"),
+                                scaleMin, scaleMax, HTuple("auto"),
+                                HTuple("auto"),
+                                metricForPolarity(config.polarity).toLatin1().constData(),
+                                contrast, minContrast, &model.modelId);
                     modelCreated = true;
-                    modelCacheHit = true;
-                } catch (const HException &) {
-                    QFile::remove(modelPath);
-                    QFile::remove(signaturePath);
+                    try {
+                        WriteShapeModel(model.modelId,
+                                        model.modelPath.toLocal8Bit().constData());
+                        model.cachePersisted = writeSignature(signaturePath,
+                                                              model.signature);
+                    } catch (const HException &) {
+                        QFile::remove(model.modelPath);
+                        QFile::remove(signaturePath);
+                    }
+                } else {
+                    model.cachePersisted = true;
                 }
             }
+            guard.add(model.modelId);
+            if (config.timeoutMs > 0)
+                SetShapeModelParam(model.modelId, "timeout", config.timeoutMs);
 
-            if (!modelCreated) {
-                CreateScaledShapeModel(templateDomain,
-                                             levels,
-                                             angleStart,
-                                             angleExtent,
-                                             HTuple("auto"),
-                                             scaleMin,
-                                             scaleMax,
-                                             HTuple("auto"),
-                                             HTuple("auto"),
-                                             metricForPolarity(config.polarity).toLatin1().constData(),
-                                             contrast,
-                                             minContrast,
-                                             &modelId);
-                modelCreated = true;
-                try {
-                    WriteShapeModel(modelId, modelPath.toLocal8Bit().constData());
-                    modelCachePersisted = writeSignature(signaturePath, signature);
-                } catch (const HException &) {
-                    QFile::remove(modelPath);
-                    QFile::remove(signaturePath);
-                }
-            } else {
-                modelCachePersisted = true;
-            }
+            HTuple actualAngleStart;
+            HTuple actualAngleExtent;
+            HTuple actualAngleStep;
+            HTuple actualScaleMin;
+            HTuple actualScaleMax;
+            HTuple actualScaleStep;
+            HTuple actualMetric;
+            GetShapeModelParams(model.modelId,
+                                &model.actualLevels,
+                                &actualAngleStart, &actualAngleExtent,
+                                &actualAngleStep, &actualScaleMin,
+                                &actualScaleMax, &actualScaleStep,
+                                &actualMetric, &model.actualMinContrast);
+            model.contours.reset(new HObject);
+            GetShapeModelContours(model.contours.data(), model.modelId, 1);
+            prepared.append(model);
         }
-        if (config.timeoutMs > 0)
-            SetShapeModelParam(modelId, "timeout", config.timeoutMs);
+        // Exceptions below belong to the bank search/fusion phase, not to the
+        // last model that happened to be prepared.
+        activeTemplate.clear();
 
-        HTuple actualLevels;
-        HTuple actualAngleStart;
-        HTuple actualAngleExtent;
-        HTuple actualAngleStep;
-        HTuple actualScaleMin;
-        HTuple actualScaleMax;
-        HTuple actualScaleStep;
-        HTuple actualMetric;
-        HTuple actualMinContrast;
-        GetShapeModelParams(modelId,
-                                          &actualLevels, &actualAngleStart, &actualAngleExtent,
-                                          &actualAngleStep, &actualScaleMin, &actualScaleMax,
-                                          &actualScaleStep, &actualMetric, &actualMinContrast);
+        HTuple modelIds;
+        HTuple angleStarts;
+        HTuple angleExtents;
+        HTuple scaleMins;
+        HTuple scaleMaxs;
+        HTuple minScores;
+        HTuple numMatches;
+        HTuple maxOverlaps;
+        for (const PreparedModel &model : prepared) {
+            modelIds.Append(model.modelId[0]);
+            angleStarts.Append(angleStart);
+            angleExtents.Append(angleExtent);
+            scaleMins.Append(scaleMin);
+            scaleMaxs.Append(scaleMax);
+            minScores.Append(config.minScore / 100.0);
+            numMatches.Append(config.maxMatches);
+            // A tuple applies overlap suppression within each model. Cross-model
+            // duplicates are fused below using the common public origin.
+            maxOverlaps.Append(config.maxOverlap);
+        }
 
         HTuple rows;
         HTuple columns;
         HTuple angles;
         HTuple scales;
         HTuple scores;
-        FindScaledShapeModel(searchDomain,
-                                           modelId,
-                                           angleStart,
-                                           angleExtent,
-                                           scaleMin,
-                                           scaleMax,
-                                           config.minScore / 100.0,
-                                           config.maxMatches,
-                                           config.maxOverlap,
-                                           config.subPixel == QStringLiteral("none") ? "none" : "least_squares",
-                                           config.numLevels > 0 ? config.numLevels : 0,
-                                           config.greediness,
-                                           &rows, &columns, &angles, &scales, &scores);
+        HTuple models;
+        FindScaledShapeModels(
+                    searchDomain, modelIds,
+                    angleStarts, angleExtents,
+                    scaleMins, scaleMaxs,
+                    minScores, numMatches, maxOverlaps,
+                    HTuple(config.subPixel == QStringLiteral("none")
+                           ? "none" : "least_squares"),
+                    HTuple(config.numLevels > 0 ? config.numLevels : 0),
+                    HTuple(config.greediness),
+                    &rows, &columns, &angles, &scales, &scores, &models);
 
-        HObject modelContours;
-        GetShapeModelContours(&modelContours, modelId, 1);
-        const int count = static_cast<int>(qMin(qMin(rows.Length(), columns.Length()),
-                                                qMin(qMin(angles.Length(), scales.Length()), scores.Length())));
-        TemplateLocationHalconResult result;
-        result.success = true;
-        const bool found = count > 0;
-        result.ok = count >= config.minMatchCount && count <= config.maxMatchCount;
-        result.status = !found ? QStringLiteral("not_found")
-                               : (result.ok ? QStringLiteral("found")
-                                            : QStringLiteral("count_out_of_range"));
-        result.message = !found
-                ? QStringLiteral("TemplateLocation: no match reached the minimum score")
-                : (result.ok
-                   ? QStringLiteral("TemplateLocation: found %1 accepted match(es)").arg(count)
-                   : QStringLiteral("TemplateLocation: found count %1 is outside %2..%3")
-                     .arg(count).arg(config.minMatchCount).arg(config.maxMatchCount));
-        result.count = count;
-        result.score = count > 0 ? scores[0].D() : 0.0;
-
-        addRegionOverlay(&result.overlays, config.searchRegionType,
-                         config.searchRoiNormalized, config.searchPolygonNormalized,
-                         config.searchCircleCenterNormalized,
-                         config.searchCircleRadiusNormalized,
-                         image.cols, image.rows, QStringLiteral("detect_roi"));
-        QJsonArray matches;
-        for (int index = 0; index < count; ++index) {
-            const double localRow = rows[index].D();
-            const double localColumn = columns[index].D();
-            const double modelGlobalRow = localRow + searchRect.y();
-            const double modelGlobalColumn = localColumn + searchRect.x();
-            const double angle = angles[index].D();
-            const double scale = scales[index].D();
-            const double score = scores[index].D();
+        const Hlong tupleCount = qMin(
+                    qMin(qMin(rows.Length(), columns.Length()),
+                         qMin(angles.Length(), scales.Length())),
+                    qMin(scores.Length(), models.Length()));
+        QVector<int> perTemplateMatchIndex(prepared.size(), 0);
+        QVector<BankMatch> rawMatches;
+        rawMatches.reserve(static_cast<int>(tupleCount));
+        for (Hlong tupleIndex = 0; tupleIndex < tupleCount; ++tupleIndex) {
+            const int modelIndex = static_cast<int>(models[tupleIndex].L());
+            if (modelIndex < 0 || modelIndex >= prepared.size())
+                continue;
+            PreparedModel &model = prepared[modelIndex];
+            BankMatch match;
+            match.preparedIndex = modelIndex;
+            match.templateMatchIndex = perTemplateMatchIndex[modelIndex]++;
+            ++model.rawMatchCount;
+            match.matchId = QStringLiteral("%1/%2")
+                    .arg(model.item.templateId)
+                    .arg(match.templateMatchIndex);
+            match.localRow = rows[tupleIndex].D();
+            match.localColumn = columns[tupleIndex].D();
+            match.modelGlobalRow = match.localRow + searchRect.y();
+            match.modelGlobalColumn = match.localColumn + searchRect.x();
+            match.angle = angles[tupleIndex].D();
+            match.scale = scales[tupleIndex].D();
+            match.score = scores[tupleIndex].D();
             HTuple anchorTransform;
             HTuple scaledAnchorTransform;
             HTuple anchorRows;
             HTuple anchorColumns;
             VectorAngleToRigid(0.0, 0.0, 0.0,
-                               localRow, localColumn, angle, &anchorTransform);
-            HomMat2dScaleLocal(anchorTransform, scale, scale, &scaledAnchorTransform);
+                               match.localRow, match.localColumn, match.angle,
+                               &anchorTransform);
+            HomMat2dScaleLocal(anchorTransform, match.scale, match.scale,
+                               &scaledAnchorTransform);
             AffineTransPoint2d(scaledAnchorTransform,
-                               originDeltaRow, originDeltaColumn,
+                               model.originDeltaRow, model.originDeltaColumn,
                                &anchorRows, &anchorColumns);
-            const double globalRow = anchorRows[0].D() + searchRect.y();
-            const double globalColumn = anchorColumns[0].D() + searchRect.x();
-            matches.append(QJsonObject{{QStringLiteral("index"), index},
-                                       {QStringLiteral("x"), globalColumn},
-                                       {QStringLiteral("y"), globalRow},
-                                       {QStringLiteral("modelX"), modelGlobalColumn},
-                                       {QStringLiteral("modelY"), modelGlobalRow},
-                                       {QStringLiteral("angleDeg"), angle * 180.0 / kPi},
-                                       {QStringLiteral("angle"), angle * 180.0 / kPi},
-                                       {QStringLiteral("scale"), scale},
-                                       {QStringLiteral("score"), score}});
-            addMatchOverlays(&result.overlays, modelContours,
-                             localRow, localColumn, globalRow, globalColumn,
-                             angle, scale, score, index,
-                             QPointF(searchRect.x(), searchRect.y()));
+            match.row = anchorRows[0].D() + searchRect.y();
+            match.column = anchorColumns[0].D() + searchRect.x();
+            match.sourceTemplateIds.append(model.item.templateId);
+            match.sourceMatchIds.append(match.matchId);
+            rawMatches.append(match);
         }
 
+        std::stable_sort(rawMatches.begin(), rawMatches.end(),
+                         [&prepared](const BankMatch &left,
+                                     const BankMatch &right) {
+            if (left.score != right.score)
+                return left.score > right.score;
+            const PreparedModel &leftModel = prepared.at(left.preparedIndex);
+            const PreparedModel &rightModel = prepared.at(right.preparedIndex);
+            if (leftModel.item.priority != rightModel.item.priority)
+                return leftModel.item.priority < rightModel.item.priority;
+            if (leftModel.item.templateId != rightModel.item.templateId)
+                return leftModel.item.templateId < rightModel.item.templateId;
+            if (left.column != right.column)
+                return left.column < right.column;
+            return left.row < right.row;
+        });
+
+        const auto angleDistance = [](double left, double right) {
+            double distance = std::fmod(std::abs(left - right) * 180.0 / kPi,
+                                        360.0);
+            if (distance > 180.0)
+                distance = 360.0 - distance;
+            return distance;
+        };
+        QVector<BankMatch> fusedMatches;
+        for (int rawIndex = 0; rawIndex < rawMatches.size(); ++rawIndex) {
+            const BankMatch &candidate = rawMatches.at(rawIndex);
+            bool fused = false;
+            if (config.fusion.enabled) {
+                for (BankMatch &accepted : fusedMatches) {
+                    const QString candidateTemplateId = prepared.at(
+                                candidate.preparedIndex).item.templateId;
+                    if (accepted.sourceTemplateIds.contains(candidateTemplateId))
+                        continue;
+                    if (std::hypot(accepted.column - candidate.column,
+                                   accepted.row - candidate.row)
+                            > config.fusion.positionTolerancePx ||
+                            angleDistance(accepted.angle, candidate.angle)
+                            > config.fusion.angleToleranceDeg ||
+                            std::abs(accepted.scale - candidate.scale)
+                            > config.fusion.scaleTolerance) {
+                        continue;
+                    }
+                    accepted.sourceTemplateIds.append(candidateTemplateId);
+                    accepted.sourceMatchIds.append(candidate.matchId);
+                    accepted.sourceRawIndices.append(rawIndex);
+                    fused = true;
+                    break;
+                }
+            }
+            if (!fused) {
+                BankMatch accepted = candidate;
+                accepted.sourceRawIndices.append(rawIndex);
+                fusedMatches.append(accepted);
+            }
+        }
+
+        const auto adoptRepresentative = [](BankMatch *aggregate,
+                                            const BankMatch &representative) {
+            if (!aggregate)
+                return;
+            const QStringList sourceTemplateIds = aggregate->sourceTemplateIds;
+            const QStringList sourceMatchIds = aggregate->sourceMatchIds;
+            const QVector<int> sourceRawIndices = aggregate->sourceRawIndices;
+            *aggregate = representative;
+            aggregate->sourceTemplateIds = sourceTemplateIds;
+            aggregate->sourceMatchIds = sourceMatchIds;
+            aggregate->sourceRawIndices = sourceRawIndices;
+        };
+        // The representative pose and its template identity must come from the
+        // same raw match.  Rebase each fused cluster before ordering it by the
+        // configured primary strategy.
+        if (config.primaryMatchStrategy == QStringLiteral("template_priority")) {
+            for (BankMatch &aggregate : fusedMatches) {
+                int selectedRawIndex = -1;
+                int selectedPriority = std::numeric_limits<int>::max();
+                double selectedScore = -1.0;
+                QString selectedId;
+                for (const int rawIndex : aggregate.sourceRawIndices) {
+                    const BankMatch &candidate = rawMatches.at(rawIndex);
+                    const PreparedModel &candidateModel = prepared.at(
+                                candidate.preparedIndex);
+                    if (candidateModel.item.priority < selectedPriority ||
+                            (candidateModel.item.priority == selectedPriority &&
+                             (candidate.score > selectedScore ||
+                              (candidate.score == selectedScore &&
+                               candidateModel.item.templateId < selectedId)))) {
+                        selectedRawIndex = rawIndex;
+                        selectedPriority = candidateModel.item.priority;
+                        selectedScore = candidate.score;
+                        selectedId = candidateModel.item.templateId;
+                    }
+                }
+                if (selectedRawIndex >= 0)
+                    adoptRepresentative(&aggregate,
+                                        rawMatches.at(selectedRawIndex));
+            }
+        } else if (config.primaryMatchStrategy == QStringLiteral("locked_template")) {
+            for (BankMatch &aggregate : fusedMatches) {
+                for (const int rawIndex : aggregate.sourceRawIndices) {
+                    const BankMatch &candidate = rawMatches.at(rawIndex);
+                    if (prepared.at(candidate.preparedIndex).item.templateId ==
+                            config.primaryTemplateId) {
+                        adoptRepresentative(&aggregate, candidate);
+                        break;
+                    }
+                }
+            }
+        }
+
+        const auto bestSourcePriority = [&prepared](const BankMatch &match) {
+            int priority = std::numeric_limits<int>::max();
+            for (const QString &templateId : match.sourceTemplateIds) {
+                for (const PreparedModel &model : prepared) {
+                    if (model.item.templateId == templateId)
+                        priority = qMin(priority, model.item.priority);
+                }
+            }
+            return priority;
+        };
+        if (config.primaryMatchStrategy == QStringLiteral("template_priority")) {
+            std::stable_sort(fusedMatches.begin(), fusedMatches.end(),
+                             [&bestSourcePriority](const BankMatch &left,
+                                                   const BankMatch &right) {
+                const int leftPriority = bestSourcePriority(left);
+                const int rightPriority = bestSourcePriority(right);
+                return leftPriority == rightPriority
+                        ? left.score > right.score
+                        : leftPriority < rightPriority;
+            });
+        } else if (config.primaryMatchStrategy == QStringLiteral("locked_template")) {
+            std::stable_sort(fusedMatches.begin(), fusedMatches.end(),
+                             [&config](const BankMatch &left,
+                                       const BankMatch &right) {
+                const bool leftLocked = left.sourceTemplateIds.contains(
+                            config.primaryTemplateId);
+                const bool rightLocked = right.sourceTemplateIds.contains(
+                            config.primaryTemplateId);
+                return leftLocked == rightLocked
+                        ? left.score > right.score : leftLocked;
+            });
+        }
+        if (fusedMatches.size() > config.maxMatches)
+            fusedMatches.resize(config.maxMatches);
+
+        int primaryIndex = fusedMatches.isEmpty() ? -1 : 0;
+        if (config.primaryMatchStrategy == QStringLiteral("locked_template") &&
+                (fusedMatches.isEmpty() ||
+                 !fusedMatches.first().sourceTemplateIds.contains(
+                     config.primaryTemplateId))) {
+            primaryIndex = -1;
+        }
+        QString selectedTemplateId;
+        if (primaryIndex >= 0) {
+            const BankMatch &primary = fusedMatches.at(primaryIndex);
+            selectedTemplateId = prepared.at(
+                        primary.preparedIndex).item.templateId;
+        }
+        QString selectedTemplateName;
+        for (const PreparedModel &model : prepared) {
+            if (model.item.templateId == selectedTemplateId) {
+                selectedTemplateName = model.item.name;
+                break;
+            }
+        }
+
+        QCryptographicHash modelSetHash(QCryptographicHash::Sha256);
+        QJsonArray templateResults;
+        bool allCacheHits = true;
+        bool allCachesPersisted = true;
+        for (const PreparedModel &model : prepared) {
+            modelSetHash.addData(model.item.templateId.toUtf8());
+            modelSetHash.addData("\0", 1);
+            modelSetHash.addData(model.signature);
+            modelSetHash.addData("\0", 1);
+            allCacheHits = allCacheHits && model.cacheHit;
+            allCachesPersisted = allCachesPersisted && model.cachePersisted;
+            templateResults.append(QJsonObject{
+                {QStringLiteral("templateId"), model.item.templateId},
+                {QStringLiteral("templateName"), model.item.name},
+                {QStringLiteral("templateIndex"), model.sourceIndex},
+                {QStringLiteral("priority"), model.item.priority},
+                {QStringLiteral("rawFoundCount"), model.rawMatchCount},
+                {QStringLiteral("modelCacheHit"), model.cacheHit},
+                {QStringLiteral("modelCachePersisted"), model.cachePersisted},
+                {QStringLiteral("modelCachePath"), model.modelPath},
+                {QStringLiteral("modelSignature"), QString::fromLatin1(model.signature)},
+                {QStringLiteral("templateMaskApplied"), model.maskApplied},
+                {QStringLiteral("templateBaseArea"), model.baseArea},
+                {QStringLiteral("templateEffectiveArea"), model.effectiveArea}
+            });
+        }
+        const QString modelSetSignature = QString::fromLatin1(
+                    modelSetHash.result().toHex());
+
+        TemplateLocationHalconResult result;
+        result.success = true;
+        result.count = fusedMatches.size();
+        const bool found = primaryIndex >= 0;
+        result.ok = found && result.count >= config.minMatchCount &&
+                result.count <= config.maxMatchCount;
+        result.status = !found ? QStringLiteral("not_found")
+                               : (result.ok ? QStringLiteral("found")
+                                            : QStringLiteral("count_out_of_range"));
+        result.message = !found
+                ? (rawMatches.isEmpty()
+                   ? QStringLiteral("TemplateLocation: no template reached the minimum score")
+                   : QStringLiteral("TemplateLocation: the locked template was not found"))
+                : (result.ok
+                   ? QStringLiteral("TemplateLocation: found %1 accepted match(es) from %2 template(s)")
+                     .arg(result.count).arg(prepared.size())
+                   : QStringLiteral("TemplateLocation: found count %1 is outside %2..%3")
+                     .arg(result.count).arg(config.minMatchCount)
+                     .arg(config.maxMatchCount));
+        result.score = primaryIndex >= 0
+                ? fusedMatches.at(primaryIndex).score : 0.0;
+        addRegionOverlay(&result.overlays, config.searchRegionType,
+                         config.searchRoiNormalized,
+                         config.searchPolygonNormalized,
+                         config.searchCircleCenterNormalized,
+                         config.searchCircleRadiusNormalized,
+                         image.cols, image.rows,
+                         QStringLiteral("detect_roi"));
+
+        QJsonArray matches;
+        for (int index = 0; index < fusedMatches.size(); ++index) {
+            const BankMatch &match = fusedMatches.at(index);
+            const PreparedModel &model = prepared.at(match.preparedIndex);
+            const bool isPrimary = index == primaryIndex;
+            QJsonArray sourceTemplateIds;
+            for (const QString &id : match.sourceTemplateIds)
+                sourceTemplateIds.append(id);
+            QJsonArray sourceMatchIds;
+            for (const QString &id : match.sourceMatchIds)
+                sourceMatchIds.append(id);
+            const QJsonObject matchJson{
+                {QStringLiteral("index"), index},
+                {QStringLiteral("matchId"), match.matchId},
+                {QStringLiteral("templateId"), model.item.templateId},
+                {QStringLiteral("templateName"), model.item.name},
+                {QStringLiteral("templateIndex"), model.sourceIndex},
+                {QStringLiteral("templateMatchIndex"), match.templateMatchIndex},
+                {QStringLiteral("templatePriority"), model.item.priority},
+                {QStringLiteral("isPrimary"), isPrimary},
+                {QStringLiteral("fused"), match.sourceTemplateIds.size() > 1},
+                {QStringLiteral("fusedSourceTemplateIds"), sourceTemplateIds},
+                {QStringLiteral("fusedSourceMatchIds"), sourceMatchIds},
+                {QStringLiteral("templateModelSignature"),
+                 QString::fromLatin1(model.signature)},
+                {QStringLiteral("x"), match.column},
+                {QStringLiteral("y"), match.row},
+                {QStringLiteral("modelX"), match.modelGlobalColumn},
+                {QStringLiteral("modelY"), match.modelGlobalRow},
+                {QStringLiteral("angleDeg"), match.angle * 180.0 / kPi},
+                {QStringLiteral("angle"), match.angle * 180.0 / kPi},
+                {QStringLiteral("scale"), match.scale},
+                {QStringLiteral("score"), match.score}
+            };
+            matches.append(matchJson);
+            const QJsonObject overlayIdentity{
+                {QStringLiteral("matchId"), match.matchId},
+                {QStringLiteral("templateId"), model.item.templateId},
+                {QStringLiteral("templateName"), model.item.name},
+                {QStringLiteral("templateIndex"), model.sourceIndex},
+                {QStringLiteral("isPrimary"), isPrimary}
+            };
+            addMatchOverlays(&result.overlays, *model.contours,
+                             match.localRow, match.localColumn,
+                             match.row, match.column,
+                             match.angle, match.scale, match.score, index,
+                             QPointF(searchRect.x(), searchRect.y()),
+                             overlayIdentity);
+        }
+
+        const QJsonObject primaryPose = primaryIndex >= 0
+                ? matches.at(primaryIndex).toObject() : QJsonObject();
         result.elapsedMs = timer.elapsed();
         result.payload.insert(QStringLiteral("found"), found);
         result.payload.insert(QStringLiteral("countAccepted"), result.ok);
-        result.payload.insert(QStringLiteral("foundCount"), count);
+        result.payload.insert(QStringLiteral("foundCount"), result.count);
+        result.payload.insert(QStringLiteral("rawFoundCount"), rawMatches.size());
         result.payload.insert(QStringLiteral("matches"), matches);
-        result.payload.insert(QStringLiteral("x"), count > 0 ? matches.at(0).toObject().value(QStringLiteral("x")) : QJsonValue(-1.0));
-        result.payload.insert(QStringLiteral("y"), count > 0 ? matches.at(0).toObject().value(QStringLiteral("y")) : QJsonValue(-1.0));
-        result.payload.insert(QStringLiteral("angleDeg"), count > 0 ? matches.at(0).toObject().value(QStringLiteral("angleDeg")) : QJsonValue(0.0));
-        result.payload.insert(QStringLiteral("angle"), count > 0 ? matches.at(0).toObject().value(QStringLiteral("angleDeg")) : QJsonValue(0.0));
-        result.payload.insert(QStringLiteral("scale"), count > 0 ? matches.at(0).toObject().value(QStringLiteral("scale")) : QJsonValue(1.0));
-        result.payload.insert(QStringLiteral("primaryMatchIndex"), count > 0 ? 0 : -1);
-        result.payload.insert(QStringLiteral("pose"), count > 0
-                              ? QJsonValue(matches.at(0).toObject()) : QJsonValue(QJsonObject()));
+        result.payload.insert(QStringLiteral("x"), primaryPose.isEmpty()
+                              ? QJsonValue(-1.0) : primaryPose.value(QStringLiteral("x")));
+        result.payload.insert(QStringLiteral("y"), primaryPose.isEmpty()
+                              ? QJsonValue(-1.0) : primaryPose.value(QStringLiteral("y")));
+        result.payload.insert(QStringLiteral("angleDeg"), primaryPose.isEmpty()
+                              ? QJsonValue(0.0) : primaryPose.value(QStringLiteral("angleDeg")));
+        result.payload.insert(QStringLiteral("angle"), primaryPose.isEmpty()
+                              ? QJsonValue(0.0) : primaryPose.value(QStringLiteral("angleDeg")));
+        result.payload.insert(QStringLiteral("scale"), primaryPose.isEmpty()
+                              ? QJsonValue(1.0) : primaryPose.value(QStringLiteral("scale")));
+        result.payload.insert(QStringLiteral("primaryMatchIndex"), primaryIndex);
+        result.payload.insert(QStringLiteral("pose"), primaryPose);
         result.payload.insert(QStringLiteral("coordinateSystem"), QStringLiteral("image_pixel"));
         result.payload.insert(QStringLiteral("angleUnit"), QStringLiteral("degree"));
         result.payload.insert(QStringLiteral("score"), result.score);
+        result.payload.insert(QStringLiteral("templateMode"), config.templateMode);
+        result.payload.insert(QStringLiteral("templateCount"), config.templates.size());
+        result.payload.insert(QStringLiteral("enabledTemplateCount"), prepared.size());
+        result.payload.insert(QStringLiteral("templateResults"), templateResults);
+        result.payload.insert(QStringLiteral("selectedTemplateId"), selectedTemplateId);
+        result.payload.insert(QStringLiteral("selectedTemplateName"), selectedTemplateName);
+        result.payload.insert(QStringLiteral("primaryMatchStrategy"), config.primaryMatchStrategy);
+        if (config.primaryMatchStrategy == QStringLiteral("locked_template"))
+            result.payload.insert(QStringLiteral("lockedTemplateId"), config.primaryTemplateId);
+        result.payload.insert(QStringLiteral("modelSetSignature"), modelSetSignature);
+        result.payload.insert(QStringLiteral("modelSignature"), prepared.size() == 1
+                              ? QString::fromLatin1(prepared.first().signature)
+                              : modelSetSignature);
         result.payload.insert(QStringLiteral("maxMatches"), config.maxMatches);
         result.payload.insert(QStringLiteral("minMatchCount"), config.minMatchCount);
         result.payload.insert(QStringLiteral("maxMatchCount"), config.maxMatchCount);
@@ -770,56 +1091,54 @@ TemplateLocationHalconResult TemplateLocationHalconRunner::run(
                               QJsonObject{{QStringLiteral("x"), config.customOriginNormalized.x()},
                                           {QStringLiteral("y"), config.customOriginNormalized.y()}});
         result.payload.insert(QStringLiteral("contrastMode"), config.contrastMode);
-        result.payload.insert(QStringLiteral("contrastUsed"), config.contrastMode == QStringLiteral("manual")
-                              ? QJsonValue(config.contrast) : QJsonValue(QStringLiteral("auto")));
-        if (actualMinContrast.Length() > 0)
-            result.payload.insert(QStringLiteral("minContrastUsed"), actualMinContrast[0].D());
-        if (actualLevels.Length() > 0)
-            result.payload.insert(QStringLiteral("numLevelsUsed"), actualLevels[0].D());
+        result.payload.insert(QStringLiteral("contrastUsed"),
+                              config.contrastMode == QStringLiteral("manual")
+                              ? QJsonValue(config.contrast)
+                              : QJsonValue(QStringLiteral("auto")));
+        if (!prepared.isEmpty() && prepared.first().actualMinContrast.Length() > 0)
+            result.payload.insert(QStringLiteral("minContrastUsed"),
+                                  prepared.first().actualMinContrast[0].D());
+        if (!prepared.isEmpty() && prepared.first().actualLevels.Length() > 0)
+            result.payload.insert(QStringLiteral("numLevelsUsed"),
+                                  prepared.first().actualLevels[0].D());
         result.payload.insert(QStringLiteral("timeoutMsUsed"), config.timeoutMs);
-        result.payload.insert(QStringLiteral("modelCacheKey"), config.modelCacheKey);
-        result.payload.insert(QStringLiteral("modelCacheHit"), modelCacheHit);
-        result.payload.insert(QStringLiteral("modelCachePersisted"), modelCachePersisted);
-        result.payload.insert(QStringLiteral("modelCachePath"), modelPath);
-        result.payload.insert(QStringLiteral("modelSignature"), QString::fromLatin1(signature));
-        result.payload.insert(QStringLiteral("templateRoiNormalized"), rectToJson(config.templateRoiNormalized));
-        result.payload.insert(QStringLiteral("templateMaskApplied"), templateMaskApplied);
-        result.payload.insert(QStringLiteral("templateMaskRegionType"),
-                              templateMaskType);
-        result.payload.insert(QStringLiteral("templateMaskRoiNormalized"),
-                              rectToJson(config.templateMaskRoiNormalized));
-        result.payload.insert(QStringLiteral("templateMaskPolygonNormalized"),
-                              pointsToJson(config.templateMaskPolygonNormalized));
-        result.payload.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
-                              QJsonObject{
-                                  {QStringLiteral("x"),
-                                   config.templateMaskCircleCenterNormalized.x()},
-                                  {QStringLiteral("y"),
-                                   config.templateMaskCircleCenterNormalized.y()}});
-        result.payload.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
-                              config.templateMaskCircleRadiusNormalized);
-        result.payload.insert(QStringLiteral("templateBaseArea"), templateBaseAreaValue);
-        result.payload.insert(QStringLiteral("templateEffectiveArea"),
-                              templateEffectiveAreaValue);
-        result.payload.insert(QStringLiteral("searchRoiNormalized"), rectToJson(config.searchRoiNormalized));
-        result.payload.insert(QStringLiteral("elapsedMs"), static_cast<double>(result.elapsedMs));
-
-        ClearShapeModel(modelId);
-        modelCreated = false;
+        result.payload.insert(QStringLiteral("modelCacheHit"), allCacheHits);
+        result.payload.insert(QStringLiteral("modelCachePersisted"), allCachesPersisted);
+        if (prepared.size() == 1) {
+            const PreparedModel &model = prepared.first();
+            result.payload.insert(QStringLiteral("modelCacheKey"), model.item.modelCacheKey);
+            result.payload.insert(QStringLiteral("modelCachePath"), model.modelPath);
+            result.payload.insert(QStringLiteral("templateRoiNormalized"),
+                                  rectToJson(model.item.templateRoiNormalized));
+            result.payload.insert(QStringLiteral("templateMaskApplied"), model.maskApplied);
+            result.payload.insert(QStringLiteral("templateMaskRegionType"), model.maskType);
+            result.payload.insert(QStringLiteral("templateMaskRoiNormalized"),
+                                  rectToJson(model.item.templateMaskRoiNormalized));
+            result.payload.insert(QStringLiteral("templateMaskPolygonNormalized"),
+                                  pointsToJson(model.item.templateMaskPolygonNormalized));
+            result.payload.insert(QStringLiteral("templateMaskCircleCenterNormalized"),
+                                  QJsonObject{{QStringLiteral("x"), model.item.templateMaskCircleCenterNormalized.x()},
+                                              {QStringLiteral("y"), model.item.templateMaskCircleCenterNormalized.y()}});
+            result.payload.insert(QStringLiteral("templateMaskCircleRadiusNormalized"),
+                                  model.item.templateMaskCircleRadiusNormalized);
+            result.payload.insert(QStringLiteral("templateBaseArea"), model.baseArea);
+            result.payload.insert(QStringLiteral("templateEffectiveArea"), model.effectiveArea);
+        }
+        result.payload.insert(QStringLiteral("searchRoiNormalized"),
+                              rectToJson(config.searchRoiNormalized));
+        result.payload.insert(QStringLiteral("elapsedMs"),
+                              static_cast<double>(result.elapsedMs));
         return result;
     } catch (const HException &exception) {
-        if (modelCreated) {
-            try { ClearShapeModel(modelId); } catch (...) {}
-        }
-        return errorResult(QStringLiteral("halcon_error"),
-                           QStringLiteral("HALCON %1: %2")
-                           .arg(static_cast<qlonglong>(exception.ErrorCode()))
-                           .arg(QString::fromUtf8(exception.ErrorMessage().Text())),
-                           timer.elapsed());
+        return errorResult(
+                    QStringLiteral("halcon_error"),
+                    QStringLiteral("%1HALCON %2: %3")
+                    .arg(activeTemplate.isEmpty()
+                         ? QString() : QStringLiteral("%1: ").arg(activeTemplate))
+                    .arg(static_cast<qlonglong>(exception.ErrorCode()))
+                    .arg(QString::fromUtf8(exception.ErrorMessage().Text())),
+                    timer.elapsed());
     } catch (const std::exception &exception) {
-        if (modelCreated) {
-            try { ClearShapeModel(modelId); } catch (...) {}
-        }
         return errorResult(QStringLiteral("execution_error"),
                            QString::fromLocal8Bit(exception.what()), timer.elapsed());
     }
