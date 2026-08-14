@@ -1,6 +1,7 @@
 #include "PositionCorrectionDialogTestHelper.h"
 
 #include "SchemeStore.h"
+#include "frame/ReferenceImageProvider.h"
 #include "toolcore/PositionCorrection.h"
 
 #include <QJsonObject>
@@ -13,13 +14,22 @@ ToolResult runPositionCorrectionAwareDialogTest(
         const cv::Mat &referenceImage,
         const PositionCorrectionDialogTestContext *testContext)
 {
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const cv::Mat effectiveReferenceImage =
+            referenceSet.primary.frame.empty()
+            ? referenceImage : referenceSet.primary.frame;
+
     const PositionCorrectionConfig correction =
             PositionCorrection::fromParams(currentConfig.params);
     if (!correction.enabled) {
         ToolRequest request;
         request.config = currentConfig;
         request.image = image;
-        request.referenceImage = referenceImage;
+        request.referenceImage = effectiveReferenceImage;
+        request.referenceImages = referenceSet.frames;
+        request.referenceImageRevisions = referenceSet.contentRevisions;
+        request.primaryReferenceBaseId = referenceSet.primaryBaseId;
         return engine.runTool(request);
     }
 
@@ -63,9 +73,12 @@ ToolResult runPositionCorrectionAwareDialogTest(
     const QVector<ToolResult> results =
             engine.runTools(prefix,
                             image,
-                            referenceImage,
+                            effectiveReferenceImage,
                             runtimeContext,
-                            &referenceCorrectionResult);
+                            &referenceCorrectionResult,
+                            referenceSet.frames,
+                            referenceSet.contentRevisions,
+                            referenceSet.primaryBaseId);
     for (auto it = results.crbegin(); it != results.crend(); ++it) {
         if (it->toolId == testConfig.toolId)
             return *it;

@@ -367,8 +367,9 @@ void PositionCorrectionDialog::createReferencePose()
         return;
     }
 
-    const ReferenceFrameSnapshot snapshot =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const ReferenceFrameSnapshot &snapshot = referenceSet.primary;
     if (snapshot.frame.empty()) {
         ui->statusLabel->setText(tr("请先设置基准图"));
         return;
@@ -434,6 +435,9 @@ void PositionCorrectionDialog::createReferencePose()
     request.config = producerConfig;
     request.image = snapshot.frame;
     request.referenceImage = snapshot.frame;
+    request.referenceImages = referenceSet.frames;
+    request.referenceImageRevisions = referenceSet.contentRevisions;
+    request.primaryReferenceBaseId = referenceSet.primaryBaseId;
     request.frameId = QStringLiteral("reference");
     request.imageFormat = QStringLiteral("reference");
     request.runtimeContext.insert(QStringLiteral("frameId"), QStringLiteral("reference"));
@@ -505,8 +509,9 @@ void PositionCorrectionDialog::runPositionCorrectionTest()
         return;
     }
 
-    const ReferenceFrameSnapshot referenceSnapshot =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const ReferenceFrameSnapshot &referenceSnapshot = referenceSet.primary;
     if (referenceSnapshot.frame.empty()) {
         ui->statusLabel->setText(tr("请先设置基准图"));
         return;
@@ -537,7 +542,11 @@ void PositionCorrectionDialog::runPositionCorrectionTest()
                     QVector<ToolConfig>{toolConfig()},
                     runSnapshot.frame,
                     referenceSnapshot.frame,
-                    runtimeContext);
+                    runtimeContext,
+                    nullptr,
+                    referenceSet.frames,
+                    referenceSet.contentRevisions,
+                    referenceSet.primaryBaseId);
         if (results.isEmpty()) {
             ui->statusLabel->setText(tr("测试运行失败：位置修正工具未执行"));
             return;
@@ -556,6 +565,11 @@ void PositionCorrectionDialog::runPositionCorrectionTest()
         producerRequest.config = producerConfig;
         producerRequest.image = runSnapshot.frame;
         producerRequest.referenceImage = referenceSnapshot.frame;
+        producerRequest.referenceImages = referenceSet.frames;
+        producerRequest.referenceImageRevisions =
+                referenceSet.contentRevisions;
+        producerRequest.primaryReferenceBaseId =
+                referenceSet.primaryBaseId;
         producerRequest.frameId = QStringLiteral("position-correction-test");
         producerRequest.imageFormat = QStringLiteral("runtime");
         producerRequest.runtimeContext.insert(

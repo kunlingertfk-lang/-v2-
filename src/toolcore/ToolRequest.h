@@ -4,6 +4,8 @@
 #include "ToolConfig.h"
 
 #include <QJsonObject>
+#include <QJsonArray>
+#include <QMap>
 #include <QString>
 #include <opencv2/core.hpp>
 
@@ -13,6 +15,13 @@ struct ToolRequest {
     ToolConfig config;
     cv::Mat image;
     cv::Mat referenceImage;
+    /**
+     * Scheme-level Base frames keyed by stable baseId.  The legacy
+     * referenceImage remains the primary Base compatibility mirror.
+     */
+    QMap<QString, cv::Mat> referenceImages;
+    QMap<QString, QString> referenceImageRevisions;
+    QString primaryReferenceBaseId;
     QString imagePath;
     QString imageFormat;
     QString frameId;
@@ -20,6 +29,20 @@ struct ToolRequest {
     QJsonObject runtimeContext;
 
     ToolRequest() = default;
+
+    cv::Mat referenceImageForBase(const QString &baseId) const
+    {
+        const QString normalized = baseId.trimmed();
+        if (!normalized.isEmpty()) {
+            const auto it = referenceImages.constFind(normalized);
+            if (it != referenceImages.cend())
+                return it.value();
+            // A stable Base binding must never silently execute against the
+            // primary compatibility image when its asset is missing.
+            return cv::Mat();
+        }
+        return referenceImage;
+    }
 
     QJsonObject toJson() const
     {
@@ -41,12 +64,30 @@ struct ToolRequest {
         referenceImageRef.insert(QStringLiteral("channels"), referenceImage.empty() ? 0 : referenceImage.channels());
         referenceImageRef.insert(QStringLiteral("matType"), referenceImage.empty() ? -1 : referenceImage.type());
 
+        QJsonArray referenceImageSet;
+        for (auto it = referenceImages.cbegin(); it != referenceImages.cend(); ++it) {
+            const cv::Mat &frame = it.value();
+            referenceImageSet.append(QJsonObject{
+                {QStringLiteral("baseId"), it.key()},
+                {QStringLiteral("contentRevision"),
+                 referenceImageRevisions.value(it.key())},
+                {QStringLiteral("hasMat"), !frame.empty()},
+                {QStringLiteral("width"), frame.empty() ? 0 : frame.cols},
+                {QStringLiteral("height"), frame.empty() ? 0 : frame.rows},
+                {QStringLiteral("channels"), frame.empty() ? 0 : frame.channels()},
+                {QStringLiteral("matType"), frame.empty() ? -1 : frame.type()}
+            });
+        }
+
         QJsonObject json;
         json.insert(QStringLiteral("schemaVersion"), schemaVersion);
         json.insert(QStringLiteral("requestId"), requestId);
         json.insert(QStringLiteral("config"), config.toJson());
         json.insert(QStringLiteral("imageRef"), imageRef);
         json.insert(QStringLiteral("referenceImageRef"), referenceImageRef);
+        json.insert(QStringLiteral("referenceImageSet"), referenceImageSet);
+        json.insert(QStringLiteral("primaryReferenceBaseId"),
+                    primaryReferenceBaseId);
         json.insert(QStringLiteral("runtimeContext"), runtimeContext);
         return json;
     }
@@ -64,6 +105,8 @@ struct ToolRequest {
         request.frameId = imageRef.value(QStringLiteral("frameId")).toString();
         request.sharedMemoryKey = imageRef.value(QStringLiteral("sharedMemoryKey")).toString();
         request.runtimeContext = json.value(QStringLiteral("runtimeContext")).toObject();
+        request.primaryReferenceBaseId = json.value(
+                    QStringLiteral("primaryReferenceBaseId")).toString();
         return request;
     }
 };

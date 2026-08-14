@@ -820,16 +820,16 @@ void CirclePresenceDialog::finishConfiguration()
 
 void CirclePresenceDialog::runReferenceTest()
 {
-    const cv::Mat referenceImage = ReferenceImageProvider::instance().referenceFrame();
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const cv::Mat referenceImage = referenceSet.primary.frame;
     if (referenceImage.empty()) {
         displayCirclePresenceError(QStringLiteral("no_reference_image"),
                                    tr("基准图为空，无法测试"));
         return;
     }
 
-    QImage image = ReferenceImageProvider::instance().referenceImage();
-    if (image.isNull())
-        image = imageFromFrame(referenceImage);
+    const QImage image = imageFromFrame(referenceImage);
     if (!image.isNull() && m_previewHelper) {
         ui->viewerTitleLabel->setText(tr("基准图"));
         m_previewHelper->setImage(image);
@@ -837,10 +837,10 @@ void CirclePresenceDialog::runReferenceTest()
     }
 
     runCirclePresenceOnFrame(referenceImage.clone(),
-                             referenceImage.clone(),
                              tr("基准图"),
                              tr("基准图为空，无法测试"),
-                             true);
+                             true,
+                             &referenceSet);
 }
 
 void CirclePresenceDialog::runCameraTest()
@@ -876,7 +876,6 @@ void CirclePresenceDialog::runCameraTest()
 
     runCirclePresenceOnFrame(
             snapshot,
-            ReferenceImageProvider::instance().referenceFrame(),
             imageTitle,
             tr("当前图像为空，无法测试"));
 }
@@ -918,7 +917,6 @@ void CirclePresenceDialog::importTestImageFromPc()
 
     runCirclePresenceOnFrame(
             m_importedTestFrame,
-            ReferenceImageProvider::instance().referenceFrame(),
             m_importedTestImageTitle,
             tr("导入图片为空，无法测试"));
 }
@@ -1280,10 +1278,10 @@ void CirclePresenceDialog::refreshDisplayedRoiOverlay()
 }
 
 void CirclePresenceDialog::runCirclePresenceOnFrame(const cv::Mat &frame,
-                                                    const cv::Mat &referenceImage,
                                                     const QString &imageTitle,
                                                     const QString &emptyFrameMessage,
-                                                    bool referenceTest)
+                                                    bool referenceTest,
+                                                    const ReferenceFrameSetSnapshot *capturedReferenceSet)
 {
     if (m_circlePresenceRunning)
         return;
@@ -1317,6 +1315,14 @@ void CirclePresenceDialog::runCirclePresenceOnFrame(const cv::Mat &frame,
     QJsonObject runtimeContext;
     runtimeContext.insert(QStringLiteral("frameId"), frameId);
     runtimeContext.insert(QStringLiteral("input"), inputMetadata.toJson());
+    const ReferenceFrameSetSnapshot ownedReferenceSet = capturedReferenceSet
+            ? ReferenceFrameSetSnapshot()
+            : ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const ReferenceFrameSetSnapshot &referenceSet = capturedReferenceSet
+            ? *capturedReferenceSet : ownedReferenceSet;
+    const cv::Mat referenceImage = referenceSet.primary.frame;
+    runtimeContext.insert(QStringLiteral("referenceInput"),
+                          referenceSet.primary.metadata.toJson());
     runtimeContext.insert(
         QStringLiteral("referencePositionCorrection"),
         PositionCorrection::referenceToJson(m_referencePositionCorrection));
@@ -1367,7 +1373,10 @@ void CirclePresenceDialog::runCirclePresenceOnFrame(const cv::Mat &frame,
                                 ? cv::Mat()
                                 : referenceImage.clone(),
                         runtimeContext,
-                        &referenceCorrectionResult);
+                        &referenceCorrectionResult,
+                        referenceSet.frames,
+                        referenceSet.contentRevisions,
+                        referenceSet.primaryBaseId);
 
         for (auto it = results.crbegin(); it != results.crend(); ++it) {
             if (it->toolId == config.toolId) {
@@ -1393,6 +1402,9 @@ void CirclePresenceDialog::runCirclePresenceOnFrame(const cv::Mat &frame,
                 referenceImage.empty()
                         ? cv::Mat()
                         : referenceImage.clone();
+        request.referenceImages = referenceSet.frames;
+        request.referenceImageRevisions = referenceSet.contentRevisions;
+        request.primaryReferenceBaseId = referenceSet.primaryBaseId;
         request.runtimeContext = runtimeContext;
 
         result = m_testToolEngine.runTool(request);

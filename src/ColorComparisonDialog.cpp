@@ -2883,22 +2883,23 @@ void ColorComparisonDialog::runReferenceTest()
     m_testUiMode = TestUiMode::Edit;
     updateBottomButtons();
 
-    const ReferenceFrameSnapshot snapshot =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
-    if (snapshot.frame.empty()) {
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    if (referenceSet.primary.frame.empty()) {
         displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
         return;
     }
 
-    showFrameImage(snapshot.frame, tr("基准图"));
+    showFrameImage(referenceSet.primary.frame, tr("基准图"));
     if (m_model.state != ColorComparisonModelState::Ready) {
         displayStoredModelInstruction();
         return;
     }
-    runComparisonOnFrame(snapshot.frame,
-                         snapshot.metadata,
+    runComparisonOnFrame(referenceSet.primary.frame,
+                         referenceSet.primary.metadata,
                          tr("基准图"),
-                         true);
+                         true,
+                         &referenceSet);
 }
 
 void ColorComparisonDialog::startContinuousRun()
@@ -3062,15 +3063,19 @@ void ColorComparisonDialog::rerunLiveComparison()
     FrameInputMetadata metadata;
     bool referenceSource = false;
     QString title;
+    ReferenceFrameSetSnapshot referenceSet;
+    const ReferenceFrameSetSnapshot *capturedReferenceSet = nullptr;
     if (m_liveTestSource == LiveTestSource::Reference) {
-        const ReferenceFrameSnapshot snapshot =
-                ReferenceImageProvider::instance().referenceFrameSnapshot();
-        frame = snapshot.frame;
-        metadata = snapshot.metadata;
+        referenceSet = ReferenceImageProvider::instance()
+                .referenceFrameSetSnapshot();
+        capturedReferenceSet = &referenceSet;
+        frame = referenceSet.primary.frame;
+        metadata = referenceSet.primary.metadata;
         referenceSource = true;
         title = tr("基准图");
         if (frame.empty()) {
-            displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
+            displayError(QStringLiteral("no_reference_image"),
+                         tr("请先设置基准图"));
             return;
         }
     } else if (m_liveTestSource == LiveTestSource::Imported) {
@@ -3101,7 +3106,11 @@ void ColorComparisonDialog::rerunLiveComparison()
     }
 
     showFrameImage(frame, title);
-    runComparisonOnFrame(frame, metadata, title, referenceSource);
+    runComparisonOnFrame(frame,
+                         metadata,
+                         title,
+                         referenceSource,
+                         capturedReferenceSet);
 }
 
 void ColorComparisonDialog::exitTestMode()
@@ -3150,28 +3159,42 @@ void ColorComparisonDialog::updateBottomButtons()
 void ColorComparisonDialog::runComparisonOnFrame(const cv::Mat &frame,
                                                  const FrameInputMetadata &metadata,
                                                  const QString &imageTitle,
-                                                 bool referenceSource)
+                                                 bool referenceSource,
+                                                 const ReferenceFrameSetSnapshot *capturedReferenceSet)
 {
     if (blockInvalidConfigAction())
         return;
 
-    if (frame.empty()) {
+    const ReferenceFrameSetSnapshot ownedReferenceSet = capturedReferenceSet
+            ? ReferenceFrameSetSnapshot()
+            : ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const ReferenceFrameSetSnapshot &referenceSet = capturedReferenceSet
+            ? *capturedReferenceSet : ownedReferenceSet;
+    const cv::Mat requestFrame = referenceSource
+            ? referenceSet.primary.frame : frame;
+    const FrameInputMetadata requestMetadata = referenceSource
+            ? referenceSet.primary.metadata : metadata;
+    if (requestFrame.empty()) {
         displayError(QStringLiteral("image_empty"), tr("当前图像为空"));
         return;
     }
 
-    const ToolRequest request = makeTestRequest(frame, metadata);
+    const ToolRequest request = makeTestRequest(requestFrame,
+                                                requestMetadata,
+                                                referenceSet);
     if (!imageTitle.isEmpty() && m_viewerTitleLabel)
         m_viewerTitleLabel->setText(imageTitle);
     if (!referenceSource) {
-        m_liveTestFrameSnapshot = frame.clone();
-        m_liveTestFrameMetadata = metadata;
+        m_liveTestFrameSnapshot = requestFrame.clone();
+        m_liveTestFrameMetadata = requestMetadata;
     }
     queueTestRequest(request, imageTitle, referenceSource);
 }
 
 ToolRequest ColorComparisonDialog::makeTestRequest(
-        const cv::Mat &frame, const FrameInputMetadata &metadata) const
+        const cv::Mat &frame,
+        const FrameInputMetadata &metadata,
+        const ReferenceFrameSetSnapshot &referenceSet) const
 {
     ToolRequest request;
     request.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -3179,11 +3202,12 @@ ToolRequest ColorComparisonDialog::makeTestRequest(
     request.image = frame.clone();
     request.runtimeContext.insert(QStringLiteral("input"), metadata.toJson());
 
-    const ReferenceFrameSnapshot reference =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
-    request.referenceImage = reference.frame.clone();
+    request.referenceImage = referenceSet.primary.frame;
+    request.referenceImages = referenceSet.frames;
+    request.referenceImageRevisions = referenceSet.contentRevisions;
+    request.primaryReferenceBaseId = referenceSet.primaryBaseId;
     request.runtimeContext.insert(QStringLiteral("referenceInput"),
-                                  reference.metadata.toJson());
+                                  referenceSet.primary.metadata.toJson());
     request.runtimeContext.insert(
                 QStringLiteral("referencePositionCorrection"),
                 PositionCorrection::referenceToJson(
@@ -3241,7 +3265,11 @@ void ColorComparisonDialog::launchTestRequest(const ToolRequest &inputRequest,
                     testChain,
                     request.image,
                     request.referenceImage,
-                    request.runtimeContext);
+                    request.runtimeContext,
+                    nullptr,
+                    request.referenceImages,
+                    request.referenceImageRevisions,
+                    request.primaryReferenceBaseId);
         for (auto it = results.crbegin(); it != results.crend(); ++it) {
             if (it->toolId == request.config.toolId)
                 return *it;

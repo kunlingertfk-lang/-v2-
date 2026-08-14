@@ -58,6 +58,44 @@ struct TemplateLocationHalconConfig
     QPointF customOriginNormalized;
 };
 
+/// A stable, normalized image-space region used by the v6 composite-template
+/// contract.  Rectangle geometry is stored in roiNormalized; polygon geometry
+/// in polygonNormalized; and circle geometry in center/radius.  Unknown JSON
+/// fields are retained in extra during a supported v6 read/write cycle.
+struct TemplateLocationRegionConfig
+{
+    QString regionId;
+    QString regionType = QStringLiteral("rectangle");
+    QRectF roiNormalized;
+    QVector<QPointF> polygonNormalized;
+    QPointF circleCenterNormalized;
+    double circleRadiusNormalized = 0.0;
+    QJsonObject extra;
+};
+
+/// Parameters that may be inherited from the bank or completely overridden by
+/// one v6 template.  Library-wide timeout and result-count rules intentionally
+/// do not live here.
+struct TemplateLocationMatchParameters
+{
+    int minScore = 50;
+    int angleStart = -45;
+    int angleExtent = 90;
+    int scaleMin = 100;
+    int scaleMax = 100;
+    QString polarity = QStringLiteral("use_polarity");
+    QString contrastMode = QStringLiteral("auto");
+    int contrast = 40;
+    int minContrast = 10;
+    int numLevels = 0;
+    QString subPixel = QStringLiteral("least_squares");
+    double greediness = 0.5;
+    double maxOverlap = 0.5;
+
+    // Unknown parameter fields are retained. Known fields win on output.
+    QJsonObject extra;
+};
+
 /// One independently cached HALCON shape model in a template-location bank.
 struct TemplateLocationTemplateConfig
 {
@@ -76,8 +114,36 @@ struct TemplateLocationTemplateConfig
     QString modelCacheKey;
     bool modelCreated = false;
 
+    // v6 composite-template source. Legacy v4/v5 callers continue to use the
+    // scalar region mirrors above until the runner/UI migration is complete.
+    QString sourceBaseId;
+    int order = 0;
+    QVector<TemplateLocationRegionConfig> includeRegions;
+    QVector<TemplateLocationRegionConfig> excludeRegions;
+    bool useIndependentParameters = false;
+    TemplateLocationMatchParameters independentParameters;
+    // False only when a decoded v6 independent-parameter object omitted one or
+    // more required known fields. Programmatically created configs start valid.
+    bool independentParametersComplete = true;
+
     // Unknown item fields are retained so a read/write cycle does not erase a
     // contract introduced by a newer UI. Known fields always win on output.
+    QJsonObject extra;
+};
+
+/// Search domain and public output origin attached to one immutable reference
+/// asset in the v6 contract.
+struct TemplateLocationBaseBindingConfig
+{
+    QString baseId;
+    int order = 0;
+    QString searchRegionType = QStringLiteral("full");
+    QRectF searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+    QVector<QPointF> searchPolygonNormalized;
+    QPointF searchCircleCenterNormalized;
+    double searchCircleRadiusNormalized = 0.0;
+    QString originMode = QStringLiteral("centroid");
+    QPointF customOriginNormalized = QPointF(0.5, 0.5);
     QJsonObject extra;
 };
 
@@ -105,6 +171,9 @@ struct TemplateLocationModelBankConfig
     QStringList halconSoPathCandidates;
     QString templateMode = QStringLiteral("alternatives");
     QVector<TemplateLocationTemplateConfig> templates;
+
+    // v6 source of truth for per-reference search/origin configuration.
+    QVector<TemplateLocationBaseBindingConfig> baseBindings;
 
     QString searchRegionType = QStringLiteral("full");
     QRectF searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
@@ -152,7 +221,10 @@ namespace TemplateLocationConfig {
 
 constexpr int LegacyParamsVersion = 4;
 constexpr int ModelBankParamsVersion = 5;
+constexpr int CompositeBankParamsVersion = 6;
 constexpr int MaximumTemplateCount = 8;
+constexpr int MaximumBaseBindingCount = 8;
+constexpr int MaximumRegionsPerTemplate = 8;
 
 struct EnvelopeInspection
 {
@@ -162,7 +234,7 @@ struct EnvelopeInspection
     QString message;
 };
 
-/// Inspect only the v4/v5 envelope shape. This header-only gate is shared by
+/// Inspect only the v4/v5/v6 envelope shape. This header-only gate is shared by
 /// persistence code that must decide whether it is safe to rewrite a locator
 /// without pulling the full codec implementation into every small consumer.
 /// It deliberately mirrors the first stage of fromToolParams().
@@ -181,15 +253,16 @@ inline EnvelopeInspection inspectEnvelope(const QJsonObject &params)
             result.supported = false;
             result.status = QStringLiteral("invalid_config_version");
             result.message = QStringLiteral(
-                        "Template location version must be the exact JSON integer 4 or 5.");
+                        "Template location version must be the exact JSON integer 4, 5, or 6.");
             return result;
         }
         if (number != LegacyParamsVersion
-                && number != ModelBankParamsVersion) {
+                && number != ModelBankParamsVersion
+                && number != CompositeBankParamsVersion) {
             result.supported = false;
             result.status = QStringLiteral("unsupported_config_version");
             result.message = QStringLiteral(
-                        "Template location supports configuration versions 4 and 5.");
+                        "Template location supports configuration versions 4, 5, and 6.");
             return result;
         }
         result.version = static_cast<int>(number);
@@ -201,12 +274,14 @@ inline EnvelopeInspection inspectEnvelope(const QJsonObject &params)
                     "Version 4 is a flat template contract and cannot contain templates[].");
         return result;
     }
-    if (result.version == ModelBankParamsVersion) {
+    if (result.version == ModelBankParamsVersion
+            || result.version == CompositeBankParamsVersion) {
         if (!hasTemplates) {
             result.supported = false;
             result.status = QStringLiteral("missing_templates");
             result.message = QStringLiteral(
-                        "Version 5 requires a templates array.");
+                        "Version %1 requires a templates array.")
+                    .arg(result.version);
             return result;
         }
         const QJsonValue templatesValue = params.value(
@@ -215,7 +290,8 @@ inline EnvelopeInspection inspectEnvelope(const QJsonObject &params)
             result.supported = false;
             result.status = QStringLiteral("invalid_templates_type");
             result.message = QStringLiteral(
-                        "Version 5 templates must be a JSON array.");
+                        "Version %1 templates must be a JSON array.")
+                    .arg(result.version);
             return result;
         }
         const QJsonArray templates = templatesValue.toArray();
@@ -225,16 +301,81 @@ inline EnvelopeInspection inspectEnvelope(const QJsonObject &params)
             result.supported = false;
             result.status = QStringLiteral("invalid_template_item_type");
             result.message = QStringLiteral(
-                        "Version 5 template item %1 must be a JSON object.")
+                        "Version %1 template item %2 must be a JSON object.")
+                    .arg(result.version).arg(index);
+            return result;
+        }
+    }
+    if (result.version == CompositeBankParamsVersion) {
+        const QJsonValue bindingsValue = params.value(
+                    QStringLiteral("baseBindings"));
+        if (!bindingsValue.isArray()) {
+            result.supported = false;
+            result.status = QStringLiteral("invalid_base_bindings_type");
+            result.message = QStringLiteral(
+                        "Version 6 requires a baseBindings JSON array.");
+            return result;
+        }
+        const QJsonArray bindings = bindingsValue.toArray();
+        for (int index = 0; index < bindings.size(); ++index) {
+            if (bindings.at(index).isObject())
+                continue;
+            result.supported = false;
+            result.status = QStringLiteral("invalid_base_binding_item_type");
+            result.message = QStringLiteral(
+                        "Version 6 base binding item %1 must be a JSON object.")
                     .arg(index);
             return result;
+        }
+        const QJsonArray templates = params.value(
+                    QStringLiteral("templates")).toArray();
+        for (int templateIndex = 0; templateIndex < templates.size();
+             ++templateIndex) {
+            const QJsonObject item = templates.at(templateIndex).toObject();
+            const QJsonValue includesValue = item.value(
+                        QStringLiteral("includeRegions"));
+            const QJsonValue excludesValue = item.value(
+                        QStringLiteral("excludeRegions"));
+            if (!includesValue.isArray() || !excludesValue.isArray()) {
+                result.supported = false;
+                result.status = QStringLiteral("invalid_composite_regions_type");
+                result.message = QStringLiteral(
+                            "Version 6 template item %1 requires includeRegions and excludeRegions arrays.")
+                        .arg(templateIndex);
+                return result;
+            }
+            const QJsonArray regionArrays[]{includesValue.toArray(),
+                                            excludesValue.toArray()};
+            for (const QJsonArray &regions : regionArrays) {
+                for (int regionIndex = 0; regionIndex < regions.size();
+                     ++regionIndex) {
+                    if (regions.at(regionIndex).isObject())
+                        continue;
+                    result.supported = false;
+                    result.status = QStringLiteral("invalid_region_item_type");
+                    result.message = QStringLiteral(
+                                "Version 6 template item %1 region item %2 must be a JSON object.")
+                            .arg(templateIndex).arg(regionIndex);
+                    return result;
+                }
+            }
+            if (item.contains(QStringLiteral("parameterOverrides"))
+                    && !item.value(QStringLiteral("parameterOverrides"))
+                        .isObject()) {
+                result.supported = false;
+                result.status = QStringLiteral("invalid_parameter_overrides_type");
+                result.message = QStringLiteral(
+                            "Version 6 template item %1 parameterOverrides must be a JSON object.")
+                        .arg(templateIndex);
+                return result;
+            }
         }
     }
     return result;
 }
 
 /// Parse ToolConfig.params. A missing version is inferred from templates[];
-/// an explicitly present version must be the exact JSON number 4 or 5. v4
+/// an explicitly present version must be the exact JSON number 4, 5, or 6. v4
 /// flat fields are wrapped as one in-memory item; v5 templates[] is the only
 /// template source and flat item fields are ignored.
 TemplateLocationModelBankConfig fromToolConfig(const ToolConfig &config);
@@ -267,6 +408,50 @@ TemplateLocationHalconConfig scalarConfigForTemplate(
 void ensureStableTemplateIds(TemplateLocationModelBankConfig *config);
 TemplateLocationModelBankConfig withStableTemplateIds(
         const TemplateLocationModelBankConfig &config);
+
+/// Normalize every persistent v6 identity without changing existing unique
+/// base/template/region IDs. Also derives legacy cache/region mirrors so v5
+/// consumers can continue operating during the staged migration.
+void ensureStableV6Ids(TemplateLocationModelBankConfig *config);
+
+struct TemplateLocationOrderedTemplateRef
+{
+    int globalIndex = -1;
+    int baseBindingIndex = -1;
+    int templateIndex = -1;
+    int baseOrder = 0;
+    int templateOrder = 0;
+    QString baseId;
+    QString templateId;
+};
+
+TemplateLocationMatchParameters sharedMatchParameters(
+        const TemplateLocationModelBankConfig &config);
+TemplateLocationMatchParameters effectiveMatchParameters(
+        const TemplateLocationModelBankConfig &config,
+        const TemplateLocationTemplateConfig &item);
+QVector<TemplateLocationOrderedTemplateRef> orderedTemplateRefs(
+        const TemplateLocationModelBankConfig &config,
+        bool enabledOnly = false);
+QVector<TemplateLocationOrderedTemplateRef> firstValidTemplateOrder(
+        const TemplateLocationModelBankConfig &config);
+int globalTemplateIndex(const TemplateLocationModelBankConfig &config,
+                        const QString &templateId,
+                        bool enabledOnly = false);
+
+const TemplateLocationBaseBindingConfig *findBaseBinding(
+        const TemplateLocationModelBankConfig &config,
+        const QString &baseId);
+TemplateLocationBaseBindingConfig *findBaseBinding(
+        TemplateLocationModelBankConfig *config,
+        const QString &baseId);
+
+/// Explicit migration only: maps each legacy ROI/mask to one v6 composite
+/// include/exclude region and binds every template to defaultBaseId. Unsupported
+/// input remains raw passthrough. The caller decides when to persist the result.
+TemplateLocationModelBankConfig upgradeToV6(
+        const TemplateLocationModelBankConfig &config,
+        const QString &defaultBaseId = QStringLiteral("base-0"));
 
 int enabledTemplateCount(const TemplateLocationModelBankConfig &config);
 bool allEnabledModelsReady(

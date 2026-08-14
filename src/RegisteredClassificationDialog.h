@@ -25,6 +25,7 @@ class QResizeEvent;
 class QSpinBox;
 class QToolButton;
 class QWidget;
+struct ReferenceFrameSetSnapshot;
 namespace Ui { class RegisteredClassificationDialog; }
 
 class RegisteredClassificationDialog : public QDialog
@@ -77,8 +78,8 @@ private:
     void setViewerStatusText(const QString &text);
     void displayResult(const ToolResult &result);
     ToolResult runOnFrame(const cv::Mat &frame,
-                          const cv::Mat &referenceImage,
-                          const QString &inputSource);
+                          const QString &inputSource,
+                          const ReferenceFrameSetSnapshot *referenceSet = nullptr);
     void updateTestButtons();
     QString resultStatusText(const ToolResult &result) const;
     void showTodoMessage(const QString &actionName);

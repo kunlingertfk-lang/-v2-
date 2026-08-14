@@ -60,8 +60,24 @@ ToolResult TemplateLocationAdapter::run(const ToolRequest &request)
     bank.halconSoPath = HalconRuntimePaths::resolveHalconLibPath(
                 bank.halconSoPath, &bank.halconSoPathCandidates);
 
+    QMap<QString, cv::Mat> referenceImages = request.referenceImages;
+    QMap<QString, QString> referenceRevisions = request.referenceImageRevisions;
+    QString primaryBaseId = request.primaryReferenceBaseId.trimmed();
+    if (bank.version == TemplateLocationConfig::CompositeBankParamsVersion &&
+            !request.referenceImage.empty()) {
+        // Only an explicitly identified compatibility image may enter a v6
+        // Base map. Guessing the first binding when primaryBaseId is absent
+        // would execute immutable sourceBaseId data against unrelated pixels.
+        if (!primaryBaseId.isEmpty() &&
+                !referenceImages.contains(primaryBaseId)) {
+            referenceImages.insert(primaryBaseId, request.referenceImage);
+        }
+    }
     const TemplateLocationHalconResult matched =
-            m_runner.run(request.image, request.referenceImage, bank);
+            bank.version == TemplateLocationConfig::CompositeBankParamsVersion
+            ? m_runner.run(request.image, referenceImages, referenceRevisions,
+                           bank, primaryBaseId)
+            : m_runner.run(request.image, request.referenceImage, bank);
     ToolResult result;
     result.toolId = config.toolId;
     result.toolType = ToolType::TemplateLocation;
@@ -76,9 +92,25 @@ ToolResult TemplateLocationAdapter::run(const ToolRequest &request)
     result.text = matched.status;
     result.overlays = matched.overlays;
     result.payload = matched.payload;
-    result.payload.insert(
-                QStringLiteral("coordinateSourceReferenceSignature"),
-                CalibrationSourceFingerprint::imageSignature(request.referenceImage));
+    const CalibrationSourceFingerprint::TemplateReferenceDependency
+            referenceDependency =
+            CalibrationSourceFingerprint::templateReferenceDependency(
+                config,
+                referenceImages,
+                referenceRevisions,
+                primaryBaseId,
+                request.referenceImage);
+    if (referenceDependency.valid) {
+        CalibrationSourceFingerprint::applyTemplateReferenceDependency(
+                    referenceDependency, &result.payload);
+    } else {
+        // A successful v6 run should already have proven every required Base
+        // frame.  Preserve the algorithm result but make the missing identity
+        // explicit so calibration sampling refuses an incomplete fingerprint.
+        result.payload.insert(
+                    QStringLiteral("coordinateSourceReferenceError"),
+                    referenceDependency.errorCode);
+    }
     CalibrationSourceFingerprint::enrichTemplatePayload(config, &result.payload);
     return result;
 }

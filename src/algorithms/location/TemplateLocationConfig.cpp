@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QUuid>
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -91,6 +92,234 @@ QString itemCacheKey(const QString &toolId, const QString &templateId)
     return QStringLiteral("%1_%2_shape_model").arg(owner, templateId);
 }
 
+TemplateLocationRegionConfig regionFromJson(const QJsonObject &object)
+{
+    TemplateLocationRegionConfig region;
+    region.extra = object;
+    region.regionId = object.value(QStringLiteral("regionId"))
+            .toString().trimmed();
+    region.regionType = stringValue(
+                object, QStringLiteral("regionType"),
+                QStringLiteral("rectangle")).toLower();
+    region.roiNormalized = rectFromJson(
+                object.value(QStringLiteral("roiNormalized")).toObject());
+    region.polygonNormalized = pointsFromJson(
+                object.value(QStringLiteral("polygonNormalized")).toArray());
+    region.circleCenterNormalized = pointFromJson(
+                object.value(QStringLiteral("circleCenterNormalized")).toObject(),
+                region.roiNormalized.center());
+    region.circleRadiusNormalized = object.value(
+                QStringLiteral("circleRadiusNormalized")).toDouble(
+                qMin(region.roiNormalized.width(),
+                     region.roiNormalized.height()) / 2.0);
+    return region;
+}
+
+QJsonObject regionToJson(const TemplateLocationRegionConfig &region)
+{
+    QJsonObject object = region.extra;
+    object.insert(QStringLiteral("regionId"), region.regionId);
+    object.insert(QStringLiteral("regionType"), region.regionType);
+    object.insert(QStringLiteral("roiNormalized"),
+                  rectToJson(region.roiNormalized));
+    object.insert(QStringLiteral("polygonNormalized"),
+                  pointsToJson(region.polygonNormalized));
+    object.insert(QStringLiteral("circleCenterNormalized"),
+                  pointToJson(region.circleCenterNormalized));
+    object.insert(QStringLiteral("circleRadiusNormalized"),
+                  region.circleRadiusNormalized);
+    return object;
+}
+
+QJsonArray regionsToJson(const QVector<TemplateLocationRegionConfig> &regions)
+{
+    QJsonArray array;
+    for (const TemplateLocationRegionConfig &region : regions)
+        array.append(regionToJson(region));
+    return array;
+}
+
+QVector<TemplateLocationRegionConfig> regionsFromJson(const QJsonArray &array)
+{
+    QVector<TemplateLocationRegionConfig> regions;
+    regions.reserve(array.size());
+    for (const QJsonValue &value : array)
+        regions.append(regionFromJson(value.toObject()));
+    return regions;
+}
+
+const QStringList &matchParameterKeys()
+{
+    static const QStringList keys{
+        QStringLiteral("minScore"),
+        QStringLiteral("angleStart"),
+        QStringLiteral("angleExtent"),
+        QStringLiteral("scaleMin"),
+        QStringLiteral("scaleMax"),
+        QStringLiteral("polarity"),
+        QStringLiteral("contrastMode"),
+        QStringLiteral("contrast"),
+        QStringLiteral("minContrast"),
+        QStringLiteral("numLevels"),
+        QStringLiteral("subPixel"),
+        QStringLiteral("greediness"),
+        QStringLiteral("maxOverlap")
+    };
+    return keys;
+}
+
+TemplateLocationMatchParameters matchParametersFromJson(
+        const QJsonObject &object,
+        const TemplateLocationMatchParameters &fallback,
+        bool *complete = nullptr)
+{
+    TemplateLocationMatchParameters parameters = fallback;
+    parameters.extra = object;
+    if (complete) {
+        *complete = true;
+        for (const QString &key : matchParameterKeys()) {
+            if (!object.contains(key)) {
+                *complete = false;
+                break;
+            }
+        }
+    }
+    parameters.minScore = object.value(QStringLiteral("minScore"))
+            .toInt(fallback.minScore);
+    parameters.angleStart = object.value(QStringLiteral("angleStart"))
+            .toInt(fallback.angleStart);
+    parameters.angleExtent = object.value(QStringLiteral("angleExtent"))
+            .toInt(fallback.angleExtent);
+    parameters.scaleMin = object.value(QStringLiteral("scaleMin"))
+            .toInt(fallback.scaleMin);
+    parameters.scaleMax = object.value(QStringLiteral("scaleMax"))
+            .toInt(fallback.scaleMax);
+    parameters.polarity = stringValue(
+                object, QStringLiteral("polarity"), fallback.polarity);
+    parameters.contrastMode = stringValue(
+                object, QStringLiteral("contrastMode"), fallback.contrastMode);
+    parameters.contrast = object.value(QStringLiteral("contrast"))
+            .toInt(fallback.contrast);
+    parameters.minContrast = object.value(QStringLiteral("minContrast"))
+            .toInt(fallback.minContrast);
+    parameters.numLevels = object.value(QStringLiteral("numLevels"))
+            .toInt(fallback.numLevels);
+    parameters.subPixel = stringValue(
+                object, QStringLiteral("subPixel"), fallback.subPixel);
+    parameters.greediness = object.value(QStringLiteral("greediness"))
+            .toDouble(fallback.greediness);
+    parameters.maxOverlap = object.value(QStringLiteral("maxOverlap"))
+            .toDouble(fallback.maxOverlap * 100.0) / 100.0;
+    return parameters;
+}
+
+QJsonObject matchParametersToJson(
+        const TemplateLocationMatchParameters &parameters)
+{
+    QJsonObject object = parameters.extra;
+    object.insert(QStringLiteral("minScore"), parameters.minScore);
+    object.insert(QStringLiteral("angleStart"), parameters.angleStart);
+    object.insert(QStringLiteral("angleExtent"), parameters.angleExtent);
+    object.insert(QStringLiteral("scaleMin"), parameters.scaleMin);
+    object.insert(QStringLiteral("scaleMax"), parameters.scaleMax);
+    object.insert(QStringLiteral("polarity"), parameters.polarity);
+    object.insert(QStringLiteral("contrastMode"), parameters.contrastMode);
+    object.insert(QStringLiteral("contrast"), parameters.contrast);
+    object.insert(QStringLiteral("minContrast"), parameters.minContrast);
+    object.insert(QStringLiteral("numLevels"), parameters.numLevels);
+    object.insert(QStringLiteral("subPixel"), parameters.subPixel);
+    object.insert(QStringLiteral("greediness"), parameters.greediness);
+    object.insert(QStringLiteral("maxOverlap"), parameters.maxOverlap * 100.0);
+    return object;
+}
+
+void deriveLegacyRegionMirrors(TemplateLocationTemplateConfig *item)
+{
+    if (!item || item->includeRegions.isEmpty())
+        return;
+    const TemplateLocationRegionConfig &include = item->includeRegions.first();
+    item->templateRegionType = include.regionType;
+    item->templateRoiNormalized = include.roiNormalized;
+    item->templatePolygonNormalized = include.polygonNormalized;
+    if (include.regionType == QStringLiteral("circle")) {
+        const double radius = include.circleRadiusNormalized;
+        item->templateRegionType = QStringLiteral("rectangle");
+        item->templateRoiNormalized = QRectF(
+                    include.circleCenterNormalized.x() - radius,
+                    include.circleCenterNormalized.y() - radius,
+                    radius * 2.0, radius * 2.0);
+        item->templatePolygonNormalized.clear();
+    }
+
+    item->templateMaskRegionType = QStringLiteral("none");
+    item->templateMaskRoiNormalized = QRectF();
+    item->templateMaskPolygonNormalized.clear();
+    item->templateMaskCircleCenterNormalized = QPointF();
+    item->templateMaskCircleRadiusNormalized = 0.0;
+    if (item->excludeRegions.isEmpty())
+        return;
+    const TemplateLocationRegionConfig &exclude = item->excludeRegions.first();
+    item->templateMaskRegionType = exclude.regionType;
+    item->templateMaskRoiNormalized = exclude.roiNormalized;
+    item->templateMaskPolygonNormalized = exclude.polygonNormalized;
+    item->templateMaskCircleCenterNormalized = exclude.circleCenterNormalized;
+    item->templateMaskCircleRadiusNormalized = exclude.circleRadiusNormalized;
+}
+
+TemplateLocationBaseBindingConfig baseBindingFromJson(
+        const QJsonObject &object,
+        int index)
+{
+    TemplateLocationBaseBindingConfig binding;
+    binding.extra = object;
+    binding.baseId = object.value(QStringLiteral("baseId"))
+            .toString().trimmed();
+    binding.order = object.value(QStringLiteral("order")).toInt(index);
+    binding.searchRegionType = stringValue(
+                object, QStringLiteral("searchRegionType"),
+                QStringLiteral("full")).toLower();
+    binding.searchRoiNormalized = rectFromJson(
+                object.value(QStringLiteral("searchRoiNormalized")).toObject(),
+                QRectF(0.0, 0.0, 1.0, 1.0));
+    binding.searchPolygonNormalized = pointsFromJson(
+                object.value(QStringLiteral("searchPolygonNormalized")).toArray());
+    binding.searchCircleCenterNormalized = pointFromJson(
+                object.value(QStringLiteral("searchCircleCenterNormalized"))
+                    .toObject(),
+                binding.searchRoiNormalized.center());
+    binding.searchCircleRadiusNormalized = object.value(
+                QStringLiteral("searchCircleRadiusNormalized")).toDouble(
+                qMin(binding.searchRoiNormalized.width(),
+                     binding.searchRoiNormalized.height()) / 2.0);
+    binding.originMode = stringValue(
+                object, QStringLiteral("originMode"),
+                QStringLiteral("centroid")).toLower();
+    binding.customOriginNormalized = pointFromJson(
+                object.value(QStringLiteral("customOriginNormalized")).toObject(),
+                QPointF(0.5, 0.5));
+    return binding;
+}
+
+QJsonObject baseBindingToJson(const TemplateLocationBaseBindingConfig &binding)
+{
+    QJsonObject object = binding.extra;
+    object.insert(QStringLiteral("baseId"), binding.baseId);
+    object.insert(QStringLiteral("order"), binding.order);
+    object.insert(QStringLiteral("searchRegionType"), binding.searchRegionType);
+    object.insert(QStringLiteral("searchRoiNormalized"),
+                  rectToJson(binding.searchRoiNormalized));
+    object.insert(QStringLiteral("searchPolygonNormalized"),
+                  pointsToJson(binding.searchPolygonNormalized));
+    object.insert(QStringLiteral("searchCircleCenterNormalized"),
+                  pointToJson(binding.searchCircleCenterNormalized));
+    object.insert(QStringLiteral("searchCircleRadiusNormalized"),
+                  binding.searchCircleRadiusNormalized);
+    object.insert(QStringLiteral("originMode"), binding.originMode);
+    object.insert(QStringLiteral("customOriginNormalized"),
+                  pointToJson(binding.customOriginNormalized));
+    return object;
+}
+
 TemplateLocationTemplateConfig itemFromJson(const QJsonObject &object,
                                             int index,
                                             const QString &toolId,
@@ -175,6 +404,93 @@ QJsonObject itemToJson(const TemplateLocationTemplateConfig &item,
         object.remove(QStringLiteral("enabled"));
         object.remove(QStringLiteral("priority"));
     }
+    return object;
+}
+
+TemplateLocationTemplateConfig v6ItemFromJson(
+        const QJsonObject &object,
+        int index,
+        const QString &toolId,
+        const TemplateLocationMatchParameters &sharedParameters)
+{
+    TemplateLocationTemplateConfig item;
+    item.extra = object;
+    item.templateId = object.value(QStringLiteral("templateId"))
+            .toString().trimmed();
+    item.name = stringValue(object, QStringLiteral("name"),
+                            QStringLiteral("模板%1").arg(index + 1));
+    item.enabled = object.value(QStringLiteral("enabled")).toBool(true);
+    item.order = object.value(QStringLiteral("order")).toInt(index);
+    // Keep the legacy ordering mirror usable until every consumer switches to
+    // orderedTemplateRefs().
+    item.priority = item.order;
+    item.sourceBaseId = object.value(QStringLiteral("sourceBaseId"))
+            .toString().trimmed();
+    item.includeRegions = regionsFromJson(
+                object.value(QStringLiteral("includeRegions")).toArray());
+    item.excludeRegions = regionsFromJson(
+                object.value(QStringLiteral("excludeRegions")).toArray());
+    item.useIndependentParameters = object.value(
+                QStringLiteral("useIndependentParameters")).toBool(false);
+    const QJsonObject overrides = object.value(
+                QStringLiteral("parameterOverrides")).toObject();
+    item.independentParameters = matchParametersFromJson(
+                overrides, sharedParameters,
+                &item.independentParametersComplete);
+    if (!item.useIndependentParameters)
+        item.independentParametersComplete = true;
+    item.modelCacheKey = object.value(QStringLiteral("modelCacheKey"))
+            .toString().trimmed();
+    if (item.modelCacheKey.isEmpty() && !item.templateId.isEmpty())
+        item.modelCacheKey = itemCacheKey(toolId, item.templateId);
+    item.modelCreated = object.value(QStringLiteral("modelCreated"))
+            .toBool(false);
+    deriveLegacyRegionMirrors(&item);
+    return item;
+}
+
+QJsonObject v6ItemToJson(const TemplateLocationTemplateConfig &item)
+{
+    QJsonObject object = item.extra;
+    // v6 composite regions are the sole geometry source. Do not perpetuate
+    // stale v4/v5 mirrors if an intermediate editor happened to write them.
+    const QStringList staleGeometryKeys{
+        QStringLiteral("templateRegionType"),
+        QStringLiteral("templateRoiNormalized"),
+        QStringLiteral("templatePolygonNormalized"),
+        QStringLiteral("templateMaskRegionType"),
+        QStringLiteral("templateMaskRoiNormalized"),
+        QStringLiteral("templateMaskPolygonNormalized"),
+        QStringLiteral("templateMaskCircleCenterNormalized"),
+        QStringLiteral("templateMaskCircleRadiusNormalized"),
+        QStringLiteral("priority"),
+        QStringLiteral("templateName")
+    };
+    for (const QString &key : staleGeometryKeys)
+        object.remove(key);
+    object.insert(QStringLiteral("templateId"), item.templateId);
+    object.insert(QStringLiteral("name"), item.name);
+    object.insert(QStringLiteral("enabled"), item.enabled);
+    object.insert(QStringLiteral("order"), item.order);
+    object.insert(QStringLiteral("sourceBaseId"), item.sourceBaseId);
+    object.insert(QStringLiteral("includeRegions"),
+                  regionsToJson(item.includeRegions));
+    object.insert(QStringLiteral("excludeRegions"),
+                  regionsToJson(item.excludeRegions));
+    object.insert(QStringLiteral("useIndependentParameters"),
+                  item.useIndependentParameters);
+    if (item.useIndependentParameters) {
+        object.insert(QStringLiteral("parameterOverrides"),
+                      matchParametersToJson(item.independentParameters));
+    } else if (item.independentParameters.extra.isEmpty()) {
+        object.remove(QStringLiteral("parameterOverrides"));
+    } else {
+        // Preserve extension fields even while inheritance is selected.
+        object.insert(QStringLiteral("parameterOverrides"),
+                      item.independentParameters.extra);
+    }
+    object.insert(QStringLiteral("modelCacheKey"), item.modelCacheKey);
+    object.insert(QStringLiteral("modelCreated"), item.modelCreated);
     return object;
 }
 
@@ -284,6 +600,28 @@ void writeSharedFields(const TemplateLocationModelBankConfig &config,
                    pointToJson(config.customOriginNormalized));
 }
 
+void writeV6SharedFields(const TemplateLocationModelBankConfig &config,
+                         QJsonObject *params)
+{
+    if (!params)
+        return;
+    writeSharedFields(config, params);
+    // In v6 search geometry and public output origins are owned exclusively by
+    // baseBindings. These legacy mirrors must not become a second authority.
+    const QStringList bindingOwnedKeys{
+        QStringLiteral("searchRegionType"),
+        QStringLiteral("searchRoiNormalized"),
+        QStringLiteral("searchPolygonNormalized"),
+        QStringLiteral("searchCircleCenterNormalized"),
+        QStringLiteral("searchCircleRadiusNormalized"),
+        QStringLiteral("originMode"),
+        QStringLiteral("customOriginNormalized"),
+        QStringLiteral("angleEnd")
+    };
+    for (const QString &key : bindingOwnedKeys)
+        params->remove(key);
+}
+
 bool finitePoint(const QPointF &point)
 {
     return std::isfinite(point.x()) && std::isfinite(point.y());
@@ -340,6 +678,289 @@ QString itemDescription(const TemplateLocationTemplateConfig &item, int index)
     return QStringLiteral("template[%1]").arg(index);
 }
 
+bool validMatchParameters(const TemplateLocationMatchParameters &parameters)
+{
+    const QSet<QString> polarities{
+        QStringLiteral("use_polarity"),
+        QStringLiteral("ignore_local_polarity"),
+        QStringLiteral("ignore_global_polarity")
+    };
+    const QSet<QString> subPixelModes{
+        QStringLiteral("least_squares"), QStringLiteral("none")
+    };
+    return parameters.minScore >= 0 && parameters.minScore <= 100
+            && parameters.angleStart >= -180
+            && parameters.angleStart <= 180
+            && parameters.angleExtent >= 0
+            && parameters.angleExtent <= 360
+            && parameters.scaleMin >= 10 && parameters.scaleMax <= 200
+            && parameters.scaleMin <= parameters.scaleMax
+            && polarities.contains(parameters.polarity)
+            && (parameters.contrastMode == QStringLiteral("auto")
+                || parameters.contrastMode == QStringLiteral("manual"))
+            && parameters.contrast >= 2 && parameters.contrast <= 255
+            && parameters.minContrast >= 1
+            && parameters.minContrast <= 254
+            && (parameters.contrastMode != QStringLiteral("manual")
+                || parameters.minContrast < parameters.contrast)
+            && parameters.numLevels >= 0 && parameters.numLevels <= 10
+            && subPixelModes.contains(parameters.subPixel)
+            && std::isfinite(parameters.greediness)
+            && parameters.greediness >= 0.0
+            && parameters.greediness <= 1.0
+            && std::isfinite(parameters.maxOverlap)
+            && parameters.maxOverlap >= 0.0
+            && parameters.maxOverlap <= 1.0;
+}
+
+bool validRegion(const TemplateLocationRegionConfig &region)
+{
+    const QString type = region.regionType.trimmed().toLower();
+    if (type == QStringLiteral("rectangle"))
+        return validNormalizedRect(region.roiNormalized);
+    if (type == QStringLiteral("polygon"))
+        return validNormalizedPolygon(region.polygonNormalized);
+    if (type == QStringLiteral("circle")) {
+        return validNormalizedPoint(region.circleCenterNormalized)
+                && std::isfinite(region.circleRadiusNormalized)
+                && region.circleRadiusNormalized > 0.0
+                && region.circleRadiusNormalized <= 1.0;
+    }
+    return false;
+}
+
+bool validSearchGeometry(const TemplateLocationBaseBindingConfig &binding)
+{
+    const QString type = binding.searchRegionType.trimmed().toLower();
+    if (type != QStringLiteral("full")
+            && type != QStringLiteral("rectangle")
+            && type != QStringLiteral("circle")
+            && type != QStringLiteral("polygon")) {
+        return false;
+    }
+    return validNormalizedRect(binding.searchRoiNormalized)
+            && (type != QStringLiteral("polygon")
+                || validNormalizedPolygon(binding.searchPolygonNormalized))
+            && (type != QStringLiteral("circle")
+                || (validNormalizedPoint(binding.searchCircleCenterNormalized)
+                    && std::isfinite(binding.searchCircleRadiusNormalized)
+                    && binding.searchCircleRadiusNormalized > 0.0
+                    && binding.searchCircleRadiusNormalized <= 1.0));
+}
+
+TemplateLocationConfigValidationResult validateV6ModelBank(
+        const TemplateLocationModelBankConfig &config,
+        bool requireReadyModels)
+{
+    if (config.baseBindings.isEmpty()) {
+        return validationError(QStringLiteral("no_base_bindings"),
+                               QStringLiteral("The v6 template bank has no base binding."));
+    }
+    if (config.baseBindings.size() >
+            TemplateLocationConfig::MaximumBaseBindingCount) {
+        return validationError(
+                    QStringLiteral("too_many_base_bindings"),
+                    QStringLiteral("A template bank supports at most %1 base bindings.")
+                    .arg(TemplateLocationConfig::MaximumBaseBindingCount));
+    }
+
+    QSet<QString> baseIds;
+    QSet<int> baseOrders;
+    int enabledTemplateCount = 0;
+    QSet<QString> enabledBaseIds;
+    for (const TemplateLocationTemplateConfig &item : config.templates) {
+        if (!item.enabled)
+            continue;
+        ++enabledTemplateCount;
+        enabledBaseIds.insert(item.sourceBaseId.trimmed());
+    }
+    const bool requiresCommonOrigin = enabledTemplateCount > 1
+            || enabledBaseIds.size() > 1;
+    for (const TemplateLocationBaseBindingConfig &binding :
+         config.baseBindings) {
+        const QString baseId = binding.baseId.trimmed();
+        if (baseId.isEmpty()) {
+            return validationError(QStringLiteral("missing_base_id"),
+                                   QStringLiteral("A v6 base binding has no stable base ID."));
+        }
+        if (baseIds.contains(baseId)) {
+            return validationError(
+                        QStringLiteral("duplicate_base_id"),
+                        QStringLiteral("Base ID '%1' is duplicated.").arg(baseId));
+        }
+        if (binding.order < 0 || baseOrders.contains(binding.order)) {
+            return validationError(
+                        QStringLiteral("invalid_base_order"),
+                        QStringLiteral("Base binding order must be non-negative and unique."));
+        }
+        baseIds.insert(baseId);
+        baseOrders.insert(binding.order);
+        if (!validSearchGeometry(binding)) {
+            return validationError(
+                        QStringLiteral("invalid_search_region"),
+                        QStringLiteral("Base '%1' has invalid search geometry.")
+                        .arg(baseId));
+        }
+        if (binding.originMode != QStringLiteral("centroid")
+                && binding.originMode != QStringLiteral("custom")) {
+            return validationError(
+                        QStringLiteral("invalid_origin"),
+                        QStringLiteral("Base '%1' has an invalid output origin mode.")
+                        .arg(baseId));
+        }
+        const bool bindingNeedsCommonOrigin = requiresCommonOrigin
+                && enabledBaseIds.contains(baseId);
+        if ((binding.originMode == QStringLiteral("custom")
+             && !validNormalizedPoint(binding.customOriginNormalized))
+                || (bindingNeedsCommonOrigin
+                    && binding.originMode != QStringLiteral("custom"))) {
+            return validationError(
+                        QStringLiteral("invalid_origin"),
+                        bindingNeedsCommonOrigin
+                        ? QStringLiteral("Every base in a multi-template or multi-base bank requires a custom common origin.")
+                        : QStringLiteral("The custom output origin is invalid."));
+        }
+    }
+
+    const TemplateLocationMatchParameters shared =
+            TemplateLocationConfig::sharedMatchParameters(config);
+    if (!validMatchParameters(shared)) {
+        return validationError(QStringLiteral("invalid_parameter"),
+                               QStringLiteral("Shared template matching parameters are invalid."));
+    }
+    if (config.timeoutMs < 0
+            || config.maxMatches < 1 || config.maxMatches > 100
+            || config.minMatchCount < 1
+            || config.maxMatchCount < config.minMatchCount
+            || config.maxMatchCount > config.maxMatches) {
+        return validationError(QStringLiteral("invalid_parameter"),
+                               QStringLiteral("Library-wide timeout or result-count rules are invalid."));
+    }
+    if (config.primaryMatchStrategy != QStringLiteral("first_valid")) {
+        return validationError(
+                    QStringLiteral("invalid_primary_match_strategy"),
+                    QStringLiteral("Version 6 requires the first_valid template strategy."));
+    }
+
+    QSet<QString> templateIds;
+    QSet<QString> cacheKeys;
+    QSet<QString> regionIds;
+    QSet<QString> templateOrderKeys;
+    int enabledCount = 0;
+    for (int templateIndex = 0; templateIndex < config.templates.size();
+         ++templateIndex) {
+        const TemplateLocationTemplateConfig &item =
+                config.templates.at(templateIndex);
+        const QString id = item.templateId.trimmed();
+        const QString description = itemDescription(item, templateIndex);
+        if (id.isEmpty()) {
+            return validationError(
+                        QStringLiteral("missing_template_id"),
+                        QStringLiteral("%1 has no stable template ID.").arg(description),
+                        templateIndex, id);
+        }
+        if (templateIds.contains(id)) {
+            return validationError(
+                        QStringLiteral("duplicate_template_id"),
+                        QStringLiteral("Template ID '%1' is duplicated.").arg(id),
+                        templateIndex, id);
+        }
+        templateIds.insert(id);
+        if (!baseIds.contains(item.sourceBaseId)) {
+            return validationError(
+                        QStringLiteral("missing_source_base"),
+                        QStringLiteral("%1 references an unknown source base.")
+                        .arg(description), templateIndex, id);
+        }
+        const QString orderKey = QStringLiteral("%1\n%2")
+                .arg(item.sourceBaseId).arg(item.order);
+        if (item.order < 0 || templateOrderKeys.contains(orderKey)) {
+            return validationError(
+                        QStringLiteral("invalid_template_order"),
+                        QStringLiteral("Template order must be non-negative and unique within each base."),
+                        templateIndex, id);
+        }
+        templateOrderKeys.insert(orderKey);
+        if (item.modelCacheKey.trimmed().isEmpty()
+                || cacheKeys.contains(item.modelCacheKey.trimmed())) {
+            return validationError(
+                        item.modelCacheKey.trimmed().isEmpty()
+                        ? QStringLiteral("missing_model_cache_key")
+                        : QStringLiteral("duplicate_model_cache_key"),
+                        QStringLiteral("%1 has an invalid model cache identity.")
+                        .arg(description), templateIndex, id);
+        }
+        cacheKeys.insert(item.modelCacheKey.trimmed());
+
+        // A disabled v6 item is a persistent slot, not an executable model.
+        // Keep its stable identity/Base/order contract strict so UI T-numbering
+        // remains deterministic, but allow an unfinished draft to be disabled
+        // without its geometry, override parameters, or model readiness
+        // blocking the other enabled templates.
+        if (!item.enabled)
+            continue;
+
+        ++enabledCount;
+        if (item.includeRegions.isEmpty()
+                || item.includeRegions.size() >
+                   TemplateLocationConfig::MaximumRegionsPerTemplate) {
+            return validationError(
+                        QStringLiteral("invalid_include_region_count"),
+                        QStringLiteral("%1 requires 1 to %2 include regions.")
+                        .arg(description)
+                        .arg(TemplateLocationConfig::MaximumRegionsPerTemplate),
+                        templateIndex, id);
+        }
+        if (item.excludeRegions.size() >
+                TemplateLocationConfig::MaximumRegionsPerTemplate) {
+            return validationError(
+                        QStringLiteral("invalid_exclude_region_count"),
+                        QStringLiteral("%1 supports at most %2 exclude regions.")
+                        .arg(description)
+                        .arg(TemplateLocationConfig::MaximumRegionsPerTemplate),
+                        templateIndex, id);
+        }
+        const auto validateRegions = [&](
+                const QVector<TemplateLocationRegionConfig> &regions) {
+            for (const TemplateLocationRegionConfig &region : regions) {
+                const QString regionId = region.regionId.trimmed();
+                if (regionId.isEmpty() || regionIds.contains(regionId)
+                        || !validRegion(region)) {
+                    return false;
+                }
+                regionIds.insert(regionId);
+            }
+            return true;
+        };
+        if (!validateRegions(item.includeRegions)
+                || !validateRegions(item.excludeRegions)) {
+            return validationError(
+                        QStringLiteral("invalid_composite_region"),
+                        QStringLiteral("%1 has a missing/duplicate region ID or invalid geometry.")
+                        .arg(description), templateIndex, id);
+        }
+        if (item.useIndependentParameters
+                && (!item.independentParametersComplete
+                    || !validMatchParameters(item.independentParameters))) {
+            return validationError(
+                        QStringLiteral("invalid_parameter_override"),
+                        QStringLiteral("%1 requires a complete valid parameter override.")
+                        .arg(description), templateIndex, id);
+        }
+        if (requireReadyModels && !item.modelCreated) {
+            return validationError(
+                        QStringLiteral("model_not_created"),
+                        QStringLiteral("%1 must be built before execution.")
+                        .arg(description), templateIndex, id);
+        }
+    }
+    if (enabledCount == 0) {
+        return validationError(QStringLiteral("no_enabled_templates"),
+                               QStringLiteral("The template bank has no enabled templates."));
+    }
+    return TemplateLocationConfigValidationResult();
+}
+
 void rejectDecode(TemplateLocationModelBankConfig *config,
                   const QString &status,
                   const QString &message)
@@ -374,6 +995,8 @@ TemplateLocationModelBankConfig fromToolParams(const QJsonObject &params,
         return config;
     }
     const bool bankContract = config.version == ModelBankParamsVersion;
+    const bool compositeContract =
+            config.version == CompositeBankParamsVersion;
     config.halconSoPath = params.value(QStringLiteral("halconSoPath"))
             .toString().trimmed();
     config.templateMode = stringValue(
@@ -428,7 +1051,8 @@ TemplateLocationModelBankConfig fromToolParams(const QJsonObject &params,
                 QPointF(0.5, 0.5));
     config.primaryMatchStrategy = stringValue(
                 params, QStringLiteral("primaryMatchStrategy"),
-                QStringLiteral("best_score"));
+                compositeContract ? QStringLiteral("first_valid")
+                                  : QStringLiteral("best_score"));
     config.primaryTemplateId = params.value(
                 QStringLiteral("primaryTemplateId")).toString().trimmed();
 
@@ -441,7 +1065,41 @@ TemplateLocationModelBankConfig fromToolParams(const QJsonObject &params,
     config.fusion.scaleTolerance = fusion.value(
                 QStringLiteral("scaleTolerance")).toDouble(0.05);
 
-    if (bankContract) {
+    if (compositeContract) {
+        const QJsonArray bindings = params.value(
+                    QStringLiteral("baseBindings")).toArray();
+        config.baseBindings.reserve(bindings.size());
+        for (int index = 0; index < bindings.size(); ++index) {
+            config.baseBindings.append(baseBindingFromJson(
+                                           bindings.at(index).toObject(),
+                                           index));
+        }
+        if (!config.baseBindings.isEmpty()) {
+            // Compatibility mirrors are derived, never serialized as a second
+            // v6 source of truth.
+            const TemplateLocationBaseBindingConfig &binding =
+                    config.baseBindings.first();
+            config.searchRegionType = binding.searchRegionType;
+            config.searchRoiNormalized = binding.searchRoiNormalized;
+            config.searchPolygonNormalized = binding.searchPolygonNormalized;
+            config.searchCircleCenterNormalized =
+                    binding.searchCircleCenterNormalized;
+            config.searchCircleRadiusNormalized =
+                    binding.searchCircleRadiusNormalized;
+            config.originMode = binding.originMode;
+            config.customOriginNormalized = binding.customOriginNormalized;
+        }
+        const TemplateLocationMatchParameters shared =
+                sharedMatchParameters(config);
+        const QJsonArray templates = params.value(QStringLiteral("templates"))
+                .toArray();
+        config.templates.reserve(templates.size());
+        for (int index = 0; index < templates.size(); ++index) {
+            config.templates.append(v6ItemFromJson(
+                                        templates.at(index).toObject(),
+                                        index, config.toolId, shared));
+        }
+    } else if (bankContract) {
         const QJsonArray templates = params.value(QStringLiteral("templates")).toArray();
         config.templates.reserve(templates.size());
         for (int index = 0; index < templates.size(); ++index) {
@@ -459,11 +1117,38 @@ QJsonObject toToolParams(const TemplateLocationModelBankConfig &config)
 {
     if (!config.decodeSupported || config.rawPassthrough
             || (config.version != LegacyParamsVersion
-                && config.version != ModelBankParamsVersion)) {
+                && config.version != ModelBankParamsVersion
+                && config.version != CompositeBankParamsVersion)) {
         return config.extraParams;
     }
 
     QJsonObject params = config.extraParams;
+
+    if (config.version == CompositeBankParamsVersion) {
+        writeV6SharedFields(config, &params);
+        params.insert(QStringLiteral("version"),
+                      CompositeBankParamsVersion);
+        params.insert(QStringLiteral("templateMode"),
+                      QStringLiteral("alternatives"));
+        params.insert(QStringLiteral("primaryMatchStrategy"),
+                      QStringLiteral("first_valid"));
+        params.remove(QStringLiteral("primaryTemplateId"));
+        params.remove(QStringLiteral("fusion"));
+        removeFlatTemplateFields(&params);
+
+        QJsonArray bindings;
+        for (const TemplateLocationBaseBindingConfig &binding :
+             config.baseBindings) {
+            bindings.append(baseBindingToJson(binding));
+        }
+        params.insert(QStringLiteral("baseBindings"), bindings);
+
+        QJsonArray templates;
+        for (const TemplateLocationTemplateConfig &item : config.templates)
+            templates.append(v6ItemToJson(item));
+        params.insert(QStringLiteral("templates"), templates);
+        return params;
+    }
 
     const bool bankContract = config.version >= ModelBankParamsVersion
             || config.templates.size() != 1;
@@ -513,6 +1198,154 @@ QJsonObject toToolParams(const TemplateLocationModelBankConfig &config)
                        config.fusion.scaleTolerance}
                   });
     return params;
+}
+
+TemplateLocationMatchParameters sharedMatchParameters(
+        const TemplateLocationModelBankConfig &config)
+{
+    TemplateLocationMatchParameters parameters;
+    parameters.minScore = config.minScore;
+    parameters.angleStart = config.angleStart;
+    parameters.angleExtent = config.angleExtent;
+    parameters.scaleMin = config.scaleMin;
+    parameters.scaleMax = config.scaleMax;
+    parameters.polarity = config.polarity;
+    parameters.contrastMode = config.contrastMode;
+    parameters.contrast = config.contrast;
+    parameters.minContrast = config.minContrast;
+    parameters.numLevels = config.numLevels;
+    parameters.subPixel = config.subPixel;
+    parameters.greediness = config.greediness;
+    parameters.maxOverlap = config.maxOverlap;
+    return parameters;
+}
+
+TemplateLocationMatchParameters effectiveMatchParameters(
+        const TemplateLocationModelBankConfig &config,
+        const TemplateLocationTemplateConfig &item)
+{
+    if (config.version == CompositeBankParamsVersion
+            && item.useIndependentParameters) {
+        return item.independentParameters;
+    }
+    return sharedMatchParameters(config);
+}
+
+const TemplateLocationBaseBindingConfig *findBaseBinding(
+        const TemplateLocationModelBankConfig &config,
+        const QString &baseId)
+{
+    const QString id = baseId.trimmed();
+    if (id.isEmpty())
+        return nullptr;
+    for (const TemplateLocationBaseBindingConfig &binding :
+         config.baseBindings) {
+        if (binding.baseId == id)
+            return &binding;
+    }
+    return nullptr;
+}
+
+TemplateLocationBaseBindingConfig *findBaseBinding(
+        TemplateLocationModelBankConfig *config,
+        const QString &baseId)
+{
+    if (!config)
+        return nullptr;
+    const QString id = baseId.trimmed();
+    if (id.isEmpty())
+        return nullptr;
+    for (TemplateLocationBaseBindingConfig &binding : config->baseBindings) {
+        if (binding.baseId == id)
+            return &binding;
+    }
+    return nullptr;
+}
+
+QVector<TemplateLocationOrderedTemplateRef> orderedTemplateRefs(
+        const TemplateLocationModelBankConfig &config,
+        bool enabledOnly)
+{
+    QVector<TemplateLocationOrderedTemplateRef> refs;
+    refs.reserve(config.templates.size());
+    for (int templateIndex = 0; templateIndex < config.templates.size();
+         ++templateIndex) {
+        const TemplateLocationTemplateConfig &item =
+                config.templates.at(templateIndex);
+        if (enabledOnly && !item.enabled)
+            continue;
+        TemplateLocationOrderedTemplateRef ref;
+        ref.templateIndex = templateIndex;
+        ref.templateId = item.templateId;
+        ref.baseId = item.sourceBaseId;
+        ref.templateOrder = config.version == CompositeBankParamsVersion
+                ? item.order : item.priority;
+        if (config.version == CompositeBankParamsVersion) {
+            for (int bindingIndex = 0;
+                 bindingIndex < config.baseBindings.size(); ++bindingIndex) {
+                const TemplateLocationBaseBindingConfig &binding =
+                        config.baseBindings.at(bindingIndex);
+                if (binding.baseId != item.sourceBaseId)
+                    continue;
+                ref.baseBindingIndex = bindingIndex;
+                ref.baseOrder = binding.order;
+                break;
+            }
+            if (ref.baseBindingIndex < 0)
+                ref.baseOrder = MaximumBaseBindingCount + 1;
+        }
+        refs.append(ref);
+    }
+    std::stable_sort(refs.begin(), refs.end(),
+                     [](const TemplateLocationOrderedTemplateRef &left,
+                        const TemplateLocationOrderedTemplateRef &right) {
+        if (left.baseOrder != right.baseOrder)
+            return left.baseOrder < right.baseOrder;
+        if (left.baseId != right.baseId)
+            return left.baseId < right.baseId;
+        if (left.templateOrder != right.templateOrder)
+            return left.templateOrder < right.templateOrder;
+        if (left.templateId != right.templateId)
+            return left.templateId < right.templateId;
+        return left.templateIndex < right.templateIndex;
+    });
+    for (int index = 0; index < refs.size(); ++index)
+        refs[index].globalIndex = index;
+    return refs;
+}
+
+QVector<TemplateLocationOrderedTemplateRef> firstValidTemplateOrder(
+        const TemplateLocationModelBankConfig &config)
+{
+    // Assign T0..T7 from the complete persisted bank first, then filter the
+    // execution list. Disabled slots therefore keep their UI-visible global
+    // indices while FirstValid still searches enabled templates only.
+    const QVector<TemplateLocationOrderedTemplateRef> allRefs =
+            orderedTemplateRefs(config, false);
+    QVector<TemplateLocationOrderedTemplateRef> enabledRefs;
+    enabledRefs.reserve(allRefs.size());
+    for (const TemplateLocationOrderedTemplateRef &ref : allRefs) {
+        if (ref.templateIndex >= 0 &&
+                ref.templateIndex < config.templates.size() &&
+                config.templates.at(ref.templateIndex).enabled) {
+            enabledRefs.append(ref);
+        }
+    }
+    return enabledRefs;
+}
+
+int globalTemplateIndex(const TemplateLocationModelBankConfig &config,
+                        const QString &templateId,
+                        bool enabledOnly)
+{
+    const QString id = templateId.trimmed();
+    const QVector<TemplateLocationOrderedTemplateRef> refs =
+            orderedTemplateRefs(config, enabledOnly);
+    for (const TemplateLocationOrderedTemplateRef &ref : refs) {
+        if (ref.templateId == id)
+            return ref.globalIndex;
+    }
+    return -1;
 }
 
 TemplateLocationTemplateConfig templateConfigFromScalar(
@@ -593,6 +1426,8 @@ TemplateLocationHalconConfig scalarConfigForTemplate(
         const TemplateLocationModelBankConfig &bank,
         const TemplateLocationTemplateConfig &item)
 {
+    const TemplateLocationMatchParameters effective =
+            effectiveMatchParameters(bank, item);
     TemplateLocationHalconConfig config;
     config.toolId = bank.toolId;
     config.halconSoPath = bank.halconSoPath;
@@ -608,30 +1443,41 @@ TemplateLocationHalconConfig scalarConfigForTemplate(
             item.templateMaskCircleCenterNormalized;
     config.templateMaskCircleRadiusNormalized =
             item.templateMaskCircleRadiusNormalized;
-    config.searchRegionType = bank.searchRegionType;
-    config.searchRoiNormalized = bank.searchRoiNormalized;
-    config.searchPolygonNormalized = bank.searchPolygonNormalized;
-    config.searchCircleCenterNormalized = bank.searchCircleCenterNormalized;
-    config.searchCircleRadiusNormalized = bank.searchCircleRadiusNormalized;
-    config.minScore = bank.minScore;
-    config.angleStart = bank.angleStart;
-    config.angleExtent = bank.angleExtent;
-    config.scaleMin = bank.scaleMin;
-    config.scaleMax = bank.scaleMax;
-    config.polarity = bank.polarity;
-    config.contrastMode = bank.contrastMode;
-    config.contrast = bank.contrast;
-    config.minContrast = bank.minContrast;
-    config.numLevels = bank.numLevels;
-    config.subPixel = bank.subPixel;
-    config.greediness = bank.greediness;
+    const TemplateLocationBaseBindingConfig *binding =
+            bank.version == CompositeBankParamsVersion
+            ? findBaseBinding(bank, item.sourceBaseId) : nullptr;
+    config.searchRegionType = binding ? binding->searchRegionType
+                                      : bank.searchRegionType;
+    config.searchRoiNormalized = binding ? binding->searchRoiNormalized
+                                         : bank.searchRoiNormalized;
+    config.searchPolygonNormalized = binding ? binding->searchPolygonNormalized
+                                             : bank.searchPolygonNormalized;
+    config.searchCircleCenterNormalized = binding
+            ? binding->searchCircleCenterNormalized
+            : bank.searchCircleCenterNormalized;
+    config.searchCircleRadiusNormalized = binding
+            ? binding->searchCircleRadiusNormalized
+            : bank.searchCircleRadiusNormalized;
+    config.minScore = effective.minScore;
+    config.angleStart = effective.angleStart;
+    config.angleExtent = effective.angleExtent;
+    config.scaleMin = effective.scaleMin;
+    config.scaleMax = effective.scaleMax;
+    config.polarity = effective.polarity;
+    config.contrastMode = effective.contrastMode;
+    config.contrast = effective.contrast;
+    config.minContrast = effective.minContrast;
+    config.numLevels = effective.numLevels;
+    config.subPixel = effective.subPixel;
+    config.greediness = effective.greediness;
     config.timeoutMs = bank.timeoutMs;
     config.maxMatches = bank.maxMatches;
     config.minMatchCount = bank.minMatchCount;
     config.maxMatchCount = bank.maxMatchCount;
-    config.maxOverlap = bank.maxOverlap;
-    config.originMode = bank.originMode;
-    config.customOriginNormalized = bank.customOriginNormalized;
+    config.maxOverlap = effective.maxOverlap;
+    config.originMode = binding ? binding->originMode : bank.originMode;
+    config.customOriginNormalized = binding
+            ? binding->customOriginNormalized : bank.customOriginNormalized;
     return config;
 }
 
@@ -677,7 +1523,120 @@ TemplateLocationModelBankConfig withStableTemplateIds(
         const TemplateLocationModelBankConfig &config)
 {
     TemplateLocationModelBankConfig result = config;
-    ensureStableTemplateIds(&result);
+    if (result.version == CompositeBankParamsVersion)
+        ensureStableV6Ids(&result);
+    else
+        ensureStableTemplateIds(&result);
+    return result;
+}
+
+void ensureStableV6Ids(TemplateLocationModelBankConfig *config)
+{
+    if (!config || config->version != CompositeBankParamsVersion
+            || !config->decodeSupported || config->rawPassthrough) {
+        return;
+    }
+
+    // Base IDs are foreign keys into the scheme-level ReferenceAssetSet.
+    // Never invent or rewrite them here: malformed/missing bindings must stay
+    // visible so validation and the UI can require an explicit rebind.
+    ensureStableTemplateIds(config);
+    QSet<QString> regionIds;
+    for (TemplateLocationTemplateConfig &item : config->templates) {
+        const auto normalizeRegions = [&regionIds](
+                QVector<TemplateLocationRegionConfig> *regions) {
+            if (!regions)
+                return;
+            for (TemplateLocationRegionConfig &region : *regions) {
+                QString id = region.regionId.trimmed();
+                while (id.isEmpty() || regionIds.contains(id)) {
+                    id = QStringLiteral("region-%1").arg(
+                                QUuid::createUuid().toString(
+                                    QUuid::WithoutBraces));
+                }
+                region.regionId = id;
+                regionIds.insert(id);
+            }
+        };
+        normalizeRegions(&item.includeRegions);
+        normalizeRegions(&item.excludeRegions);
+        deriveLegacyRegionMirrors(&item);
+    }
+}
+
+TemplateLocationModelBankConfig upgradeToV6(
+        const TemplateLocationModelBankConfig &config,
+        const QString &defaultBaseId)
+{
+    if (!config.decodeSupported || config.rawPassthrough)
+        return config;
+    if (config.version == CompositeBankParamsVersion) {
+        TemplateLocationModelBankConfig result = config;
+        ensureStableV6Ids(&result);
+        return result;
+    }
+    if (config.version != LegacyParamsVersion
+            && config.version != ModelBankParamsVersion) {
+        return config;
+    }
+
+    TemplateLocationModelBankConfig result = config;
+    result.version = CompositeBankParamsVersion;
+    result.templateMode = QStringLiteral("alternatives");
+    result.primaryMatchStrategy = QStringLiteral("first_valid");
+    result.primaryTemplateId.clear();
+    result.baseBindings.clear();
+
+    TemplateLocationBaseBindingConfig binding;
+    binding.baseId = defaultBaseId.trimmed().isEmpty()
+            ? QStringLiteral("base-0") : defaultBaseId.trimmed();
+    binding.order = 0;
+    binding.searchRegionType = config.searchRegionType;
+    binding.searchRoiNormalized = config.searchRoiNormalized;
+    binding.searchPolygonNormalized = config.searchPolygonNormalized;
+    binding.searchCircleCenterNormalized = config.searchCircleCenterNormalized;
+    binding.searchCircleRadiusNormalized = config.searchCircleRadiusNormalized;
+    binding.originMode = config.originMode;
+    binding.customOriginNormalized = config.customOriginNormalized;
+    result.baseBindings.append(binding);
+
+    const TemplateLocationMatchParameters shared =
+            sharedMatchParameters(config);
+    for (int index = 0; index < result.templates.size(); ++index) {
+        TemplateLocationTemplateConfig &item = result.templates[index];
+        item.sourceBaseId = binding.baseId;
+        item.order = index;
+        item.priority = index;
+        item.includeRegions.clear();
+        item.excludeRegions.clear();
+
+        TemplateLocationRegionConfig include;
+        include.regionType = item.templateRegionType;
+        include.roiNormalized = item.templateRoiNormalized;
+        include.polygonNormalized = item.templatePolygonNormalized;
+        item.includeRegions.append(include);
+
+        QString maskType = item.templateMaskRegionType.trimmed().toLower();
+        if ((maskType.isEmpty() || maskType == QStringLiteral("none"))
+                && !item.templateMaskPolygonNormalized.isEmpty()) {
+            maskType = QStringLiteral("polygon");
+        }
+        if (!maskType.isEmpty() && maskType != QStringLiteral("none")) {
+            TemplateLocationRegionConfig exclude;
+            exclude.regionType = maskType;
+            exclude.roiNormalized = item.templateMaskRoiNormalized;
+            exclude.polygonNormalized = item.templateMaskPolygonNormalized;
+            exclude.circleCenterNormalized =
+                    item.templateMaskCircleCenterNormalized;
+            exclude.circleRadiusNormalized =
+                    item.templateMaskCircleRadiusNormalized;
+            item.excludeRegions.append(exclude);
+        }
+        item.useIndependentParameters = false;
+        item.independentParameters = shared;
+        item.independentParametersComplete = true;
+    }
+    ensureStableV6Ids(&result);
     return result;
 }
 
@@ -727,10 +1686,11 @@ TemplateLocationConfigValidationResult validateModelBank(
                     : config.decodeMessage);
     }
     if (config.version != LegacyParamsVersion
-            && config.version != ModelBankParamsVersion) {
+            && config.version != ModelBankParamsVersion
+            && config.version != CompositeBankParamsVersion) {
         return validationError(
                     QStringLiteral("unsupported_config_version"),
-                    QStringLiteral("Template location supports configuration versions 4 and 5."));
+                    QStringLiteral("Template location supports configuration versions 4, 5, and 6."));
     }
     if (config.templateMode != QStringLiteral("alternatives")) {
         return validationError(
@@ -752,6 +1712,8 @@ TemplateLocationConfigValidationResult validateModelBank(
                     QStringLiteral("legacy_multiple_templates"),
                     QStringLiteral("The version 4 flat contract supports exactly one template."));
     }
+    if (config.version == CompositeBankParamsVersion)
+        return validateV6ModelBank(config, requireReadyModels);
 
     QSet<QString> templateIds;
     QSet<QString> modelCacheKeys;

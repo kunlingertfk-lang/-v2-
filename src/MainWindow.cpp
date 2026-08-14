@@ -414,6 +414,10 @@ MainWindow::MainWindow(QWidget *parent)
     m_previewHelper->bindPixelStatusLabel(ui->cursorLabel);
     m_toolChainWatcher = new QFutureWatcher<ToolChainRunOutput>(this);
     setupUiState();
+    connect(&SchemeStore::instance(),
+            &SchemeStore::referenceAssetStateCommitted,
+            this,
+            &MainWindow::syncCommittedReferenceAssetState);
     setupSchemeSelector();
     applyCurrentSchemeState();
     ui->planSettingButton->setStyleSheet("background:#ff7a00");
@@ -914,6 +918,52 @@ void MainWindow::applyCurrentSchemeState()
     }
 }
 
+void MainWindow::syncCommittedReferenceAssetState(const QString &schemeId)
+{
+    SchemeStore &store = SchemeStore::instance();
+    const SchemeState committed = store.currentScheme();
+    if (schemeId.trimmed().isEmpty() || committed.schemeId != schemeId)
+        return;
+
+    QString selectedToolId;
+    if (m_selectedToolIndex >= 0 &&
+            m_selectedToolIndex < m_schemeToolConfigs.size()) {
+        selectedToolId = m_schemeToolConfigs.at(m_selectedToolIndex).toolId;
+    }
+
+    int restoredSelection = -1;
+    if (!selectedToolId.isEmpty()) {
+        for (int index = 0; index < committed.toolConfigs.size(); ++index) {
+            if (committed.toolConfigs.at(index).toolId == selectedToolId) {
+                restoredSelection = index;
+                break;
+            }
+        }
+    }
+
+    // Results produced against the previous Base revisions are no longer a
+    // valid display/runtime cache. The committed previews below retain only
+    // snapshots that SchemeStore deliberately kept valid.
+    m_lastRunSnapshots.clear();
+    m_lastReferenceCorrectionOverlays.clear();
+    m_lastRunImage = QImage();
+    m_selectedToolIndex = restoredSelection;
+    applySavedSchemeTools(committed.toolConfigs,
+                          committed.referencePreviewSnapshots);
+
+    // SchemeSetupWindow owns long-lived Tools/Output pages. Refresh those
+    // copies too, otherwise navigating back from the reference page could
+    // recommit the pre-invalidation modelCreated state.
+    if (SchemeSetupWindow *window =
+            qobject_cast<SchemeSetupWindow *>(m_activeSetupWindow.data())) {
+        window->setInitialToolState(committed.toolConfigs,
+                                    committed.referencePreviewSnapshots);
+    }
+
+    qDebug() << "[MainWindow] 已同步参考资产提交后的工具态，方案:"
+             << schemeId << "工具数:" << committed.toolConfigs.size();
+}
+
 bool MainWindow::persistCurrentSchemeState(const QString &context)
 {
     SchemeStore &store = SchemeStore::instance();
@@ -1183,9 +1233,19 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
 
     QElapsedTimer referenceCopyTimer;
     referenceCopyTimer.start();
+    // Copy frames, revisions and the primary compatibility view under one
+    // provider lock so a concurrent Base replacement cannot mix generations.
+    const ReferenceFrameSetSnapshot referenceSetSnapshot =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
     const ReferenceFrameSnapshot referenceSnapshot =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
+            referenceSetSnapshot.primary;
     const cv::Mat referenceImage = referenceSnapshot.frame;
+    const QMap<QString, cv::Mat> referenceImages =
+            referenceSetSnapshot.frames;
+    const QMap<QString, QString> referenceRevisions =
+            referenceSetSnapshot.contentRevisions;
+    const QString primaryReferenceBaseId =
+            referenceSetSnapshot.primaryBaseId;
     const qint64 referenceCopyMs = referenceCopyTimer.elapsed();
 
     QJsonObject runtimeContext;
@@ -1222,6 +1282,9 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
                                      enabledConfigs,
                                      image,
                                      referenceImage,
+                                     referenceImages,
+                                     referenceRevisions,
+                                     primaryReferenceBaseId,
                                      runtimeContext,
                                      displayImage,
                                      startedWallMs,
@@ -1256,7 +1319,10 @@ bool MainWindow::submitToolChainRun(bool continuousRun, qint64 triggerFrameIndex
                                           image,
                                           referenceImage,
                                           runtimeContext,
-                                          &output.referenceCorrectionResult);
+                                          &output.referenceCorrectionResult,
+                                          referenceImages,
+                                          referenceRevisions,
+                                          primaryReferenceBaseId);
         output.engineMs = timer.elapsed();
 
         output.overallOk = !output.results.isEmpty();

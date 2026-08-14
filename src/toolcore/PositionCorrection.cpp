@@ -489,7 +489,7 @@ QJsonObject PositionCorrection::referenceToJson(
         };
         for (const QString &key : legacyKeys)
             json.remove(key);
-        json.insert(QStringLiteral("version"), 4);
+        json.insert(QStringLiteral("version"), config.version);
         json.insert(QStringLiteral("locator"), config.locator);
         json.insert(QStringLiteral("referencePosesByTemplateId"),
                     config.referencePosesByTemplateId);

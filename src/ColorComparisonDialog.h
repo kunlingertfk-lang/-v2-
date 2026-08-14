@@ -30,6 +30,7 @@ class QToolButton;
 class QTimer;
 class QWidget;
 class ColorComparisonFeatureView;
+struct ReferenceFrameSetSnapshot;
 namespace Ui { class ColorComparisonDialog; }
 template <typename T> class QFutureWatcher;
 
@@ -106,9 +107,11 @@ private:
     void runComparisonOnFrame(const cv::Mat &frame,
                               const FrameInputMetadata &metadata,
                               const QString &imageTitle,
-                              bool referenceSource);
+                              bool referenceSource,
+                              const ReferenceFrameSetSnapshot *referenceSet = nullptr);
     ToolRequest makeTestRequest(const cv::Mat &frame,
-                                const FrameInputMetadata &metadata) const;
+                                const FrameInputMetadata &metadata,
+                                const ReferenceFrameSetSnapshot &referenceSet) const;
     void queueTestRequest(const ToolRequest &request,
                           const QString &imageTitle,
                           bool referenceSource);

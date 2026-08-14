@@ -1335,17 +1335,59 @@ bool QuickCalibrationWizard::validateCoordinateSourceFingerprint(
     }
 
     const ToolConfig &currentConfig = configIt.value();
-    cv::Mat currentReferenceFrame =
-            ReferenceImageProvider::instance().referenceFrame();
-    if (currentReferenceFrame.empty())
-        currentReferenceFrame = qImageToBgrMat(m_referencePreviewImage);
+    const CalibrationSourceFingerprint::TemplateOriginIdentity originIdentity =
+            CalibrationSourceFingerprint::templateOriginIdentity(
+                currentConfig,
+                fingerprint.value(QStringLiteral("selectedBaseId"))
+                .toString());
+    if (!originIdentity.valid) {
+        if (errorMessage) {
+            *errorMessage = tr("无法核对模板定位原点：%1")
+                    .arg(originIdentity.errorMessage);
+        }
+        return false;
+    }
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    cv::Mat legacyReferenceFrame = referenceSet.primary.frame;
+    if (legacyReferenceFrame.empty())
+        legacyReferenceFrame = qImageToBgrMat(m_referencePreviewImage);
+    const CalibrationSourceFingerprint::TemplateReferenceDependency
+            referenceDependency =
+            CalibrationSourceFingerprint::templateReferenceDependency(
+                currentConfig,
+                referenceSet.frames,
+                referenceSet.contentRevisions,
+                referenceSet.primaryBaseId,
+                legacyReferenceFrame,
+                fingerprint);
+    if (!referenceDependency.valid) {
+        if (errorMessage) {
+            *errorMessage = tr("无法核对模板定位依赖的基准图：%1")
+                    .arg(referenceDependency.errorMessage);
+        }
+        return false;
+    }
+    if (referenceDependency.legacyCompositePrimarySignature) {
+        if (errorMessage) {
+            QString originMismatch;
+            if (!CalibrationSourceFingerprint::matchesTemplateOriginIdentity(
+                    fingerprint, originIdentity, &originMismatch)) {
+                *errorMessage = tr("当前 v6 模板定位原点已变化（%1），"
+                                   "请重新采样")
+                        .arg(originMismatch);
+            } else if (referenceDependency.signature != fingerprint.value(
+                    QStringLiteral("referenceImageSignature")).toString()) {
+                *errorMessage = tr("当前主 Base 与旧版 v6 采样时不一致，"
+                                   "请重新采样");
+            } else {
+                *errorMessage = tr("旧版 v6 坐标来源仅记录了主 Base 签名，"
+                                   "无法核对非主 Base 依赖，请重新采样");
+            }
+        }
+        return false;
+    }
     QJsonObject currentPayload{
-        {QStringLiteral("originMode"),
-         currentConfig.params.value(QStringLiteral("originMode"))
-         .toString(QStringLiteral("centroid"))},
-        {QStringLiteral("customOriginNormalized"),
-         currentConfig.params.value(
-             QStringLiteral("customOriginNormalized")).toObject()},
         // The model signature is deterministic for an unchanged template
         // configuration and reference image.  The surrounding comparison also
         // checks both identities before this saved value can be reused.
@@ -1353,11 +1395,26 @@ bool QuickCalibrationWizard::validateCoordinateSourceFingerprint(
          fingerprint.value(QStringLiteral("modelSignature")).toString()},
         {QStringLiteral("coordinateSourceConfigSignature"),
          CalibrationSourceFingerprint::coordinateSourceConfigSignature(
-             currentConfig)},
-        {QStringLiteral("coordinateSourceReferenceSignature"),
-         CalibrationSourceFingerprint::imageSignature(
-             currentReferenceFrame)}
+             currentConfig)}
     };
+    CalibrationSourceFingerprint::applyTemplateOriginIdentity(
+                originIdentity, &currentPayload);
+    CalibrationSourceFingerprint::applyTemplateReferenceDependency(
+                referenceDependency, &currentPayload);
+    // This read-only validation cannot rebuild HALCON model-selection fields.
+    // Preserve the signed expected identity while independently recomputing
+    // configuration and every referenced Base fingerprint above.
+    const QStringList retainedIdentityFields{
+        QStringLiteral("modelSetSignature"),
+        QStringLiteral("selectedTemplateId"),
+        QStringLiteral("selectedBaseId"),
+        QStringLiteral("primaryMatchStrategy"),
+        QStringLiteral("lockedTemplateId")
+    };
+    for (const QString &field : retainedIdentityFields) {
+        if (fingerprint.contains(field))
+            currentPayload.insert(field, fingerprint.value(field));
+    }
     const QJsonObject currentFingerprint =
             CalibrationSourceFingerprint::makeFingerprint(
                 producerId, currentConfig.toolType, currentPayload);
@@ -2022,7 +2079,9 @@ bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
     if (currentFrame.empty())
         return fail(tr("当前没有可用于模板定位的图像"));
 
-    cv::Mat referenceFrame = ReferenceImageProvider::instance().referenceFrame();
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    cv::Mat referenceFrame = referenceSet.primary.frame;
     if (referenceFrame.empty())
         referenceFrame = qImageToBgrMat(m_referencePreviewImage);
     if (referenceFrame.empty())
@@ -2034,6 +2093,9 @@ bool QuickCalibrationWizard::runCurrentImageLocation(QString *errorMessage)
     request.config = configIt.value();
     request.image = currentFrame;
     request.referenceImage = referenceFrame;
+    request.referenceImages = referenceSet.frames;
+    request.referenceImageRevisions = referenceSet.contentRevisions;
+    request.primaryReferenceBaseId = referenceSet.primaryBaseId;
     request.imagePath = imagePath;
     const QString source = externalImageIndex >= 0
             ? QStringLiteral("calibration_external_image")

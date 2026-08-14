@@ -494,25 +494,8 @@ ToolResult CalibrationTransformAdapter::run(const ToolRequest &request)
             calibrationBindingStatus = QStringLiteral("manual_unverifiable");
             calibrationBindingWarning = QStringLiteral(
                         "该标定文件由手动坐标生成，无法验证当前模板定位来源");
-        } else if (expectedSignature.isEmpty()
-                   || expectedSignature
-                      != CalibrationSourceFingerprint::coordinateSourceSignature(
-                          expectedSourceFingerprint)
-                   || expectedSourceFingerprint
-                      .value(QStringLiteral("producerId")).toString().trimmed().isEmpty()
-                   || expectedSourceFingerprint
-                      .value(QStringLiteral("producerType")).toString().trimmed().isEmpty()
-                   || expectedSourceFingerprint
-                      .value(QStringLiteral("outputContract")).toObject().isEmpty()
-                   || expectedSourceFingerprint
-                      .value(QStringLiteral("originMode")).toString().trimmed().isEmpty()
-                   || expectedSourceFingerprint
-                      .value(QStringLiteral("customOriginNormalized")).toObject().isEmpty()
-                   || expectedSourceFingerprint
-                      .value(QStringLiteral("modelSignature")).toString().trimmed().isEmpty()
-                   || expectedSourceFingerprint
-                      .value(QStringLiteral("coordinateSourceConfigSignature"))
-                      .toString().trimmed().isEmpty()) {
+        } else if (!CalibrationSourceFingerprint::isComplete(
+                       expectedSourceFingerprint)) {
             ToolResult result = failure(
                         config,
                         QStringLiteral("calibration_stale"),

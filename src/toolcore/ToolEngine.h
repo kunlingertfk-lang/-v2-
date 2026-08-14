@@ -7,6 +7,7 @@
 #include "ToolResult.h"
 
 #include <QJsonObject>
+#include <QMap>
 #include <QVector>
 #include <opencv2/core.hpp>
 
@@ -23,7 +24,10 @@ public:
                                   const cv::Mat &image,
                                   const cv::Mat &referenceImage = cv::Mat(),
                                   const QJsonObject &runtimeContext = QJsonObject(),
-                                  ToolResult *referenceCorrectionResult = nullptr) const;
+                                  ToolResult *referenceCorrectionResult = nullptr,
+                                  const QMap<QString, cv::Mat> &referenceImages = {},
+                                  const QMap<QString, QString> &referenceRevisions = {},
+                                  const QString &primaryReferenceBaseId = QString()) const;
 
 private:
     /// 返回首个声明支持指定 ToolType 的已注册适配器。

@@ -7,6 +7,9 @@
 #include "frame/RoiGeometry.h"
 #include "toolcore/PositionCorrection.h"
 
+struct FrameInputMetadata;
+struct ReferenceFrameSnapshot;
+
 class FrameViewHelper;
 class QPushButton;
 class QFrame;
@@ -15,6 +18,7 @@ class QComboBox;
 class QButtonGroup;
 class QCheckBox;
 class QDoubleSpinBox;
+class QFormLayout;
 class QListWidget;
 class QListWidgetItem;
 class QSpinBox;
@@ -77,6 +81,24 @@ private:
     void setAdvancedVisible(bool visible);
     void connectNavigation();
     void setupReferenceImageControls();
+    void setupReferenceAssetControls();
+    void refreshReferenceAssetControls();
+    void updateMultiReferenceUi();
+    void selectReferenceBase(const QString &baseId);
+    void addReferenceBaseFromPc();
+    void replaceSelectedReferenceBaseFromPc();
+    void removeSelectedReferenceBase();
+    void makeSelectedReferenceBasePrimary();
+    bool persistReferenceFrameForSelectedBase(
+            const cv::Mat &frame,
+            const FrameInputMetadata &metadata,
+            bool forceAdd,
+            const QString &suggestedName = QString());
+    bool saveReferenceDraftBeforeAssetMutation(QString *errorMessage = nullptr);
+    QString selectedReferenceBaseId() const;
+    QString activeTemplateBaseId() const;
+    ReferenceFrameSnapshot selectedReferenceSnapshot() const;
+    bool showActiveTemplateBase();
     void refreshSchemeHeader();
     void ensureCameraRunning();
     void updateReferenceImageControls();
@@ -88,9 +110,16 @@ private:
     void loadPositionCorrectionConfig();
     void loadLocatorControls(const TemplateLocationModelBankConfig &config);
     void writeLocatorControls();
+    void synchronizeLocatorBaseBindings(bool forceV6 = false);
+    void storeLegacyBaseBindingGeometry();
+    void loadActiveBaseBindingGeometry();
+    void storeMatchingParametersToActiveTemplate();
+    void loadMatchingParametersForActiveTemplate();
+    void invalidateLocatorForBase(const QString &baseId);
     void updateMatchingParameterControlState();
     void markLocatorDirty(bool modelParametersChanged = true);
     void markActiveTemplateDirty();
+    bool locatorBaseBindingIssue(QString *message = nullptr) const;
     bool validateLocatorControls(QString *message = nullptr) const;
     int activeTemplateIndex() const;
     void storeLegacyGeometryToActiveTemplate();
@@ -152,6 +181,7 @@ private:
     QWidget *m_templateMaskToolsWidget = nullptr;
     QFrame *m_basicMatchingCard = nullptr;
     QFrame *m_advancedMatchingCard = nullptr;
+    QFormLayout *m_advancedMatchingForm = nullptr;
     QWidget *m_searchRegionToolsWidget = nullptr;
     QLabel *m_positionStatusLabel = nullptr;
     QPushButton *m_positionRectButton = nullptr;
@@ -171,6 +201,18 @@ private:
     QPushButton *m_addReferenceTemplateButton = nullptr;
     QPushButton *m_renameReferenceTemplateButton = nullptr;
     QPushButton *m_deleteReferenceTemplateButton = nullptr;
+    QFrame *m_multiReferenceCard = nullptr;
+    QCheckBox *m_multiReferenceBaseSwitch = nullptr;
+    QFrame *m_referenceBaseThumbnailPanel = nullptr;
+    QListWidget *m_referenceBaseList = nullptr;
+    QLabel *m_referenceBaseSummaryLabel = nullptr;
+    QPushButton *m_addReferenceBaseButton = nullptr;
+    QPushButton *m_addCurrentReferenceBaseButton = nullptr;
+    QPushButton *m_replaceReferenceBaseButton = nullptr;
+    QPushButton *m_deleteReferenceBaseButton = nullptr;
+    QPushButton *m_makePrimaryReferenceBaseButton = nullptr;
+    QComboBox *m_templateSourceBaseComboBox = nullptr;
+    QCheckBox *m_templateIndependentParametersCheckBox = nullptr;
     QSpinBox *m_minScoreSpinBox = nullptr;
     QSpinBox *m_angleMinSpinBox = nullptr;
     QSpinBox *m_angleMaxSpinBox = nullptr;
@@ -198,13 +240,18 @@ private:
     QPushButton *m_searchPolygonButton = nullptr;
     QPushButton *m_searchFinishButton = nullptr;
     bool m_liveCaptureMode = false;
+    bool m_captureCreatesNewBase = false;
     PositionCorrectionRoiEditMode m_positionRoiEditMode =
             PositionCorrectionRoiEditMode::None;
     ReferencePositionCorrectionConfig m_referencePositionCorrection;
     TemplateLocationModelBankConfig m_locatorConfig;
     QString m_activeTemplateId;
+    QString m_selectedReferenceBaseId;
     bool m_loadingLocatorControls = false;
     bool m_updatingTemplateBank = false;
+    bool m_updatingReferenceAssets = false;
+    bool m_referenceTemplateIncludeEdited = false;
+    bool m_referenceTemplateExcludeEdited = false;
     bool m_referenceLocatorBankEnvelope = false;
     bool m_referencePositionEditorReadOnly = false;
     QString m_referencePositionUnsupportedStatus;

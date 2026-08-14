@@ -130,6 +130,9 @@ ToolResult referencePositionCorrectionError(const QString &status,
 // 在普通工具链之前运行方案级参考位置修正，并把结果注入同帧上下文。
 ToolResult runReferencePositionCorrection(const cv::Mat &image,
                                           const cv::Mat &referenceImage,
+                                          const QMap<QString, cv::Mat> &referenceImages,
+                                          const QMap<QString, QString> &referenceRevisions,
+                                          const QString &primaryReferenceBaseId,
                                           const QJsonObject &runtimeContext)
 {
     const QJsonObject referenceJson = runtimeContext.value(
@@ -155,7 +158,9 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
     if (image.empty())
         return referencePositionCorrectionError(QStringLiteral("image_empty"),
                                                 QStringLiteral("input image is empty"));
-    if (referenceImage.empty())
+    if (locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion
+            && referenceImage.empty())
         return referencePositionCorrectionError(QStringLiteral("no_reference_image"),
                                                 QStringLiteral("reference image is empty"));
 
@@ -256,7 +261,11 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
 
     TemplateLocationHalconRunner locator;
     const TemplateLocationHalconResult located =
-            locator.run(image, referenceImage, locatorConfig);
+            locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion
+            ? locator.run(image, referenceImages, referenceRevisions,
+                          locatorConfig, primaryReferenceBaseId)
+            : locator.run(image, referenceImage, locatorConfig);
     if (!located.success || !located.ok) {
         ToolResult result = referencePositionCorrectionError(
                     located.status,
@@ -479,12 +488,18 @@ ToolResult runReferencePositionCorrection(const cv::Mat &image,
     result.payload.insert(QStringLiteral("locatorPayload"), located.payload);
     result.payload.insert(QStringLiteral("selectedTemplateId"),
                           currentTemplateId);
+    result.payload.insert(QStringLiteral("selectedBaseId"),
+                          located.payload.value(QStringLiteral("selectedBaseId")));
     result.payload.insert(QStringLiteral("referencePoseTemplateId"),
                           resolved.bankEnvelope
                           ? frozenPose.value(QStringLiteral("locatorTemplateId"))
                           : QJsonValue(currentTemplateId));
+    result.payload.insert(QStringLiteral("referencePoseBaseId"),
+                          resolved.bankEnvelope
+                          ? frozenPose.value(QStringLiteral("locatorBaseId"))
+                          : QJsonValue());
     result.payload.insert(QStringLiteral("referencePoseBankVersion"),
-                          resolved.bankEnvelope ? 4 : referenceConfig.version);
+                          referenceConfig.version);
     result.payload.insert(QStringLiteral("x"), runPose.x);
     result.payload.insert(QStringLiteral("y"), runPose.y);
     result.payload.insert(QStringLiteral("angle"), runPose.angleDeg);
@@ -544,7 +559,10 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
                                          const cv::Mat &image,
                                          const cv::Mat &referenceImage,
                                          const QJsonObject &runtimeContext,
-                                         ToolResult *referenceCorrectionResult) const
+                                         ToolResult *referenceCorrectionResult,
+                                         const QMap<QString, cv::Mat> &referenceImages,
+                                         const QMap<QString, QString> &referenceRevisions,
+                                         const QString &primaryReferenceBaseId) const
 {
     // 工具顺序即依赖顺序；每次调用重建动态结果映射，禁止跨帧复用旧坐标。
     QVector<ToolResult> results;
@@ -558,7 +576,11 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
             .toString().trimmed();
 
     ToolResult referenceCorrection =
-            runReferencePositionCorrection(image, referenceImage, frameContext);
+            runReferencePositionCorrection(image, referenceImage,
+                                           referenceImages,
+                                           referenceRevisions,
+                                           primaryReferenceBaseId,
+                                           frameContext);
     if (!frameId.isEmpty())
         referenceCorrection.payload.insert(QStringLiteral("frameId"), frameId);
     if (referenceCorrectionResult)
@@ -574,6 +596,9 @@ QVector<ToolResult> ToolEngine::runTools(const QVector<ToolConfig> &configs,
         request.config = config;
         request.image = image;
         request.referenceImage = referenceImage;
+        request.referenceImages = referenceImages;
+        request.referenceImageRevisions = referenceRevisions;
+        request.primaryReferenceBaseId = primaryReferenceBaseId;
         request.frameId = frameId;
         request.runtimeContext = frameContext;
         ToolResult result = runTool(request);

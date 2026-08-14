@@ -1,6 +1,7 @@
 #ifndef CALIBRATION_CALIBRATIONSOURCEFINGERPRINT_H
 #define CALIBRATION_CALIBRATIONSOURCEFINGERPRINT_H
 
+#include "algorithms/location/TemplateLocationConfig.h"
 #include "toolcore/ToolConfig.h"
 
 #include <QCryptographicHash>
@@ -8,12 +9,15 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QMap>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 
 #include <opencv2/core.hpp>
 
 #include <algorithm>
+#include <cmath>
 
 /**
  * Stable identity contract for a producer whose image-space pose is used to
@@ -85,6 +89,228 @@ inline QString imageSignature(const cv::Mat &image)
     return QString::fromLatin1(hash.result().toHex());
 }
 
+/**
+ * Reference-pixel identity consumed by a TemplateLocation producer.
+ *
+ * v4/v5 retain the historical primary-image signature.  v6 signs every Base
+ * used by an enabled template, including the stable Base ID, content revision
+ * and normalized runtime pixels.  This prevents a calibration bound to B02
+ * from being validated against unrelated primary Base pixels.
+ */
+struct TemplateReferenceDependency
+{
+    bool valid = false;
+    bool composite = false;
+    bool legacyCompositePrimarySignature = false;
+    QString signature;
+    QString contract;
+    QStringList baseIds;
+    QJsonObject contentRevisions;
+    QString errorCode;
+    QString errorMessage;
+};
+
+inline QString templateReferenceDependencyContract()
+{
+    return QStringLiteral("template_reference_dependencies_v1");
+}
+
+inline TemplateReferenceDependency templateReferenceDependency(
+        const ToolConfig &config,
+        const QMap<QString, cv::Mat> &referenceImages,
+        const QMap<QString, QString> &referenceRevisions,
+        const QString &primaryBaseId,
+        const cv::Mat &legacyReferenceImage,
+        const QJsonObject &expectedFingerprint = QJsonObject())
+{
+    TemplateReferenceDependency result;
+    const TemplateLocationConfig::EnvelopeInspection envelope =
+            TemplateLocationConfig::inspectEnvelope(config.params);
+    if (!envelope.supported) {
+        result.errorCode = envelope.status;
+        result.errorMessage = envelope.message;
+        return result;
+    }
+
+    if (envelope.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        cv::Mat primary = legacyReferenceImage;
+        const QString primaryId = primaryBaseId.trimmed();
+        if (primary.empty() && !primaryId.isEmpty())
+            primary = referenceImages.value(primaryId);
+        if (primary.empty()) {
+            result.errorCode = QStringLiteral("reference_image_missing");
+            result.errorMessage = QStringLiteral(
+                        "The primary reference image required by the legacy locator is unavailable.");
+            return result;
+        }
+        result.signature = imageSignature(primary);
+        if (result.signature.isEmpty()) {
+            result.errorCode = QStringLiteral("reference_signature_failed");
+            result.errorMessage = QStringLiteral(
+                        "The primary reference image could not be fingerprinted.");
+            return result;
+        }
+        result.valid = true;
+        if (!primaryId.isEmpty()) {
+            result.baseIds.append(primaryId);
+            result.contentRevisions.insert(
+                        primaryId, referenceRevisions.value(primaryId));
+        }
+        return result;
+    }
+
+    result.composite = true;
+    const QJsonArray templates = config.params.value(
+                QStringLiteral("templates")).toArray();
+    const bool legacyCompositePrimaryContract =
+            expectedFingerprint.contains(QStringLiteral("referenceImageSignature"))
+            && expectedFingerprint.value(
+                QStringLiteral("referenceDependencyContract"))
+               .toString().trimmed().isEmpty();
+
+    if (legacyCompositePrimaryContract) {
+        // Historical v6 fingerprints were produced before the dependency-set
+        // contract and signed request.referenceImage (the primary Base mirror).
+        // Preserve that comparison only as a compatibility signal.  Callers
+        // must downgrade it to unverifiable because non-primary dependencies
+        // were not covered by the saved identity.
+        cv::Mat historicalPrimary = legacyReferenceImage;
+        const QString primaryId = primaryBaseId.trimmed();
+        if (historicalPrimary.empty() && !primaryId.isEmpty())
+            historicalPrimary = referenceImages.value(primaryId);
+        if (historicalPrimary.empty()) {
+            result.errorCode = QStringLiteral("reference_image_missing");
+            result.errorMessage = QStringLiteral(
+                        "The historical v6 primary Base image is unavailable.");
+            return result;
+        }
+        result.signature = imageSignature(historicalPrimary);
+        if (result.signature.isEmpty()) {
+            result.errorCode = QStringLiteral("reference_signature_failed");
+            result.errorMessage = QStringLiteral(
+                        "The historical v6 primary Base could not be fingerprinted.");
+            return result;
+        }
+        result.valid = true;
+        result.legacyCompositePrimarySignature = true;
+        if (!primaryId.isEmpty()) {
+            result.baseIds.append(primaryId);
+            result.contentRevisions.insert(
+                        primaryId, referenceRevisions.value(primaryId));
+        }
+        return result;
+    }
+
+    QStringList dependencyIds;
+    QSet<QString> enabledBaseIds;
+    for (const QJsonValue &value : templates) {
+        const QJsonObject item = value.toObject();
+        if (!item.value(QStringLiteral("enabled")).toBool(true))
+            continue;
+        const QString baseId = item.value(
+                    QStringLiteral("sourceBaseId")).toString().trimmed();
+        if (baseId.isEmpty()) {
+            result.errorCode = QStringLiteral("reference_base_identity_missing");
+            result.errorMessage = QStringLiteral(
+                        "An enabled v6 template has no stable Base binding.");
+            return result;
+        }
+        enabledBaseIds.insert(baseId);
+    }
+    if (enabledBaseIds.isEmpty()) {
+        result.errorCode = QStringLiteral("reference_base_identity_missing");
+        result.errorMessage = QStringLiteral(
+                    "The v6 locator has no enabled Base dependency.");
+        return result;
+    }
+
+    const QJsonArray bindings = config.params.value(
+                QStringLiteral("baseBindings")).toArray();
+    for (const QJsonValue &value : bindings) {
+        const QString baseId = value.toObject().value(
+                    QStringLiteral("baseId")).toString().trimmed();
+        if (!enabledBaseIds.remove(baseId))
+            continue;
+        dependencyIds.append(baseId);
+    }
+    if (!enabledBaseIds.isEmpty()) {
+        result.errorCode = QStringLiteral("reference_base_binding_missing");
+        result.errorMessage = QStringLiteral(
+                    "The v6 locator refers to Base '%1' without a matching Base binding.")
+                .arg(*enabledBaseIds.constBegin());
+        return result;
+    }
+
+    QJsonArray signedBases;
+    for (const QString &baseId : dependencyIds) {
+        const cv::Mat frame = referenceImages.value(baseId);
+        if (frame.empty()) {
+            result.errorCode = QStringLiteral("reference_image_for_base_missing");
+            result.errorMessage = QStringLiteral(
+                        "The v6 locator requires unavailable Base '%1'.")
+                    .arg(baseId);
+            return result;
+        }
+        const QString pixels = imageSignature(frame);
+        if (pixels.isEmpty()) {
+            result.errorCode = QStringLiteral("reference_signature_failed");
+            result.errorMessage = QStringLiteral(
+                        "Base '%1' could not be fingerprinted.").arg(baseId);
+            return result;
+        }
+        const QString revision = referenceRevisions.value(baseId).trimmed();
+        if (revision.isEmpty()) {
+            result.errorCode = QStringLiteral(
+                        "reference_revision_for_base_missing");
+            result.errorMessage = QStringLiteral(
+                        "The v6 locator requires a non-empty content revision for Base '%1'.")
+                    .arg(baseId);
+            return result;
+        }
+        result.baseIds.append(baseId);
+        result.contentRevisions.insert(baseId, revision);
+        signedBases.append(QJsonObject{
+            {QStringLiteral("baseId"), baseId},
+            {QStringLiteral("contentRevision"), revision},
+            {QStringLiteral("imageSignature"), pixels}
+        });
+    }
+
+    result.contract = templateReferenceDependencyContract();
+    result.signature = sha256(QJsonObject{
+        {QStringLiteral("contract"), result.contract},
+        {QStringLiteral("bases"), signedBases}
+    });
+    result.valid = !result.signature.isEmpty();
+    return result;
+}
+
+inline void applyTemplateReferenceDependency(
+        const TemplateReferenceDependency &dependency,
+        QJsonObject *payload)
+{
+    if (!payload || !dependency.valid)
+        return;
+    payload->insert(QStringLiteral("coordinateSourceReferenceSignature"),
+                    dependency.signature);
+    if (dependency.contract.isEmpty()) {
+        payload->remove(QStringLiteral("coordinateSourceReferenceContract"));
+        payload->remove(QStringLiteral("coordinateSourceReferenceBaseIds"));
+        payload->remove(QStringLiteral("coordinateSourceReferenceRevisions"));
+        return;
+    }
+    QJsonArray baseIds;
+    for (const QString &baseId : dependency.baseIds)
+        baseIds.append(baseId);
+    payload->insert(QStringLiteral("coordinateSourceReferenceContract"),
+                    dependency.contract);
+    payload->insert(QStringLiteral("coordinateSourceReferenceBaseIds"),
+                    baseIds);
+    payload->insert(QStringLiteral("coordinateSourceReferenceRevisions"),
+                    dependency.contentRevisions);
+}
+
 inline QJsonObject normalizedPoint(const QJsonObject &point,
                                    double fallbackX = 0.5,
                                    double fallbackY = 0.5)
@@ -93,6 +319,152 @@ inline QJsonObject normalizedPoint(const QJsonObject &point,
         {QStringLiteral("x"), point.value(QStringLiteral("x")).toDouble(fallbackX)},
         {QStringLiteral("y"), point.value(QStringLiteral("y")).toDouble(fallbackY)}
     };
+}
+
+/**
+ * Public output-origin identity for the Base selected by TemplateLocation.
+ *
+ * In v6, baseBindings is the sole authority for output origin semantics.  A
+ * selected Base identity is therefore mandatory and must resolve exactly one
+ * binding.  v4/v5 retain their historical top-level origin fields.
+ */
+struct TemplateOriginIdentity
+{
+    bool valid = false;
+    bool composite = false;
+    QString selectedBaseId;
+    QString originMode;
+    QJsonObject customOriginNormalized;
+    QString errorCode;
+    QString errorMessage;
+};
+
+inline TemplateOriginIdentity templateOriginIdentity(
+        const ToolConfig &config,
+        const QString &selectedBaseId)
+{
+    TemplateOriginIdentity result;
+    const TemplateLocationConfig::EnvelopeInspection envelope =
+            TemplateLocationConfig::inspectEnvelope(config.params);
+    if (!envelope.supported) {
+        result.errorCode = envelope.status;
+        result.errorMessage = envelope.message;
+        return result;
+    }
+
+    QJsonObject originOwner = config.params;
+    if (envelope.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        result.composite = true;
+        result.selectedBaseId = selectedBaseId.trimmed();
+        if (result.selectedBaseId.isEmpty()) {
+            result.errorCode = QStringLiteral("selected_base_identity_missing");
+            result.errorMessage = QStringLiteral(
+                        "The v6 coordinate-source fingerprint has no selected Base identity.");
+            return result;
+        }
+
+        int matchingBindings = 0;
+        const QJsonArray bindings = config.params.value(
+                    QStringLiteral("baseBindings")).toArray();
+        for (const QJsonValue &value : bindings) {
+            const QJsonObject binding = value.toObject();
+            if (binding.value(QStringLiteral("baseId")).toString().trimmed()
+                    != result.selectedBaseId) {
+                continue;
+            }
+            originOwner = binding;
+            ++matchingBindings;
+        }
+        if (matchingBindings == 0) {
+            result.errorCode = QStringLiteral("selected_base_binding_missing");
+            result.errorMessage = QStringLiteral(
+                        "The selected Base '%1' has no v6 Base binding.")
+                    .arg(result.selectedBaseId);
+            return result;
+        }
+        if (matchingBindings != 1) {
+            result.errorCode = QStringLiteral("selected_base_binding_ambiguous");
+            result.errorMessage = QStringLiteral(
+                        "The selected Base '%1' has duplicate v6 Base bindings.")
+                    .arg(result.selectedBaseId);
+            return result;
+        }
+    }
+
+    result.originMode = originOwner.value(QStringLiteral("originMode"))
+            .toString().trimmed().toLower();
+    if (result.originMode.isEmpty())
+        result.originMode = QStringLiteral("centroid");
+    if (result.originMode != QStringLiteral("centroid")
+            && result.originMode != QStringLiteral("custom")) {
+        result.errorCode = QStringLiteral("origin_mode_invalid");
+        result.errorMessage = QStringLiteral(
+                    "Template location origin mode must be centroid or custom.");
+        return result;
+    }
+    result.customOriginNormalized = normalizedPoint(
+                originOwner.value(
+                    QStringLiteral("customOriginNormalized")).toObject());
+    if (result.originMode == QStringLiteral("custom")) {
+        const double x = result.customOriginNormalized.value(
+                    QStringLiteral("x")).toDouble();
+        const double y = result.customOriginNormalized.value(
+                    QStringLiteral("y")).toDouble();
+        if (!std::isfinite(x) || !std::isfinite(y)
+                || x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) {
+            result.errorCode = QStringLiteral("custom_origin_invalid");
+            result.errorMessage = QStringLiteral(
+                        "Template location custom origin must be normalized to [0, 1].");
+            return result;
+        }
+    }
+    result.valid = true;
+    return result;
+}
+
+inline void applyTemplateOriginIdentity(
+        const TemplateOriginIdentity &origin,
+        QJsonObject *payload)
+{
+    if (!payload || !origin.valid)
+        return;
+    payload->insert(QStringLiteral("originMode"), origin.originMode);
+    payload->insert(QStringLiteral("customOriginNormalized"),
+                    origin.customOriginNormalized);
+}
+
+inline bool matchesTemplateOriginIdentity(
+        const QJsonObject &expectedFingerprint,
+        const TemplateOriginIdentity &actualOrigin,
+        QString *mismatchField = nullptr)
+{
+    if (!actualOrigin.valid) {
+        if (mismatchField)
+            *mismatchField = actualOrigin.errorCode;
+        return false;
+    }
+    if (expectedFingerprint.value(QStringLiteral("originMode")).toString()
+            != actualOrigin.originMode) {
+        if (mismatchField)
+            *mismatchField = QStringLiteral("originMode");
+        return false;
+    }
+    const QJsonObject actualPoint = actualOrigin.originMode
+            == QStringLiteral("custom")
+            ? actualOrigin.customOriginNormalized
+            : QJsonObject{{QStringLiteral("x"), 0.5},
+                          {QStringLiteral("y"), 0.5}};
+    if (canonicalJson(expectedFingerprint.value(
+                          QStringLiteral("customOriginNormalized")))
+            != canonicalJson(actualPoint)) {
+        if (mismatchField)
+            *mismatchField = QStringLiteral("customOriginNormalized");
+        return false;
+    }
+    if (mismatchField)
+        mismatchField->clear();
+    return true;
 }
 
 /// 递归移除模板库中的运行环境、持久缓存和建模生命周期字段。
@@ -210,9 +582,23 @@ inline QJsonObject makeFingerprint(const QString &producerId,
         fingerprint.insert(QStringLiteral("referenceImageSignature"),
                            referenceSignature);
     }
+    const QString referenceContract = payload.value(
+                QStringLiteral("coordinateSourceReferenceContract"))
+            .toString().trimmed();
+    if (!referenceContract.isEmpty()) {
+        fingerprint.insert(QStringLiteral("referenceDependencyContract"),
+                           referenceContract);
+        fingerprint.insert(QStringLiteral("referenceBaseIds"),
+                           payload.value(QStringLiteral(
+                               "coordinateSourceReferenceBaseIds")));
+        fingerprint.insert(QStringLiteral("referenceContentRevisions"),
+                           payload.value(QStringLiteral(
+                               "coordinateSourceReferenceRevisions")));
+    }
     const QStringList optionalIdentityFields{
         QStringLiteral("modelSetSignature"),
         QStringLiteral("selectedTemplateId"),
+        QStringLiteral("selectedBaseId"),
         QStringLiteral("primaryMatchStrategy"),
         QStringLiteral("lockedTemplateId")
     };
@@ -257,6 +643,113 @@ inline bool isComplete(const QJsonObject &fingerprint,
             return false;
         }
     }
+    const QString contractField = QStringLiteral(
+                "referenceDependencyContract");
+    const QString baseIdsField = QStringLiteral("referenceBaseIds");
+    const QString revisionsField = QStringLiteral(
+                "referenceContentRevisions");
+    const bool hasDependencyMetadata = fingerprint.contains(contractField)
+            || fingerprint.contains(baseIdsField)
+            || fingerprint.contains(revisionsField);
+    if (hasDependencyMetadata) {
+        const QJsonValue contractValue = fingerprint.value(contractField);
+        if (!contractValue.isString()
+                || contractValue.toString()
+                   != templateReferenceDependencyContract()) {
+            if (missingField)
+                *missingField = contractField;
+            return false;
+        }
+        if (!fingerprint.value(QStringLiteral("referenceImageSignature"))
+                .isString()
+                || fingerprint.value(QStringLiteral(
+                    "referenceImageSignature"))
+                   .toString().trimmed().isEmpty()) {
+            if (missingField)
+                *missingField = QStringLiteral("referenceImageSignature");
+            return false;
+        }
+
+        const QJsonValue baseIdsValue = fingerprint.value(baseIdsField);
+        if (!baseIdsValue.isArray() || baseIdsValue.toArray().isEmpty()) {
+            if (missingField)
+                *missingField = baseIdsField;
+            return false;
+        }
+        QSet<QString> dependencyBaseIds;
+        for (const QJsonValue &value : baseIdsValue.toArray()) {
+            if (!value.isString()) {
+                if (missingField)
+                    *missingField = baseIdsField;
+                return false;
+            }
+            const QString baseId = value.toString();
+            if (baseId.isEmpty() || baseId != baseId.trimmed()
+                    || dependencyBaseIds.contains(baseId)) {
+                if (missingField)
+                    *missingField = baseIdsField;
+                return false;
+            }
+            dependencyBaseIds.insert(baseId);
+        }
+
+        const QJsonValue revisionsValue = fingerprint.value(revisionsField);
+        if (!revisionsValue.isObject()) {
+            if (missingField)
+                *missingField = revisionsField;
+            return false;
+        }
+        const QJsonObject revisions = revisionsValue.toObject();
+        if (revisions.size() != dependencyBaseIds.size()) {
+            if (missingField)
+                *missingField = revisionsField;
+            return false;
+        }
+        for (const QString &baseId : dependencyBaseIds) {
+            const QJsonValue revision = revisions.value(baseId);
+            if (!revision.isString()
+                    || revision.toString().trimmed().isEmpty()) {
+                if (missingField)
+                    *missingField = revisionsField;
+                return false;
+            }
+        }
+
+        const QJsonValue selectedBaseValue = fingerprint.value(
+                    QStringLiteral("selectedBaseId"));
+        const QString selectedBaseId = selectedBaseValue.toString();
+        if (!selectedBaseValue.isString()
+                || selectedBaseId.isEmpty()
+                || selectedBaseId != selectedBaseId.trimmed()
+                || !dependencyBaseIds.contains(selectedBaseId)) {
+            if (missingField)
+                *missingField = QStringLiteral("selectedBaseId");
+            return false;
+        }
+    } else if (fingerprint.contains(QStringLiteral("selectedBaseId"))) {
+        // Historical v6 fingerprints predate the dependency-set contract but
+        // retain the selected Base together with the scalar primary-image
+        // signature.  A selected Base left behind without that signature is a
+        // stripped composite fingerprint, not a valid v4/v5 identity.
+        const QJsonValue selectedBaseValue = fingerprint.value(
+                    QStringLiteral("selectedBaseId"));
+        const QString selectedBaseId = selectedBaseValue.toString();
+        if (!selectedBaseValue.isString()
+                || selectedBaseId.isEmpty()
+                || selectedBaseId != selectedBaseId.trimmed()) {
+            if (missingField)
+                *missingField = QStringLiteral("selectedBaseId");
+            return false;
+        }
+        const QJsonValue referenceSignature = fingerprint.value(
+                    QStringLiteral("referenceImageSignature"));
+        if (!referenceSignature.isString()
+                || referenceSignature.toString().trimmed().isEmpty()) {
+            if (missingField)
+                *missingField = QStringLiteral("referenceImageSignature");
+            return false;
+        }
+    }
     if (fingerprint.value(QStringLiteral("coordinateSourceSignature")).toString()
             != coordinateSourceSignature(fingerprint)) {
         if (missingField)
@@ -284,13 +777,10 @@ inline bool matches(const QJsonObject &expected,
         QStringLiteral("coordinateSourceConfigSignature")
     };
     for (const QJsonObject &fingerprint : {expected, actual}) {
-        const QString signature = fingerprint.value(
-                    QStringLiteral("coordinateSourceSignature"))
-                .toString().trimmed();
-        if (!signature.isEmpty()
-                && signature != coordinateSourceSignature(fingerprint)) {
+        QString invalidField;
+        if (!isComplete(fingerprint, &invalidField)) {
             if (mismatchField)
-                *mismatchField = QStringLiteral("coordinateSourceSignature");
+                *mismatchField = invalidField;
             return false;
         }
     }
@@ -308,9 +798,25 @@ inline bool matches(const QJsonObject &expected,
             *mismatchField = QStringLiteral("referenceImageSignature");
         return false;
     }
+    const QStringList dependencyMetadataFields{
+        QStringLiteral("referenceDependencyContract"),
+        QStringLiteral("referenceBaseIds"),
+        QStringLiteral("referenceContentRevisions")
+    };
+    for (const QString &field : dependencyMetadataFields) {
+        if (expected.contains(field) != actual.contains(field)
+                || (expected.contains(field)
+                    && canonicalJson(expected.value(field))
+                       != canonicalJson(actual.value(field)))) {
+            if (mismatchField)
+                *mismatchField = field;
+            return false;
+        }
+    }
     const QStringList optionalIdentityFields{
         QStringLiteral("modelSetSignature"),
         QStringLiteral("selectedTemplateId"),
+        QStringLiteral("selectedBaseId"),
         QStringLiteral("primaryMatchStrategy"),
         QStringLiteral("lockedTemplateId")
     };
@@ -348,6 +854,9 @@ inline void propagateIdentityFields(const QJsonObject &source, QJsonObject *targ
         QStringLiteral("coordinateSourceContractVersion"),
         QStringLiteral("coordinateSourceOutputContract"),
         QStringLiteral("coordinateSourceReferenceSignature"),
+        QStringLiteral("coordinateSourceReferenceContract"),
+        QStringLiteral("coordinateSourceReferenceBaseIds"),
+        QStringLiteral("coordinateSourceReferenceRevisions"),
         QStringLiteral("coordinateSourceConfigSignature"),
         QStringLiteral("coordinateSourceSignature"),
         QStringLiteral("originMode"),
@@ -356,6 +865,7 @@ inline void propagateIdentityFields(const QJsonObject &source, QJsonObject *targ
         QStringLiteral("modelSetSignature"),
         QStringLiteral("selectedTemplateId"),
         QStringLiteral("selectedTemplateName"),
+        QStringLiteral("selectedBaseId"),
         QStringLiteral("primaryMatchStrategy"),
         QStringLiteral("lockedTemplateId"),
         QStringLiteral("coordinateSystem"),

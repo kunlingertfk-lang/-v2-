@@ -2057,6 +2057,111 @@ QDialog#TemplateLocationDialog QPushButton#finishButton {
     border-color: #ea580c;
 }
 
+QDialog#TemplateLocationDialog QListWidget#templateBankListWidget {
+    background: #f5f7fa;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px 0 0 3px;
+    outline: 0;
+    padding: 0;
+}
+
+QDialog#TemplateLocationDialog QListWidget#templateBankListWidget::item,
+QDialog#TemplateLocationDialog QListWidget#templateBankListWidget::item:selected {
+    background: transparent;
+    border: 0;
+    padding: 0;
+}
+
+QDialog#TemplateLocationDialog QListWidget#templateBankListWidget QScrollBar:horizontal {
+    height: 8px;
+    margin: 0;
+    background: #e2e8f0;
+}
+
+QDialog#TemplateLocationDialog QListWidget#templateBankListWidget QScrollBar::handle:horizontal {
+    min-width: 32px;
+    background: #94a3b8;
+    border-radius: 4px;
+}
+
+QDialog#TemplateLocationDialog QFrame#templateLocationTemplateTab {
+    background: #f5f7fa;
+    border-right: 1px solid #cbd5e1;
+}
+
+QDialog#TemplateLocationDialog QFrame#templateLocationTemplateTab[activeTemplate="true"] {
+    background: #ffffff;
+    border-bottom: 2px solid #f97316;
+}
+
+QDialog#TemplateLocationDialog QPushButton#templateLocationTemplateTabButton {
+    min-height: 38px;
+    padding: 0 3px;
+    color: #64748b;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+}
+
+QDialog#TemplateLocationDialog QPushButton#templateLocationTemplateTabButton[activeTemplate="true"] {
+    color: #ea580c;
+}
+
+QDialog#TemplateLocationDialog QToolButton#templateLocationTemplateEnableButton,
+QDialog#TemplateLocationDialog QToolButton#templateLocationTemplateCloseButton {
+    color: #94a3b8;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 17px;
+}
+
+QDialog#TemplateLocationDialog QToolButton#templateLocationTemplateEnableButton {
+    min-width: 14px;
+    max-width: 14px;
+    min-height: 14px;
+    max-height: 14px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: #cbd5e1;
+    border-radius: 7px;
+}
+
+QDialog#TemplateLocationDialog QToolButton#templateLocationTemplateEnableButton:checked {
+    background: #f97316;
+}
+
+QDialog#TemplateLocationDialog QToolButton#templateLocationTemplateCloseButton:hover {
+    color: #dc2626;
+    background: #fee2e2;
+    border-radius: 3px;
+}
+
+QDialog#TemplateLocationDialog QPushButton#addTemplateItemButton {
+    min-width: 46px;
+    max-width: 46px;
+    min-height: 46px;
+    max-height: 46px;
+    padding: 0;
+    color: #64748b;
+    background: #f5f7fa;
+    border: 1px solid #cbd5e1;
+    border-left: 0;
+    border-radius: 0 3px 3px 0;
+    font-size: 26px;
+    font-weight: 400;
+}
+
+QDialog#TemplateLocationDialog QPushButton#addTemplateItemButton:hover {
+    color: #ea580c;
+    background: #ffffff;
+}
+
 QDialog#TemplateLocationDialog QFrame#previewPanel,
 QDialog#TemplateLocationDialog QGraphicsView#previewGraphicsView {
     background: #000000;
@@ -3693,6 +3798,249 @@ QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget::item:s
     background: #fff3e8;
     color: #e96f00;
     border: 1px solid #ffb66f;
+}
+
+/* The scheme reference page owns its segmented state. Keep the active fill
+   scoped here so global tool-level segment rules cannot make both choices look
+   selected. */
+QDialog#ReferenceImageDialog QFrame#segmentFrame QPushButton#basicModeButton,
+QDialog#ReferenceImageDialog QFrame#segmentFrame QPushButton#allModeButton {
+    background: transparent;
+    color: #6f7887;
+    border: 0;
+}
+
+QDialog#ReferenceImageDialog QFrame#segmentFrame QPushButton[parameterModeState="active"],
+QDialog#ReferenceImageDialog QFrame#segmentFrame QPushButton:checked {
+    background: #ffffff;
+    color: #ff830f;
+    border: 1px solid #f0f2f5;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget {
+    background: #f8fafc;
+    color: #314968;
+    border: 1px solid #d6dde7;
+    border-radius: 5px;
+    outline: 0;
+    padding: 3px;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget::item {
+    min-height: 31px;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget::item:selected {
+    background: #fff3e8;
+    color: #e96f00;
+    border: 1px solid #ffb66f;
+}
+
+QDialog#ReferenceImageDialog QLabel#referenceBaseSummaryLabel {
+    color: #7b8797;
+    background: transparent;
+}
+
+/* Reference setup: the multi-Base switch owns the thumbnail workspace below
+   the image. Keep every selector page-scoped so generic list/switch widgets in
+   camera, tools and output pages retain their current appearance. */
+QDialog#ReferenceImageDialog QCheckBox#multiReferenceBaseSwitch {
+    min-width: 54px;
+    max-width: 54px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0;
+    spacing: 0;
+    border: 0;
+    background: transparent;
+}
+
+QDialog#ReferenceImageDialog QCheckBox#multiReferenceBaseSwitch::indicator {
+    width: 54px;
+    height: 28px;
+    image: url(:/icons/toggle-off.svg);
+    border: 0;
+    background: transparent;
+}
+
+QDialog#ReferenceImageDialog QCheckBox#multiReferenceBaseSwitch::indicator:checked {
+    image: url(:/icons/toggle-on.svg);
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceBaseThumbnailPanel {
+    background: #292d34;
+    border-top: 1px solid #3c424c;
+}
+
+QDialog#ReferenceImageDialog QLabel#referenceBaseThumbnailTitleLabel {
+    color: #f8fafc;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceBaseThumbnailPanel QLabel#referenceBaseSummaryLabel {
+    color: #cbd5e1;
+    background: transparent;
+    font-size: 14px;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceBaseThumbnailPanel QPushButton[thumbnailAction="true"] {
+    min-width: 58px;
+    padding: 0 8px;
+    color: #e2e8f0;
+    background: #343941;
+    border: 1px solid #4b535f;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceBaseThumbnailPanel QPushButton[thumbnailAction="true"]:hover {
+    background: #414852;
+    border-color: #6b7481;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceBaseThumbnailPanel QPushButton[thumbnailAction="true"]:disabled {
+    color: #707987;
+    background: #2e3239;
+    border-color: #3b414a;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget {
+    background: #202329;
+    color: #e5e7eb;
+    border: 0;
+    border-radius: 0;
+    outline: 0;
+    padding: 0;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget::item {
+    color: #e5e7eb;
+    background: #111317;
+    border: 2px solid #111317;
+    border-radius: 2px;
+    padding: 3px;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget::item:selected {
+    color: #ffffff;
+    background: #111317;
+    border: 2px solid #ff830f;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget QScrollBar:horizontal,
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget QScrollBar:horizontal {
+    height: 8px;
+    margin: 0;
+    background: #20242a;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceBaseListWidget QScrollBar::handle:horizontal,
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget QScrollBar::handle:horizontal {
+    min-width: 32px;
+    background: #69717d;
+    border-radius: 4px;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceTemplateBankCard[templateTabStrip="true"] {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget {
+    background: #f5f7fa;
+    border: 1px solid #d6dde7;
+    border-radius: 3px 0 0 3px;
+    outline: 0;
+    padding: 0;
+}
+
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget::item,
+QDialog#ReferenceImageDialog QListWidget#referenceTemplateBankListWidget::item:selected {
+    background: transparent;
+    border: 0;
+    padding: 0;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceTemplateTab {
+    background: #f5f7fa;
+    border-right: 1px solid #d6dde7;
+}
+
+QDialog#ReferenceImageDialog QFrame#referenceTemplateTab[activeTemplate="true"] {
+    background: #ffffff;
+    border-bottom: 2px solid #ff830f;
+}
+
+QDialog#ReferenceImageDialog QPushButton#referenceTemplateTabButton {
+    min-height: 38px;
+    padding: 0 3px;
+    color: #667386;
+    background: transparent;
+    border: 0;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+}
+
+QDialog#ReferenceImageDialog QPushButton#referenceTemplateTabButton[activeTemplate="true"] {
+    color: #f47b0b;
+}
+
+QDialog#ReferenceImageDialog QToolButton#referenceTemplateEnableButton,
+QDialog#ReferenceImageDialog QToolButton#referenceTemplateCloseButton {
+    color: #9aa4b2;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 17px;
+}
+
+QDialog#ReferenceImageDialog QToolButton#referenceTemplateEnableButton:checked {
+    background: #ff830f;
+}
+
+QDialog#ReferenceImageDialog QToolButton#referenceTemplateEnableButton {
+    min-width: 14px;
+    max-width: 14px;
+    min-height: 14px;
+    max-height: 14px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: #cbd5e1;
+    border-radius: 7px;
+}
+
+QDialog#ReferenceImageDialog QToolButton#referenceTemplateCloseButton:hover {
+    color: #ef4444;
+    background: #fee2e2;
+    border-radius: 3px;
+}
+
+QDialog#ReferenceImageDialog QPushButton#addReferenceTemplateButton {
+    min-width: 46px;
+    max-width: 46px;
+    min-height: 46px;
+    max-height: 46px;
+    padding: 0;
+    color: #667386;
+    background: #f5f7fa;
+    border: 1px solid #d6dde7;
+    border-left: 0;
+    border-radius: 0 3px 3px 0;
+    font-size: 26px;
+    font-weight: 400;
+}
+
+QDialog#ReferenceImageDialog QPushButton#addReferenceTemplateButton:hover {
+    color: #ff830f;
+    background: #ffffff;
 }
 
 QDialog#ReferenceImageDialog QLabel#referenceFixedOutputCountLabel,

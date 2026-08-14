@@ -326,6 +326,29 @@ QCheckBox::indicator:checked {
     border-color: #ff830f;
 }
 
+QCheckBox#multiReferenceBaseSwitch {
+    min-width: 54px;
+    max-width: 54px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0;
+    border: 0;
+}
+
+QCheckBox#multiReferenceBaseSwitch::indicator {
+    width: 54px;
+    height: 28px;
+    image: url(:/icons/toggle-off.svg);
+    border: 0;
+    background: transparent;
+}
+
+QCheckBox#multiReferenceBaseSwitch::indicator:checked {
+    image: url(:/icons/toggle-on.svg);
+    border: 0;
+    background: transparent;
+}
+
 QScrollArea {
     border: none;
     background: transparent;
@@ -355,6 +378,87 @@ QScrollBar:horizontal {
 
 QScrollBar::handle:horizontal {
     background: transparent;
+}
+
+QListWidget#referenceBaseListWidget QScrollBar:horizontal,
+QListWidget#referenceTemplateBankListWidget QScrollBar:horizontal {
+    height: 8px;
+    margin: 0;
+    background: #20242a;
+}
+
+QListWidget#referenceBaseListWidget QScrollBar::handle:horizontal,
+QListWidget#referenceTemplateBankListWidget QScrollBar::handle:horizontal {
+    min-width: 32px;
+    background: #69717d;
+    border-radius: 4px;
+}
+
+QFrame#referenceTemplateTab {
+    background: #f5f7fa;
+    border-right: 1px solid #d6dde7;
+}
+
+QFrame#referenceTemplateTab[activeTemplate=&quot;true&quot;] {
+    background: #ffffff;
+    border-bottom: 2px solid #ff830f;
+}
+
+QPushButton#referenceTemplateTabButton {
+    min-height: 38px;
+    padding: 0 3px;
+    color: #667386;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+}
+
+QPushButton#referenceTemplateTabButton[activeTemplate=&quot;true&quot;] {
+    color: #f47b0b;
+}
+
+QToolButton#referenceTemplateEnableButton,
+QToolButton#referenceTemplateCloseButton {
+    color: #9aa4b2;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 17px;
+}
+
+QToolButton#referenceTemplateEnableButton:checked {
+    background: #ff830f;
+}
+
+QToolButton#referenceTemplateEnableButton {
+    min-width: 14px;
+    max-width: 14px;
+    min-height: 14px;
+    max-height: 14px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: #cbd5e1;
+    border-radius: 7px;
+}
+
+QPushButton#addReferenceTemplateButton {
+    min-width: 46px;
+    max-width: 46px;
+    min-height: 46px;
+    max-height: 46px;
+    padding: 0;
+    color: #667386;
+    background: #f5f7fa;
+    border: 1px solid #d6dde7;
+    border-left: 0;
+    border-radius: 0 3px 3px 0;
+    font-size: 26px;
+    font-weight: 400;
 }
 
 QFrame[table=&quot;true&quot;] QLabel[tableCell=&quot;true&quot;] {

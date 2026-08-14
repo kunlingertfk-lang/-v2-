@@ -25,8 +25,6 @@ namespace {
 
 constexpr auto kProjectsDirName = "projects";
 constexpr auto kSchemeJsonName = "scheme.json";
-constexpr auto kReferenceImageSlotA = "reference_a.png";
-constexpr auto kReferenceImageSlotB = "reference_b.png";
 constexpr auto kProjectRootOverrideEnvironment =
         "ZNXJ_SCHEME_STORE_PROJECT_ROOT";
 
@@ -79,7 +77,9 @@ void invalidateReferenceLocatorForImageChange(
             && locatorEnvelope.supported
             && poseMapEncodingSupported;
     if (knownLocator) {
-        if (locatorVersion == 5) {
+        if (locatorVersion == TemplateLocationConfig::ModelBankParamsVersion
+                || locatorVersion ==
+                   TemplateLocationConfig::CompositeBankParamsVersion) {
             QJsonArray templates = locator.value(
                         QStringLiteral("templates")).toArray();
             for (int index = 0; index < templates.size(); ++index) {
@@ -95,9 +95,11 @@ void invalidateReferenceLocatorForImageChange(
             locator.insert(QStringLiteral("modelCreated"), false);
         }
         config->locator = locator;
-        // A known nested locator is normalized to the public v4 reference
-        // envelope the next time the candidate state is serialized.
-        config->version = 4;
+        // The v5 reference envelope is required when its nested locator binds
+        // templates to stable Base IDs. Legacy v4/v5 locator banks keep the
+        // established v4 outer envelope.
+        config->version = locatorVersion ==
+                TemplateLocationConfig::CompositeBankParamsVersion ? 5 : 4;
     }
 
     // Keep config.extra coherent as well.  This is important for malformed or
@@ -115,6 +117,165 @@ void invalidateReferenceLocatorForImageChange(
     else if (locatorObjectWasPresent)
         config->locator = config->extra.value(QStringLiteral("locator"))
                 .toObject();
+}
+
+void markReferenceLocatorChanged(ReferencePositionCorrectionConfig *config,
+                                 const QString &message)
+{
+    if (!config)
+        return;
+    config->referenceCreated = false;
+    config->referencePose = QJsonObject();
+    config->score = 0.0;
+    config->elapsedMs = 0;
+    config->status = QStringLiteral("reference_image_changed");
+    config->message = message;
+    config->extra.insert(QStringLiteral("referenceCreated"), false);
+    config->extra.insert(QStringLiteral("referencePose"), QJsonObject());
+    config->extra.insert(QStringLiteral("referencePosesByTemplateId"),
+                         config->referencePosesByTemplateId);
+    config->extra.insert(QStringLiteral("status"), config->status);
+    config->extra.insert(QStringLiteral("message"), config->message);
+    config->extra.insert(QStringLiteral("score"), 0.0);
+    config->extra.insert(QStringLiteral("elapsedMs"), 0.0);
+}
+
+bool invalidateReferenceLocatorDependencies(
+        ReferencePositionCorrectionConfig *config,
+        const QString &baseId,
+        bool legacyPrimaryChanged,
+        bool v6PixelsChanged)
+{
+    if (!config)
+        return false;
+    const TemplateLocationConfig::EnvelopeInspection envelope =
+            TemplateLocationConfig::inspectEnvelope(config->locator);
+    if (envelope.supported
+            && envelope.version ==
+               TemplateLocationConfig::CompositeBankParamsVersion) {
+        // Changing the legacy primary pointer does not change the immutable
+        // Base selected by a v6 locator. Only pixel replacement of a Base that
+        // the bank actually references invalidates its cached model/pose.
+        if (!v6PixelsChanged)
+            return false;
+        TemplateLocationModelBankConfig bank =
+                TemplateLocationConfig::fromToolParams(
+                    config->locator, PositionCorrection::defaultSourceId());
+        if (!bank.decodeSupported || bank.rawPassthrough)
+            return false;
+        bool affected = false;
+        for (TemplateLocationTemplateConfig &item : bank.templates) {
+            if (item.sourceBaseId != baseId)
+                continue;
+            item.modelCreated = false;
+            config->referencePosesByTemplateId.remove(item.templateId);
+            affected = true;
+        }
+        if (!affected)
+            return false;
+        config->locator = TemplateLocationConfig::toToolParams(bank);
+        config->version = 5;
+        config->extra.insert(QStringLiteral("version"), 5);
+        config->extra.insert(QStringLiteral("locator"), config->locator);
+        markReferenceLocatorChanged(
+                    config,
+                    QStringLiteral("Reference Base '%1' changed; rebuild its bound templates.")
+                    .arg(baseId));
+        return true;
+    }
+    if (legacyPrimaryChanged) {
+        invalidateReferenceLocatorForImageChange(config);
+        return true;
+    }
+    return false;
+}
+
+bool invalidateToolLocatorDependencies(ToolConfig *tool,
+                                       const QString &baseId,
+                                       bool legacyPrimaryChanged,
+                                       bool v6PixelsChanged)
+{
+    if (!tool || tool->toolType != ToolType::TemplateLocation)
+        return false;
+    TemplateLocationModelBankConfig bank =
+            TemplateLocationConfig::fromToolConfig(*tool);
+    if (!bank.decodeSupported || bank.rawPassthrough)
+        return false;
+    bool affected = false;
+    if (bank.version == TemplateLocationConfig::CompositeBankParamsVersion) {
+        if (!v6PixelsChanged)
+            return false;
+        for (TemplateLocationTemplateConfig &item : bank.templates) {
+            if (item.sourceBaseId != baseId)
+                continue;
+            item.modelCreated = false;
+            affected = true;
+        }
+    } else if (legacyPrimaryChanged) {
+        for (TemplateLocationTemplateConfig &item : bank.templates)
+            item.modelCreated = false;
+        affected = !bank.templates.isEmpty();
+    }
+    if (affected)
+        tool->params = TemplateLocationConfig::toToolParams(bank);
+    return affected;
+}
+
+void invalidateSchemeLocatorDependencies(SchemeState *state,
+                                         const QString &baseId,
+                                         bool legacyPrimaryChanged,
+                                         bool v6PixelsChanged)
+{
+    if (!state)
+        return;
+    invalidateReferenceLocatorDependencies(
+                &state->referencePositionCorrection, baseId,
+                legacyPrimaryChanged, v6PixelsChanged);
+    for (ToolConfig &tool : state->toolConfigs) {
+        if (!invalidateToolLocatorDependencies(
+                    &tool, baseId, legacyPrimaryChanged,
+                    v6PixelsChanged)) {
+            continue;
+        }
+        state->referencePreviewSnapshots.remove(tool.toolId);
+    }
+}
+
+bool jsonReferencesBaseId(const QJsonValue &value, const QString &baseId)
+{
+    if (value.isArray()) {
+        for (const QJsonValue &item : value.toArray()) {
+            if (jsonReferencesBaseId(item, baseId))
+                return true;
+        }
+        return false;
+    }
+    if (!value.isObject())
+        return false;
+    const QJsonObject object = value.toObject();
+    if (object.value(QStringLiteral("sourceBaseId")).toString().trimmed()
+            == baseId) {
+        return true;
+    }
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        if (jsonReferencesBaseId(it.value(), baseId))
+            return true;
+    }
+    return false;
+}
+
+bool schemeReferencesBaseId(const SchemeState &state, const QString &baseId)
+{
+    if (jsonReferencesBaseId(
+                PositionCorrection::referenceToJson(
+                    state.referencePositionCorrection), baseId)) {
+        return true;
+    }
+    for (const ToolConfig &tool : state.toolConfigs) {
+        if (jsonReferencesBaseId(tool.params, baseId))
+            return true;
+    }
+    return false;
 }
 
 QJsonArray toolConfigsToJson(const QVector<ToolConfig> &configs)
@@ -364,16 +525,59 @@ QString sanitizedSchemeId(QString id)
     return id;
 }
 
-QString nextReferenceImageSlot(const QString &currentPath)
-{
-    return QFileInfo(currentPath).fileName() == QString::fromLatin1(kReferenceImageSlotA)
-            ? QString::fromLatin1(kReferenceImageSlotB)
-            : QString::fromLatin1(kReferenceImageSlotA);
-}
-
 QString cleanAbsolutePath(const QString &path)
 {
     return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+}
+
+QString bytesRevision(const QByteArray &bytes)
+{
+    if (bytes.isEmpty())
+        return QString();
+    return QStringLiteral("sha256:%1").arg(QString::fromLatin1(
+                QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()));
+}
+
+QString fileRevision(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return QString();
+    return bytesRevision(file.readAll());
+}
+
+bool encodeReferencePng(const cv::Mat &frame,
+                        QByteArray *bytes,
+                        QString *errorMessage)
+{
+    if (!bytes)
+        return false;
+    try {
+        std::vector<uchar> encoded;
+        if (!cv::imencode(".png", frame, encoded) || encoded.empty()) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("无法编码参考图 PNG");
+            return false;
+        }
+        *bytes = QByteArray(reinterpret_cast<const char *>(encoded.data()),
+                            static_cast<int>(encoded.size()));
+        return true;
+    } catch (const cv::Exception &exception) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("编码参考图异常: %1")
+                    .arg(QString::fromLocal8Bit(exception.what()));
+        }
+        return false;
+    }
+}
+
+QString immutableReferenceFileName(const QString &baseId,
+                                   const QString &contentRevision)
+{
+    QString digest = contentRevision;
+    if (digest.startsWith(QStringLiteral("sha256:")))
+        digest.remove(0, 7);
+    return QStringLiteral("reference_%1_%2.png").arg(baseId, digest);
 }
 
 bool isSafeReferenceFileName(const QString &path)
@@ -496,8 +700,10 @@ bool SchemeStore::ensureLoaded(QString *errorMessage)
     m_loaded = true;
     normalizeSnapshotsForCurrentTools();
     QString loadReferenceError;
-    if (!loadCurrentReferenceIntoProvider(&loadReferenceError) && !m_currentScheme.referenceImagePath.isEmpty())
+    if (!loadCurrentReferenceIntoProvider(&loadReferenceError)) {
+        ReferenceImageProvider::instance().clearReferenceFrames();
         qWarning() << "[SchemeStore]" << loadReferenceError;
+    }
     return true;
 }
 
@@ -530,14 +736,48 @@ bool SchemeStore::setCurrentScheme(const QString &schemeId, QString *errorMessag
         return false;
     }
 
+    SchemeState loadedTarget;
     const QString path = schemeJsonPath(target);
-    if (!loadSchemeFromFile(path, &m_currentScheme, errorMessage))
+    if (!loadSchemeFromFile(path, &loadedTarget, errorMessage))
         return false;
 
+    QList<ReferenceFrameEntry> targetEntries;
+    QString prepareError;
+    if (!prepareReferenceFrameEntries(loadedTarget,
+                                      &targetEntries,
+                                      &prepareError)) {
+        setError(errorMessage,
+                 QStringLiteral("目标方案的参考资产不可用，已保留当前方案: %1")
+                 .arg(prepareError));
+        return false;
+    }
+
+    const SchemeState previousState = m_currentScheme;
+    const QList<ReferenceFrameEntry> previousEntries =
+            ReferenceImageProvider::instance().referenceFrames();
+    const QString previousPrimary =
+            ReferenceImageProvider::instance().primaryBaseId();
+    m_currentScheme = loadedTarget;
     normalizeSnapshotsForCurrentTools();
-    QString loadReferenceError;
-    if (!loadCurrentReferenceIntoProvider(&loadReferenceError) && !m_currentScheme.referenceImagePath.isEmpty())
-        qWarning() << "[SchemeStore]" << loadReferenceError;
+    QString publishError;
+    if (!ReferenceImageProvider::instance().setReferenceFrames(
+            targetEntries,
+            loadedTarget.referenceAssets.primaryBaseId(),
+            &publishError)) {
+        m_currentScheme = previousState;
+        normalizeSnapshotsForCurrentTools();
+        QString restoreError;
+        if (!ReferenceImageProvider::instance().setReferenceFrames(
+                previousEntries, previousPrimary, &restoreError)) {
+            ReferenceImageProvider::instance().clearReferenceFrames();
+            publishError += QStringLiteral("；恢复旧运行态失败: %1")
+                    .arg(restoreError);
+        }
+        setError(errorMessage,
+                 QStringLiteral("目标方案运行态发布失败，已回滚方案切换: %1")
+                 .arg(publishError));
+        return false;
+    }
     return true;
 }
 
@@ -588,12 +828,14 @@ bool SchemeStore::saveCurrentScheme(QString *errorMessage)
                                &persistedState,
                                &rollbackLoadError);
 
-    if (!saveSchemeToFile(m_currentScheme, errorMessage)) {
+    SchemeState savedState;
+    if (!saveSchemeToFile(m_currentScheme, errorMessage, nullptr, &savedState)) {
         if (hasPersistedState)
             m_currentScheme = persistedState;
         return false;
     }
 
+    m_currentScheme = savedState;
     refreshAvailableSchemes(nullptr);
     return true;
 }
@@ -622,34 +864,102 @@ bool SchemeStore::saveCurrentSchemeAs(const QString &schemeName, QString *errorM
             : schemeName.trimmed();
 
     SchemeState copy = m_currentScheme;
+    if (copy.referenceAssets.isReadOnly()) {
+        setError(errorMessage,
+                 QStringLiteral("参考资产配置无法安全复制: %1")
+                 .arg(copy.referenceAssets.readOnlyReason()));
+        return false;
+    }
     copy.schemeId = makeUniqueSchemeId();
     copy.schemeName = newName;
     copy.schemeDir = QDir(projectsRootPath()).filePath(copy.schemeId);
     copy.updatedAt = QDateTime::currentDateTime();
-    cv::Mat referenceFrame;
-    if (!copy.referenceImagePath.trimmed().isEmpty()) {
-        const QString sourceReferencePath = currentReferenceImageAbsolutePath();
-        referenceFrame = cv::imread(sourceReferencePath.toStdString(), cv::IMREAD_UNCHANGED);
-        if (referenceFrame.empty()) {
+
+    SaveFileRollback rollback;
+    QDir targetDir(copy.schemeDir);
+    if (!targetDir.mkpath(QStringLiteral("."))) {
+        setError(errorMessage,
+                 QStringLiteral("无法创建方案副本目录: %1").arg(copy.schemeDir));
+        return false;
+    }
+    rollback.trackDirectory(cleanAbsolutePath(copy.schemeDir));
+    for (const ReferenceAsset &asset : copy.referenceAssets.assets()) {
+        QString sourceError;
+        const QString sourcePath = referenceAssetAbsolutePath(
+                    m_currentScheme, asset.baseId, true, &sourceError);
+        if (sourcePath.isEmpty()) {
             setError(errorMessage,
-                     QStringLiteral("无法读取待复制的基准图: %1").arg(sourceReferencePath));
+                     QStringLiteral("无法读取待复制的参考资产 %1: %2")
+                     .arg(asset.baseId, sourceError));
             return false;
         }
-        copy.referenceImagePath = QString::fromLatin1(kReferenceImageSlotA);
+        QFile source(sourcePath);
+        if (!source.open(QIODevice::ReadOnly)) {
+            setError(errorMessage,
+                     QStringLiteral("无法读取待复制的参考资产: %1").arg(sourcePath));
+            return false;
+        }
+        const QByteArray bytes = source.readAll();
+        if (bytes.isEmpty()) {
+            setError(errorMessage,
+                     QStringLiteral("待复制的参考资产为空: %1").arg(sourcePath));
+            return false;
+        }
+        const QString targetPath = targetDir.filePath(asset.path);
+        QSaveFile target(targetPath);
+        if (!target.open(QIODevice::WriteOnly)
+                || target.write(bytes) != bytes.size()
+                || !target.commit()) {
+            target.cancelWriting();
+            setError(errorMessage,
+                     QStringLiteral("无法复制参考资产: %1").arg(asset.path));
+            return false;
+        }
+        rollback.trackFile(targetPath);
     }
+
+    copy = normalizedStateForSave(copy);
+    QList<ReferenceFrameEntry> copiedEntries;
+    QString prepareError;
+    if (!prepareReferenceFrameEntries(copy, &copiedEntries, &prepareError)) {
+        setError(errorMessage,
+                 QStringLiteral("方案副本的参考资产不可用: %1")
+                 .arg(prepareError));
+        return false;
+    }
+
     SchemeState savedCopy;
-    const cv::Mat *referenceFramePtr = referenceFrame.empty() ? nullptr : &referenceFrame;
-    if (!saveSchemeToFile(copy, errorMessage, referenceFramePtr, &savedCopy))
+    if (!saveSchemeToFile(copy, errorMessage, nullptr, &savedCopy))
         return false;
 
+    rollback.trackFile(schemeJsonPath(savedCopy));
+    const SchemeState previousState = m_currentScheme;
+    const QList<ReferenceFrameEntry> previousEntries =
+            ReferenceImageProvider::instance().referenceFrames();
+    const QString previousPrimary =
+            ReferenceImageProvider::instance().primaryBaseId();
     m_currentScheme = savedCopy;
-    if (referenceFrame.empty()) {
-        ReferenceImageProvider::instance().clearReferenceFrame();
-    } else {
-        ReferenceImageProvider::instance().setReferenceFrame(
-                    referenceFrame, savedCopy.referenceInputMetadata);
-    }
     refreshAvailableSchemes(nullptr);
+    QString publishError;
+    if (!ReferenceImageProvider::instance().setReferenceFrames(
+            copiedEntries,
+            savedCopy.referenceAssets.primaryBaseId(),
+            &publishError)) {
+        m_currentScheme = previousState;
+        refreshAvailableSchemes(nullptr);
+        QString restoreError;
+        if (!ReferenceImageProvider::instance().setReferenceFrames(
+                previousEntries, previousPrimary, &restoreError)) {
+            ReferenceImageProvider::instance().clearReferenceFrames();
+            publishError += QStringLiteral("；恢复原方案运行态失败: %1")
+                    .arg(restoreError);
+        }
+        setError(errorMessage,
+                 QStringLiteral("方案副本运行态发布失败，已保留原方案: %1")
+                 .arg(publishError));
+        return false;
+    }
+    rollback.commit();
     return true;
 }
 
@@ -664,6 +974,7 @@ SchemeState SchemeStore::createEmptyScheme(const QString &schemeName, QString *e
     state.schemeName = trimmedName.isEmpty() ? defaultName : trimmedName;
     state.schemeDir = QDir(projectsRootPath()).filePath(state.schemeId);
     state.referenceImagePath.clear();
+    state.referenceAssets = ReferenceAssetSet();
     state.referencePositionCorrection = ReferencePositionCorrectionConfig();
     state.toolConfigs.clear();
     state.referencePreviewSnapshots.clear();
@@ -671,11 +982,12 @@ SchemeState SchemeStore::createEmptyScheme(const QString &schemeName, QString *e
     state.outputConfig = QJsonObject();
     state.updatedAt = QDateTime::currentDateTime();
 
-    if (!saveSchemeToFile(state, errorMessage))
+    SchemeState savedState;
+    if (!saveSchemeToFile(state, errorMessage, nullptr, &savedState))
         return SchemeState();
 
     refreshAvailableSchemes(nullptr);
-    return state;
+    return savedState;
 }
 
 bool SchemeStore::schemeExists(const QString &schemeId) const
@@ -773,6 +1085,37 @@ QString SchemeStore::currentReferenceImageAbsolutePath() const
     return dir.filePath(m_currentScheme.referenceImagePath);
 }
 
+QVector<ReferenceAsset> SchemeStore::referenceAssets() const
+{
+    return m_currentScheme.referenceAssets.assets();
+}
+
+bool SchemeStore::referenceAsset(const QString &baseId,
+                                 ReferenceAsset *asset) const
+{
+    const ReferenceAsset *found = m_currentScheme.referenceAssets.assetById(baseId);
+    if (!found)
+        return false;
+    if (asset)
+        *asset = *found;
+    return true;
+}
+
+bool SchemeStore::primaryReferenceAsset(ReferenceAsset *asset) const
+{
+    const ReferenceAsset *primary = m_currentScheme.referenceAssets.primaryAsset();
+    if (!primary)
+        return false;
+    if (asset)
+        *asset = *primary;
+    return true;
+}
+
+QString SchemeStore::referenceAssetAbsolutePath(const QString &baseId) const
+{
+    return referenceAssetAbsolutePath(m_currentScheme, baseId, true, nullptr);
+}
+
 void SchemeStore::setSchemeName(const QString &schemeName)
 {
     if (!ensureLoaded(nullptr))
@@ -855,37 +1198,418 @@ bool SchemeStore::setReferenceFrame(const cv::Mat &frame,
         return false;
     }
 
-    SchemeState candidate = m_currentScheme;
-    candidate.referenceImagePath =
-            nextReferenceImageSlot(m_currentScheme.referenceImagePath);
-    const QString source = metadata.source.trimmed().isEmpty()
-            ? QStringLiteral("reference")
-            : metadata.source;
-    candidate.referenceInputMetadata =
-            FrameInputMetadata::fromMat(normalizedFrame, source);
-    // Every reference-image preview/model is tied to the previous pixels.
-    // Keeping those snapshots would make source validation trust a stale
-    // TemplateLocation model after the reference image changes.
-    candidate.referencePreviewSnapshots.clear();
-    // Invalidate the locator inside the same candidate that owns the new
-    // pixels.  A failed image save therefore leaves both the old image and all
-    // old frozen poses untouched in m_currentScheme.
-    invalidateReferenceLocatorForImageChange(
-                &candidate.referencePositionCorrection);
-    candidate.updatedAt = QDateTime::currentDateTime();
+    ReferenceAsset primary;
+    if (!primaryReferenceAsset(&primary)) {
+        QString createdBaseId;
+        return addReferenceAsset(QStringLiteral("基准图 1"),
+                                 normalizedFrame,
+                                 &createdBaseId,
+                                 errorMessage,
+                                 metadata);
+    }
+    return replaceReferenceAsset(primary.baseId,
+                                 normalizedFrame,
+                                 errorMessage,
+                                 metadata);
+}
 
-    SchemeState savedState;
-    if (!saveSchemeToFile(candidate,
-                          errorMessage,
-                          &normalizedFrame,
-                          &savedState)) {
+bool SchemeStore::addReferenceAsset(const QString &name,
+                                    const cv::Mat &frame,
+                                    QString *createdBaseId,
+                                    QString *errorMessage,
+                                    const FrameInputMetadata &metadata)
+{
+    if (!ensureLoaded(errorMessage))
+        return false;
+    if (m_currentScheme.referenceAssets.isReadOnly()) {
+        setError(errorMessage, m_currentScheme.referenceAssets.readOnlyReason());
         return false;
     }
 
+    const cv::Mat normalizedFrame =
+            ReferenceImageProvider::normalizeReferenceFrame(frame);
+    if (normalizedFrame.empty()) {
+        setError(errorMessage, frame.empty()
+                 ? QStringLiteral("参考图为空")
+                 : QStringLiteral("参考图格式不受支持"));
+        return false;
+    }
+
+    QString baseId;
+    if (m_currentScheme.referenceAssets.isEmpty()) {
+        baseId = QStringLiteral("base0");
+    } else {
+        do {
+            baseId = QStringLiteral("base_%1")
+                    .arg(QUuid::createUuid().toString(
+                             QUuid::WithoutBraces).left(8));
+        } while (m_currentScheme.referenceAssets.assetById(baseId));
+    }
+
+    QByteArray pngBytes;
+    if (!encodeReferencePng(normalizedFrame, &pngBytes, errorMessage))
+        return false;
+    const QString revision = bytesRevision(pngBytes);
+    const QString source = metadata.source.trimmed().isEmpty()
+            ? QStringLiteral("reference") : metadata.source;
+
+    ReferenceAsset asset;
+    asset.baseId = baseId;
+    asset.name = name.trimmed().isEmpty()
+            ? QStringLiteral("基准图 %1")
+              .arg(m_currentScheme.referenceAssets.size() + 1)
+            : name.trimmed();
+    asset.path = immutableReferenceFileName(baseId, revision);
+    asset.inputMetadata = FrameInputMetadata::fromMat(normalizedFrame, source);
+    asset.contentRevision = revision;
+
+    SchemeState candidate = m_currentScheme;
+    const bool firstAsset = candidate.referenceAssets.isEmpty();
+    if (!candidate.referenceAssets.addAsset(asset,
+                                            firstAsset,
+                                            errorMessage)) {
+        return false;
+    }
+    if (!persistReferenceAssetFrameMutation(candidate,
+                                            baseId,
+                                            normalizedFrame,
+                                            firstAsset,
+                                            errorMessage)) {
+        return false;
+    }
+    if (createdBaseId)
+        *createdBaseId = baseId;
+    return true;
+}
+
+bool SchemeStore::replaceReferenceAsset(const QString &baseId,
+                                        const cv::Mat &frame,
+                                        QString *errorMessage,
+                                        const FrameInputMetadata &metadata)
+{
+    if (!ensureLoaded(errorMessage))
+        return false;
+    if (m_currentScheme.referenceAssets.isReadOnly()) {
+        setError(errorMessage, m_currentScheme.referenceAssets.readOnlyReason());
+        return false;
+    }
+
+    const ReferenceAsset *existing =
+            m_currentScheme.referenceAssets.assetById(baseId);
+    if (!existing) {
+        setError(errorMessage,
+                 QStringLiteral("未找到参考资产: %1").arg(baseId));
+        return false;
+    }
+    const cv::Mat normalizedFrame =
+            ReferenceImageProvider::normalizeReferenceFrame(frame);
+    if (normalizedFrame.empty()) {
+        setError(errorMessage, frame.empty()
+                 ? QStringLiteral("参考图为空")
+                 : QStringLiteral("参考图格式不受支持"));
+        return false;
+    }
+
+    QByteArray pngBytes;
+    if (!encodeReferencePng(normalizedFrame, &pngBytes, errorMessage))
+        return false;
+    const QString revision = bytesRevision(pngBytes);
+    const QString source = metadata.source.trimmed().isEmpty()
+            ? QStringLiteral("reference") : metadata.source;
+
+    ReferenceAsset replacement = *existing;
+    replacement.path = immutableReferenceFileName(replacement.baseId, revision);
+    replacement.inputMetadata = FrameInputMetadata::fromMat(normalizedFrame, source);
+    replacement.contentRevision = revision;
+
+    SchemeState candidate = m_currentScheme;
+    if (!candidate.referenceAssets.replaceAsset(replacement, errorMessage))
+        return false;
+    const bool replacingPrimary = baseId.trimmed()
+            == candidate.referenceAssets.primaryBaseId();
+    return persistReferenceAssetFrameMutation(candidate,
+                                              replacement.baseId,
+                                              normalizedFrame,
+                                              replacingPrimary,
+                                              errorMessage);
+}
+
+bool SchemeStore::removeReferenceAsset(const QString &baseId,
+                                       QString *errorMessage)
+{
+    if (!ensureLoaded(errorMessage))
+        return false;
+    const QString normalizedBaseId = baseId.trimmed();
+    if (schemeReferencesBaseId(m_currentScheme, normalizedBaseId)) {
+        setError(errorMessage,
+                 QStringLiteral("参考资产 %1 正被模板定位配置使用，请先移除对应模板")
+                 .arg(normalizedBaseId));
+        return false;
+    }
+    SchemeState candidate = m_currentScheme;
+    if (!candidate.referenceAssets.removeAsset(normalizedBaseId, errorMessage))
+        return false;
+    syncLegacyReferenceMirror(&candidate);
+
+    return commitReferenceAssetState(candidate, errorMessage);
+}
+
+bool SchemeStore::setPrimaryReferenceAsset(const QString &baseId,
+                                           QString *errorMessage)
+{
+    if (!ensureLoaded(errorMessage))
+        return false;
+    SchemeState candidate = m_currentScheme;
+    if (candidate.referenceAssets.primaryBaseId() == baseId.trimmed())
+        return true;
+    if (!candidate.referenceAssets.setPrimaryBaseId(baseId, errorMessage))
+        return false;
+
+    // The primary pointer is only a compatibility source for legacy tools.
+    // Stable v6 Base bindings remain valid because no Base pixels changed.
+    candidate.referencePreviewSnapshots.clear();
+    invalidateSchemeLocatorDependencies(&candidate,
+                                        baseId.trimmed(),
+                                        true,
+                                        false);
+    syncLegacyReferenceMirror(&candidate);
+
+    return commitReferenceAssetState(candidate, errorMessage);
+}
+
+bool SchemeStore::setMultiReferenceEnabled(bool enabled,
+                                           QString *errorMessage)
+{
+    if (!m_loaded && !ensureLoaded(errorMessage))
+        return false;
+    return m_currentScheme.referenceAssets.setMultiBaseEnabled(
+                enabled, errorMessage);
+}
+
+bool SchemeStore::persistReferenceAssetFrameMutation(
+        SchemeState candidate,
+        const QString &baseId,
+        const cv::Mat &frame,
+        bool replacingPrimary,
+        QString *errorMessage,
+        QString *savedRelativePath)
+{
+    const ReferenceAsset *asset = candidate.referenceAssets.assetById(baseId);
+    if (!asset) {
+        setError(errorMessage,
+                 QStringLiteral("参考资产候选状态缺少: %1").arg(baseId));
+        return false;
+    }
+
+    QByteArray pngBytes;
+    if (!encodeReferencePng(frame, &pngBytes, errorMessage))
+        return false;
+    if (bytesRevision(pngBytes) != asset->contentRevision) {
+        setError(errorMessage, QStringLiteral("参考资产内容修订签名不一致"));
+        return false;
+    }
+
+    QString directoryError;
+    if (!validateSchemeDirectory(projectsRootPath(),
+                                 candidate.schemeId,
+                                 candidate.schemeDir,
+                                 true,
+                                 &directoryError)
+            || !validateReferencePath(candidate.schemeDir,
+                                      asset->path,
+                                      false,
+                                      &directoryError)) {
+        setError(errorMessage, directoryError);
+        return false;
+    }
+
+    const QString absolutePath = QDir(candidate.schemeDir).filePath(asset->path);
+    bool createdFile = false;
+    if (QFileInfo::exists(absolutePath)) {
+        if (QFileInfo(absolutePath).isSymLink()
+                || fileRevision(absolutePath) != asset->contentRevision) {
+            setError(errorMessage,
+                     QStringLiteral("同名不可变参考资产内容冲突: %1")
+                     .arg(absolutePath));
+            return false;
+        }
+    } else {
+        QSaveFile imageFile(absolutePath);
+        if (!imageFile.open(QIODevice::WriteOnly)
+                || imageFile.write(pngBytes) != pngBytes.size()
+                || !imageFile.commit()) {
+            imageFile.cancelWriting();
+            setError(errorMessage,
+                     QStringLiteral("无法提交参考资产: %1").arg(absolutePath));
+            return false;
+        }
+        createdFile = true;
+    }
+
+    invalidateSchemeLocatorDependencies(&candidate,
+                                        baseId,
+                                        replacingPrimary,
+                                        true);
+    if (replacingPrimary) {
+        candidate.referencePreviewSnapshots.clear();
+    }
+    syncLegacyReferenceMirror(&candidate);
+    candidate.updatedAt = QDateTime::currentDateTime();
+
+    const QString assetPath = asset->path;
+    if (!commitReferenceAssetState(candidate, errorMessage)) {
+        if (createdFile)
+            QFile::remove(absolutePath);
+        return false;
+    }
+    if (savedRelativePath)
+        *savedRelativePath = assetPath;
+    return true;
+}
+
+bool SchemeStore::prepareReferenceFrameEntries(
+        const SchemeState &state,
+        QList<ReferenceFrameEntry> *entries,
+        QString *errorMessage) const
+{
+    if (!entries) {
+        setError(errorMessage, QStringLiteral("参考资产运行态输出指针为空"));
+        return false;
+    }
+    entries->clear();
+    if (state.referenceAssets.isReadOnly()) {
+        setError(errorMessage,
+                 QStringLiteral("参考资产配置无法安全加载: %1")
+                 .arg(state.referenceAssets.readOnlyReason()));
+        return false;
+    }
+    if (state.referenceAssets.isEmpty())
+        return true;
+
+    QString validationError;
+    if (!state.referenceAssets.validate(&validationError)) {
+        setError(errorMessage,
+                 QStringLiteral("参考资产集合无效: %1").arg(validationError));
+        return false;
+    }
+
+    entries->reserve(state.referenceAssets.size());
+    for (const ReferenceAsset &asset : state.referenceAssets.assets()) {
+        QString pathError;
+        const QString path = referenceAssetAbsolutePath(
+                    state, asset.baseId, true, &pathError);
+        if (path.isEmpty()) {
+            entries->clear();
+            setError(errorMessage,
+                     QStringLiteral("无法解析参考资产 %1: %2")
+                     .arg(asset.baseId, pathError));
+            return false;
+        }
+        const cv::Mat decoded = cv::imread(path.toStdString(),
+                                           cv::IMREAD_UNCHANGED);
+        if (decoded.empty()) {
+            entries->clear();
+            setError(errorMessage,
+                     QStringLiteral("无法解码参考资产 %1: %2")
+                     .arg(asset.baseId, path));
+            return false;
+        }
+        const cv::Mat normalized =
+                ReferenceImageProvider::normalizeReferenceFrame(decoded);
+        if (normalized.empty()) {
+            entries->clear();
+            setError(errorMessage,
+                     QStringLiteral("参考资产格式不受支持 %1: %2")
+                     .arg(asset.baseId, path));
+            return false;
+        }
+
+        ReferenceFrameEntry entry;
+        entry.baseId = asset.baseId;
+        entry.name = asset.name;
+        entry.frame = normalized;
+        const QString source = asset.inputMetadata.source.trimmed().isEmpty()
+                ? QStringLiteral("reference:%1").arg(asset.baseId)
+                : asset.inputMetadata.source;
+        entry.metadata = FrameInputMetadata::fromMat(normalized, source);
+        entry.contentRevision = asset.contentRevision;
+        entry.displayOrder = asset.order;
+        entries->append(entry);
+    }
+    return true;
+}
+
+bool SchemeStore::commitReferenceAssetState(SchemeState candidate,
+                                            QString *errorMessage)
+{
+    candidate = normalizedStateForSave(candidate);
+    QList<ReferenceFrameEntry> preparedEntries;
+    QString prepareError;
+    if (!prepareReferenceFrameEntries(candidate,
+                                      &preparedEntries,
+                                      &prepareError)) {
+        setError(errorMessage,
+                 QStringLiteral("参考资产未保存，候选运行态不可用: %1")
+                 .arg(prepareError));
+        return false;
+    }
+
+    const SchemeState previousState = m_currentScheme;
+    const QByteArray previousJson = [&previousState]() {
+        QFile file(QDir(previousState.schemeDir).filePath(
+                       QString::fromLatin1(kSchemeJsonName)));
+        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    }();
+    const QList<ReferenceFrameEntry> previousEntries =
+            ReferenceImageProvider::instance().referenceFrames();
+    const QString previousPrimary =
+            ReferenceImageProvider::instance().primaryBaseId();
+
+    SchemeState savedState;
+    if (!saveSchemeToFile(candidate, errorMessage, nullptr, &savedState))
+        return false;
+
+    // Publish signals are synchronous. Make the matching scheme state visible
+    // first, then compensate both durable and runtime state on an unexpected
+    // provider rejection (all normal validation happened in the prepare step).
     m_currentScheme = savedState;
-    ReferenceImageProvider::instance().setReferenceFrame(
-                normalizedFrame, savedState.referenceInputMetadata);
     refreshAvailableSchemes(nullptr);
+    QString publishError;
+    if (!ReferenceImageProvider::instance().setReferenceFrames(
+            preparedEntries,
+            savedState.referenceAssets.primaryBaseId(),
+            &publishError)) {
+        QString rollbackError;
+        if (!previousJson.isEmpty()) {
+            QSaveFile rollbackFile(schemeJsonPath(previousState));
+            if (!rollbackFile.open(QIODevice::WriteOnly)
+                    || rollbackFile.write(previousJson) != previousJson.size()
+                    || !rollbackFile.commit()) {
+                rollbackFile.cancelWriting();
+                rollbackError = QStringLiteral("方案文件回滚失败");
+            }
+        } else {
+            rollbackError = QStringLiteral("缺少旧方案文件快照");
+        }
+        m_currentScheme = previousState;
+        refreshAvailableSchemes(nullptr);
+        QString restoreError;
+        if (!ReferenceImageProvider::instance().setReferenceFrames(
+                previousEntries, previousPrimary, &restoreError)) {
+            ReferenceImageProvider::instance().clearReferenceFrames();
+            rollbackError += QStringLiteral("；运行态恢复失败: %1")
+                    .arg(restoreError);
+        }
+        setError(errorMessage,
+                 QStringLiteral("参考资产运行态发布失败，事务已回滚: %1%2")
+                 .arg(publishError,
+                      rollbackError.isEmpty()
+                      ? QString()
+                      : QStringLiteral("；%1").arg(rollbackError)));
+        return false;
+    }
+
+    emit referenceAssetStateCommitted(m_currentScheme.schemeId);
     return true;
 }
 
@@ -894,31 +1618,19 @@ bool SchemeStore::loadCurrentReferenceIntoProvider(QString *errorMessage)
     if (!ensureLoaded(errorMessage))
         return false;
 
-    const QString path = currentReferenceImageAbsolutePath();
-    if (path.trimmed().isEmpty()) {
-        if (!m_currentScheme.referenceImagePath.trimmed().isEmpty()) {
-            ReferenceImageProvider::instance().clearReferenceFrame();
-            setError(errorMessage, QStringLiteral("方案基准图路径校验失败"));
-            return false;
-        }
-        ReferenceImageProvider::instance().clearReferenceFrame();
-        return true;
-    }
+    QList<ReferenceFrameEntry> entries;
+    if (!prepareReferenceFrameEntries(m_currentScheme, &entries, errorMessage))
+        return false;
 
-    const cv::Mat frame = cv::imread(path.toStdString(), cv::IMREAD_UNCHANGED);
-    if (frame.empty()) {
-        ReferenceImageProvider::instance().clearReferenceFrame();
-        setError(errorMessage, QStringLiteral("无法加载方案基准图: %1").arg(path));
+    QString providerError;
+    if (!ReferenceImageProvider::instance().setReferenceFrames(
+            entries,
+            m_currentScheme.referenceAssets.primaryBaseId(),
+            &providerError)) {
+        setError(errorMessage,
+                 QStringLiteral("无法发布参考资产运行态: %1").arg(providerError));
         return false;
     }
-
-    // The persisted PNG may be 8-bit or 16-bit. Do not reuse acquisition metadata
-    // (for example RGBX8/BGRA16) as the runtime contract after decoding/normalization.
-    const QString source = m_currentScheme.referenceInputMetadata.source.trimmed().isEmpty()
-            ? QStringLiteral("reference")
-            : m_currentScheme.referenceInputMetadata.source;
-    const FrameInputMetadata metadata = FrameInputMetadata::fromMat(frame, source);
-    ReferenceImageProvider::instance().setReferenceFrame(frame, metadata);
     m_currentScheme.referenceInputMetadata =
             ReferenceImageProvider::instance().referenceFrameMetadata();
     return true;
@@ -990,6 +1702,45 @@ bool SchemeStore::loadSchemeFromFile(const QString &schemeJsonPath,
     }
     loaded.referenceInputMetadata = FrameInputMetadata::fromJson(
                 json.value(QStringLiteral("referenceInputMetadata")).toObject());
+    if (json.contains(QStringLiteral("referenceAssets"))) {
+        QString assetsDecodeMessage;
+        loaded.referenceAssets = ReferenceAssetSet::fromJson(
+                    json.value(QStringLiteral("referenceAssets")),
+                    &assetsDecodeMessage);
+        if (loaded.referenceAssets.isReadOnly())
+            qWarning() << "[SchemeStore]" << assetsDecodeMessage;
+    } else {
+        const QString legacyAbsolutePath = loaded.referenceImagePath.trimmed().isEmpty()
+                ? QString()
+                : QDir(loaded.schemeDir).filePath(loaded.referenceImagePath);
+        loaded.referenceAssets = ReferenceAssetSet::fromLegacyReference(
+                    loaded.referenceImagePath,
+                    loaded.referenceInputMetadata,
+                    legacyAbsolutePath.isEmpty()
+                    ? QString() : fileRevision(legacyAbsolutePath));
+    }
+    if (!loaded.referenceAssets.isReadOnly()) {
+        for (const ReferenceAsset &asset : loaded.referenceAssets.assets()) {
+            if (!validateReferencePath(loaded.schemeDir,
+                                       asset.path,
+                                       true,
+                                       &pathError)) {
+                setError(errorMessage,
+                         QStringLiteral("参考资产 %1 无效: %2")
+                         .arg(asset.baseId, pathError));
+                return false;
+            }
+            if (asset.contentRevision.startsWith(QStringLiteral("sha256:"))
+                    && fileRevision(QDir(loaded.schemeDir).filePath(asset.path))
+                       != asset.contentRevision) {
+                setError(errorMessage,
+                         QStringLiteral("参考资产内容修订不匹配: %1")
+                         .arg(asset.baseId));
+                return false;
+            }
+        }
+        syncLegacyReferenceMirror(&loaded);
+    }
     loaded.referencePositionCorrection = PositionCorrection::referenceFromJson(
                 json.value(QStringLiteral("referencePositionCorrection")).toObject());
     loaded.toolConfigs = toolConfigsFromJson(json.value(QStringLiteral("tools")).toArray());
@@ -1058,6 +1809,34 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
     if (!materializeCalibrationAssetsForScheme(&normalized, &rollback, errorMessage))
         return false;
 
+    if (!normalized.referenceAssets.isReadOnly()) {
+        QString assetsError;
+        if (!normalized.referenceAssets.validate(&assetsError)) {
+            setError(errorMessage,
+                     QStringLiteral("参考资产集合无效: %1").arg(assetsError));
+            return false;
+        }
+        for (const ReferenceAsset &asset : normalized.referenceAssets.assets()) {
+            if (!validateReferencePath(normalized.schemeDir,
+                                       asset.path,
+                                       true,
+                                       &pathError)) {
+                setError(errorMessage,
+                         QStringLiteral("参考资产 %1 无效: %2")
+                         .arg(asset.baseId, pathError));
+                return false;
+            }
+            if (asset.contentRevision.startsWith(QStringLiteral("sha256:"))
+                    && fileRevision(schemeDir.filePath(asset.path))
+                       != asset.contentRevision) {
+                setError(errorMessage,
+                         QStringLiteral("参考资产内容修订不匹配: %1")
+                         .arg(asset.baseId));
+                return false;
+            }
+        }
+    }
+
     QString newlyWrittenReferencePath;
     if (referenceFrame) {
         if (referenceFrame->empty() || normalized.referenceImagePath.trimmed().isEmpty()) {
@@ -1101,6 +1880,8 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
     json.insert(QStringLiteral("referenceImage"), normalized.referenceImagePath);
     json.insert(QStringLiteral("referenceInputMetadata"),
                 normalized.referenceInputMetadata.toJson());
+    json.insert(QStringLiteral("referenceAssets"),
+                normalized.referenceAssets.toJson());
     json.insert(QStringLiteral("referencePositionCorrection"),
                 PositionCorrection::referenceToJson(normalized.referencePositionCorrection));
     json.insert(QStringLiteral("tools"), toolConfigsToJson(normalized.toolConfigs));
@@ -1138,9 +1919,6 @@ bool SchemeStore::saveSchemeToFile(const SchemeState &state,
     rollback.commit();
     if (savedState)
         *savedState = normalized;
-    if (normalized.schemeId == m_currentScheme.schemeId)
-        const_cast<SchemeStore *>(this)->m_currentScheme = normalized;
-
     return true;
 }
 
@@ -1257,8 +2035,53 @@ SchemeState SchemeStore::normalizedStateForSave(SchemeState state) const
     if (state.schemeDir.trimmed().isEmpty())
         state.schemeDir = QDir(projectsRootPath()).filePath(state.schemeId);
     state.schemeDir = cleanAbsolutePath(state.schemeDir);
+    if (!state.referenceAssets.isReadOnly()) {
+        state.referenceAssets.normalizeOrder();
+        syncLegacyReferenceMirror(&state);
+    }
     state.updatedAt = QDateTime::currentDateTime();
     return state;
+}
+
+QString SchemeStore::referenceAssetAbsolutePath(const SchemeState &state,
+                                                const QString &baseId,
+                                                bool mustExist,
+                                                QString *errorMessage) const
+{
+    const ReferenceAsset *asset = state.referenceAssets.assetById(baseId);
+    if (!asset) {
+        setError(errorMessage,
+                 QStringLiteral("未找到参考资产: %1").arg(baseId));
+        return QString();
+    }
+    QString pathError;
+    if (!validateSchemeDirectory(projectsRootPath(),
+                                 state.schemeId,
+                                 state.schemeDir,
+                                 mustExist,
+                                 &pathError)
+            || !validateReferencePath(state.schemeDir,
+                                      asset->path,
+                                      mustExist,
+                                      &pathError)) {
+        setError(errorMessage, pathError);
+        return QString();
+    }
+    return QDir(state.schemeDir).filePath(asset->path);
+}
+
+void SchemeStore::syncLegacyReferenceMirror(SchemeState *state) const
+{
+    if (!state || state->referenceAssets.isReadOnly())
+        return;
+    const ReferenceAsset *primary = state->referenceAssets.primaryAsset();
+    if (!primary) {
+        state->referenceImagePath.clear();
+        state->referenceInputMetadata = FrameInputMetadata();
+        return;
+    }
+    state->referenceImagePath = primary->path;
+    state->referenceInputMetadata = primary->inputMetadata;
 }
 
 void SchemeStore::normalizeSnapshotsForCurrentTools()

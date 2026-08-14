@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QList>
 #include <QMap>
+#include <QObject>
 #include <QString>
 #include <QVector>
 
@@ -14,6 +15,8 @@
 #include "toolcore/PositionCorrection.h"
 #include "toolcore/ToolPreviewSnapshot.h"
 #include "frame/FrameInputMetadata.h"
+#include "frame/ReferenceAssetSet.h"
+#include "frame/ReferenceImageProvider.h"
 
 struct SchemeState
 {
@@ -23,6 +26,7 @@ struct SchemeState
     QString schemeDir;
     QString referenceImagePath;
     FrameInputMetadata referenceInputMetadata;
+    ReferenceAssetSet referenceAssets;
     ReferencePositionCorrectionConfig referencePositionCorrection;
     QVector<ToolConfig> toolConfigs;
     QMap<QString, ToolPreviewSnapshot> referencePreviewSnapshots;
@@ -41,8 +45,10 @@ struct SchemeSummary
     QDateTime updatedAt;
 };
 
-class SchemeStore
+class SchemeStore : public QObject
 {
+    Q_OBJECT
+
 public:
     static SchemeStore &instance();
 
@@ -62,6 +68,10 @@ public:
     QString projectsRootPath() const;
     QString currentSchemeName() const;
     QString currentReferenceImageAbsolutePath() const;
+    QVector<ReferenceAsset> referenceAssets() const;
+    bool referenceAsset(const QString &baseId, ReferenceAsset *asset) const;
+    bool primaryReferenceAsset(ReferenceAsset *asset) const;
+    QString referenceAssetAbsolutePath(const QString &baseId) const;
 
     void setSchemeName(const QString &schemeName);
     /// 更新方案工具与基准预览快照；调用方仍需 saveCurrentScheme 才会落盘。
@@ -76,10 +86,40 @@ public:
             const cv::Mat &frame,
             QString *errorMessage = nullptr,
             const FrameInputMetadata &metadata = FrameInputMetadata());
+    bool addReferenceAsset(
+            const QString &name,
+            const cv::Mat &frame,
+            QString *createdBaseId = nullptr,
+            QString *errorMessage = nullptr,
+            const FrameInputMetadata &metadata = FrameInputMetadata());
+    bool replaceReferenceAsset(
+            const QString &baseId,
+            const cv::Mat &frame,
+            QString *errorMessage = nullptr,
+            const FrameInputMetadata &metadata = FrameInputMetadata());
+    bool removeReferenceAsset(const QString &baseId,
+                              QString *errorMessage = nullptr);
+    bool setPrimaryReferenceAsset(const QString &baseId,
+                                  QString *errorMessage = nullptr);
+    /// Update the persisted UI mode without deleting or rebinding Base assets.
+    bool setMultiReferenceEnabled(bool enabled,
+                                  QString *errorMessage = nullptr);
     bool loadCurrentReferenceIntoProvider(QString *errorMessage = nullptr);
 
+signals:
+    /**
+     * Emitted exactly once after a reference-asset mutation has both been
+     * persisted and published as a complete ReferenceImageProvider set.
+     * Consumers can then copy currentScheme() without observing a half-
+     * committed asset/config state.
+     */
+    void referenceAssetStateCommitted(const QString &schemeId);
+
 private:
-    SchemeStore() = default;
+    explicit SchemeStore(QObject *parent = nullptr)
+        : QObject(parent)
+    {
+    }
 
     bool loadSchemeFromFile(const QString &schemeJsonPath,
                             SchemeState *state,
@@ -95,6 +135,24 @@ private:
     QString schemeJsonPath(const SchemeState &state) const;
     QString makeUniqueSchemeId() const;
     SchemeState normalizedStateForSave(SchemeState state) const;
+    bool persistReferenceAssetFrameMutation(
+            SchemeState candidate,
+            const QString &baseId,
+            const cv::Mat &frame,
+            bool replacingPrimary,
+            QString *errorMessage,
+            QString *savedRelativePath = nullptr);
+    bool prepareReferenceFrameEntries(
+            const SchemeState &state,
+            QList<ReferenceFrameEntry> *entries,
+            QString *errorMessage = nullptr) const;
+    bool commitReferenceAssetState(SchemeState candidate,
+                                   QString *errorMessage = nullptr);
+    QString referenceAssetAbsolutePath(const SchemeState &state,
+                                       const QString &baseId,
+                                       bool mustExist,
+                                       QString *errorMessage = nullptr) const;
+    void syncLegacyReferenceMirror(SchemeState *state) const;
     void normalizeSnapshotsForCurrentTools();
     void setError(QString *errorMessage, const QString &message) const;
 

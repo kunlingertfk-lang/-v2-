@@ -5,6 +5,7 @@
 #include "toolcore/ToolOverlay.h"
 
 #include <QJsonObject>
+#include <QMap>
 #include <QPointF>
 #include <QRectF>
 #include <QString>
@@ -40,6 +41,15 @@ public:
     TemplateLocationHalconResult run(const cv::Mat &image,
                                      const cv::Mat &referenceImage,
                                      const TemplateLocationModelBankConfig &config);
+    /// Execute the v6 composite bank against its immutable Base image set.
+    /// v4/v5 callers are also accepted and use the first available image as a
+    /// compatibility fallback; their matching semantics remain unchanged.
+    TemplateLocationHalconResult run(
+            const cv::Mat &image,
+            const QMap<QString, cv::Mat> &referenceImages,
+            const QMap<QString, QString> &referenceImageRevisions,
+            const TemplateLocationModelBankConfig &config,
+            const QString &primaryBaseId = QString());
 };
 
 #endif // ALGORITHMS_LOCATION_TEMPLATELOCATIONHALCONRUNNER_H

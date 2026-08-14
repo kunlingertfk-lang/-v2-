@@ -66,6 +66,8 @@ SOURCES += \
     src/frame/FramePixelProbe.cpp \
     src/frame/FrameViewHelper.cpp \
     src/frame/MatImageConverter.cpp \
+    src/frame/ReferenceAssetSet.cpp \
+    src/frame/ReferenceBaseSelector.cpp \
     src/frame/ReferenceImageProvider.cpp \
     src/toolcore/PositionCorrection.cpp \
     src/toolcore/PositionCorrectionConsumer.cpp \
@@ -161,6 +163,8 @@ HEADERS += \
     src/frame/FramePixelProbe.h \
     src/frame/FrameViewHelper.h \
     src/frame/MatImageConverter.h \
+    src/frame/ReferenceAssetSet.h \
+    src/frame/ReferenceBaseSelector.h \
     src/frame/ReferenceImageProvider.h \
     src/toolcore/ToolTypes.h \
     src/toolcore/ToolConfig.h \

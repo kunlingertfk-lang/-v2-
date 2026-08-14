@@ -84,6 +84,7 @@ private:
     void createAndSwitchToNewScheme();
     bool switchSchemeById(const QString &schemeId);
     void applyCurrentSchemeState();
+    void syncCommittedReferenceAssetState(const QString &schemeId);
     bool persistCurrentSchemeState(const QString &context);
     void ensureCameraRunning();
     void refreshLivePreview();

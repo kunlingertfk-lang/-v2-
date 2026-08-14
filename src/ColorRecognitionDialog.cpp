@@ -1091,15 +1091,9 @@ void ColorRecognitionDialog::rerunLiveTest()
     FrameInputMetadata metadata;
     bool referenceSource = false;
     if (m_liveTestSource == LiveTestSource::Reference) {
-        const ReferenceFrameSnapshot snapshot =
-                ReferenceImageProvider::instance().referenceFrameSnapshot();
-        frame = snapshot.frame;
-        metadata = snapshot.metadata;
+        // launchDetection takes the one atomic Base-set snapshot used by the
+        // complete request.  Do not fetch the primary independently here.
         referenceSource = true;
-        if (frame.empty()) {
-            displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
-            return;
-        }
     } else if (m_liveTestSource == LiveTestSource::Imported) {
         frame = m_liveTestFrameSnapshot;
         metadata = m_liveTestFrameMetadata;
@@ -1135,17 +1129,33 @@ void ColorRecognitionDialog::rerunLiveTest()
 // 统一发起异步检测任务，处理在途请求排队、generation 标记和结果回调识别。
 void ColorRecognitionDialog::launchDetection(const cv::Mat &frame,
                                              const FrameInputMetadata &metadata,
-                                             bool referenceSource)
+                                             bool referenceSource,
+                                             const ReferenceFrameSetSnapshot *capturedReferenceSet)
 {
     if (m_testRunBusy) {
         // 检测在途：标记待补跑，等当前结束后用最新来源重跑，避免点击/绘制被吞。
         m_pendingRerun = true;
         return;
     }
-    if (frame.empty())
+    const ReferenceFrameSetSnapshot ownedReferenceSet = capturedReferenceSet
+            ? ReferenceFrameSetSnapshot()
+            : ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const ReferenceFrameSetSnapshot &referenceSet = capturedReferenceSet
+            ? *capturedReferenceSet : ownedReferenceSet;
+    const cv::Mat requestFrame = referenceSource
+            ? referenceSet.primary.frame : frame;
+    const FrameInputMetadata requestMetadata = referenceSource
+            ? referenceSet.primary.metadata : metadata;
+    if (requestFrame.empty()) {
+        if (referenceSource) {
+            displayError(QStringLiteral("no_reference_image"),
+                         tr("请先设置基准图"));
+        }
         return;
+    }
 
-    const QImage image = MatImageConverter::matToDisplayImage(frame, QStringLiteral("ColorRecognitionDialog"));
+    const QImage image = MatImageConverter::matToDisplayImage(
+                requestFrame, QStringLiteral("ColorRecognitionDialog"));
     if (!image.isNull() && m_previewHelper) {
         const QString imageTitle = referenceSource
                 ? tr("基准图")
@@ -1161,8 +1171,8 @@ void ColorRecognitionDialog::launchDetection(const cv::Mat &frame,
     setViewerStatusText(tr("运行中…"));
 
     if (!referenceSource) {
-        m_liveTestFrameSnapshot = frame;  // 缓存为停止态重测的快照帧
-        m_liveTestFrameMetadata = metadata;
+        m_liveTestFrameSnapshot = requestFrame;  // 缓存为停止态重测的快照帧
+        m_liveTestFrameMetadata = requestMetadata;
     }
 
     ToolRequest request;
@@ -1170,14 +1180,16 @@ void ColorRecognitionDialog::launchDetection(const cv::Mat &frame,
     request.frameId = QStringLiteral("color-recognition-dialog-test-%1")
             .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     request.config = toToolConfig();
-    request.image = frame.clone();
+    request.image = requestFrame.clone();
     request.runtimeContext.insert(QStringLiteral("frameId"), request.frameId);
-    request.runtimeContext.insert(QStringLiteral("input"), metadata.toJson());
-    const ReferenceFrameSnapshot reference =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
-    request.referenceImage = reference.frame.clone();
+    request.runtimeContext.insert(QStringLiteral("input"),
+                                  requestMetadata.toJson());
+    request.referenceImage = referenceSet.primary.frame;
+    request.referenceImages = referenceSet.frames;
+    request.referenceImageRevisions = referenceSet.contentRevisions;
+    request.primaryReferenceBaseId = referenceSet.primaryBaseId;
     request.runtimeContext.insert(QStringLiteral("referenceInput"),
-                                  reference.metadata.toJson());
+                                  referenceSet.primary.metadata.toJson());
     request.runtimeContext.insert(
                 QStringLiteral("referencePositionCorrection"),
                 PositionCorrection::referenceToJson(
@@ -1200,7 +1212,11 @@ void ColorRecognitionDialog::launchDetection(const cv::Mat &frame,
                     testChain,
                     request.image,
                     request.referenceImage,
-                    request.runtimeContext);
+                    request.runtimeContext,
+                    nullptr,
+                    request.referenceImages,
+                    request.referenceImageRevisions,
+                    request.primaryReferenceBaseId);
         ToolResult result;
         for (auto it = results.crbegin(); it != results.crend(); ++it) {
             if (it->toolId == request.config.toolId) {
@@ -1229,13 +1245,16 @@ void ColorRecognitionDialog::runReferenceTest()
     m_testUiMode = TestUiMode::Edit;
     updateBottomButtons();
 
-    const ReferenceFrameSnapshot snapshot =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
-    if (snapshot.frame.empty()) {
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    if (referenceSet.primary.frame.empty()) {
         displayError(QStringLiteral("no_reference_image"), tr("请先设置基准图"));
         return;
     }
-    launchDetection(snapshot.frame, snapshot.metadata, true);
+    launchDetection(referenceSet.primary.frame,
+                    referenceSet.primary.metadata,
+                    true,
+                    &referenceSet);
     setViewerStatusText(tr("已进入基准图测试，可继续绘制检测区域，松开即自动判别"));
 }
 

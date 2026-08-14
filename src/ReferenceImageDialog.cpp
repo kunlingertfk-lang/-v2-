@@ -2,10 +2,12 @@
 
 #include <QDebug>
 #include <QButtonGroup>
+#include <QBrush>
 #include <QComboBox>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -17,16 +19,23 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QListView>
+#include <QMap>
+#include <QPixmap>
 #include <QPushButton>
 #include <QSet>
 #include <QSize>
 #include <QSizePolicy>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStyledItemDelegate>
+#include <QStyle>
 #include <QToolButton>
+#include <QTimer>
 #include <QUuid>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
 #include <opencv2/imgproc.hpp>
 
@@ -45,6 +54,49 @@
 namespace {
 
 constexpr int kReferenceTemplateIdRole = Qt::UserRole + 21;
+constexpr int kReferenceBaseIdRole = Qt::UserRole + 22;
+
+class ItemWidgetOnlyDelegate final : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    void paint(QPainter *, const QStyleOptionViewItem &,
+               const QModelIndex &) const override
+    {
+        // Template tabs are fully rendered by QListWidget::setItemWidget().
+        // Keep the underlying item roles for persistence/tests without also
+        // painting the legacy text and check indicator underneath the tab.
+    }
+};
+
+bool loadImageFileAsBgr(const QString &fileName,
+                        cv::Mat *frame,
+                        FrameInputMetadata *metadata,
+                        QString *message)
+{
+    if (!frame || !metadata)
+        return false;
+    const QImage image(fileName);
+    if (image.isNull()) {
+        if (message)
+            *message = QObject::tr("无法读取所选图片");
+        return false;
+    }
+    *metadata = FrameInputMetadata::fromQImage(
+                image, QStringLiteral("file"));
+    const QImage rgbImage = image.convertToFormat(QImage::Format_RGB888);
+    cv::Mat rgbFrame(rgbImage.height(), rgbImage.width(), CV_8UC3,
+                     const_cast<uchar *>(rgbImage.constBits()),
+                     static_cast<size_t>(rgbImage.bytesPerLine()));
+    cv::cvtColor(rgbFrame, *frame, cv::COLOR_RGB2BGR);
+    if (frame->empty()) {
+        if (message)
+            *message = QObject::tr("图片转换失败");
+        return false;
+    }
+    return true;
+}
 
 QFrame *parameterCard(QWidget *parent, const QString &objectName,
                       const QString &title, QFormLayout **form)
@@ -139,6 +191,40 @@ QRectF boundingRectForPoints(const QVector<QPointF> &points)
         maxY = qMax(maxY, point.y());
     }
     return QRectF(QPointF(minX, minY), QPointF(maxX, maxY)).normalized();
+}
+
+QRectF boundsForTemplate(const TemplateLocationTemplateConfig &item)
+{
+    QRectF bounds;
+    const auto appendRect = [&bounds](const QRectF &candidate) {
+        if (!candidate.isValid() || candidate.width() <= 0.0 ||
+                candidate.height() <= 0.0)
+            return;
+        bounds = bounds.isEmpty() ? candidate.normalized()
+                                  : bounds.united(candidate.normalized());
+    };
+    if (!item.includeRegions.isEmpty()) {
+        for (const TemplateLocationRegionConfig &region : item.includeRegions) {
+            if (region.regionType == QStringLiteral("polygon"))
+                appendRect(boundingRectForPoints(region.polygonNormalized));
+            else if (region.regionType == QStringLiteral("circle")) {
+                appendRect(QRectF(
+                    region.circleCenterNormalized.x() -
+                        region.circleRadiusNormalized,
+                    region.circleCenterNormalized.y() -
+                        region.circleRadiusNormalized,
+                    region.circleRadiusNormalized * 2.0,
+                    region.circleRadiusNormalized * 2.0));
+            } else {
+                appendRect(region.roiNormalized);
+            }
+        }
+    } else if (item.templateRegionType == QStringLiteral("polygon")) {
+        appendRect(boundingRectForPoints(item.templatePolygonNormalized));
+    } else {
+        appendRect(item.templateRoiNormalized);
+    }
+    return bounds.intersected(QRectF(0.0, 0.0, 1.0, 1.0));
 }
 
 QPointF centroidForTemplate(const TemplateLocationTemplateConfig &item)
@@ -259,6 +345,16 @@ QJsonObject referencePoseJson(const QJsonObject &payload)
                     QStringLiteral("selectedTemplateId")).toString().trimmed();
     pose.insert(QStringLiteral("locatorModelSignature"), modelSignature);
     pose.insert(QStringLiteral("locatorTemplateId"), templateId);
+    QString baseId = source.value(
+                QStringLiteral("selectedBaseId")).toString().trimmed();
+    if (baseId.isEmpty())
+        baseId = payload.value(
+                    QStringLiteral("selectedBaseId")).toString().trimmed();
+    if (baseId.isEmpty())
+        baseId = payload.value(
+                    QStringLiteral("sourceBaseId")).toString().trimmed();
+    if (!baseId.isEmpty())
+        pose.insert(QStringLiteral("locatorBaseId"), baseId);
     const QString originMode = payload.value(
                 QStringLiteral("originMode")).toString().trimmed();
     pose.insert(QStringLiteral("locatorOriginMode"), originMode);
@@ -321,18 +417,24 @@ bool validateReferencePoseConsistency(
         QString *templateName,
         QString *message)
 {
-    const TemplateLocationTemplateConfig *anchorItem = nullptr;
-    QJsonObject anchorPose;
+    QMap<QString, const TemplateLocationTemplateConfig *> anchorItems;
+    QMap<QString, QJsonObject> anchorPoses;
     for (const TemplateLocationTemplateConfig &item : bank.templates) {
         if (!item.enabled)
             continue;
+        const QString groupId = bank.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion
+                ? item.sourceBaseId : QStringLiteral("legacy-primary");
         const QJsonObject pose = posesByTemplateId.value(
                     item.templateId).toObject();
-        if (!anchorItem) {
-            anchorItem = &item;
-            anchorPose = pose;
+        if (!anchorItems.contains(groupId)) {
+            anchorItems.insert(groupId, &item);
+            anchorPoses.insert(groupId, pose);
             continue;
         }
+        const TemplateLocationTemplateConfig *anchorItem =
+                anchorItems.value(groupId);
+        const QJsonObject anchorPose = anchorPoses.value(groupId);
         const double dx = pose.value(QStringLiteral("x")).toDouble() -
                 anchorPose.value(QStringLiteral("x")).toDouble();
         const double dy = pose.value(QStringLiteral("y")).toDouble() -
@@ -351,8 +453,8 @@ bool validateReferencePoseConsistency(
                 *templateName = item.name;
             if (message) {
                 *message = QObject::tr(
-                            "与模板“%1”的公共位姿不一致：位置差 %2 px、角度差 %3°、尺度差 %4")
-                        .arg(anchorItem->name)
+                            "与同一 Base 的模板“%1”公共位姿不一致：位置差 %2 px、角度差 %3°、尺度差 %4")
+                        .arg(anchorItem ? anchorItem->name : QString())
                         .arg(positionDelta, 0, 'f', 2)
                         .arg(angleDelta, 0, 'f', 2)
                         .arg(scaleDelta, 0, 'f', 3);
@@ -406,14 +508,19 @@ ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
     connect(&ReferenceImageProvider::instance(),
             &ReferenceImageProvider::referenceFrameChanged,
             this,
-            [this](const QImage &image) {
+            [this](const QImage &) {
                 if (!m_liveCaptureMode && m_previewHelper) {
                     clearReferencePositionMatchOverlays();
-                    m_previewHelper->setImage(image);
-                    ui->viewerTitleLabel->setText(image.isNull() ? tr("请先设置基准图") : tr("基准图"));
-                    restoreReferencePositionRoi();
+                    refreshReferenceImage();
                 }
             });
+    connect(&ReferenceImageProvider::instance(),
+            &ReferenceImageProvider::referenceFrameSetChanged,
+            this, [this]() {
+        refreshReferenceAssetControls();
+        if (!m_liveCaptureMode)
+            refreshReferenceImage();
+    });
 
     QString error;
     if (!SchemeStore::instance().ensureLoaded(&error)) {
@@ -423,6 +530,7 @@ ReferenceImageDialog::ReferenceImageDialog(QWidget *parent)
         qWarning() << "[ReferenceImageDialog]" << error;
     }
     refreshSchemeHeader();
+    refreshReferenceAssetControls();
     loadPositionCorrectionConfig();
     showReferenceImageMode();
 }
@@ -435,6 +543,7 @@ ReferenceImageDialog::~ReferenceImageDialog()
 void ReferenceImageDialog::prepareForDisplay()
 {
     refreshSchemeHeader();
+    refreshReferenceAssetControls();
     loadPositionCorrectionConfig();
     showReferenceImageMode();
 }
@@ -457,8 +566,8 @@ void ReferenceImageDialog::setupParameterModeControls()
     m_parameterModeGroup->setExclusive(true);
     m_parameterModeGroup->addButton(ui->basicModeButton, 0);
     m_parameterModeGroup->addButton(ui->allModeButton, 1);
-    ui->basicModeButton->setAutoExclusive(true);
-    ui->allModeButton->setAutoExclusive(true);
+    ui->basicModeButton->setAutoExclusive(false);
+    ui->allModeButton->setAutoExclusive(false);
     connect(ui->basicModeButton, &QPushButton::clicked,
             this, [this]() { setAdvancedVisible(false); });
     connect(ui->allModeButton, &QPushButton::clicked,
@@ -478,6 +587,14 @@ void ReferenceImageDialog::setAdvancedVisible(bool visible)
     }
     ui->basicModeButton->setChecked(!visible);
     ui->allModeButton->setChecked(visible);
+    ui->basicModeButton->setProperty("parameterModeState",
+                                     visible ? "inactive" : "active");
+    ui->allModeButton->setProperty("parameterModeState",
+                                   visible ? "active" : "inactive");
+    ui->basicModeButton->style()->unpolish(ui->basicModeButton);
+    ui->basicModeButton->style()->polish(ui->basicModeButton);
+    ui->allModeButton->style()->unpolish(ui->allModeButton);
+    ui->allModeButton->style()->polish(ui->allModeButton);
     const bool locatorVisible = !m_referencePositionEditorReadOnly;
     if (m_basicMatchingCard)
         m_basicMatchingCard->setVisible(locatorVisible);
@@ -494,7 +611,13 @@ void ReferenceImageDialog::connectNavigation()
     connect(ui->outputStepButton, &QToolButton::clicked, this, &ReferenceImageDialog::openOutputDialog);
     connect(ui->previousButton, &QPushButton::clicked, this, &ReferenceImageDialog::openCameraParamsDialog);
     connect(ui->nextButton, &QPushButton::clicked, this, &ReferenceImageDialog::openToolsDialog);
-    connect(ui->currentImageButton, &QPushButton::clicked, this, &ReferenceImageDialog::showCurrentImageMode);
+    connect(ui->currentImageButton, &QPushButton::clicked, this, [this]() {
+        const ReferenceAssetSet &assets =
+                SchemeStore::instance().currentScheme().referenceAssets;
+        m_captureCreatesNewBase = assets.multiBaseEnabled()
+                && assets.size() < ReferenceAssetSet::kMaximumAssets;
+        showCurrentImageMode();
+    });
     connect(m_captureImageButton, &QPushButton::clicked, this, &ReferenceImageDialog::captureReferenceImage);
     connect(m_exitCaptureButton, &QPushButton::clicked, this, &ReferenceImageDialog::showReferenceImageMode);
     connect(ui->setupExternalEditButton, &QToolButton::clicked, this, &ReferenceImageDialog::editCurrentSchemeName);
@@ -560,6 +683,7 @@ bool ReferenceImageDialog::saveCurrentScheme()
         // immediately so a later navigation action cannot resubmit the failed
         // candidate kept in this dialog.
         loadPositionCorrectionConfig();
+        refreshReferenceAssetControls();
         refreshSchemeHeader();
         QMessageBox::warning(this, tr("保存失败"), tr("方案保存失败：%1").arg(error));
         return false;
@@ -580,41 +704,76 @@ void ReferenceImageDialog::setupReferenceTemplateBankControls()
     auto *layout = card ? qobject_cast<QVBoxLayout *>(card->layout()) : nullptr;
     if (!layout)
         return;
+    ui->referenceTemplateBankCardHeaderFrame->hide();
+    card->setProperty("card", false);
+    card->setProperty("templateTabStrip", true);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(8);
 
     m_referenceTemplateBankList = new QListWidget(card);
     m_referenceTemplateBankList->setObjectName(
                 QStringLiteral("referenceTemplateBankListWidget"));
     m_referenceTemplateBankList->setSelectionMode(
                 QAbstractItemView::SingleSelection);
-    m_referenceTemplateBankList->setHorizontalScrollBarPolicy(
+    m_referenceTemplateBankList->setFlow(QListView::LeftToRight);
+    m_referenceTemplateBankList->setWrapping(false);
+    m_referenceTemplateBankList->setMovement(QListView::Static);
+    m_referenceTemplateBankList->setResizeMode(QListView::Adjust);
+    m_referenceTemplateBankList->setVerticalScrollBarPolicy(
                 Qt::ScrollBarAlwaysOff);
-    m_referenceTemplateBankList->setMinimumHeight(108);
-    m_referenceTemplateBankList->setMaximumHeight(132);
-    layout->addWidget(m_referenceTemplateBankList);
+    m_referenceTemplateBankList->setHorizontalScrollBarPolicy(
+                Qt::ScrollBarAsNeeded);
+    m_referenceTemplateBankList->setMinimumHeight(46);
+    m_referenceTemplateBankList->setMaximumHeight(46);
+    m_referenceTemplateBankList->setItemDelegate(
+                new ItemWidgetOnlyDelegate(m_referenceTemplateBankList));
+
+    m_addReferenceTemplateButton = new QPushButton(tr("+"), card);
+    m_addReferenceTemplateButton->setObjectName(
+                QStringLiteral("addReferenceTemplateButton"));
+    m_addReferenceTemplateButton->setToolTip(tr("添加模板（最多 8 个）"));
+    m_addReferenceTemplateButton->setFixedSize(46, 46);
+    auto *tabRow = new QHBoxLayout;
+    tabRow->setContentsMargins(0, 0, 0, 0);
+    tabRow->setSpacing(0);
+    tabRow->addWidget(m_referenceTemplateBankList, 1);
+    tabRow->addWidget(m_addReferenceTemplateButton);
+    layout->addLayout(tabRow);
+
+    auto *sourceRow = new QHBoxLayout;
+    sourceRow->setContentsMargins(0, 0, 0, 0);
+    sourceRow->setSpacing(8);
+    auto *sourceLabel = new QLabel(tr("模板来源 Base"), card);
+    sourceLabel->setProperty("role", QStringLiteral("rowField"));
+    m_templateSourceBaseComboBox = new QComboBox(card);
+    m_templateSourceBaseComboBox->setObjectName(
+                QStringLiteral("referenceTemplateSourceBaseComboBox"));
+    m_templateSourceBaseComboBox->setSizePolicy(
+                QSizePolicy::Expanding, QSizePolicy::Fixed);
+    sourceRow->addWidget(sourceLabel);
+    sourceRow->addWidget(m_templateSourceBaseComboBox, 1);
+    layout->addLayout(sourceRow);
 
     m_referenceTemplateBankSummaryLabel = new QLabel(card);
     m_referenceTemplateBankSummaryLabel->setObjectName(
                 QStringLiteral("referenceTemplateBankSummaryLabel"));
     m_referenceTemplateBankSummaryLabel->setProperty("hint", true);
+    m_referenceTemplateBankSummaryLabel->hide();
     layout->addWidget(m_referenceTemplateBankSummaryLabel);
 
     auto *buttons = new QHBoxLayout;
     buttons->setContentsMargins(0, 0, 0, 0);
     buttons->setSpacing(6);
-    m_addReferenceTemplateButton = new QPushButton(tr("+ 添加模板"), card);
-    m_addReferenceTemplateButton->setObjectName(
-                QStringLiteral("addReferenceTemplateButton"));
-    m_addReferenceTemplateButton->setProperty("actionRole",
-                                               QStringLiteral("secondary"));
     m_renameReferenceTemplateButton = new QPushButton(tr("重命名"), card);
     m_renameReferenceTemplateButton->setObjectName(
                 QStringLiteral("renameReferenceTemplateButton"));
     m_deleteReferenceTemplateButton = new QPushButton(tr("删除模板"), card);
     m_deleteReferenceTemplateButton->setObjectName(
                 QStringLiteral("deleteReferenceTemplateButton"));
-    buttons->addWidget(m_addReferenceTemplateButton, 1);
     buttons->addWidget(m_renameReferenceTemplateButton);
     buttons->addWidget(m_deleteReferenceTemplateButton);
+    m_renameReferenceTemplateButton->hide();
+    m_deleteReferenceTemplateButton->hide();
     layout->addLayout(buttons);
 
     connect(m_addReferenceTemplateButton, &QPushButton::clicked,
@@ -630,6 +789,49 @@ void ReferenceImageDialog::setupReferenceTemplateBankControls()
     });
     connect(m_referenceTemplateBankList, &QListWidget::itemChanged,
             this, &ReferenceImageDialog::handleReferenceTemplateItemChanged);
+    connect(m_templateSourceBaseComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int) {
+        if (m_updatingTemplateBank || m_loadingLocatorControls ||
+                m_referencePositionEditorReadOnly)
+            return;
+        const int index = activeTemplateIndex();
+        const QString baseId = m_templateSourceBaseComboBox
+                ->currentData().toString().trimmed();
+        if (index < 0 || baseId.isEmpty())
+            return;
+        if (m_locatorConfig.version !=
+                TemplateLocationConfig::CompositeBankParamsVersion) {
+            synchronizeLocatorBaseBindings(true);
+        }
+        TemplateLocationTemplateConfig &item =
+                m_locatorConfig.templates[index];
+        if (item.sourceBaseId == baseId)
+            return;
+        storeLegacyGeometryToActiveTemplate();
+        storeLegacyBaseBindingGeometry();
+        int nextOrder = 0;
+        for (const TemplateLocationTemplateConfig &candidate :
+             qAsConst(m_locatorConfig.templates)) {
+            if (candidate.templateId != item.templateId &&
+                    candidate.sourceBaseId == baseId) {
+                nextOrder = qMax(nextOrder, candidate.order + 1);
+            }
+        }
+        item.sourceBaseId = baseId;
+        item.order = nextOrder;
+        item.priority = nextOrder;
+        item.modelCreated = false;
+        // This is the only path that repairs an unavailable v6 source Base:
+        // the user has explicitly selected a concrete asset.  Do not run the
+        // generic v6 ID normalizer here because it would also fill missing
+        // sourceBaseId values on unrelated templates.
+        synchronizeLocatorBaseBindings(false);
+        loadActiveBaseBindingGeometry();
+        selectReferenceBase(baseId);
+        markLocatorDirty(false);
+        refreshReferenceTemplateBank();
+    });
 }
 
 void ReferenceImageDialog::setupPositionCorrectionControls()
@@ -653,6 +855,11 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
     header->addStretch(1);
     header->addWidget(m_positionTestButton);
     settingsLayout->addLayout(header);
+    // The template bank is an editor tab strip, not a separate top-level
+    // card. Moving the existing widget preserves all object names and test
+    // hooks while matching the compact “template tab + add” interaction.
+    if (ui->referenceTemplateBankCard)
+        settingsLayout->addWidget(ui->referenceTemplateBankCard);
 
     QHBoxLayout *tools = new QHBoxLayout;
     QLabel *field = new QLabel(tr("模板区域"), m_positionSettingsFrame);
@@ -792,10 +999,14 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
         m_referencePositionCorrection.templateMaskCircleCenterNormalized =
                 QPointF();
         m_referencePositionCorrection.templateMaskCircleRadiusNormalized = 0.0;
+        m_referenceTemplateExcludeEdited = true;
         markActiveTemplateDirty();
         clearReferencePositionMatchOverlays();
         restoreReferencePositionRoi();
         renderReferencePositionOverlays();
+        m_positionMaskClearButton->setEnabled(
+                    m_referencePositionCorrection.templateMaskRegionType !=
+                    QStringLiteral("none"));
         m_positionStatusLabel->setText(
                     tr("模板屏蔽区域已清除，请点击“创建/更新基准”重新验证"));
     });
@@ -816,7 +1027,7 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
     });
     connect(m_positionSelectOriginButton, &QPushButton::clicked,
             this, [this](bool checked) {
-        if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+        if (!showActiveTemplateBase() || !m_previewHelper) {
             m_positionSelectOriginButton->setChecked(false);
             m_positionStatusLabel->setText(tr("请先设置基准图"));
             return;
@@ -828,10 +1039,6 @@ void ReferenceImageDialog::setupPositionCorrectionControls()
                 ? tr("点击基准图选择自定义定位点") : tr("基准图"));
     });
     connect(m_positionTestButton, &QPushButton::clicked, this, [this]() {
-        if (ReferenceImageProvider::instance().referenceImage().isNull()) {
-            m_positionStatusLabel->setText(tr("请先设置基准图"));
-            return;
-        }
         if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None) {
             m_positionStatusLabel->setText(tr("请先点击“完成”确认当前区域"));
             return;
@@ -940,6 +1147,7 @@ void ReferenceImageDialog::setupReferenceMatchingParameterControls(
                 m_positionSettingsFrame,
                 QStringLiteral("referenceAdvancedMatchingCard"),
                 tr("全部匹配参数"), &advancedForm);
+    m_advancedMatchingForm = advancedForm;
     m_searchRegionToolsWidget = new QWidget(m_advancedMatchingCard);
     m_searchRegionToolsWidget->setObjectName(
                 QStringLiteral("referenceSearchRegionToolsWidget"));
@@ -969,6 +1177,11 @@ void ReferenceImageDialog::setupReferenceMatchingParameterControls(
     m_templatePrioritySpinBox = integerField(
                 m_advancedMatchingCard,
                 QStringLiteral("referenceTemplatePrioritySpinBox"), 0, 7, 0);
+    m_templateIndependentParametersCheckBox = new QCheckBox(
+                tr("当前模板独立使用全部匹配参数"),
+                m_advancedMatchingCard);
+    m_templateIndependentParametersCheckBox->setObjectName(
+                QStringLiteral("referenceTemplateIndependentParametersCheckBox"));
     m_polarityComboBox = new QComboBox(m_advancedMatchingCard);
     m_polarityComboBox->setObjectName(
                 QStringLiteral("referencePolarityComboBox"));
@@ -1016,6 +1229,8 @@ void ReferenceImageDialog::setupReferenceMatchingParameterControls(
     m_primaryStrategyComboBox = new QComboBox(m_advancedMatchingCard);
     m_primaryStrategyComboBox->setObjectName(
                 QStringLiteral("referencePrimaryStrategyComboBox"));
+    m_primaryStrategyComboBox->addItem(tr("首个有效模板"),
+                                       QStringLiteral("first_valid"));
     m_primaryStrategyComboBox->addItem(tr("最佳得分"),
                                        QStringLiteral("best_score"));
     m_primaryStrategyComboBox->addItem(tr("模板优先级"),
@@ -1042,6 +1257,8 @@ void ReferenceImageDialog::setupReferenceMatchingParameterControls(
                 QStringLiteral("referenceFusionScaleToleranceSpinBox"),
                 0.0, 1.0, 0.05, 0.01, 2);
     advancedForm->addRow(tr("当前模板优先级"), m_templatePrioritySpinBox);
+    advancedForm->addRow(QString(),
+                         m_templateIndependentParametersCheckBox);
     advancedForm->addRow(tr("极性"), m_polarityComboBox);
     advancedForm->addRow(tr("对比度模式"), m_contrastModeComboBox);
     advancedForm->addRow(tr("Contrast"), m_contrastSpinBox);
@@ -1117,9 +1334,62 @@ void ReferenceImageDialog::setupReferenceMatchingParameterControls(
         const int index = activeTemplateIndex();
         if (m_loadingLocatorControls || index < 0)
             return;
-        m_locatorConfig.templates[index].priority = value;
+        if (m_locatorConfig.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion) {
+            const QString baseId = m_locatorConfig.templates.at(index)
+                    .sourceBaseId;
+            QVector<int> siblingIndexes;
+            for (int candidate = 0;
+                 candidate < m_locatorConfig.templates.size(); ++candidate) {
+                if (candidate != index &&
+                        m_locatorConfig.templates.at(candidate).sourceBaseId ==
+                        baseId) {
+                    siblingIndexes.append(candidate);
+                }
+            }
+            std::stable_sort(siblingIndexes.begin(), siblingIndexes.end(),
+                             [this](int left, int right) {
+                return m_locatorConfig.templates.at(left).order <
+                        m_locatorConfig.templates.at(right).order;
+            });
+            siblingIndexes.insert(qBound(0, value, siblingIndexes.size()),
+                                  index);
+            for (int order = 0; order < siblingIndexes.size(); ++order) {
+                TemplateLocationTemplateConfig &ordered =
+                        m_locatorConfig.templates[siblingIndexes.at(order)];
+                ordered.order = order;
+                ordered.priority = order;
+            }
+        } else {
+            m_locatorConfig.templates[index].priority = value;
+        }
         markLocatorDirty(false);
         refreshReferenceTemplateBank();
+    });
+    connect(m_templateIndependentParametersCheckBox, &QCheckBox::toggled,
+            this, [this](bool checked) {
+        if (m_loadingLocatorControls || m_referencePositionEditorReadOnly)
+            return;
+        if (m_locatorConfig.version !=
+                TemplateLocationConfig::CompositeBankParamsVersion) {
+            synchronizeLocatorBaseBindings(true);
+        }
+        const int index = activeTemplateIndex();
+        if (index < 0)
+            return;
+        TemplateLocationTemplateConfig &item =
+                m_locatorConfig.templates[index];
+        if (checked) {
+            item.independentParameters =
+                    TemplateLocationConfig::sharedMatchParameters(
+                        m_locatorConfig);
+            item.independentParametersComplete = true;
+            item.useIndependentParameters = true;
+        } else {
+            item.useIndependentParameters = false;
+        }
+        loadMatchingParametersForActiveTemplate();
+        markActiveTemplateDirty();
     });
     connect(m_searchFullButton, &QPushButton::clicked, this, [this]() {
         stopReferencePositionRoiEditing(false);
@@ -1182,11 +1452,12 @@ void ReferenceImageDialog::loadPositionCorrectionConfig()
                     m_referencePositionCorrection.referencePosesByTemplateId,
                     &invalidTemplateId, &readinessMessage);
         if (!ready) {
-            // Overall pose readiness is atomic, but each item's persisted model
-            // cache state remains truthful and may be reused by a later test.
+            // Overall readiness is atomic, but the pose bank is intentionally
+            // per-template.  A Base replacement removes only poses bound to
+            // that Base in SchemeStore; keep the unaffected frozen poses so a
+            // later rebuild can reuse their stable template/Base identities.
             m_referencePositionCorrection.referenceCreated = false;
             m_referencePositionCorrection.referencePose = QJsonObject();
-            m_referencePositionCorrection.referencePosesByTemplateId = QJsonObject();
             m_referencePositionCorrection.status =
                     QStringLiteral("reference_bank_not_ready");
             m_referencePositionCorrection.message = !resolved.valid
@@ -1229,11 +1500,360 @@ void ReferenceImageDialog::loadPositionCorrectionConfig()
 
 void ReferenceImageDialog::reloadReferenceStateAfterImageChange()
 {
-    // SchemeStore commits the new pixels and invalidates every frozen locator
-    // pose atomically.  Always reload that committed state here; writing the
-    // dialog's pre-change copy back would resurrect stale model identities.
+    // SchemeStore commits the new pixels and invalidates only the models and
+    // frozen poses bound to the changed Base. Always reload that committed
+    // state here; writing the dialog's pre-change copy back would resurrect
+    // stale model identities.
     loadPositionCorrectionConfig();
     clearReferencePositionMatchOverlays();
+}
+
+bool ReferenceImageDialog::saveReferenceDraftBeforeAssetMutation(
+        QString *errorMessage)
+{
+    SchemeStore &store = SchemeStore::instance();
+    QString error;
+    if (!store.ensureLoaded(&error)) {
+        if (errorMessage)
+            *errorMessage = error;
+        return false;
+    }
+    if (m_positionRoiEditMode != PositionCorrectionRoiEditMode::None) {
+        if (errorMessage)
+            *errorMessage = tr("请先点击“完成”确认当前区域，再修改 Base");
+        return false;
+    }
+    if (!m_referencePositionEditorReadOnly)
+        writeLocatorControls();
+    store.setReferencePositionCorrection(m_referencePositionCorrection);
+    if (!store.saveCurrentScheme(&error)) {
+        // saveCurrentScheme restores SchemeStore's persisted candidate on
+        // failure. Mirror that rollback so a subsequent asset action cannot
+        // resubmit the rejected draft.
+        loadPositionCorrectionConfig();
+        if (errorMessage)
+            *errorMessage = error;
+        return false;
+    }
+    return true;
+}
+
+void ReferenceImageDialog::synchronizeLocatorBaseBindings(bool forceV6)
+{
+    const QVector<ReferenceAsset> assets =
+            SchemeStore::instance().referenceAssets();
+    if (assets.isEmpty())
+        return;
+    const QString primaryId = SchemeStore::instance().currentScheme()
+            .referenceAssets.primaryBaseId();
+    if (forceV6 && m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        m_locatorConfig = TemplateLocationConfig::upgradeToV6(
+                    m_locatorConfig,
+                    primaryId.trimmed().isEmpty()
+                    ? assets.first().baseId : primaryId);
+    }
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion)
+        return;
+
+    QMap<QString, int> assetOrders;
+    for (int index = 0; index < assets.size(); ++index) {
+        assetOrders.insert(assets.at(index).baseId, index);
+    }
+    QSet<QString> referencedIds;
+    QMap<QString, QVector<int>> templateIndexesByBase;
+    for (int index = 0; index < m_locatorConfig.templates.size(); ++index) {
+        TemplateLocationTemplateConfig &item = m_locatorConfig.templates[index];
+        const QString sourceBaseId = item.sourceBaseId.trimmed();
+        // An existing v6 source identity is authoritative even when its Base
+        // was removed or the field is empty.  Silently substituting the
+        // primary Base would make an invalid bank look valid and rewrite the
+        // user's binding merely by opening/saving this page.
+        if (sourceBaseId.isEmpty())
+            continue;
+        referencedIds.insert(sourceBaseId);
+        templateIndexesByBase[sourceBaseId].append(index);
+    }
+    // Existing per-Base template order is serialized identity.  Do not
+    // normalize it during load/save; explicit add/rebind/reorder handlers
+    // allocate or update an order themselves.
+    const bool requiresCustomOrigin = referencedIds.size() > 1 ||
+            m_locatorConfig.templates.size() > 1;
+
+    QVector<TemplateLocationBaseBindingConfig> bindings;
+    bindings.reserve(referencedIds.size());
+    QSet<QString> appendedBaseIds;
+    for (const ReferenceAsset &asset : assets) {
+        if (!referencedIds.contains(asset.baseId))
+            continue;
+        const TemplateLocationBaseBindingConfig *existing =
+                TemplateLocationConfig::findBaseBinding(
+                    m_locatorConfig, asset.baseId);
+        TemplateLocationBaseBindingConfig binding;
+        if (existing) {
+            binding = *existing;
+        } else {
+            binding.baseId = asset.baseId;
+            binding.searchRegionType = QStringLiteral("full");
+            binding.searchRoiNormalized = QRectF(0.0, 0.0, 1.0, 1.0);
+            binding.originMode = requiresCustomOrigin
+                    ? QStringLiteral("centroid")
+                    : m_locatorConfig.originMode;
+            binding.customOriginNormalized =
+                    m_locatorConfig.customOriginNormalized;
+        }
+        binding.order = assetOrders.value(asset.baseId);
+        bindings.append(binding);
+        appendedBaseIds.insert(asset.baseId);
+    }
+
+    // Keep an unavailable but still-referenced binding intact so opening the
+    // editor is lossless.  It remains visibly invalid until the user actively
+    // chooses a replacement Base.
+    for (const TemplateLocationBaseBindingConfig &existing :
+         qAsConst(m_locatorConfig.baseBindings)) {
+        const QString baseId = existing.baseId.trimmed();
+        if (baseId.isEmpty() || appendedBaseIds.contains(baseId) ||
+                !referencedIds.contains(baseId)) {
+            continue;
+        }
+        bindings.append(existing);
+        appendedBaseIds.insert(baseId);
+    }
+
+    // Multi-template v6 requires a custom origin per binding, but those
+    // normalized coordinates belong to different Base images and therefore
+    // must never be copied across Bases.  Preserve every valid custom value;
+    // when upgrading a centroid binding, freeze the first valid template
+    // centre belonging to that same Base.
+    if (requiresCustomOrigin) {
+        for (TemplateLocationBaseBindingConfig &binding : bindings) {
+            if (binding.originMode == QStringLiteral("custom") &&
+                    validNormalizedPoint(binding.customOriginNormalized)) {
+                continue;
+            }
+            QPointF baseOrigin;
+            const QVector<int> indexes =
+                    templateIndexesByBase.value(binding.baseId);
+            for (int templateIndex : indexes) {
+                const QPointF candidate = centroidForTemplate(
+                            m_locatorConfig.templates.at(templateIndex));
+                if (!validNormalizedPoint(candidate))
+                    continue;
+                baseOrigin = candidate;
+                break;
+            }
+            if (validNormalizedPoint(baseOrigin)) {
+                binding.originMode = QStringLiteral("custom");
+                binding.customOriginNormalized = baseOrigin;
+            }
+        }
+    }
+    m_locatorConfig.baseBindings = bindings;
+    m_locatorConfig.primaryMatchStrategy = QStringLiteral("first_valid");
+    m_locatorConfig.primaryTemplateId.clear();
+    TemplateLocationConfig::ensureStableTemplateIds(&m_locatorConfig);
+
+    const int activeIndex = activeTemplateIndex();
+    if (activeIndex >= 0) {
+        const TemplateLocationBaseBindingConfig *activeBinding =
+                TemplateLocationConfig::findBaseBinding(
+                    m_locatorConfig,
+                    m_locatorConfig.templates.at(activeIndex).sourceBaseId);
+        if (activeBinding) {
+            m_referencePositionCorrection.originMode =
+                    activeBinding->originMode;
+            m_referencePositionCorrection.customOriginNormalized =
+                    activeBinding->customOriginNormalized;
+            m_locatorConfig.originMode = activeBinding->originMode;
+            m_locatorConfig.customOriginNormalized =
+                    activeBinding->customOriginNormalized;
+        }
+    }
+}
+
+void ReferenceImageDialog::storeLegacyBaseBindingGeometry()
+{
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion)
+        return;
+    const QString baseId = activeTemplateBaseId();
+    TemplateLocationBaseBindingConfig *binding =
+            TemplateLocationConfig::findBaseBinding(
+                &m_locatorConfig, baseId);
+    if (!binding)
+        return;
+    binding->searchRegionType = m_locatorConfig.searchRegionType;
+    binding->searchRoiNormalized = m_locatorConfig.searchRoiNormalized;
+    binding->searchPolygonNormalized = m_locatorConfig.searchPolygonNormalized;
+    binding->searchCircleCenterNormalized =
+            m_locatorConfig.searchCircleCenterNormalized;
+    binding->searchCircleRadiusNormalized =
+            m_locatorConfig.searchCircleRadiusNormalized;
+    binding->originMode = m_referencePositionCorrection.originMode;
+    binding->customOriginNormalized =
+            m_referencePositionCorrection.customOriginNormalized;
+}
+
+void ReferenceImageDialog::loadActiveBaseBindingGeometry()
+{
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion)
+        return;
+    const TemplateLocationBaseBindingConfig *binding =
+            TemplateLocationConfig::findBaseBinding(
+                m_locatorConfig, activeTemplateBaseId());
+    if (!binding)
+        return;
+    m_locatorConfig.searchRegionType = binding->searchRegionType;
+    m_locatorConfig.searchRoiNormalized = binding->searchRoiNormalized;
+    m_locatorConfig.searchPolygonNormalized = binding->searchPolygonNormalized;
+    m_locatorConfig.searchCircleCenterNormalized =
+            binding->searchCircleCenterNormalized;
+    m_locatorConfig.searchCircleRadiusNormalized =
+            binding->searchCircleRadiusNormalized;
+    m_referencePositionCorrection.originMode = binding->originMode;
+    m_referencePositionCorrection.customOriginNormalized =
+            binding->customOriginNormalized;
+    if (m_positionOriginModeComboBox) {
+        const QSignalBlocker blocker(m_positionOriginModeComboBox);
+        m_positionOriginModeComboBox->setCurrentIndex(
+                    binding->originMode == QStringLiteral("custom") ? 1 : 0);
+    }
+    updateReferencePositionOriginControls();
+    if (m_searchFullButton) {
+        m_searchFullButton->setChecked(
+                    binding->searchRegionType == QStringLiteral("full"));
+        m_searchRectButton->setChecked(
+                    binding->searchRegionType == QStringLiteral("rectangle"));
+        m_searchCircleButton->setChecked(
+                    binding->searchRegionType == QStringLiteral("circle"));
+        m_searchPolygonButton->setChecked(
+                    binding->searchRegionType == QStringLiteral("polygon"));
+    }
+}
+
+void ReferenceImageDialog::storeMatchingParametersToActiveTemplate()
+{
+    const int index = activeTemplateIndex();
+    if (index < 0 || m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion)
+        return;
+    TemplateLocationTemplateConfig &item = m_locatorConfig.templates[index];
+    if (!item.useIndependentParameters)
+        return;
+    TemplateLocationMatchParameters parameters = item.independentParameters;
+    parameters.minScore = m_minScoreSpinBox->value();
+    parameters.angleStart = m_angleMinSpinBox->value();
+    parameters.angleExtent = m_angleMaxSpinBox->value() -
+            m_angleMinSpinBox->value();
+    parameters.scaleMin = m_scaleMinSpinBox->value();
+    parameters.scaleMax = m_scaleMaxSpinBox->value();
+    parameters.polarity = m_polarityComboBox->currentData().toString();
+    parameters.contrastMode =
+            m_contrastModeComboBox->currentData().toString();
+    parameters.contrast = m_contrastSpinBox->value();
+    parameters.minContrast = m_minContrastSpinBox->value();
+    parameters.numLevels = m_numLevelsSpinBox->value();
+    parameters.subPixel = m_subPixelComboBox->currentText();
+    parameters.greediness = m_greedinessSpinBox->value();
+    parameters.maxOverlap = m_maxOverlapSpinBox->value() / 100.0;
+    item.independentParameters = parameters;
+    item.independentParametersComplete = true;
+}
+
+void ReferenceImageDialog::loadMatchingParametersForActiveTemplate()
+{
+    const int index = activeTemplateIndex();
+    if (index < 0 || !m_minScoreSpinBox)
+        return;
+    const TemplateLocationTemplateConfig &item =
+            m_locatorConfig.templates.at(index);
+    const TemplateLocationMatchParameters parameters =
+            TemplateLocationConfig::effectiveMatchParameters(
+                m_locatorConfig, item);
+    const bool previousLoading = m_loadingLocatorControls;
+    m_loadingLocatorControls = true;
+    m_minScoreSpinBox->setValue(parameters.minScore);
+    m_angleMinSpinBox->setValue(parameters.angleStart);
+    m_angleMaxSpinBox->setValue(parameters.angleStart +
+                                parameters.angleExtent);
+    m_scaleMinSpinBox->setValue(parameters.scaleMin);
+    m_scaleMaxSpinBox->setValue(parameters.scaleMax);
+    int comboIndex = m_polarityComboBox->findData(parameters.polarity);
+    m_polarityComboBox->setCurrentIndex(comboIndex < 0 ? 0 : comboIndex);
+    comboIndex = m_contrastModeComboBox->findData(parameters.contrastMode);
+    m_contrastModeComboBox->setCurrentIndex(comboIndex < 0 ? 0 : comboIndex);
+    m_contrastSpinBox->setValue(parameters.contrast);
+    m_minContrastSpinBox->setValue(parameters.minContrast);
+    m_numLevelsSpinBox->setValue(parameters.numLevels);
+    comboIndex = m_subPixelComboBox->findText(parameters.subPixel);
+    m_subPixelComboBox->setCurrentIndex(comboIndex < 0 ? 0 : comboIndex);
+    m_greedinessSpinBox->setValue(parameters.greediness);
+    m_maxOverlapSpinBox->setValue(qRound(parameters.maxOverlap * 100.0));
+    if (m_templateIndependentParametersCheckBox) {
+        m_templateIndependentParametersCheckBox->setChecked(
+                    m_locatorConfig.version ==
+                    TemplateLocationConfig::CompositeBankParamsVersion &&
+                    item.useIndependentParameters);
+        m_templateIndependentParametersCheckBox->setEnabled(
+                    !m_referencePositionEditorReadOnly &&
+                    m_locatorConfig.version ==
+                    TemplateLocationConfig::CompositeBankParamsVersion);
+    }
+    m_loadingLocatorControls = previousLoading;
+    updateMatchingParameterControlState();
+}
+
+void ReferenceImageDialog::invalidateLocatorForBase(const QString &baseId)
+{
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        for (TemplateLocationTemplateConfig &item : m_locatorConfig.templates)
+            item.modelCreated = false;
+        m_referencePositionCorrection.referenceCreated = false;
+        m_referencePositionCorrection.referencePose = QJsonObject();
+        m_referencePositionCorrection.referencePosesByTemplateId = QJsonObject();
+        m_referencePositionCorrection.score = 0.0;
+        m_referencePositionCorrection.elapsedMs = 0;
+        m_referencePositionCorrection.status =
+                QStringLiteral("reference_base_changed");
+        m_referencePositionCorrection.message =
+                tr("主 Base 已更新，需要重新创建基准定位");
+        if (m_referenceLocatorBankEnvelope)
+            writeLocatorControls();
+        clearReferencePositionMatchOverlays();
+        if (m_positionStatusLabel)
+            m_positionStatusLabel->setText(
+                        m_referencePositionCorrection.message);
+        return;
+    }
+    bool affected = false;
+    for (TemplateLocationTemplateConfig &item : m_locatorConfig.templates) {
+        if (item.sourceBaseId == baseId) {
+            item.modelCreated = false;
+            m_referencePositionCorrection.referencePosesByTemplateId.remove(
+                        item.templateId);
+            affected = true;
+        }
+    }
+    if (!affected)
+        return;
+    m_referenceLocatorBankEnvelope = true;
+    m_referencePositionCorrection.referenceCreated = false;
+    m_referencePositionCorrection.referencePose = QJsonObject();
+    m_referencePositionCorrection.score = 0.0;
+    m_referencePositionCorrection.elapsedMs = 0;
+    m_referencePositionCorrection.status =
+            QStringLiteral("reference_base_changed");
+    m_referencePositionCorrection.message = tr(
+                "Base %1 已更新，仅其绑定模板需要重新创建基准")
+            .arg(baseId);
+    writeLocatorControls();
+    clearReferencePositionMatchOverlays();
+    if (m_positionStatusLabel)
+        m_positionStatusLabel->setText(m_referencePositionCorrection.message);
 }
 
 void ReferenceImageDialog::loadLocatorControls(
@@ -1241,6 +1861,10 @@ void ReferenceImageDialog::loadLocatorControls(
 {
     m_loadingLocatorControls = true;
     m_locatorConfig = config;
+    // Stable template identities may be repaired for editable known banks,
+    // but the v6 normalizer must not run here: it fills a missing
+    // sourceBaseId from the first binding and would silently rebind merely on
+    // dialog load.
     TemplateLocationConfig::ensureStableTemplateIds(&m_locatorConfig);
     if (m_locatorConfig.templates.isEmpty()) {
         TemplateLocationTemplateConfig item;
@@ -1253,6 +1877,7 @@ void ReferenceImageDialog::loadLocatorControls(
         m_locatorConfig.templates.append(item);
         m_locatorConfig.version = TemplateLocationConfig::ModelBankParamsVersion;
     }
+    synchronizeLocatorBaseBindings(false);
     m_locatorConfig.maxMatches = 1;
     m_locatorConfig.minMatchCount = 1;
     m_locatorConfig.maxMatchCount = 1;
@@ -1303,6 +1928,8 @@ void ReferenceImageDialog::loadLocatorControls(
     m_referencePositionCorrection.customOriginNormalized =
             m_locatorConfig.customOriginNormalized;
     loadActiveTemplateGeometry();
+    loadActiveBaseBindingGeometry();
+    loadMatchingParametersForActiveTemplate();
     refreshReferenceTemplateBank();
     m_loadingLocatorControls = false;
     updateMatchingParameterControlState();
@@ -1314,48 +1941,73 @@ void ReferenceImageDialog::writeLocatorControls()
             !m_referenceLocatorBankEnvelope)
         return;
     storeLegacyGeometryToActiveTemplate();
-    m_locatorConfig.version = TemplateLocationConfig::ModelBankParamsVersion;
+    storeLegacyBaseBindingGeometry();
+    storeMatchingParametersToActiveTemplate();
     m_locatorConfig.templateMode = QStringLiteral("alternatives");
-    m_locatorConfig.minScore = m_minScoreSpinBox->value();
-    m_locatorConfig.angleStart = m_angleMinSpinBox->value();
-    m_locatorConfig.angleExtent = m_angleMaxSpinBox->value() -
-            m_angleMinSpinBox->value();
-    m_locatorConfig.scaleMin = m_scaleMinSpinBox->value();
-    m_locatorConfig.scaleMax = m_scaleMaxSpinBox->value();
-    m_locatorConfig.polarity = m_polarityComboBox->currentData().toString();
-    m_locatorConfig.contrastMode =
-            m_contrastModeComboBox->currentData().toString();
-    m_locatorConfig.contrast = m_contrastSpinBox->value();
-    m_locatorConfig.minContrast = m_minContrastSpinBox->value();
-    m_locatorConfig.numLevels = m_numLevelsSpinBox->value();
-    m_locatorConfig.subPixel = m_subPixelComboBox->currentText();
-    m_locatorConfig.greediness = m_greedinessSpinBox->value();
+    const int currentTemplateIndex = activeTemplateIndex();
+    const bool independent = currentTemplateIndex >= 0 &&
+            m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion &&
+            m_locatorConfig.templates.at(currentTemplateIndex)
+            .useIndependentParameters;
+    if (!independent) {
+        m_locatorConfig.minScore = m_minScoreSpinBox->value();
+        m_locatorConfig.angleStart = m_angleMinSpinBox->value();
+        m_locatorConfig.angleExtent = m_angleMaxSpinBox->value() -
+                m_angleMinSpinBox->value();
+        m_locatorConfig.scaleMin = m_scaleMinSpinBox->value();
+        m_locatorConfig.scaleMax = m_scaleMaxSpinBox->value();
+        m_locatorConfig.polarity = m_polarityComboBox->currentData().toString();
+        m_locatorConfig.contrastMode =
+                m_contrastModeComboBox->currentData().toString();
+        m_locatorConfig.contrast = m_contrastSpinBox->value();
+        m_locatorConfig.minContrast = m_minContrastSpinBox->value();
+        m_locatorConfig.numLevels = m_numLevelsSpinBox->value();
+        m_locatorConfig.subPixel = m_subPixelComboBox->currentText();
+        m_locatorConfig.greediness = m_greedinessSpinBox->value();
+        m_locatorConfig.maxOverlap = m_maxOverlapSpinBox->value() / 100.0;
+    }
     m_locatorConfig.timeoutMs = m_timeoutSpinBox->value();
-    m_locatorConfig.maxOverlap = m_maxOverlapSpinBox->value() / 100.0;
     m_locatorConfig.maxMatches = 1;
     m_locatorConfig.minMatchCount = 1;
     m_locatorConfig.maxMatchCount = 1;
-    m_locatorConfig.primaryMatchStrategy =
-            m_primaryStrategyComboBox->currentData().toString();
-    m_locatorConfig.primaryTemplateId =
-            m_lockedTemplateComboBox->currentData().toString();
-    m_locatorConfig.fusion.enabled = m_fusionEnabledCheckBox->isChecked();
-    m_locatorConfig.fusion.positionTolerancePx =
-            m_fusionPositionToleranceSpinBox->value();
-    m_locatorConfig.fusion.angleToleranceDeg =
-            m_fusionAngleToleranceSpinBox->value();
-    m_locatorConfig.fusion.scaleTolerance =
-            m_fusionScaleToleranceSpinBox->value();
+    if (m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        synchronizeLocatorBaseBindings(false);
+        m_locatorConfig.primaryMatchStrategy = QStringLiteral("first_valid");
+        m_locatorConfig.primaryTemplateId.clear();
+    } else {
+        m_locatorConfig.primaryMatchStrategy =
+                m_primaryStrategyComboBox->currentData().toString();
+        m_locatorConfig.primaryTemplateId =
+                m_lockedTemplateComboBox->currentData().toString();
+    }
+    // The v6 codec intentionally has no fusion contract.  Keep these legacy
+    // controls strictly v4/v5 so the UI cannot offer parameters that disappear
+    // on save.
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        m_locatorConfig.fusion.enabled =
+                m_fusionEnabledCheckBox->isChecked();
+        m_locatorConfig.fusion.positionTolerancePx =
+                m_fusionPositionToleranceSpinBox->value();
+        m_locatorConfig.fusion.angleToleranceDeg =
+                m_fusionAngleToleranceSpinBox->value();
+        m_locatorConfig.fusion.scaleTolerance =
+                m_fusionScaleToleranceSpinBox->value();
+    }
     m_locatorConfig.originMode = m_referencePositionCorrection.originMode;
     m_locatorConfig.customOriginNormalized =
             m_referencePositionCorrection.customOriginNormalized;
     m_referencePositionCorrection.locator =
             TemplateLocationConfig::toToolParams(m_locatorConfig);
-    m_referencePositionCorrection.version =
-            ReferenceTemplateLocationConfig::ModelBankEnvelopeVersion;
+    const int referenceEnvelopeVersion = m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion
+            ? 5 : ReferenceTemplateLocationConfig::ModelBankEnvelopeVersion;
+    m_referencePositionCorrection.version = referenceEnvelopeVersion;
     m_referencePositionCorrection.extra.insert(
                 QStringLiteral("version"),
-                ReferenceTemplateLocationConfig::ModelBankEnvelopeVersion);
+                referenceEnvelopeVersion);
 }
 
 void ReferenceImageDialog::updateMatchingParameterControlState()
@@ -1370,7 +2022,30 @@ void ReferenceImageDialog::updateMatchingParameterControlState()
             QStringLiteral("locked_template");
     m_lockedTemplateComboBox->setEnabled(locked &&
                                          !m_referencePositionEditorReadOnly);
-    const bool fusion = m_fusionEnabledCheckBox->isChecked();
+    m_primaryStrategyComboBox->setEnabled(
+                !m_referencePositionEditorReadOnly &&
+                m_locatorConfig.version !=
+                TemplateLocationConfig::CompositeBankParamsVersion);
+    const bool v6 = m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion;
+    const QList<QWidget *> fusionFields{
+        m_fusionEnabledCheckBox,
+        m_fusionPositionToleranceSpinBox,
+        m_fusionAngleToleranceSpinBox,
+        m_fusionScaleToleranceSpinBox
+    };
+    for (QWidget *field : fusionFields) {
+        if (!field)
+            continue;
+        field->setVisible(!v6);
+        if (m_advancedMatchingForm) {
+            if (QWidget *label = m_advancedMatchingForm->labelForField(field))
+                label->setVisible(!v6);
+        }
+    }
+    const bool fusion = !v6 && m_fusionEnabledCheckBox->isChecked();
+    m_fusionEnabledCheckBox->setEnabled(
+                !v6 && !m_referencePositionEditorReadOnly);
     m_fusionPositionToleranceSpinBox->setEnabled(
                 fusion && !m_referencePositionEditorReadOnly);
     m_fusionAngleToleranceSpinBox->setEnabled(
@@ -1384,10 +2059,17 @@ void ReferenceImageDialog::markLocatorDirty(bool modelParametersChanged)
     if (m_loadingLocatorControls || m_referencePositionEditorReadOnly)
         return;
     // Loading a v1..v3 reference creates only an in-memory compatibility bank.
-    // Promote it to the strict locator envelope only after a real locator edit;
-    // opening, saving or merely toggling correction must preserve the legacy
-    // pose contract byte-for-byte.
+    // Promote it to a supported locator envelope only after a real locator
+    // edit, while retaining v4/v5 semantics.  v6 is entered only by an
+    // explicit composite action (Base rebind, independent parameters or the
+    // v6 template-add path), never because an unrelated Base merely exists.
     m_referenceLocatorBankEnvelope = true;
+    if (m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        synchronizeLocatorBaseBindings(false);
+    } else {
+        TemplateLocationConfig::ensureStableTemplateIds(&m_locatorConfig);
+    }
     if (modelParametersChanged) {
         for (TemplateLocationTemplateConfig &item : m_locatorConfig.templates)
             item.modelCreated = false;
@@ -1412,6 +2094,50 @@ void ReferenceImageDialog::markActiveTemplateDirty()
     if (index >= 0)
         m_locatorConfig.templates[index].modelCreated = false;
     markLocatorDirty(false);
+}
+
+bool ReferenceImageDialog::locatorBaseBindingIssue(QString *message) const
+{
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        return false;
+    }
+
+    QSet<QString> availableBaseIds;
+    for (const ReferenceAsset &asset :
+         SchemeStore::instance().referenceAssets()) {
+        availableBaseIds.insert(asset.baseId);
+    }
+    for (int index = 0; index < m_locatorConfig.templates.size(); ++index) {
+        const TemplateLocationTemplateConfig &item =
+                m_locatorConfig.templates.at(index);
+        const QString templateName = item.name.trimmed().isEmpty()
+                ? tr("模板%1").arg(index + 1) : item.name;
+        const QString sourceBaseId = item.sourceBaseId.trimmed();
+        if (sourceBaseId.isEmpty()) {
+            if (message) {
+                *message = tr("模板“%1”尚未绑定来源 Base，请在模板来源中重新选择")
+                        .arg(templateName);
+            }
+            return true;
+        }
+        if (!availableBaseIds.contains(sourceBaseId)) {
+            if (message) {
+                *message = tr("模板“%1”绑定的 Base 已不存在（%2），请主动改绑")
+                        .arg(templateName, sourceBaseId);
+            }
+            return true;
+        }
+        if (!TemplateLocationConfig::findBaseBinding(
+                m_locatorConfig, sourceBaseId)) {
+            if (message) {
+                *message = tr("模板“%1”缺少 Base %2 的绑定配置，请重新选择来源 Base")
+                        .arg(templateName, sourceBaseId);
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 bool ReferenceImageDialog::validateLocatorControls(QString *message) const
@@ -1441,7 +2167,11 @@ bool ReferenceImageDialog::validateLocatorControls(QString *message) const
         if (message) *message = tr("至少启用一个模板");
         return false;
     }
-    if (m_locatorConfig.templates.size() > 1 &&
+    if (locatorBaseBindingIssue(message))
+        return false;
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion &&
+            m_locatorConfig.templates.size() > 1 &&
             (m_referencePositionCorrection.originMode !=
                  QStringLiteral("custom") ||
              !validNormalizedPoint(
@@ -1494,8 +2224,11 @@ int ReferenceImageDialog::activeTemplateIndex() const
 void ReferenceImageDialog::storeLegacyGeometryToActiveTemplate()
 {
     const int index = activeTemplateIndex();
-    if (index < 0)
+    if (index < 0) {
+        m_referenceTemplateIncludeEdited = false;
+        m_referenceTemplateExcludeEdited = false;
         return;
+    }
     TemplateLocationTemplateConfig &item = m_locatorConfig.templates[index];
     item.templateRegionType = m_referencePositionCorrection.templateRegionType;
     item.templateRoiNormalized =
@@ -1512,10 +2245,88 @@ void ReferenceImageDialog::storeLegacyGeometryToActiveTemplate()
             m_referencePositionCorrection.templateMaskCircleCenterNormalized;
     item.templateMaskCircleRadiusNormalized =
             m_referencePositionCorrection.templateMaskCircleRadiusNormalized;
+    if (m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion &&
+            m_referenceTemplateIncludeEdited) {
+        TemplateLocationRegionConfig include;
+        include.regionId = !item.includeRegions.isEmpty()
+                ? item.includeRegions.first().regionId
+                : QStringLiteral("region-%1").arg(
+                      QUuid::createUuid().toString(QUuid::WithoutBraces));
+        include.regionType = item.templateRegionType;
+        include.roiNormalized = item.templateRoiNormalized;
+        include.polygonNormalized = item.templatePolygonNormalized;
+        if (item.includeRegions.isEmpty())
+            item.includeRegions.append(include);
+        else
+            item.includeRegions[0] = include;
+    }
+    if (m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion &&
+            m_referenceTemplateExcludeEdited) {
+        const QString maskType = item.templateMaskRegionType.trimmed();
+        if (maskType.isEmpty() || maskType == QStringLiteral("none")) {
+            if (!item.excludeRegions.isEmpty())
+                item.excludeRegions.removeFirst();
+            if (!item.excludeRegions.isEmpty()) {
+                const TemplateLocationRegionConfig &next =
+                        item.excludeRegions.first();
+                item.templateMaskRegionType = next.regionType;
+                item.templateMaskRoiNormalized = next.roiNormalized;
+                item.templateMaskPolygonNormalized = next.polygonNormalized;
+                item.templateMaskCircleCenterNormalized =
+                        next.circleCenterNormalized;
+                item.templateMaskCircleRadiusNormalized =
+                        next.circleRadiusNormalized;
+                m_referencePositionCorrection.templateMaskRegionType =
+                        next.regionType;
+                m_referencePositionCorrection.templateMaskRoiNormalized =
+                        next.roiNormalized;
+                m_referencePositionCorrection.templateMaskPolygonNormalized =
+                        polygonPointsToJson(next.polygonNormalized);
+                m_referencePositionCorrection
+                        .templateMaskCircleCenterNormalized =
+                        next.circleCenterNormalized;
+                m_referencePositionCorrection
+                        .templateMaskCircleRadiusNormalized =
+                        next.circleRadiusNormalized;
+            }
+        } else {
+            TemplateLocationRegionConfig exclude;
+            exclude.regionId = !item.excludeRegions.isEmpty()
+                    ? item.excludeRegions.first().regionId
+                    : QStringLiteral("region-%1").arg(
+                          QUuid::createUuid().toString(QUuid::WithoutBraces));
+            exclude.regionType = maskType;
+            exclude.roiNormalized = item.templateMaskRoiNormalized;
+            exclude.polygonNormalized = item.templateMaskPolygonNormalized;
+            exclude.circleCenterNormalized =
+                    item.templateMaskCircleCenterNormalized;
+            exclude.circleRadiusNormalized =
+                    item.templateMaskCircleRadiusNormalized;
+            if (item.excludeRegions.isEmpty())
+                item.excludeRegions.append(exclude);
+            else
+                item.excludeRegions[0] = exclude;
+        }
+    }
+    if (m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion &&
+            (m_referenceTemplateIncludeEdited ||
+             m_referenceTemplateExcludeEdited)) {
+        TemplateLocationConfig::ensureStableTemplateIds(&m_locatorConfig);
+    }
+    m_referenceTemplateIncludeEdited = false;
+    m_referenceTemplateExcludeEdited = false;
 }
 
 void ReferenceImageDialog::loadActiveTemplateGeometry()
 {
+    // v6 may expose a rectangle legacy mirror for a circle include region.
+    // Loading that mirror is not an edit and must never authorize replacing
+    // the authoritative first include/exclude region during switch or save.
+    m_referenceTemplateIncludeEdited = false;
+    m_referenceTemplateExcludeEdited = false;
     const int index = activeTemplateIndex();
     if (index < 0)
         return;
@@ -1554,7 +2365,19 @@ void ReferenceImageDialog::refreshReferenceTemplateBank()
     int enabledCount = 0;
     int readyCount = 0;
     int selectedRow = 0;
-    for (int index = 0; index < m_locatorConfig.templates.size(); ++index) {
+    QMap<QString, QString> baseNames;
+    const QVector<ReferenceAsset> assets =
+            SchemeStore::instance().referenceAssets();
+    for (int baseIndex = 0; baseIndex < assets.size(); ++baseIndex) {
+        baseNames.insert(assets.at(baseIndex).baseId,
+                         tr("B%1").arg(baseIndex + 1, 2, 10,
+                                        QLatin1Char('0')));
+    }
+    const QVector<TemplateLocationConfig::TemplateLocationOrderedTemplateRef>
+            orderedTemplates =
+            TemplateLocationConfig::orderedTemplateRefs(m_locatorConfig, false);
+    for (int row = 0; row < orderedTemplates.size(); ++row) {
+        const int index = orderedTemplates.at(row).templateIndex;
         const TemplateLocationTemplateConfig &item =
                 m_locatorConfig.templates.at(index);
         if (item.enabled)
@@ -1570,17 +2393,141 @@ void ReferenceImageDialog::refreshReferenceTemplateBank()
                 .contains(item.templateId)) {
             status = tr("可用");
         }
+        const QString baseId = m_locatorConfig.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion
+                ? item.sourceBaseId
+                : ReferenceImageProvider::instance().primaryBaseId();
+        const bool sourceAvailable = !baseId.trimmed().isEmpty() &&
+                baseNames.contains(baseId);
+        const bool bindingAvailable = m_locatorConfig.version !=
+                TemplateLocationConfig::CompositeBankParamsVersion ||
+                TemplateLocationConfig::findBaseBinding(
+                    m_locatorConfig, baseId);
+        if (m_locatorConfig.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion &&
+                (!sourceAvailable || !bindingAvailable)) {
+            status = tr("缺少 Base");
+        }
+        const QString baseLabel = sourceAvailable && bindingAvailable
+                ? baseNames.value(baseId)
+                : baseId.trimmed().isEmpty()
+                  ? tr("未绑定 Base")
+                  : sourceAvailable
+                    ? tr("Base 配置缺失")
+                    : tr("Base 已缺失");
+        const int globalIndex = m_locatorConfig.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion
+                ? TemplateLocationConfig::globalTemplateIndex(
+                      m_locatorConfig, item.templateId)
+                : index;
         auto *listItem = new QListWidgetItem(
-                    tr("%1  ·  P%2  ·  %3")
+                    tr("T%1 · %2 · %3 · %4")
+                    .arg(qMax(0, globalIndex))
                     .arg(item.name.trimmed().isEmpty()
                          ? tr("模板%1").arg(index + 1) : item.name)
-                    .arg(item.priority + 1).arg(status),
+                    .arg(baseLabel)
+                    .arg(status),
                     m_referenceTemplateBankList);
         listItem->setData(kReferenceTemplateIdRole, item.templateId);
+        if (!sourceAvailable || !bindingAvailable) {
+            listItem->setToolTip(baseId.trimmed().isEmpty()
+                    ? tr("来源 Base 未绑定；保存不会自动改绑，请手动选择")
+                    : tr("保留的来源 Base ID：%1；该 Base 当前不可用")
+                      .arg(baseId));
+        }
         listItem->setFlags(listItem->flags() | Qt::ItemIsUserCheckable);
         listItem->setCheckState(item.enabled ? Qt::Checked : Qt::Unchecked);
+        // The item model retains text/check-state for accessibility, tests and
+        // serialization, while the compact item widget owns all painting.
+        listItem->setFlags(listItem->flags() & ~Qt::ItemIsUserCheckable);
+        listItem->setForeground(QBrush(Qt::transparent));
+        listItem->setSizeHint(QSize(166, 42));
+
+        auto *tab = new QFrame(m_referenceTemplateBankList);
+        tab->setObjectName(QStringLiteral("referenceTemplateTab"));
+        tab->setProperty("activeTemplate",
+                         item.templateId == m_activeTemplateId);
+        auto *tabLayout = new QHBoxLayout(tab);
+        tabLayout->setContentsMargins(8, 0, 5, 0);
+        tabLayout->setSpacing(4);
+        auto *enabledButton = new QToolButton(tab);
+        enabledButton->setObjectName(
+                    QStringLiteral("referenceTemplateEnableButton"));
+        enabledButton->setText(QString());
+        enabledButton->setCheckable(true);
+        enabledButton->setChecked(item.enabled);
+        enabledButton->setToolTip(item.enabled
+                ? tr("点击停用当前模板") : tr("点击启用当前模板"));
+        enabledButton->setFixedSize(14, 14);
+        auto *tabButton = new QPushButton(
+                    tr("T%1  %2")
+                    .arg(qMax(0, globalIndex))
+                    .arg(item.name.trimmed().isEmpty()
+                         ? tr("模板%1").arg(index + 1) : item.name), tab);
+        tabButton->setObjectName(
+                    QStringLiteral("referenceTemplateTabButton"));
+        tabButton->setProperty("activeTemplate",
+                               item.templateId == m_activeTemplateId);
+        tabButton->setToolTip(listItem->text());
+        auto *closeButton = new QToolButton(tab);
+        closeButton->setObjectName(
+                    QStringLiteral("referenceTemplateCloseButton"));
+        closeButton->setText(QStringLiteral("×"));
+        closeButton->setToolTip(tr("删除该模板"));
+        closeButton->setFixedSize(24, 30);
+        closeButton->setEnabled(!m_referencePositionEditorReadOnly &&
+                                m_locatorConfig.templates.size() > 1);
+        tabLayout->addWidget(enabledButton, 0, Qt::AlignVCenter);
+        tabLayout->addWidget(tabButton, 1);
+        tabLayout->addWidget(closeButton);
+        m_referenceTemplateBankList->setItemWidget(listItem, tab);
+
+        connect(tabButton, &QPushButton::clicked, this,
+                [this, templateId = item.templateId]() {
+            QTimer::singleShot(0, this, [this, templateId]() {
+                if (!m_referenceTemplateBankList)
+                    return;
+                for (int row = 0;
+                     row < m_referenceTemplateBankList->count(); ++row) {
+                    QListWidgetItem *candidate =
+                            m_referenceTemplateBankList->item(row);
+                    if (candidate->data(kReferenceTemplateIdRole).toString()
+                            == templateId) {
+                        m_referenceTemplateBankList->setCurrentItem(candidate);
+                        break;
+                    }
+                }
+            });
+        });
+        connect(enabledButton, &QToolButton::toggled, this,
+                [this, templateId = item.templateId](bool enabled) {
+            QTimer::singleShot(0, this, [this, templateId, enabled]() {
+                if (!m_referenceTemplateBankList)
+                    return;
+                for (int row = 0;
+                     row < m_referenceTemplateBankList->count(); ++row) {
+                    QListWidgetItem *candidate =
+                            m_referenceTemplateBankList->item(row);
+                    if (candidate->data(kReferenceTemplateIdRole).toString()
+                            == templateId) {
+                        candidate->setCheckState(
+                                    enabled ? Qt::Checked : Qt::Unchecked);
+                        break;
+                    }
+                }
+            });
+        });
+        connect(closeButton, &QToolButton::clicked, this,
+                [this, templateId = item.templateId]() {
+            // Switching rebuilds the tab widgets. Queue deletion so the
+            // sender is never destroyed in the middle of its click handler.
+            QTimer::singleShot(0, this, [this, templateId]() {
+                switchActiveTemplate(templateId);
+                deleteReferenceTemplate();
+            });
+        });
         if (item.templateId == m_activeTemplateId)
-            selectedRow = index;
+            selectedRow = row;
     }
     if (!m_locatorConfig.templates.isEmpty())
         m_referenceTemplateBankList->setCurrentRow(selectedRow);
@@ -1599,6 +2546,45 @@ void ReferenceImageDialog::refreshReferenceTemplateBank()
                 !m_referencePositionEditorReadOnly &&
                 m_locatorConfig.templates.size() > 1);
 
+    if (m_templateSourceBaseComboBox) {
+        const QSignalBlocker sourceBlocker(m_templateSourceBaseComboBox);
+        m_templateSourceBaseComboBox->clear();
+        for (int index = 0; index < assets.size(); ++index) {
+            const ReferenceAsset &asset = assets.at(index);
+            m_templateSourceBaseComboBox->addItem(
+                        tr("B%1 · %2%3")
+                        .arg(index + 1, 2, 10, QLatin1Char('0'))
+                        .arg(asset.name)
+                        .arg(asset.baseId ==
+                             SchemeStore::instance().currentScheme()
+                             .referenceAssets.primaryBaseId()
+                             ? tr("（主）") : QString()),
+                        asset.baseId);
+        }
+        const int activeIndex = activeTemplateIndex();
+        const QString activeBaseId = activeIndex >= 0 &&
+                m_locatorConfig.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion
+                ? m_locatorConfig.templates.at(activeIndex).sourceBaseId
+                : ReferenceImageProvider::instance().primaryBaseId();
+        int sourceIndex = m_templateSourceBaseComboBox->findData(activeBaseId);
+        if (activeIndex >= 0 && m_locatorConfig.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion &&
+                sourceIndex < 0) {
+            m_templateSourceBaseComboBox->insertItem(
+                        0,
+                        activeBaseId.trimmed().isEmpty()
+                        ? tr("⚠ 未绑定（请选择 Base）")
+                        : tr("⚠ Base 已缺失 · %1").arg(activeBaseId),
+                        activeBaseId);
+            sourceIndex = 0;
+        }
+        m_templateSourceBaseComboBox->setCurrentIndex(sourceIndex);
+        m_templateSourceBaseComboBox->setEnabled(
+                    !m_referencePositionEditorReadOnly &&
+                    !assets.isEmpty());
+    }
+
     const QString lockedId = m_locatorConfig.primaryTemplateId;
     const QSignalBlocker comboBlocker(m_lockedTemplateComboBox);
     m_lockedTemplateComboBox->clear();
@@ -1612,6 +2598,19 @@ void ReferenceImageDialog::refreshReferenceTemplateBank()
     m_lockedTemplateComboBox->setCurrentIndex(lockedIndex);
     m_locatorConfig.primaryTemplateId =
             m_lockedTemplateComboBox->currentData().toString();
+    QString bindingIssue;
+    const bool hasBindingIssue = locatorBaseBindingIssue(&bindingIssue);
+    if (m_positionTestButton) {
+        m_positionTestButton->setEnabled(
+                    !m_referencePositionEditorReadOnly && !hasBindingIssue);
+        m_positionTestButton->setToolTip(hasBindingIssue
+                ? bindingIssue
+                : tr("逐个创建所有启用模板并在各自局部区域完成自匹配，全部成功后更新基准"));
+    }
+    if (hasBindingIssue && m_referenceTemplateBankSummaryLabel)
+        m_referenceTemplateBankSummaryLabel->setToolTip(bindingIssue);
+    else if (m_referenceTemplateBankSummaryLabel)
+        m_referenceTemplateBankSummaryLabel->setToolTip(QString());
     m_updatingTemplateBank = false;
     updateMatchingParameterControlState();
 }
@@ -1623,8 +2622,15 @@ void ReferenceImageDialog::switchActiveTemplate(const QString &templateId)
     stopReferencePositionOriginSelection();
     stopReferencePositionRoiEditing(true);
     storeLegacyGeometryToActiveTemplate();
+    storeMatchingParametersToActiveTemplate();
+    storeLegacyBaseBindingGeometry();
     m_activeTemplateId = templateId;
     loadActiveTemplateGeometry();
+    loadActiveBaseBindingGeometry();
+    loadMatchingParametersForActiveTemplate();
+    const QString baseId = activeTemplateBaseId();
+    if (!baseId.isEmpty())
+        selectReferenceBase(baseId);
     refreshReferenceTemplateBank();
     clearReferencePositionMatchOverlays();
     restoreReferencePositionRoi();
@@ -1644,6 +2650,11 @@ void ReferenceImageDialog::addReferenceTemplate()
             m_locatorConfig.templates.size() >=
             TemplateLocationConfig::MaximumTemplateCount)
         return;
+    // Capture the operator's Base selection before any legacy-bank upgrade or
+    // template refresh can move the page back to the active template's Base.
+    QString targetBaseId = selectedReferenceBaseId().trimmed();
+    if (targetBaseId.isEmpty())
+        targetBaseId = ReferenceImageProvider::instance().primaryBaseId();
     stopReferencePositionRoiEditing(true);
     storeLegacyGeometryToActiveTemplate();
     if (m_locatorConfig.templates.size() == 1 &&
@@ -1666,11 +2677,22 @@ void ReferenceImageDialog::addReferenceTemplate()
         }
         updateReferencePositionOriginControls();
     }
-    int maximumPriority = -1;
+    if (m_locatorConfig.version !=
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        QString legacyBaseId = ReferenceImageProvider::instance()
+                .primaryBaseId().trimmed();
+        if (legacyBaseId.isEmpty())
+            legacyBaseId = targetBaseId;
+        m_locatorConfig = TemplateLocationConfig::upgradeToV6(
+                    m_locatorConfig, legacyBaseId);
+        synchronizeLocatorBaseBindings(false);
+    }
+    int nextOrder = 0;
     QSet<QString> names;
     for (const TemplateLocationTemplateConfig &existing :
          qAsConst(m_locatorConfig.templates)) {
-        maximumPriority = qMax(maximumPriority, existing.priority);
+        if (existing.sourceBaseId == targetBaseId)
+            nextOrder = qMax(nextOrder, existing.order + 1);
         names.insert(existing.name);
     }
     int suffix = m_locatorConfig.templates.size() + 1;
@@ -1684,7 +2706,9 @@ void ReferenceImageDialog::addReferenceTemplate()
     TemplateLocationTemplateConfig item;
     item.templateId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     item.name = name;
-    item.priority = maximumPriority + 1;
+    item.priority = nextOrder;
+    item.order = nextOrder;
+    item.sourceBaseId = targetBaseId;
     item.modelCacheKey = QStringLiteral(
                 "reference.positionCorrection.template.%1")
             .arg(item.templateId);
@@ -1692,8 +2716,12 @@ void ReferenceImageDialog::addReferenceTemplate()
     item.extra = QJsonObject();
     m_locatorConfig.templates.append(item);
     m_activeTemplateId = item.templateId;
-    m_locatorConfig.version = TemplateLocationConfig::ModelBankParamsVersion;
+    synchronizeLocatorBaseBindings(false);
     loadActiveTemplateGeometry();
+    loadActiveBaseBindingGeometry();
+    loadMatchingParametersForActiveTemplate();
+    if (!targetBaseId.isEmpty())
+        selectReferenceBase(targetBaseId);
     markLocatorDirty(false);
     refreshReferenceTemplateBank();
     if (m_positionStatusLabel)
@@ -1774,8 +2802,11 @@ void ReferenceImageDialog::handleReferenceTemplateItemChanged(
     }
     const bool enabled = listItem->checkState() == Qt::Checked;
     if (!enabled && item->enabled && enabledCount <= 1) {
-        const QSignalBlocker blocker(m_referenceTemplateBankList);
-        listItem->setCheckState(Qt::Checked);
+        {
+            const QSignalBlocker blocker(m_referenceTemplateBankList);
+            listItem->setCheckState(Qt::Checked);
+        }
+        refreshReferenceTemplateBank();
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(tr("至少需要启用一个模板"));
         return;
@@ -1864,7 +2895,7 @@ QString ReferenceImageDialog::referencePositionReadOnlyMessage() const
 // 切换到静态基准图，并启用矩形拖拽模式；已有矩形会先回显供继续调整。
 void ReferenceImageDialog::startReferencePositionRectEditing()
 {
-    if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+    if (!m_previewHelper || !showActiveTemplateBase()) {
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(tr("请先设置基准图"));
         return;
@@ -1899,7 +2930,7 @@ void ReferenceImageDialog::startReferencePositionRectEditing()
 // 切换到静态基准图并启用多边形逐点绘制模式，保留已确认多边形供回显。
 void ReferenceImageDialog::startReferencePositionPolygonEditing()
 {
-    if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+    if (!m_previewHelper || !showActiveTemplateBase()) {
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(tr("请先设置基准图"));
         return;
@@ -1933,7 +2964,7 @@ void ReferenceImageDialog::startReferencePositionPolygonEditing()
 void ReferenceImageDialog::startReferencePositionMaskEditing(
         PositionCorrectionRoiEditMode mode)
 {
-    if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+    if (!m_previewHelper || !showActiveTemplateBase()) {
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(tr("请先设置基准图"));
         return;
@@ -2010,8 +3041,7 @@ void ReferenceImageDialog::startReferencePositionMaskEditing(
 void ReferenceImageDialog::startReferenceSearchRegionEditing(
         PositionCorrectionRoiEditMode mode)
 {
-    if (!m_previewHelper ||
-            ReferenceImageProvider::instance().referenceImage().isNull()) {
+    if (!m_previewHelper || !showActiveTemplateBase()) {
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(tr("请先设置基准图"));
         return;
@@ -2124,7 +3154,9 @@ bool ReferenceImageDialog::finishReferenceSearchRegionEditing()
 
 bool ReferenceImageDialog::finishReferencePositionMaskEditing()
 {
-    if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+    if (!m_previewHelper || selectedReferenceBaseId() != activeTemplateBaseId()
+            || ReferenceImageProvider::instance()
+               .referenceImage(activeTemplateBaseId()).isNull()) {
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(tr("请先设置基准图"));
         return false;
@@ -2186,6 +3218,7 @@ bool ReferenceImageDialog::finishReferencePositionMaskEditing()
         return false;
     }
 
+    m_referenceTemplateExcludeEdited = true;
     storeLegacyGeometryToActiveTemplate();
     markActiveTemplateDirty();
     stopReferencePositionRoiEditing(true);
@@ -2198,7 +3231,9 @@ bool ReferenceImageDialog::finishReferencePositionMaskEditing()
 // 完成当前绘制并校验 ROI；只有有效矩形或至少三个点的多边形可以确认。
 bool ReferenceImageDialog::finishReferencePositionRoiEditing()
 {
-    if (!m_previewHelper || ReferenceImageProvider::instance().referenceImage().isNull()) {
+    if (!m_previewHelper || selectedReferenceBaseId() != activeTemplateBaseId()
+            || ReferenceImageProvider::instance()
+               .referenceImage(activeTemplateBaseId()).isNull()) {
         if (m_positionStatusLabel)
             m_positionStatusLabel->setText(tr("请先设置基准图"));
         return false;
@@ -2242,6 +3277,7 @@ bool ReferenceImageDialog::finishReferencePositionRoiEditing()
                 QStringLiteral("rectangle");
     }
 
+    m_referenceTemplateIncludeEdited = true;
     storeLegacyGeometryToActiveTemplate();
     markActiveTemplateDirty();
     stopReferencePositionRoiEditing(true);
@@ -2324,6 +3360,7 @@ void ReferenceImageDialog::handleReferencePositionPolygonChanged(
             polygonPointsToJson(pointsNormalized);
     m_referencePositionCorrection.templateRoiNormalized =
             boundingRectForPoints(pointsNormalized);
+    m_referenceTemplateIncludeEdited = true;
     storeLegacyGeometryToActiveTemplate();
     markActiveTemplateDirty();
     clearReferencePositionMatchOverlays();
@@ -2366,7 +3403,9 @@ void ReferenceImageDialog::restoreReferencePositionRoi()
     m_positionRoiEditMode = PositionCorrectionRoiEditMode::None;
 
     if (!m_referencePositionCorrection.enabled || m_liveCaptureMode
-            || ReferenceImageProvider::instance().referenceImage().isNull()) {
+            || selectedReferenceBaseId() != activeTemplateBaseId()
+            || ReferenceImageProvider::instance()
+               .referenceImage(selectedReferenceBaseId()).isNull()) {
         m_previewHelper->clearRoi();
         m_previewHelper->clearPolygonRoi();
         m_previewHelper->clearCircleRoi();
@@ -2456,9 +3495,13 @@ QString ReferenceImageDialog::referencePositionRoiStatusText() const
 
 bool ReferenceImageDialog::buildAndValidateReferencePositionModel()
 {
-    const ReferenceFrameSnapshot snapshot =
-            ReferenceImageProvider::instance().referenceFrameSnapshot();
-    if (snapshot.frame.empty()) {
+    // Capture the entire Base set under one provider lock.  Every template in
+    // this build must use frames and content revisions from this same atomic
+    // generation; per-template provider reads could otherwise mix revisions
+    // while a camera/import mutation is arriving.
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    if (referenceSet.frames.isEmpty()) {
         clearReferencePositionMatchOverlays();
         // A failed test is not an edit.  Preserve the last local ready
         // candidate atomically and only surface the transient failure in UI.
@@ -2500,27 +3543,62 @@ bool ReferenceImageDialog::buildAndValidateReferencePositionModel()
         TemplateLocationTemplateConfig buildItem = item;
         buildItem.enabled = true;
         buildItem.modelCreated = true;
-        single.version = TemplateLocationConfig::ModelBankParamsVersion;
         single.templates = QVector<TemplateLocationTemplateConfig>{buildItem};
-        single.primaryMatchStrategy = QStringLiteral("best_score");
-        single.primaryTemplateId = item.templateId;
+        const QString sourceBaseId = m_locatorConfig.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion
+                ? item.sourceBaseId
+                : referenceSet.primaryBaseId;
+        const cv::Mat sourceFrame = referenceSet.frames.value(sourceBaseId);
+        if (sourceFrame.empty()) {
+            m_referencePositionCorrection = previousReference;
+            m_locatorConfig = previousBank;
+            m_referenceLocatorBankEnvelope = previousBankEnvelope;
+            clearReferencePositionMatchOverlays();
+            m_positionStatusLabel->setText(
+                        tr("模板“%1”绑定的 Base 不存在或图像为空")
+                        .arg(item.name));
+            return false;
+        }
+        if (single.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion) {
+            const TemplateLocationBaseBindingConfig *configuredBinding =
+                    TemplateLocationConfig::findBaseBinding(
+                        m_locatorConfig, sourceBaseId);
+            if (!configuredBinding) {
+                m_referencePositionCorrection = previousReference;
+                m_locatorConfig = previousBank;
+                m_referenceLocatorBankEnvelope = previousBankEnvelope;
+                m_positionStatusLabel->setText(
+                            tr("模板“%1”缺少 Base 绑定配置").arg(item.name));
+                return false;
+            }
+            single.baseBindings = {
+                *configuredBinding
+            };
+            single.primaryMatchStrategy = QStringLiteral("first_valid");
+            single.primaryTemplateId.clear();
+        } else {
+            single.version = TemplateLocationConfig::ModelBankParamsVersion;
+            single.primaryMatchStrategy = QStringLiteral("best_score");
+            single.primaryTemplateId = item.templateId;
+        }
         // A reference self-test must freeze this exact source instance.  Reuse
         // of the user's runtime search ROI (especially full image) can select a
         // stronger repeated texture elsewhere and bind the wrong reference
         // pose.  Search only a small clamped neighbourhood around this item's
         // own template region.
-        const QRectF bounds = item.templateRoiNormalized.normalized();
-        const double padX = qMax(2.0 / snapshot.frame.cols,
+        const QRectF bounds = boundsForTemplate(item).normalized();
+        const double padX = qMax(2.0 / sourceFrame.cols,
                                  bounds.width() * 0.1);
-        const double padY = qMax(2.0 / snapshot.frame.rows,
+        const double padY = qMax(2.0 / sourceFrame.rows,
                                  bounds.height() * 0.1);
         const double left = qMax(0.0, bounds.left() - padX);
         const double top = qMax(0.0, bounds.top() - padY);
         const double right = qMin(1.0, bounds.right() + padX);
         const double bottom = qMin(1.0, bounds.bottom() + padY);
+        const QRectF localSearch(left, top, right - left, bottom - top);
         single.searchRegionType = QStringLiteral("rectangle");
-        single.searchRoiNormalized = QRectF(
-                    left, top, right - left, bottom - top);
+        single.searchRoiNormalized = localSearch;
         single.searchPolygonNormalized.clear();
         single.searchCircleCenterNormalized = QPointF();
         single.searchCircleRadiusNormalized = 0.0;
@@ -2528,9 +3606,25 @@ bool ReferenceImageDialog::buildAndValidateReferencePositionModel()
         single.minMatchCount = 1;
         single.maxMatchCount = 1;
         single.fusion.enabled = false;
-        const TemplateLocationHalconResult result =
-                m_referencePositionRunner.run(snapshot.frame, snapshot.frame,
-                                              single);
+        if (single.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion) {
+            TemplateLocationBaseBindingConfig &binding =
+                    single.baseBindings[0];
+            binding.searchRegionType = QStringLiteral("rectangle");
+            binding.searchRoiNormalized = localSearch;
+            binding.searchPolygonNormalized.clear();
+            binding.searchCircleCenterNormalized = QPointF();
+            binding.searchCircleRadiusNormalized = 0.0;
+        }
+        const TemplateLocationHalconResult result = single.version ==
+                TemplateLocationConfig::CompositeBankParamsVersion
+                ? m_referencePositionRunner.run(
+                      sourceFrame,
+                      referenceSet.frames,
+                      referenceSet.contentRevisions,
+                      single, sourceBaseId)
+                : m_referencePositionRunner.run(
+                      sourceFrame, sourceFrame, single);
         totalElapsedMs += result.elapsedMs;
         const QJsonObject frozenPose = referencePoseJson(result.payload);
         QString identityMessage;
@@ -2570,6 +3664,7 @@ bool ReferenceImageDialog::buildAndValidateReferencePositionModel()
             }
             overlay.extra.insert(QStringLiteral("templateId"), item.templateId);
             overlay.extra.insert(QStringLiteral("templateName"), item.name);
+            overlay.extra.insert(QStringLiteral("sourceBaseId"), sourceBaseId);
             allOverlays.append(overlay);
         }
     }
@@ -2594,8 +3689,9 @@ bool ReferenceImageDialog::buildAndValidateReferencePositionModel()
         if (item.enabled)
             item.modelCreated = true;
     }
-    m_referencePositionCorrection.version =
-            ReferenceTemplateLocationConfig::ModelBankEnvelopeVersion;
+    m_referencePositionCorrection.version = m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion
+            ? 5 : ReferenceTemplateLocationConfig::ModelBankEnvelopeVersion;
     m_referencePositionCorrection.referenceCreated = true;
     m_referencePositionCorrection.referencePosesByTemplateId = posesByTemplateId;
     m_referencePositionCorrection.referencePose =
@@ -2674,13 +3770,16 @@ void ReferenceImageDialog::renderReferencePositionOverlays()
     if (!m_previewHelper)
         return;
     if (!m_referencePositionCorrection.enabled || m_liveCaptureMode
-            || ReferenceImageProvider::instance().referenceImage().isNull()) {
+            || selectedReferenceBaseId() != activeTemplateBaseId()
+            || ReferenceImageProvider::instance()
+               .referenceImage(selectedReferenceBaseId()).isNull()) {
         m_previewHelper->clearToolOverlays();
         return;
     }
 
     QVector<ToolOverlay> overlays;
-    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    const QImage image = ReferenceImageProvider::instance().referenceImage(
+                selectedReferenceBaseId());
     const bool editingMask =
             m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskRectangle ||
             m_positionRoiEditMode == PositionCorrectionRoiEditMode::MaskCircle ||
@@ -2751,7 +3850,14 @@ void ReferenceImageDialog::renderReferencePositionOverlays()
         vertical.p2 = QPointF(point.x(), point.y() + radius);
         overlays.append(vertical);
     }
-    overlays += m_referencePositionMatchOverlays;
+    for (const ToolOverlay &overlay : qAsConst(m_referencePositionMatchOverlays)) {
+        const QString overlayBaseId = overlay.extra.value(
+                    QStringLiteral("sourceBaseId")).toString();
+        if (overlayBaseId.isEmpty() ||
+                overlayBaseId == selectedReferenceBaseId()) {
+            overlays.append(overlay);
+        }
+    }
 
     if (overlays.isEmpty())
         m_previewHelper->clearToolOverlays();
@@ -2862,24 +3968,18 @@ void ReferenceImageDialog::captureReferenceImage()
         return;
     }
 
-    SchemeStore &store = SchemeStore::instance();
-    const ReferencePositionCorrectionConfig originalReference =
-            store.currentScheme().referencePositionCorrection;
-    if (!m_referencePositionEditorReadOnly) {
-        writeLocatorControls();
-        store.setReferencePositionCorrection(m_referencePositionCorrection);
-    }
-    QString error;
-    if (!store.setReferenceFrame(frame, &error, snapshot.metadata)) {
-        if (!m_referencePositionEditorReadOnly)
-            store.setReferencePositionCorrection(originalReference);
-        qWarning() << "[ReferenceImageDialog] 基准图保存失败:" << error;
-        QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
+    if (!persistReferenceFrameForSelectedBase(
+            frame, snapshot.metadata,
+            m_captureCreatesNewBase || selectedReferenceBaseId().isEmpty(),
+            m_captureCreatesNewBase
+            ? tr("相机 Base %1")
+              .arg(SchemeStore::instance().referenceAssets().size() + 1)
+            : QString())) {
         return;
     }
-    reloadReferenceStateAfterImageChange();
-    showReferenceImageMode();
-    qDebug() << QString("[ReferenceImageDialog] 已抓取静态基准图: %1x%2 type=%3")
+    m_captureCreatesNewBase = false;
+    qDebug() << QString("[ReferenceImageDialog] 已抓取 Base %1: %2x%3 type=%4")
+                    .arg(selectedReferenceBaseId())
                     .arg(frame.cols)
                     .arg(frame.rows)
                     .arg(frame.type());
@@ -2888,12 +3988,24 @@ void ReferenceImageDialog::captureReferenceImage()
 void ReferenceImageDialog::showReferenceImageMode()
 {
     m_liveCaptureMode = false;
+    m_captureCreatesNewBase = false;
     updateReferenceImageControls();
     refreshReferenceImage();
 }
 
 void ReferenceImageDialog::importReferenceImageFromPc()
 {
+    const ReferenceAssetSet &assets =
+            SchemeStore::instance().currentScheme().referenceAssets;
+    const bool addForMultiBase = assets.multiBaseEnabled();
+    if (addForMultiBase &&
+            assets.size() >= ReferenceAssetSet::kMaximumAssets) {
+        QMessageBox::information(
+                    this, tr("PC导入"),
+                    tr("多基准最多允许 %1 张，请先删除不再使用的 Base 或使用“替换”。")
+                    .arg(ReferenceAssetSet::kMaximumAssets));
+        return;
+    }
     const QString fileName = QFileDialog::getOpenFileName(this,
                                                           tr("PC导入基准图"),
                                                           QString(),
@@ -2901,51 +4013,22 @@ void ReferenceImageDialog::importReferenceImageFromPc()
     if (fileName.isEmpty())
         return;
 
-    QImage image(fileName);
-    if (image.isNull()) {
-        qWarning() << "[ReferenceImageDialog] 图片导入失败，无法读取:" << fileName;
-        ui->viewerTitleLabel->setText(tr("图片导入失败"));
-        QMessageBox::warning(this, tr("图片导入失败"), tr("无法读取所选图片。"));
-        return;
-    }
-
-    const FrameInputMetadata metadata = FrameInputMetadata::fromQImage(
-                image, QStringLiteral("file"));
-
-    const QImage rgbImage = image.convertToFormat(QImage::Format_RGB888);
-    cv::Mat rgbFrame(rgbImage.height(),
-                     rgbImage.width(),
-                     CV_8UC3,
-                     const_cast<uchar *>(rgbImage.constBits()),
-                     static_cast<size_t>(rgbImage.bytesPerLine()));
+    FrameInputMetadata metadata;
     cv::Mat bgrFrame;
-    cv::cvtColor(rgbFrame, bgrFrame, cv::COLOR_RGB2BGR);
-
-    if (bgrFrame.empty()) {
-        qWarning() << "[ReferenceImageDialog] 图片导入失败，转换为空图像:" << fileName;
+    QString message;
+    if (!loadImageFileAsBgr(fileName, &bgrFrame, &metadata, &message)) {
         ui->viewerTitleLabel->setText(tr("图片导入失败"));
-        QMessageBox::warning(this, tr("图片导入失败"), tr("图片转换失败。"));
+        QMessageBox::warning(this, tr("图片导入失败"), message);
         return;
     }
-
-    SchemeStore &store = SchemeStore::instance();
-    const ReferencePositionCorrectionConfig originalReference =
-            store.currentScheme().referencePositionCorrection;
-    if (!m_referencePositionEditorReadOnly) {
-        writeLocatorControls();
-        store.setReferencePositionCorrection(m_referencePositionCorrection);
-    }
-    QString error;
-    if (!store.setReferenceFrame(bgrFrame, &error, metadata)) {
-        if (!m_referencePositionEditorReadOnly)
-            store.setReferencePositionCorrection(originalReference);
-        qWarning() << "[ReferenceImageDialog] PC 基准图保存失败:" << error;
-        QMessageBox::warning(this, tr("基准图保存失败"), tr("基准图保存失败：%1").arg(error));
+    if (!persistReferenceFrameForSelectedBase(
+            bgrFrame, metadata,
+            addForMultiBase || selectedReferenceBaseId().isEmpty(),
+            QFileInfo(fileName).completeBaseName())) {
         return;
     }
-    reloadReferenceStateAfterImageChange();
-    showReferenceImageMode();
-    qDebug() << QString("[ReferenceImageDialog] 已导入 PC 基准图: %1 size=%2x%3 type=%4")
+    qDebug() << QString("[ReferenceImageDialog] 已导入 PC Base %1: %2 size=%3x%4 type=%5")
+                    .arg(selectedReferenceBaseId())
                     .arg(fileName)
                     .arg(bgrFrame.cols)
                     .arg(bgrFrame.rows)
@@ -2954,6 +4037,8 @@ void ReferenceImageDialog::importReferenceImageFromPc()
 
 void ReferenceImageDialog::setupReferenceImageControls()
 {
+    setupReferenceAssetControls();
+
     m_captureImageButton = new QPushButton(tr("抓取图像"), this);
     m_captureImageButton->setObjectName(QStringLiteral("captureImageButton"));
     m_captureImageButton->setProperty("actionRole", QStringLiteral("highlight"));
@@ -2971,6 +4056,515 @@ void ReferenceImageDialog::setupReferenceImageControls()
     ui->horizontalLayout_referenceButtons->addWidget(m_exitCaptureButton);
 
     updateReferenceImageControls();
+}
+
+void ReferenceImageDialog::setupReferenceAssetControls()
+{
+    m_multiReferenceCard = new QFrame(ui->referenceParamsScrollContent);
+    m_multiReferenceCard->setObjectName(QStringLiteral("multiReferenceBaseCard"));
+    m_multiReferenceCard->setProperty("card", true);
+    auto *switchLayout = new QHBoxLayout(m_multiReferenceCard);
+    switchLayout->setContentsMargins(18, 16, 18, 16);
+    switchLayout->setSpacing(12);
+    auto *switchTitle = new QLabel(tr("多基准"), m_multiReferenceCard);
+    switchTitle->setObjectName(QStringLiteral("multiReferenceBaseTitleLabel"));
+    switchTitle->setProperty("role", QStringLiteral("cardTitle"));
+    m_multiReferenceBaseSwitch = new QCheckBox(m_multiReferenceCard);
+    m_multiReferenceBaseSwitch->setObjectName(
+                QStringLiteral("multiReferenceBaseSwitch"));
+    m_multiReferenceBaseSwitch->setToolTip(
+                tr("打开后，当前图像和 PC 导入会新增 Base，并在画布下方显示缩略图栏"));
+    switchLayout->addWidget(switchTitle);
+    switchLayout->addStretch(1);
+    switchLayout->addWidget(m_multiReferenceBaseSwitch);
+    ui->verticalLayout_2->insertWidget(0, m_multiReferenceCard);
+
+    m_referenceBaseThumbnailPanel = new QFrame(ui->setupViewerFrame);
+    m_referenceBaseThumbnailPanel->setObjectName(
+                QStringLiteral("referenceBaseThumbnailPanel"));
+    m_referenceBaseThumbnailPanel->setMinimumHeight(166);
+    m_referenceBaseThumbnailPanel->setMaximumHeight(184);
+    auto *layout = new QVBoxLayout(m_referenceBaseThumbnailPanel);
+    layout->setContentsMargins(12, 9, 12, 10);
+    layout->setSpacing(7);
+
+    auto *header = new QHBoxLayout;
+    header->setContentsMargins(0, 0, 0, 0);
+    header->setSpacing(7);
+    auto *title = new QLabel(tr("基准图"), m_referenceBaseThumbnailPanel);
+    title->setObjectName(QStringLiteral("referenceBaseThumbnailTitleLabel"));
+    m_referenceBaseSummaryLabel = new QLabel(m_referenceBaseThumbnailPanel);
+    m_referenceBaseSummaryLabel->setObjectName(
+                QStringLiteral("referenceBaseSummaryLabel"));
+    header->addWidget(title);
+    header->addWidget(m_referenceBaseSummaryLabel);
+    header->addStretch(1);
+
+    m_addReferenceBaseButton = new QPushButton(tr("+ PC"), m_referenceBaseThumbnailPanel);
+    m_addReferenceBaseButton->setObjectName(
+                QStringLiteral("addReferenceBaseButton"));
+    m_addCurrentReferenceBaseButton = new QPushButton(
+                tr("+ 当前图"), m_referenceBaseThumbnailPanel);
+    m_addCurrentReferenceBaseButton->setObjectName(
+                QStringLiteral("addCurrentReferenceBaseButton"));
+    m_replaceReferenceBaseButton = new QPushButton(
+                tr("替换"), m_referenceBaseThumbnailPanel);
+    m_replaceReferenceBaseButton->setObjectName(
+                QStringLiteral("replaceReferenceBaseButton"));
+    m_deleteReferenceBaseButton = new QPushButton(
+                tr("删除"), m_referenceBaseThumbnailPanel);
+    m_deleteReferenceBaseButton->setObjectName(
+                QStringLiteral("deleteReferenceBaseButton"));
+    m_makePrimaryReferenceBaseButton = new QPushButton(
+                tr("设为主"), m_referenceBaseThumbnailPanel);
+    m_makePrimaryReferenceBaseButton->setObjectName(
+                QStringLiteral("makePrimaryReferenceBaseButton"));
+    m_addReferenceBaseButton->setIcon(QIcon(QStringLiteral(":/icons/add.svg")));
+    m_addCurrentReferenceBaseButton->setIcon(QIcon(QStringLiteral(":/icons/camera.svg")));
+    m_replaceReferenceBaseButton->setIcon(QIcon(QStringLiteral(":/icons/refresh.svg")));
+    m_deleteReferenceBaseButton->setIcon(QIcon(QStringLiteral(":/icons/trash.svg")));
+    m_makePrimaryReferenceBaseButton->setIcon(QIcon(QStringLiteral(":/icons/lock.svg")));
+    const QList<QPushButton *> thumbnailActions{
+        m_addReferenceBaseButton,
+        m_addCurrentReferenceBaseButton,
+        m_replaceReferenceBaseButton,
+        m_makePrimaryReferenceBaseButton,
+        m_deleteReferenceBaseButton
+    };
+    for (QPushButton *button : thumbnailActions) {
+        button->setProperty("thumbnailAction", true);
+        button->setMinimumHeight(30);
+        button->setMaximumHeight(30);
+        header->addWidget(button);
+    }
+    // Primary acquisition remains in the left “基准图” card, matching the
+    // setup flow. Keep these legacy hooks hidden for compatibility tests and
+    // automation; the bottom bar itself is selection/management only.
+    m_addReferenceBaseButton->hide();
+    m_addCurrentReferenceBaseButton->hide();
+    layout->addLayout(header);
+
+    m_referenceBaseList = new QListWidget(m_referenceBaseThumbnailPanel);
+    m_referenceBaseList->setObjectName(
+                QStringLiteral("referenceBaseListWidget"));
+    m_referenceBaseList->setSelectionMode(
+                QAbstractItemView::SingleSelection);
+    m_referenceBaseList->setViewMode(QListView::IconMode);
+    m_referenceBaseList->setFlow(QListView::LeftToRight);
+    m_referenceBaseList->setWrapping(false);
+    m_referenceBaseList->setMovement(QListView::Static);
+    m_referenceBaseList->setResizeMode(QListView::Adjust);
+    m_referenceBaseList->setUniformItemSizes(true);
+    m_referenceBaseList->setTextElideMode(Qt::ElideRight);
+    m_referenceBaseList->setIconSize(QSize(142, 76));
+    m_referenceBaseList->setGridSize(QSize(164, 108));
+    m_referenceBaseList->setSpacing(5);
+    m_referenceBaseList->setHorizontalScrollBarPolicy(
+                Qt::ScrollBarAsNeeded);
+    m_referenceBaseList->setVerticalScrollBarPolicy(
+                Qt::ScrollBarAlwaysOff);
+    m_referenceBaseList->setMinimumHeight(114);
+    m_referenceBaseList->setMaximumHeight(122);
+    layout->addWidget(m_referenceBaseList);
+    ui->verticalLayout_viewer->addWidget(m_referenceBaseThumbnailPanel);
+    ui->verticalLayout_viewer->setStretch(0, 0);
+    ui->verticalLayout_viewer->setStretch(1, 1);
+    ui->verticalLayout_viewer->setStretch(2, 0);
+    ui->verticalLayout_viewer->setStretch(3, 0);
+    ui->referenceHintLabel->setText(
+                tr("关闭多基准时当前图像和 PC 导入替换主 Base；打开后用于新增 Base。"));
+
+    connect(m_multiReferenceBaseSwitch, &QCheckBox::toggled,
+            this, [this](bool enabled) {
+        if (m_updatingReferenceAssets)
+            return;
+        QString error;
+        if (!SchemeStore::instance().setMultiReferenceEnabled(
+                    enabled, &error)) {
+            const QSignalBlocker blocker(m_multiReferenceBaseSwitch);
+            m_multiReferenceBaseSwitch->setChecked(!enabled);
+            QMessageBox::warning(this, tr("多基准"), error);
+            return;
+        }
+        if (!enabled) {
+            const QString primaryId = SchemeStore::instance()
+                    .currentScheme().referenceAssets.primaryBaseId();
+            if (!primaryId.isEmpty())
+                m_selectedReferenceBaseId = primaryId;
+        }
+        if (m_liveCaptureMode) {
+            m_captureCreatesNewBase = enabled &&
+                    SchemeStore::instance().referenceAssets().size() <
+                    ReferenceAssetSet::kMaximumAssets;
+        }
+        refreshReferenceAssetControls();
+        updateReferenceImageControls();
+        if (!m_liveCaptureMode)
+            refreshReferenceImage();
+    });
+
+    connect(m_referenceBaseList, &QListWidget::currentItemChanged,
+            this, [this](QListWidgetItem *current, QListWidgetItem *) {
+        if (m_updatingReferenceAssets || !current)
+            return;
+        selectReferenceBase(
+                    current->data(kReferenceBaseIdRole).toString());
+    });
+    connect(m_addReferenceBaseButton, &QPushButton::clicked,
+            this, &ReferenceImageDialog::addReferenceBaseFromPc);
+    connect(m_addCurrentReferenceBaseButton, &QPushButton::clicked,
+            this, [this]() {
+        m_captureCreatesNewBase = true;
+        showCurrentImageMode();
+    });
+    connect(m_replaceReferenceBaseButton, &QPushButton::clicked,
+            this, &ReferenceImageDialog::replaceSelectedReferenceBaseFromPc);
+    connect(m_deleteReferenceBaseButton, &QPushButton::clicked,
+            this, &ReferenceImageDialog::removeSelectedReferenceBase);
+    connect(m_makePrimaryReferenceBaseButton, &QPushButton::clicked,
+            this, &ReferenceImageDialog::makeSelectedReferenceBasePrimary);
+}
+
+void ReferenceImageDialog::updateMultiReferenceUi()
+{
+    const ReferenceAssetSet &assets =
+            SchemeStore::instance().currentScheme().referenceAssets;
+    const bool enabled = assets.multiBaseEnabled();
+    if (m_referenceBaseThumbnailPanel)
+        m_referenceBaseThumbnailPanel->setVisible(enabled);
+    if (m_referenceBaseList) {
+        m_referenceBaseList->setEnabled(
+                    enabled && !m_liveCaptureMode &&
+                    m_positionRoiEditMode == PositionCorrectionRoiEditMode::None);
+    }
+    if (m_multiReferenceBaseSwitch) {
+        const QSignalBlocker blocker(m_multiReferenceBaseSwitch);
+        m_multiReferenceBaseSwitch->setChecked(enabled);
+        m_multiReferenceBaseSwitch->setEnabled(!assets.isReadOnly());
+    }
+}
+
+QString ReferenceImageDialog::selectedReferenceBaseId() const
+{
+    const QString selected = m_selectedReferenceBaseId.trimmed();
+    if (!selected.isEmpty() &&
+            ReferenceImageProvider::instance().hasReferenceFrame(selected)) {
+        return selected;
+    }
+    return ReferenceImageProvider::instance().primaryBaseId();
+}
+
+QString ReferenceImageDialog::activeTemplateBaseId() const
+{
+    const int index = activeTemplateIndex();
+    if (index >= 0 && m_locatorConfig.version ==
+            TemplateLocationConfig::CompositeBankParamsVersion) {
+        // Empty/unavailable is meaningful invalid v6 state.  Falling back to
+        // the primary image here would display and edit the wrong Base while
+        // leaving the serialized source identity unresolved.
+        return m_locatorConfig.templates.at(index).sourceBaseId.trimmed();
+    }
+    return ReferenceImageProvider::instance().primaryBaseId();
+}
+
+ReferenceFrameSnapshot ReferenceImageDialog::selectedReferenceSnapshot() const
+{
+    return ReferenceImageProvider::instance().referenceFrameSnapshot(
+                selectedReferenceBaseId());
+}
+
+bool ReferenceImageDialog::showActiveTemplateBase()
+{
+    const QString baseId = activeTemplateBaseId();
+    if (baseId.isEmpty() ||
+            !ReferenceImageProvider::instance().hasReferenceFrame(baseId)) {
+        if (m_positionStatusLabel)
+            m_positionStatusLabel->setText(tr("当前模板尚未绑定可用 Base"));
+        return false;
+    }
+    selectReferenceBase(baseId);
+    showReferenceImageMode();
+    return true;
+}
+
+void ReferenceImageDialog::refreshReferenceAssetControls()
+{
+    if (!m_referenceBaseList)
+        return;
+    SchemeStore &store = SchemeStore::instance();
+    QString error;
+    if (!store.ensureLoaded(&error)) {
+        m_referenceBaseSummaryLabel->setText(tr("参考资产加载失败：%1").arg(error));
+        return;
+    }
+    const QVector<ReferenceAsset> assets = store.referenceAssets();
+    const QString primaryId = store.currentScheme()
+            .referenceAssets.primaryBaseId();
+    bool selectedExists = false;
+    for (const ReferenceAsset &asset : assets) {
+        if (asset.baseId == m_selectedReferenceBaseId) {
+            selectedExists = true;
+            break;
+        }
+    }
+    if (!selectedExists) {
+        m_selectedReferenceBaseId = !primaryId.isEmpty()
+                ? primaryId
+                : assets.isEmpty() ? QString() : assets.first().baseId;
+    }
+
+    m_updatingReferenceAssets = true;
+    const QSignalBlocker blocker(m_referenceBaseList);
+    m_referenceBaseList->clear();
+    int selectedRow = -1;
+    for (int index = 0; index < assets.size(); ++index) {
+        const ReferenceAsset &asset = assets.at(index);
+        const bool primary = asset.baseId == primaryId;
+        auto *item = new QListWidgetItem(
+                    tr("B%1 · %2%3")
+                    .arg(index + 1, 2, 10, QLatin1Char('0'))
+                    .arg(asset.name.trimmed().isEmpty()
+                         ? tr("Base %1").arg(index + 1) : asset.name)
+                    .arg(primary ? tr(" · 主") : QString()),
+                    m_referenceBaseList);
+        item->setData(kReferenceBaseIdRole, asset.baseId);
+        const QImage image = ReferenceImageProvider::instance()
+                .referenceImage(asset.baseId);
+        if (!image.isNull()) {
+            item->setIcon(QIcon(QPixmap::fromImage(
+                image.scaled(m_referenceBaseList->iconSize(),
+                             Qt::KeepAspectRatio,
+                             Qt::SmoothTransformation))));
+        }
+        item->setSizeHint(m_referenceBaseList->gridSize());
+        item->setToolTip(tr("Base ID：%1\n内容版本：%2")
+                         .arg(asset.baseId, asset.contentRevision));
+        if (asset.baseId == m_selectedReferenceBaseId)
+            selectedRow = index;
+    }
+    if (selectedRow >= 0)
+        m_referenceBaseList->setCurrentRow(selectedRow);
+    m_updatingReferenceAssets = false;
+
+    const bool assetSetReadOnly = store.currentScheme()
+            .referenceAssets.isReadOnly();
+    const bool hasSelection = selectedRow >= 0;
+    const bool selectedPrimary = hasSelection &&
+            m_selectedReferenceBaseId == primaryId;
+    m_referenceBaseSummaryLabel->setText(assets.isEmpty()
+            ? tr("当前：0 / 8")
+            : tr("当前：%1 / 8 · 共 %2 张%3")
+              .arg(selectedRow + 1)
+              .arg(assets.size())
+              .arg(selectedPrimary ? tr(" · 主 Base") : QString()));
+    m_addReferenceBaseButton->setEnabled(
+                !assetSetReadOnly && assets.size() <
+                ReferenceAssetSet::kMaximumAssets);
+    m_addCurrentReferenceBaseButton->setEnabled(
+                !assetSetReadOnly && assets.size() <
+                ReferenceAssetSet::kMaximumAssets);
+    m_replaceReferenceBaseButton->setEnabled(
+                !assetSetReadOnly && hasSelection);
+    // Unknown locator contracts may refer to a Base in fields this editor
+    // cannot inspect. Pixel replacement remains recoverable, but identity
+    // changes are kept disabled until a compatible editor is used.
+    const bool identityEditable = !assetSetReadOnly &&
+            !m_referencePositionEditorReadOnly;
+    m_deleteReferenceBaseButton->setEnabled(
+                identityEditable && hasSelection && !selectedPrimary &&
+                assets.size() > 1);
+    m_makePrimaryReferenceBaseButton->setEnabled(
+                identityEditable && hasSelection && !selectedPrimary);
+    updateMultiReferenceUi();
+    updateReferenceImageControls();
+    if (m_templateSourceBaseComboBox)
+        refreshReferenceTemplateBank();
+}
+
+void ReferenceImageDialog::selectReferenceBase(const QString &baseId)
+{
+    const QString id = baseId.trimmed();
+    if (id.isEmpty() ||
+            !ReferenceImageProvider::instance().hasReferenceFrame(id))
+        return;
+    stopReferencePositionOriginSelection();
+    stopReferencePositionRoiEditing(false);
+    m_selectedReferenceBaseId = id;
+    if (m_referenceBaseList) {
+        const QSignalBlocker blocker(m_referenceBaseList);
+        for (int row = 0; row < m_referenceBaseList->count(); ++row) {
+            if (m_referenceBaseList->item(row)
+                    ->data(kReferenceBaseIdRole).toString() == id) {
+                m_referenceBaseList->setCurrentRow(row);
+                break;
+            }
+        }
+    }
+    refreshReferenceAssetControls();
+    if (!m_liveCaptureMode)
+        refreshReferenceImage();
+}
+
+void ReferenceImageDialog::addReferenceBaseFromPc()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+                this, tr("增加 Base"), QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp)"));
+    if (fileName.isEmpty())
+        return;
+    cv::Mat frame;
+    FrameInputMetadata metadata;
+    QString message;
+    if (!loadImageFileAsBgr(fileName, &frame, &metadata, &message)) {
+        QMessageBox::warning(this, tr("图片导入失败"), message);
+        return;
+    }
+    persistReferenceFrameForSelectedBase(
+                frame, metadata, true, QFileInfo(fileName).completeBaseName());
+}
+
+void ReferenceImageDialog::replaceSelectedReferenceBaseFromPc()
+{
+    if (selectedReferenceBaseId().isEmpty()) {
+        addReferenceBaseFromPc();
+        return;
+    }
+    const QString fileName = QFileDialog::getOpenFileName(
+                this, tr("替换当前 Base"), QString(),
+                tr("Images (*.png *.jpg *.jpeg *.bmp)"));
+    if (fileName.isEmpty())
+        return;
+    cv::Mat frame;
+    FrameInputMetadata metadata;
+    QString message;
+    if (!loadImageFileAsBgr(fileName, &frame, &metadata, &message)) {
+        QMessageBox::warning(this, tr("图片导入失败"), message);
+        return;
+    }
+    persistReferenceFrameForSelectedBase(frame, metadata, false);
+}
+
+bool ReferenceImageDialog::persistReferenceFrameForSelectedBase(
+        const cv::Mat &frame,
+        const FrameInputMetadata &metadata,
+        bool forceAdd,
+        const QString &suggestedName)
+{
+    if (frame.empty())
+        return false;
+    SchemeStore &store = SchemeStore::instance();
+    QString error;
+    if (!store.ensureLoaded(&error)) {
+        QMessageBox::warning(this, tr("基准图保存失败"), error);
+        return false;
+    }
+    const QString targetBaseId = selectedReferenceBaseId();
+    const bool add = forceAdd || targetBaseId.isEmpty();
+    if (!saveReferenceDraftBeforeAssetMutation(&error)) {
+        QMessageBox::warning(this, tr("基准图保存失败"),
+                             tr("修改 Base 前保存当前定位草稿失败：%1")
+                             .arg(error));
+        return false;
+    }
+    const ReferencePositionCorrectionConfig persistedDraft =
+            store.currentScheme().referencePositionCorrection;
+
+    if (!add && !m_referencePositionEditorReadOnly) {
+        // Merge local, Base-scoped invalidation into the same candidate that
+        // replaceReferenceAsset persists.  There is intentionally no second
+        // scheme save after the atomic pixel mutation succeeds.
+        invalidateLocatorForBase(targetBaseId);
+        store.setReferencePositionCorrection(m_referencePositionCorrection);
+    }
+
+    QString createdBaseId;
+    const bool saved = add
+            ? store.addReferenceAsset(
+                  suggestedName.trimmed().isEmpty()
+                  ? tr("基准图 %1").arg(store.referenceAssets().size() + 1)
+                  : suggestedName,
+                  frame, &createdBaseId, &error, metadata)
+            : store.replaceReferenceAsset(
+                  targetBaseId, frame, &error, metadata);
+    if (!saved) {
+        // The pre-mutation draft was already committed.  Reload exactly that
+        // state rather than restoring an older in-memory/store snapshot.
+        store.setReferencePositionCorrection(persistedDraft);
+        loadPositionCorrectionConfig();
+        QMessageBox::warning(this, tr("基准图保存失败"),
+                             tr("基准图保存失败：%1").arg(error));
+        return false;
+    }
+
+    if (add) {
+        m_selectedReferenceBaseId = createdBaseId;
+        // An unused scheme asset is independent of locator semantics.  Do not
+        // promote v4/v5 to v6 and do not invalidate any template merely
+        // because another Base became available.
+    }
+    reloadReferenceStateAfterImageChange();
+    refreshReferenceAssetControls();
+    showReferenceImageMode();
+    return true;
+}
+
+void ReferenceImageDialog::removeSelectedReferenceBase()
+{
+    SchemeStore &store = SchemeStore::instance();
+    const QString target = selectedReferenceBaseId();
+    if (target.isEmpty())
+        return;
+    ReferenceAsset selectedAsset;
+    if (!store.referenceAsset(target, &selectedAsset))
+        return;
+    if (QMessageBox::question(
+            this, tr("删除 Base"),
+            tr("确定删除未被模板引用的“%1”吗？如果仍有模板绑定该 Base，请先改绑或删除对应模板。")
+            .arg(selectedAsset.name),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No) != QMessageBox::Yes) {
+        return;
+    }
+
+    QString error;
+    if (!saveReferenceDraftBeforeAssetMutation(&error)) {
+        QMessageBox::warning(this, tr("删除 Base 失败"),
+                             tr("删除前保存当前定位草稿失败：%1").arg(error));
+        return;
+    }
+    if (!store.removeReferenceAsset(target, &error)) {
+        QMessageBox::warning(
+                    this, tr("删除 Base 失败"),
+                    tr("%1\n请先删除或改绑使用该 Base 的模板，再执行删除。")
+                    .arg(error));
+        return;
+    }
+    m_selectedReferenceBaseId = store.currentScheme()
+            .referenceAssets.primaryBaseId();
+    reloadReferenceStateAfterImageChange();
+    refreshReferenceAssetControls();
+    showReferenceImageMode();
+}
+
+void ReferenceImageDialog::makeSelectedReferenceBasePrimary()
+{
+    const QString target = selectedReferenceBaseId();
+    if (target.isEmpty())
+        return;
+    QString error;
+    if (!saveReferenceDraftBeforeAssetMutation(&error)) {
+        QMessageBox::warning(this, tr("设置主 Base 失败"),
+                             tr("设置前保存当前定位草稿失败：%1").arg(error));
+        return;
+    }
+    if (!SchemeStore::instance().setPrimaryReferenceAsset(target, &error)) {
+        QMessageBox::warning(this, tr("设置主 Base 失败"), error);
+        return;
+    }
+    m_selectedReferenceBaseId = target;
+    reloadReferenceStateAfterImageChange();
+    refreshReferenceAssetControls();
+    showReferenceImageMode();
 }
 
 void ReferenceImageDialog::ensureCameraRunning()
@@ -3000,10 +4594,19 @@ void ReferenceImageDialog::updateReferenceImageControls()
     ui->currentImageButton->setVisible(!m_liveCaptureMode);
     ui->historyImageButton->setVisible(!m_liveCaptureMode);
     ui->pcImportButton->setVisible(!m_liveCaptureMode);
-    // Replacing the reference pixels is always allowed.  Even when a future
-    // locator contract is read-only, SchemeStore can invalidate its stale
-    // readiness fields without asking this editor to understand the contract.
-    ui->pcImportButton->setEnabled(true);
+    const ReferenceAssetSet &assets =
+            SchemeStore::instance().currentScheme().referenceAssets;
+    const bool canAdd = assets.size() < ReferenceAssetSet::kMaximumAssets;
+    const bool primaryActionEnabled = !assets.isReadOnly()
+            && (!assets.multiBaseEnabled() || canAdd);
+    ui->currentImageButton->setEnabled(primaryActionEnabled);
+    ui->pcImportButton->setEnabled(primaryActionEnabled);
+    ui->currentImageButton->setToolTip(assets.multiBaseEnabled()
+            ? tr("抓取当前相机图像并新增一个 Base")
+            : tr("抓取当前相机图像并设置/替换主 Base"));
+    ui->pcImportButton->setToolTip(assets.multiBaseEnabled()
+            ? tr("从 PC 导入图片并新增一个 Base")
+            : tr("从 PC 导入图片并设置/替换主 Base"));
 
     if (m_captureImageButton) {
         m_captureImageButton->setVisible(m_liveCaptureMode);
@@ -3012,6 +4615,7 @@ void ReferenceImageDialog::updateReferenceImageControls()
     if (m_exitCaptureButton) {
         m_exitCaptureButton->setVisible(m_liveCaptureMode);
     }
+    updateMultiReferenceUi();
 }
 
 void ReferenceImageDialog::refreshCurrentImage()
@@ -3036,14 +4640,33 @@ void ReferenceImageDialog::refreshReferenceImage()
         return;
     }
 
-    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    const QString baseId = selectedReferenceBaseId();
+    const QImage image = ReferenceImageProvider::instance().referenceImage(
+                baseId);
     if (image.isNull()) {
         m_previewHelper->clear();
         ui->viewerTitleLabel->setText(tr("请先设置基准图"));
         return;
     }
 
-    ui->viewerTitleLabel->setText(tr("基准图"));
+    QString baseName;
+    const QVector<ReferenceAsset> assets =
+            SchemeStore::instance().referenceAssets();
+    int baseNumber = 0;
+    for (int index = 0; index < assets.size(); ++index) {
+        if (assets.at(index).baseId == baseId) {
+            baseName = assets.at(index).name;
+            baseNumber = index + 1;
+            break;
+        }
+    }
+    ui->viewerTitleLabel->setText(baseNumber > 0
+            ? tr("Base B%1 · %2%3")
+              .arg(baseNumber, 2, 10, QLatin1Char('0'))
+              .arg(baseName)
+              .arg(baseId == ReferenceImageProvider::instance().primaryBaseId()
+                   ? tr("（主 Base）") : QString())
+            : tr("基准图"));
     m_previewHelper->clearToolOverlays();
     m_previewHelper->setImage(image);
     restoreReferencePositionRoi();

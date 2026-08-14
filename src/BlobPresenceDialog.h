@@ -23,6 +23,7 @@ class QButtonGroup;
 class QPushButton;
 class QResizeEvent;
 class FrameViewHelper;
+struct ReferenceFrameSetSnapshot;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -102,10 +103,10 @@ private:
     void updateBottomButtons();
     void rerunImportedTest();
     void runBlobPresenceOnFrame(const cv::Mat &frame,
-                                const cv::Mat &referenceImage,
                                 const QString &imageTitle,
                                 const QString &emptyFrameMessage,
-                                bool referenceTest = false);
+                                bool referenceTest = false,
+                                const ReferenceFrameSetSnapshot *referenceSet = nullptr);
     void displayBlobPresenceResult(const ToolResult &result);
     void displayBlobPresenceError(const QString &status, const QString &message);
     void setViewerStatusText(const QString &displayText, const QString &tooltipText = QString());

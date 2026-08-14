@@ -25,6 +25,7 @@ class QPushButton;
 class QResizeEvent;
 class QTimer;
 class QToolButton;
+struct ReferenceFrameSetSnapshot;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -130,7 +131,8 @@ private:
     // 统一的检测发射入口：处理 busy 排队、回显标题、generation 标记与异步执行。
     void launchDetection(const cv::Mat &frame,
                          const FrameInputMetadata &metadata,
-                         bool referenceSource);
+                         bool referenceSource,
+                         const ReferenceFrameSetSnapshot *referenceSet = nullptr);
     void updateBottomButtons();                  // 按编辑/连续/暂停测试态刷新底部动作按钮。
     void fitPreview();                           // 将预览图适配到当前画布尺寸。
     void showPreviewImage();                     // 显示基准图或默认预览图，并同步 ROI overlay。

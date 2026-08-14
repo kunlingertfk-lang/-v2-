@@ -147,7 +147,6 @@ void OutputDialog::setSchemeTools(const QVector<ToolConfig> &configs,
         normalized.toolType = config.toolType;
         m_referencePreviewSnapshots.insert(config.toolId, normalized);
     }
-    commitOutputStateToScheme(false);
 }
 
 void OutputDialog::connectNavigation()

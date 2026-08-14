@@ -41,7 +41,9 @@ inline bool exactSupportedBankVersion(const QJsonValue &value,
     const double number = value.toDouble();
     if (number != static_cast<double>(TemplateLocationConfig::LegacyParamsVersion)
             && number != static_cast<double>(
-                TemplateLocationConfig::ModelBankParamsVersion)) {
+                TemplateLocationConfig::ModelBankParamsVersion)
+            && number != static_cast<double>(
+                TemplateLocationConfig::CompositeBankParamsVersion)) {
         return false;
     }
     if (version)
@@ -158,11 +160,10 @@ inline ReferenceTemplateLocationConfigResult fromJson(
     if (!hasLocator)
         return fromLegacyConfig(legacyReference);
 
-    int encodedReferenceVersion = 0;
-    if (!exactSupportedBankVersion(json.value(QStringLiteral("version")),
-                                   &encodedReferenceVersion)
-            || (encodedReferenceVersion != ModelBankEnvelopeVersion
-                && encodedReferenceVersion != 5)) {
+    if (!json.value(QStringLiteral("version")).isDouble()
+            || (json.value(QStringLiteral("version")).toDouble()
+                != static_cast<double>(ModelBankEnvelopeVersion)
+                && json.value(QStringLiteral("version")).toDouble() != 5.0)) {
         return error(
                     QStringLiteral("unsupported_reference_config_version"),
                     QStringLiteral("The embedded locator requires a supported reference-position-correction envelope version."));
@@ -299,6 +300,18 @@ inline bool validateFrozenPose(const QJsonObject &pose,
         return fail(QStringLiteral("Template '%1' has no frozen model signature.")
                     .arg(templateId));
     }
+    if (bank.version == TemplateLocationConfig::CompositeBankParamsVersion) {
+        const TemplateLocationTemplateConfig *item =
+                TemplateLocationConfig::findTemplate(bank, templateId);
+        const QString expectedBaseId = item
+                ? item->sourceBaseId.trimmed() : QString();
+        const QString frozenBaseId = pose.value(
+                    QStringLiteral("locatorBaseId")).toString().trimmed();
+        if (expectedBaseId.isEmpty() || frozenBaseId != expectedBaseId) {
+            return fail(QStringLiteral("Template '%1' is paired with a pose for a different reference Base ID.")
+                        .arg(templateId));
+        }
+    }
     double x = 0.0;
     double y = 0.0;
     double angle = 0.0;
@@ -317,7 +330,20 @@ inline bool validateFrozenPose(const QJsonObject &pose,
     }
     const QString originMode = pose.value(
                 QStringLiteral("locatorOriginMode")).toString().trimmed();
-    if (originMode != bank.originMode
+    const TemplateLocationBaseBindingConfig *baseBinding = nullptr;
+    if (bank.version == TemplateLocationConfig::CompositeBankParamsVersion) {
+        const TemplateLocationTemplateConfig *item =
+                TemplateLocationConfig::findTemplate(bank, templateId);
+        if (item)
+            baseBinding = TemplateLocationConfig::findBaseBinding(
+                        bank, item->sourceBaseId);
+    }
+    const QString expectedOriginMode = baseBinding
+            ? baseBinding->originMode : bank.originMode;
+    const QPointF expectedCustomOrigin = baseBinding
+            ? baseBinding->customOriginNormalized
+            : bank.customOriginNormalized;
+    if (originMode != expectedOriginMode
             || (originMode != QStringLiteral("centroid")
                 && originMode != QStringLiteral("custom"))) {
         return fail(QStringLiteral("Template '%1' has a frozen origin mode that no longer matches the locator.")
@@ -328,8 +354,8 @@ inline bool validateFrozenPose(const QJsonObject &pose,
         if (!normalizedPoint(pose.value(
                              QStringLiteral("locatorCustomOriginNormalized")),
                              &frozenOrigin)
-                || std::abs(frozenOrigin.x() - bank.customOriginNormalized.x()) > 1e-9
-                || std::abs(frozenOrigin.y() - bank.customOriginNormalized.y()) > 1e-9) {
+                || std::abs(frozenOrigin.x() - expectedCustomOrigin.x()) > 1e-9
+                || std::abs(frozenOrigin.y() - expectedCustomOrigin.y()) > 1e-9) {
             return fail(QStringLiteral("Template '%1' has a frozen custom origin that no longer matches the locator.")
                         .arg(templateId));
         }

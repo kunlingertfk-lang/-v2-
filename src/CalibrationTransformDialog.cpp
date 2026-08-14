@@ -190,6 +190,11 @@ QString fingerprintFieldText(const QString &field)
         return QObject::tr("模板模型");
     if (field == QStringLiteral("referenceImageSignature"))
         return QObject::tr("基准图");
+    if (field == QStringLiteral("referenceDependencyContract")
+            || field == QStringLiteral("referenceBaseIds")
+            || field == QStringLiteral("referenceContentRevisions")) {
+        return QObject::tr("基准图 Base 依赖");
+    }
     if (field == QStringLiteral("coordinateSourceConfigSignature"))
         return QObject::tr("模板配置");
     return field.isEmpty() ? QObject::tr("来源信息") : field;
@@ -198,20 +203,9 @@ QString fingerprintFieldText(const QString &field)
 // 校验来源指纹字段完整且自签名可重算一致。
 bool completeSignedFingerprint(const QJsonObject &fingerprint)
 {
-    const QString signature = fingerprint
-            .value(QStringLiteral("coordinateSourceSignature")).toString().trimmed();
-    return !signature.isEmpty()
-            && signature == CalibrationSourceFingerprint::coordinateSourceSignature(
-                fingerprint)
-            && !fingerprint.value(QStringLiteral("producerId")).toString().trimmed().isEmpty()
-            && fingerprint.value(QStringLiteral("producerType")).toString()
-               == toolTypeToString(ToolType::TemplateLocation)
-            && !fingerprint.value(QStringLiteral("outputContract")).toObject().isEmpty()
-            && !fingerprint.value(QStringLiteral("originMode")).toString().trimmed().isEmpty()
-            && !fingerprint.value(QStringLiteral("customOriginNormalized")).toObject().isEmpty()
-            && !fingerprint.value(QStringLiteral("modelSignature")).toString().trimmed().isEmpty()
-            && !fingerprint.value(QStringLiteral("coordinateSourceConfigSignature"))
-                .toString().trimmed().isEmpty();
+    return fingerprint.value(QStringLiteral("producerType")).toString()
+            == toolTypeToString(ToolType::TemplateLocation)
+            && CalibrationSourceFingerprint::isComplete(fingerprint);
 }
 
 } // namespace
@@ -1350,9 +1344,73 @@ CalibrationTransformDialog::evaluateCalibrationSource() const
         const QString currentConfigSignature =
                 CalibrationSourceFingerprint::coordinateSourceConfigSignature(
                     effectiveTemplateConfig);
+        const CalibrationSourceFingerprint::TemplateOriginIdentity
+                originIdentity =
+                CalibrationSourceFingerprint::templateOriginIdentity(
+                    effectiveTemplateConfig,
+                    expected.value(QStringLiteral("selectedBaseId"))
+                    .toString());
+        if (!originIdentity.valid) {
+            const bool historicalV6Identity = originIdentity.errorCode
+                    == QStringLiteral("selected_base_identity_missing")
+                    && expected.value(QStringLiteral(
+                        "referenceDependencyContract"))
+                       .toString().trimmed().isEmpty();
+            validation.state = historicalV6Identity
+                    ? SourceValidationState::Unverifiable
+                    : SourceValidationState::Stale;
+            validation.message = tr("无法按已选 Base 核对模板定位原点：%1")
+                    .arg(originIdentity.errorMessage);
+            return validation;
+        }
+        const ReferenceFrameSetSnapshot referenceSet =
+                ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+        const CalibrationSourceFingerprint::TemplateReferenceDependency
+                referenceDependency =
+                CalibrationSourceFingerprint::templateReferenceDependency(
+                    effectiveTemplateConfig,
+                    referenceSet.frames,
+                    referenceSet.contentRevisions,
+                    referenceSet.primaryBaseId,
+                    referenceSet.primary.frame,
+                    expected);
+        if (!referenceDependency.valid) {
+            validation.state = SourceValidationState::Stale;
+            validation.message = tr("模板定位依赖的基准图不可用：%1")
+                    .arg(referenceDependency.errorMessage);
+            return validation;
+        }
         const QString currentReferenceSignature =
-                CalibrationSourceFingerprint::imageSignature(
-                    ReferenceImageProvider::instance().referenceFrame());
+                referenceDependency.signature;
+        if (referenceDependency.legacyCompositePrimarySignature) {
+            if (currentConfigSignature != expected.value(
+                    QStringLiteral("coordinateSourceConfigSignature"))
+                    .toString()) {
+                validation.state = SourceValidationState::Stale;
+                validation.message = tr("模板定位配置已改变");
+                return validation;
+            }
+            QString originMismatch;
+            if (!CalibrationSourceFingerprint::matchesTemplateOriginIdentity(
+                    expected, originIdentity, &originMismatch)) {
+                validation.state = SourceValidationState::Stale;
+                validation.message = originMismatch
+                        == QStringLiteral("originMode")
+                        ? tr("模板定位原点模式已改变")
+                        : tr("模板定位自定义原点已改变");
+                return validation;
+            }
+            if (currentReferenceSignature != expected.value(
+                    QStringLiteral("referenceImageSignature")).toString()) {
+                validation.state = SourceValidationState::Stale;
+                validation.message = tr("当前主 Base 与标定时不一致");
+                return validation;
+            }
+            validation.state = SourceValidationState::Unverifiable;
+            validation.message = tr("旧版 v6 仅记录了主 Base 签名，"
+                                    "无法核对非主 Base 依赖，请重新标定");
+            return validation;
+        }
         const bool expectsReferenceSignature = expected.contains(
                     QStringLiteral("referenceImageSignature"));
         const bool snapshotFresh = !cachedConfigSignature.isEmpty()
@@ -1363,20 +1421,12 @@ CalibrationTransformDialog::evaluateCalibrationSource() const
                            == currentReferenceSignature));
         if (!snapshotFresh)
             identityPayload.remove(QStringLiteral("modelSignature"));
-        const QJsonObject params = effectiveTemplateConfig.params;
-        identityPayload.insert(
-                    QStringLiteral("originMode"),
-                    params.value(QStringLiteral("originMode"))
-                    .toString(QStringLiteral("centroid")));
-        identityPayload.insert(
-                    QStringLiteral("customOriginNormalized"),
-                    CalibrationSourceFingerprint::normalizedPoint(
-                        params.value(QStringLiteral("customOriginNormalized")).toObject()));
+        CalibrationSourceFingerprint::applyTemplateOriginIdentity(
+                    originIdentity, &identityPayload);
         CalibrationSourceFingerprint::enrichTemplatePayload(
                     effectiveTemplateConfig, &identityPayload);
-        identityPayload.insert(
-                    QStringLiteral("coordinateSourceReferenceSignature"),
-                    currentReferenceSignature);
+        CalibrationSourceFingerprint::applyTemplateReferenceDependency(
+                    referenceDependency, &identityPayload);
     }
 
     const bool hasCurrentModelSignature = !identityPayload
@@ -1677,8 +1727,11 @@ void CalibrationTransformDialog::runTest()
     const ToolConfig config = toolConfig();
     ToolResult result;
     const bool useImportedFrame = m_importedTestActive;
-    const cv::Mat referenceFrame =
-            ReferenceImageProvider::instance().referenceFrame();
+    // Keep the primary compatibility image and every v6 Base binding on the
+    // same provider generation for this complete prefix-chain run.
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const cv::Mat referenceFrame = referenceSet.primary.frame;
     const cv::Mat frame = useImportedFrame
             ? m_importedTestFrame.clone() : referenceFrame.clone();
     if (!m_sharedToolEngine) {
@@ -1708,11 +1761,20 @@ void CalibrationTransformDialog::runTest()
                         frame,
                         useImportedFrame ? QStringLiteral("file")
                                          : QStringLiteral("reference")).toJson());
+        runtimeContext.insert(QStringLiteral("referenceInput"),
+                              referenceSet.primary.metadata.toJson());
         runtimeContext.insert(
                     QStringLiteral("referencePositionCorrection"),
                     PositionCorrection::referenceToJson(m_referencePositionCorrection));
         const QVector<ToolResult> results = m_sharedToolEngine->runTools(
-                    testChain, frame, referenceFrame, runtimeContext);
+                    testChain,
+                    frame,
+                    referenceFrame,
+                    runtimeContext,
+                    nullptr,
+                    referenceSet.frames,
+                    referenceSet.contentRevisions,
+                    referenceSet.primaryBaseId);
         bool found = false;
         for (auto it = results.crbegin(); it != results.crend(); ++it) {
             if (it->toolId != config.toolId)

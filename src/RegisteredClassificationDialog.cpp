@@ -409,16 +409,6 @@ void RegisteredClassificationDialog::finishConfiguration()
 
 void RegisteredClassificationDialog::runReferenceTest()
 {
-    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
-    if (frame.empty()) {
-        m_referenceTestMode = false;
-        refreshUiState();
-        setViewerStatusText(tr("注册分类: no_reference_image | 请先设置基准图"));
-        if (m_previewHelper)
-            m_previewHelper->clearToolOverlays();
-        return;
-    }
-
     m_referenceTestMode = !m_referenceTestMode;
     refreshUiState();
     if (m_referenceTestMode)
@@ -434,7 +424,9 @@ void RegisteredClassificationDialog::runReferenceTest()
 
 void RegisteredClassificationDialog::executeReferenceTest()
 {
-    const cv::Mat frame = ReferenceImageProvider::instance().referenceFrame();
+    const ReferenceFrameSetSnapshot referenceSet =
+            ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const cv::Mat frame = referenceSet.primary.frame;
     if (frame.empty()) {
         m_referenceTestMode = false;
         refreshUiState();
@@ -444,7 +436,8 @@ void RegisteredClassificationDialog::executeReferenceTest()
         return;
     }
 
-    const QImage image = ReferenceImageProvider::instance().referenceImage();
+    const QImage image = MatImageConverter::matToDisplayImage(
+                frame, QStringLiteral("RegisteredClassificationDialog"));
     if (!image.isNull() && m_previewHelper) {
         m_viewerTitleLabel->setText(tr("基准图"));
         m_previewHelper->setImage(image);
@@ -454,8 +447,8 @@ void RegisteredClassificationDialog::executeReferenceTest()
     const ToolConfig config = toToolConfig();
     const ToolResult result = runOnFrame(
                 frame,
-                frame,
-                QStringLiteral("reference"));
+                QStringLiteral("reference"),
+                &referenceSet);
     m_referencePreviewSnapshot =
             makeReferenceToolPreviewSnapshot(config, result, effectiveRoiNormalized());
     displayResult(result);
@@ -489,7 +482,6 @@ void RegisteredClassificationDialog::runTest()
 
     const ToolResult result = runOnFrame(
                 frame,
-                ReferenceImageProvider::instance().referenceFrame(),
                 m_importedTestActive
                 ? QStringLiteral("file")
                 : QStringLiteral("camera"));
@@ -536,9 +528,15 @@ void RegisteredClassificationDialog::exitTestMode()
 
 ToolResult RegisteredClassificationDialog::runOnFrame(
         const cv::Mat &frame,
-        const cv::Mat &referenceImage,
-        const QString &inputSource)
+        const QString &inputSource,
+        const ReferenceFrameSetSnapshot *capturedReferenceSet)
 {
+    const ReferenceFrameSetSnapshot ownedReferenceSet = capturedReferenceSet
+            ? ReferenceFrameSetSnapshot()
+            : ReferenceImageProvider::instance().referenceFrameSetSnapshot();
+    const ReferenceFrameSetSnapshot &referenceSet = capturedReferenceSet
+            ? *capturedReferenceSet : ownedReferenceSet;
+    const cv::Mat referenceImage = referenceSet.primary.frame;
     ToolConfig config = toToolConfig();
     config.enabled = true;
     const QString frameId = QStringLiteral("registered-classification-dialog-%1")
@@ -548,6 +546,8 @@ ToolResult RegisteredClassificationDialog::runOnFrame(
     runtimeContext.insert(
                 QStringLiteral("input"),
                 FrameInputMetadata::fromMat(frame, inputSource).toJson());
+    runtimeContext.insert(QStringLiteral("referenceInput"),
+                          referenceSet.primary.metadata.toJson());
     runtimeContext.insert(
                 QStringLiteral("referencePositionCorrection"),
                 PositionCorrection::referenceToJson(
@@ -589,7 +589,10 @@ ToolResult RegisteredClassificationDialog::runOnFrame(
                     frame.clone(),
                     referenceImage.empty() ? cv::Mat() : referenceImage.clone(),
                     runtimeContext,
-                    &referenceCorrectionResult);
+                    &referenceCorrectionResult,
+                    referenceSet.frames,
+                    referenceSet.contentRevisions,
+                    referenceSet.primaryBaseId);
         for (auto it = results.crbegin(); it != results.crend(); ++it) {
             if (it->toolId == config.toolId)
                 return *it;
@@ -608,6 +611,9 @@ ToolResult RegisteredClassificationDialog::runOnFrame(
     request.image = frame.clone();
     request.referenceImage =
             referenceImage.empty() ? cv::Mat() : referenceImage.clone();
+    request.referenceImages = referenceSet.frames;
+    request.referenceImageRevisions = referenceSet.contentRevisions;
+    request.primaryReferenceBaseId = referenceSet.primaryBaseId;
     request.runtimeContext = runtimeContext;
     return m_testToolEngine.runTool(request);
 }
